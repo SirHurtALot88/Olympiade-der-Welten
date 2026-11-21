@@ -1,0 +1,149 @@
+/*
+ * DRAFT BEENDET (21.11.). Vorlage: public/mockups/draft-ergebnis-modern-21-11.html. Die Regeln unter `.er` sind aus dem Mockup
+ * übernommen (1rem = var(--u), Selektoren unter `.drf .er` eingegrenzt, `.gz` heißt hier `.erz`, damit es nicht mit der
+ * Draft-Seite kollidiert). Am Ende die Handarbeit für Klassenfarbe/Icons, Liga-Balken und Seitenraster.
+ */
+.drf .er { --blau: #7fb0ff; grid-template-columns: minmax(0, 1fr) calc(31 * var(--u)) calc(24 * var(--u)); }
+.drf .er .seg { display: inline-flex; border: 1px solid var(--linie-2); border-radius: calc(.4 * var(--u)); overflow: hidden; height: calc(2.2 * var(--u)); flex: none; }
+.drf .er .seg button { padding: 0 calc(.95 * var(--u)); font-size: calc(.95 * var(--u)); font-weight: 600; color: var(--leise); display: flex; align-items: center; gap: calc(.4 * var(--u)); }
+.drf .er .seg button + button { border-left: 1px solid var(--linie); }
+.drf .er .seg button.an { background: var(--gold); color: #17120a; font-weight: 700; }
+.drf .er .seg button:not(.an):hover { background: var(--flaeche-2); color: var(--tinte); }
+.drf .er .dst { display: flex; align-items: center; justify-content: flex-end; }
+/* Tabellen (Designsystem-Regel 21.11.: jede Tabelle sortierbar, Klick auf den Kopf, zweiter Klick dreht) */
+.drf .er table.tb { width:100%;border-collapse:collapse;table-layout:fixed }
+.drf .er .tb th { position:sticky;top:0;z-index:2;height:calc(1.9 * var(--u));padding:0 calc(.4 * var(--u));background:#0f141d;border-bottom:1px solid var(--linie-2);font-size:calc(.68 * var(--u));letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--leise);text-align:left;white-space:nowrap;cursor:pointer;user-select:none }
+.drf .er .tb th:hover { color:var(--creme) }
+.drf .er .tb th.re, .drf .er .tb td.re { text-align:right }
+.drf .er .tb th.mi, .drf .er .tb td.mi { text-align:center }
+.drf .er .tb th.so { color:var(--gold) }
+.drf .er .tb th.so::after { content:"▾";margin-left:calc(.2 * var(--u));font-size:calc(.8 * var(--u));letter-spacing:0 }
+.drf .er .tb th.so.auf::after { content:"▴" }
+.drf .er .tb td { padding:0 calc(.4 * var(--u));border-bottom:1px solid rgba(244,230,196,.07);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:calc(.98 * var(--u)) }
+.drf .er .tb tbody tr:hover { background:rgba(255,255,255,.035) }
+.drf .er .tb tr.ich { background:linear-gradient(90deg,rgba(242,160,61,.16),rgba(242,160,61,.03)) }
+.drf .er .tb tfoot td { background:#0f141d;border-top:1px solid var(--linie-2);border-bottom:0;color:var(--creme);font-weight:700 }
+.drf .er .por { width:calc(2.1 * var(--u));height:calc(2.1 * var(--u));border-radius:calc(.35 * var(--u));object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111 }
+.drf .er .nm { display:flex;align-items:center;gap:calc(.5 * var(--u));min-width:0 }
+.drf .er .nm div { min-width:0;line-height:1.08 }
+.drf .er .nm b { display:block;font:400 calc(1.02 * var(--u))/1.1 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis }
+.drf .er .nm small { display:block;font-size:calc(.76 * var(--u));color:var(--leise);overflow:hidden;text-overflow:ellipsis }
+/* Notenstufen */
+/* ===================== SEITE DRAFT-ERGEBNIS ===================== */
+.drf .er .nm b { font-size:calc(.98 * var(--u)) }
+.drf .er .tkader td { height:var(--zh,calc(3.1 * var(--u))) }
+.drf .er .pick { color:var(--stumm);font-weight:700;font-size:calc(.9 * var(--u)) }
+.drf .er .pick b { color:var(--creme);font-weight:700 }
+.drf .er .ovr { font-size:calc(1.25 * var(--u));font-weight:700;color:var(--creme) }
+.drf .er .dz { display:inline-flex;align-items:baseline;gap:calc(.22 * var(--u));height:calc(1.35 * var(--u));padding:0 calc(.32 * var(--u));margin-right:calc(.18 * var(--u));border-radius:calc(.2 * var(--u));font-size:calc(.82 * var(--u));background:rgba(255,255,255,.06);color:var(--leise);border-left:2px solid var(--stumm) }
+.drf .er .dz b { color:var(--tinte);font-weight:700 }
+.drf .er .dz.h { border-left-color:var(--gut);background:rgba(98,211,148,.1) }
+.drf .er .dz.h b { color:var(--gut) }
+.drf .er .dz.m { border-left-color:var(--blau);background:rgba(127,176,255,.09) }
+.drf .er .vt { line-height:1.05 }
+.drf .er .vt b { font-weight:700 }
+.drf .er .vt small { display:block;font-size:calc(.74 * var(--u));color:var(--leise) }
+/* Kaderprofil unter der Tabelle */
+.drf .er .prof { flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,.9fr);grid-template-rows:auto auto;align-content:space-evenly;gap:calc(.7 * var(--u)) calc(1.3 * var(--u));padding:calc(.6 * var(--u)) calc(.9 * var(--u)) calc(.7 * var(--u));border-top:1px solid var(--linie-2);background:#0a0e15 }
+.drf .er .abd { grid-column:1/4 }
+.drf .er .abz { display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:calc(.2 * var(--u)) }
+.drf .er .abz div { text-align:center;line-height:1.1;cursor:pointer }
+.drf .er .abz b { display:block;height:calc(1.5 * var(--u));line-height:calc(1.5 * var(--u));border-radius:calc(.2 * var(--u));font-size:calc(.95 * var(--u));font-weight:700;color:#0b0e14 }
+.drf .er .abz small { display:block;font-size:calc(.66 * var(--u));color:var(--leise);margin-top:calc(.15 * var(--u));white-space:nowrap;overflow:hidden }
+.drf .er .abz .n0 b { background:var(--warn) }
+.drf .er .abz .n1 b { background:#c98a6a }
+.drf .er .abz .n2 b { background:#7fb0ff }
+.drf .er .abz .n3 b { background:#62d394 }
+.drf .er .vtz { display:grid;grid-template-columns:calc(3.4 * var(--u)) minmax(0,1fr) auto;gap:calc(.5 * var(--u));align-items:center;font-size:calc(.9 * var(--u));height:calc(1.5 * var(--u)) }
+.drf .er .vtz i { height:calc(.5 * var(--u));background:rgba(255,255,255,.08);transform:skewX(-14deg);display:block }
+.drf .er .vtz i b { display:block;height:100%;background:var(--blau) }
+.drf .er .vtz em { font-style:normal;color:var(--leise);font-size:calc(.8 * var(--u)) }
+.drf .er .prof h3 { margin:0 0 calc(.45 * var(--u));font-size:calc(.7 * var(--u));letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700 }
+.drf .er .axz { display:grid;grid-template-columns:calc(2.4 * var(--u)) minmax(0,1fr) calc(2 * var(--u)) calc(6.4 * var(--u));gap:calc(.5 * var(--u));align-items:center;font-size:calc(.92 * var(--u));height:calc(1.5 * var(--u)) }
+.drf .er .axz i { position:relative;height:calc(.5 * var(--u));background:rgba(255,255,255,.08);transform:skewX(-14deg);display:block }
+.drf .er .axz i b { display:block;height:100%;background:var(--heim) }
+.drf .er .axz i u { position:absolute;top:calc(-.2 * var(--u));bottom:calc(-.2 * var(--u));width:2px;background:var(--creme) }
+.drf .er .axz em { font-style:normal;color:var(--leise);font-size:calc(.8 * var(--u));text-align:right }
+.drf .er .bed { display:flex;flex-direction:column;gap:calc(.3 * var(--u));font-size:calc(.9 * var(--u)) }
+.drf .er .bed div { display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:calc(.6 * var(--u));align-items:baseline;padding:calc(.2 * var(--u)) calc(.5 * var(--u));border:1px solid var(--linie);border-radius:calc(.35 * var(--u));background:var(--flaeche-2) }
+.drf .er .bed div span { color:var(--tinte) }
+.drf .er .bed div em { font-style:normal;color:var(--leise);font-size:calc(.8 * var(--u)) }
+.drf .er .bed div b { color:var(--warn) }
+/* Kaderstaerke (unveraendert aus der App: lv3, rl16, drl-dz) */
+.drf .er .b6 { flex:1;min-height:0;display:flex;flex-direction:column;gap:calc(.45 * var(--u)) }
+.drf .er .b6 .gk { display:flex;gap:calc(.4 * var(--u));align-items:baseline }
+.drf .er .b6 .gk b { color:var(--gold);font-size:calc(.9 * var(--u));letter-spacing:.06em }
+.drf .er .b6l { flex:1;min-height:0;display:grid;grid-template-rows:repeat(6,minmax(0,1fr));gap:calc(.3 * var(--u));max-height:calc(21 * var(--u)) }
+.drf .er .b6z { display:grid;grid-template-columns:calc(1.4 * var(--u)) calc(2.3 * var(--u)) minmax(0,calc(9 * var(--u))) minmax(0,1fr) calc(2.4 * var(--u));gap:calc(.6 * var(--u));align-items:center;padding:0 calc(.6 * var(--u));border:1px solid var(--linie);border-radius:calc(.4 * var(--u));background:var(--flaeche-2) }
+.drf .er .b6z>span { color:var(--stumm);font-weight:700 }
+.drf .er .b6z img { width:calc(2.1 * var(--u));height:calc(2.1 * var(--u)) }
+.drf .er .b6z i { height:calc(.55 * var(--u));background:rgba(255,255,255,.08);transform:skewX(-14deg);display:block }
+.drf .er .b6z i b { display:block;height:100%;background:var(--blau) }
+.drf .er .b6z.h i b { background:var(--gut) }
+.drf .er .b6z.n i b { background:var(--stumm) }
+.drf .er .b6z strong { text-align:right;font-size:calc(1.2 * var(--u));color:var(--creme) }
+/* Kasse */
+.drf .er .ks { display:flex;flex-direction:column;justify-content:space-between;gap:calc(.62 * var(--u));padding:calc(.75 * var(--u)) calc(.9 * var(--u));flex:1;min-height:0 }
+.drf .er .blk { flex:none }
+.drf .er .blk>.gk { display:flex;justify-content:space-between;margin-bottom:calc(.3 * var(--u)) }
+.drf .er .blk>.gk b { color:var(--creme);letter-spacing:.04em }
+.drf .er .gross { display:flex;align-items:baseline;gap:calc(.5 * var(--u)) }
+.drf .er .gross strong { font-size:calc(2.5 * var(--u));line-height:.95;color:var(--creme) }
+.drf .er .gross small { font-size:calc(.85 * var(--u));color:var(--leise) }
+.drf .er .stp { display:flex;height:calc(.85 * var(--u));margin-top:calc(.45 * var(--u));transform:skewX(-14deg);overflow:hidden;background:rgba(255,255,255,.08) }
+.drf .er .stp i { display:block;height:100% }
+.drf .er .stp i.a { background:var(--heim) }
+.drf .er .stp i.k { background:var(--gut) }
+.drf .er .stp i.g { background:var(--blau) }
+.drf .er .stp i.l { background:rgba(255,255,255,.1) }
+.drf .er .erl { display:flex;justify-content:space-between;font-size:calc(.8 * var(--u));color:var(--leise);margin-top:calc(.25 * var(--u)) }
+.drf .er .erl b { color:var(--tinte) }
+.drf .er .erz { display:flex;justify-content:space-between;align-items:baseline;gap:calc(.5 * var(--u));padding:calc(.2 * var(--u)) 0;border-top:1px solid rgba(244,230,196,.07);font-size:calc(.94 * var(--u));white-space:nowrap }
+.drf .er .erz span { color:var(--leise);overflow:hidden;text-overflow:ellipsis }
+.drf .er .erz span small { font-size:calc(.78 * var(--u));color:var(--stumm);margin-left:calc(.3 * var(--u)) }
+.drf .er .erz b { font-weight:700 }
+.drf .er .frei { display:flex;justify-content:space-between;align-items:center;margin-top:calc(.35 * var(--u));padding:calc(.4 * var(--u)) calc(.65 * var(--u));border:1px solid rgba(98,211,148,.5);border-radius:calc(.4 * var(--u));background:rgba(98,211,148,.09) }
+.drf .er .frei span { font-size:calc(.72 * var(--u));letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--gut) }
+.drf .er .frei small { display:block;letter-spacing:0;text-transform:none;font-weight:500;color:var(--leise);font-size:calc(.78 * var(--u)) }
+.drf .er .frei strong { font-size:calc(1.7 * var(--u));color:var(--gut);line-height:1 }
+.drf .er .pl { display:grid;grid-template-columns:repeat(14,1fr);gap:calc(.22 * var(--u)) }
+.drf .er .pl i { height:calc(1.35 * var(--u));border-radius:calc(.2 * var(--u));border:1px solid var(--linie-2);background:transparent }
+.drf .er .pl i.p { background:var(--gut);border-color:var(--gut) }
+.drf .er .pl i.o { background:var(--blau);border-color:var(--blau) }
+.drf .er .pl i:nth-child(8) { margin-right:calc(.3 * var(--u)) }
+.drf .er .erv { display:grid;grid-template-columns:calc(5.6 * var(--u)) minmax(0,1fr) calc(2.3 * var(--u)) calc(4.6 * var(--u));gap:calc(.5 * var(--u));align-items:center;font-size:calc(.9 * var(--u));height:calc(1.5 * var(--u)) }
+.drf .er .erv span { color:var(--tinte) }
+.drf .er .erv strong { text-align:right;color:var(--creme) }
+.drf .er .erv em { font-style:normal;color:var(--leise);font-size:calc(.8 * var(--u));text-align:right }
+.drf .er .akt { display:flex;gap:calc(.5 * var(--u));justify-content:flex-end;align-items:center;flex:none }
+/* Liga-Tabelle */
+.drf .er .tliga td { height:calc(2.72 * var(--u)) }
+.drf .er .wp { width:calc(1.9 * var(--u));height:calc(1.9 * var(--u));border-radius:calc(.3 * var(--u));object-fit:cover;border:1px solid var(--linie-2);flex:none }
+.drf .er .lg { font-size:calc(.7 * var(--u));font-weight:700;padding:calc(.05 * var(--u)) calc(.35 * var(--u));border-radius:calc(.2 * var(--u));background:rgba(69,176,201,.14);color:var(--gast);border:1px solid rgba(69,176,201,.5) }
+.drf .er .lg.e { background:rgba(242,160,61,.18);color:var(--heim);border-color:rgba(242,160,61,.5) }
+/* ===================== Handarbeit ===================== */
+.drf .er .tbw { flex: 1; min-height: 0; overflow: auto; }
+.drf .er .pkader .tbw { flex: none; overflow: visible; }
+.drf .er .vgb { display: grid; gap: calc(.1 * var(--u)); height: calc(.7 * var(--u)); }
+.drf .er .vgb i { background: rgba(255,255,255,.08); transform: skewX(-14deg); }
+.drf .er .vgb i.an { background: var(--heim); box-shadow: 0 0 calc(.4 * var(--u)) var(--heim); }
+.drf .er .drl-dz { cursor: pointer; }
+.drf .er .drl-dz:hover span { color: var(--gold); }
+.drf .er .drl-dz.wahl span { color: var(--gold); font-weight: 700; }
+.drf .er .b6l { flex: 1; min-height: 0; display: grid; grid-template-rows: repeat(6, minmax(0, 1fr)); gap: calc(.3 * var(--u)); max-height: calc(21 * var(--u)); }
+.drf .er .pliga, .drf .er .pkader { min-width: 0; }
+.drf .er .nm b.drf-pl, .drf .er .por.drf-pl { cursor: pointer; }
+.drf .er .nm b.drf-pl:hover { text-decoration: underline dotted rgba(244,230,196,.5); }
+/* Klasse in Klassenfarbe mit Icon, Rasse mit Icon (statt „Charger · Dragon“ als Text) */
+.drf .er .klr { display: flex; align-items: center; gap: calc(.5 * var(--u)); font-size: calc(.76 * var(--u)); line-height: 1; margin-top: calc(.12 * var(--u)); }
+.drf .er .klr .class-icon-chip.kl, .drf .er .klr .race-icon-chip.ra { display: inline-flex; align-items: center; gap: calc(.25 * var(--u)); padding: 0; background: none; border: 0; box-shadow: none; min-height: 0; }
+.drf .er .klr .class-icon, .drf .er .klr .race-icon { width: calc(1.05 * var(--u)); height: calc(1.05 * var(--u)); flex: 0 0 calc(1.05 * var(--u)); }
+.drf .er .klr .class-icon-label { font-size: calc(.76 * var(--u)); font-weight: 700; color: var(--class-label-text, var(--leise)); }
+.drf .er .klr .race-icon-label { font-size: calc(.76 * var(--u)); font-weight: 600; color: var(--leise); }
+.drf .er .b6z .klr { margin-top: calc(.1 * var(--u)); }
+.drf .er .drl-dz { grid-template-columns: minmax(0, 2.4fr) minmax(0, .8fr) auto auto; }
+.drf .er .akt { margin-top: 0; }
+.drf .er .prof h3 { letter-spacing: .08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drf .er .pk .seg { height: calc(2 * var(--u)); }
+.drf .er .pk .seg button { height: 100%; line-height: 1; }
+.drf .er .seg button { line-height: 1; height: 100%; }

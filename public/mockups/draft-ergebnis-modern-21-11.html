@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Draft-Ergebnis – modern (Mockup 21.11.)</title>
+<!--
+  DRAFT-ERGEBNISSEITE „DRAFT BEENDET“ (Fable, 21.11.). Erklaerung: draft-ergebnis-modern-21-11.md
+  Ersetzt die Ansicht `Ergebnis` in app/foundation/draft-modern/DraftAnsichten.tsx. Mitte „Kaderstaerke“ ist unveraendert uebernommen.
+  ECHT: Spieler (Name, Klasse, Rasse, Portrait, Gesamt, Marktwert = Abloese, Gehaltsforderung, vier Achsen, 20 Eignungen) aus
+        data/generated/oly-player-stats.json; Teams, Wappen, Liga, Startbudget, Finanzwert aus dem Draft-Mockup vom 18.11.;
+        Formeln Ruecklage-Ziel / Gehaltspuffer / Freigabe aus finanzkonzept-v2-budgets-18-11.md.
+  ERFUNDEN: Pick-Nummern, Vertragslaufzeiten, die anderen 31 Teams (Staerke, Abloesen, Gehalt, Kasse), Gehaltstopf, Freigabe-Quote.
+  URL: ?ansicht=team|liga   ?still=1 (ohne Mockup-Leiste)
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a; --blau:#7fb0ff;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+/* Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px); die Wurzel waechst mit Breite UND Hoehe (2560 x 1440 = 21,3 px). */
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,th:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)} .acht{color:var(--acht)}
+.sp{flex:1}
+.demo{height:2.25rem;display:flex;align-items:center;gap:.7rem;padding:0 .9rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .55rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+.demo i.tr{width:1px;height:1.1rem;background:#2a3344;flex:none}
+body.still .demo{display:none}
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+/* Icon-Schiene */
+.railplatz{position:relative;z-index:60}
+.rail{position:absolute;left:0;top:0;bottom:0;width:4rem;display:flex;flex-direction:column;gap:.12rem;padding:.6rem;background:#080b11;border-right:1px solid var(--linie);overflow:hidden;transition:width .16s ease,box-shadow .16s ease}
+.rail:hover{width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.6);border-right-color:var(--linie-2)}
+.rail .kopf{display:flex;align-items:center;gap:.7rem;margin-bottom:.35rem;flex:none;white-space:nowrap}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--heim);flex:none}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail .wer{opacity:0;transition:opacity .16s;line-height:1.1}
+.rail:hover .wer{opacity:1}
+.rail .wer b{display:block;font:400 1.05rem/1.1 var(--haus);color:#fff}
+.rail .wer small{font-size:.8rem;color:var(--leise)}
+.rail .grp{height:1rem;margin-top:.25rem;padding-left:.2rem;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--stumm);font-weight:700;white-space:nowrap;opacity:0;transition:opacity .16s}
+.rail:hover .grp{opacity:1}
+.rail a{position:relative;height:2.55rem;border-radius:.55rem;display:flex;align-items:center;gap:.85rem;padding-left:.72rem;font-size:1.25rem;color:var(--stumm);white-space:nowrap;flex:none}
+.rail a span.n{font:400 1.06rem/1 var(--haus);color:inherit;opacity:0;transition:opacity .16s}
+.rail:hover a span.n{opacity:1}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.04));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.5rem;bottom:.5rem;width:.19rem;border-radius:0 2px 2px 0;background:var(--gold);box-shadow:0 0 .7rem rgba(240,195,90,.7)}
+.rail .zahl{position:absolute;left:1.7rem;top:.1rem;min-width:1rem;height:1rem;border-radius:.5rem;background:var(--warn);color:#fff;font:700 .69rem/1rem var(--zahl);text-align:center;padding:0 .2rem}
+.rail .luecke{flex:1}
+.rechts{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:4.5rem minmax(0,1fr);min-width:0;min-height:0}
+/* Regieband */
+.band{position:relative;z-index:40;display:flex;align-items:center;gap:.9rem;height:4.5rem;padding:0 1rem 0 1.25rem;border-bottom:1px solid var(--linie);white-space:nowrap;background:linear-gradient(90deg,#0a0d13 0%,#101622 45%,#0b0e15 100%)}
+.ort{flex:none;min-width:0}
+.ort em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);height:1rem}
+.ort em span{color:var(--stumm)}
+.ort h1{margin:.1rem 0 0;font:400 1.95rem/1.05 var(--haus);color:#fff}
+.kpis{display:flex;gap:.45rem;min-width:0}
+.kpi{min-width:6.6rem;padding:.38rem 1.05rem .42rem 1.15rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.7rem 0,100% 0,calc(100% - .7rem) 100%,0 100%);line-height:1.05}
+.kpi span{display:block;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.kpi strong{font-size:1.55rem;font-weight:700;color:var(--creme)}
+.kpi strong small{font-size:.8rem;font-weight:500;color:var(--leise)}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.4rem;overflow:hidden;height:2.2rem;flex:none}
+.seg button{padding:0 .95rem;font-size:.95rem;font-weight:600;color:var(--leise);display:flex;align-items:center;gap:.4rem}
+.seg button+button{border-left:1px solid var(--linie)}
+.seg button.an{background:var(--gold);color:#17120a;font-weight:700}
+.seg button:not(.an):hover{background:var(--flaeche-2);color:var(--tinte)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:2.7rem;padding:0 1.5rem;font-size:1.05rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.haupt:hover{filter:brightness(1.08)}
+/* Panels */
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.6rem;flex:none}
+.pk h2{min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pb{padding:.7rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column}
+/* Tabellen (Designsystem-Regel 21.11.: jede Tabelle sortierbar, Klick auf den Kopf, zweiter Klick dreht) */
+table.tb{width:100%;border-collapse:collapse;table-layout:fixed}
+.tb th{position:sticky;top:0;z-index:2;height:1.9rem;padding:0 .4rem;background:#0f141d;border-bottom:1px solid var(--linie-2);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--leise);text-align:left;white-space:nowrap;cursor:pointer;user-select:none}
+.tb th:hover{color:var(--creme)}
+.tb th.re,.tb td.re{text-align:right} .tb th.mi,.tb td.mi{text-align:center}
+.tb th.so{color:var(--gold)}
+.tb th.so::after{content:"▾";margin-left:.2rem;font-size:.8rem;letter-spacing:0}
+.tb th.so.auf::after{content:"▴"}
+.tb td{padding:0 .4rem;border-bottom:1px solid rgba(244,230,196,.07);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.98rem}
+.tb tbody tr:hover{background:rgba(255,255,255,.035)}
+.tb tr.ich{background:linear-gradient(90deg,rgba(242,160,61,.16),rgba(242,160,61,.03))}
+.tb tfoot td{background:#0f141d;border-top:1px solid var(--linie-2);border-bottom:0;color:var(--creme);font-weight:700}
+.por{width:2.1rem;height:2.1rem;border-radius:.35rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
+.nm{display:flex;align-items:center;gap:.5rem;min-width:0}
+.nm div{min-width:0;line-height:1.08}
+.nm b{display:block;font:400 1.02rem/1.1 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis}
+.nm small{display:block;font-size:.76rem;color:var(--leise);overflow:hidden;text-overflow:ellipsis}
+/* Notenstufen */
+.no{display:inline-block;width:1.25rem;height:1.25rem;line-height:1.25rem;border-radius:.2rem;text-align:center;font-weight:700;font-size:.82rem;color:#0b0e14;vertical-align:middle}
+.no.S{background:#f0c35a}.no.A{background:#62d394}.no.B{background:#8fd0a8}.no.C{background:#7fb0ff}.no.D{background:#9aa7ba}.no.E{background:#c98a6a}.no.F{background:#ff6058}
+.ax{display:inline-flex;align-items:center;gap:.3rem}
+.ax b{font-weight:600;min-width:1.2rem;text-align:right}
+.rl16{display:grid;gap:.1rem;height:.7rem}
+.rl16 i{background:rgba(255,255,255,.08);transform:skewX(-14deg)}
+.rl16 i.o{background:rgba(98,211,148,.22)} .rl16 i.u{background:rgba(255,96,88,.2)}
+.rl16 i.an{background:var(--heim);box-shadow:0 0 .4rem var(--heim)}
+
+/* ===================== SEITE DRAFT-ERGEBNIS ===================== */
+.en{display:grid;grid-template-columns:minmax(0,1fr) 31rem 24rem;gap:.72rem;padding:.8rem 1rem;min-height:0}
+.tbw{flex:1;min-height:0;overflow:auto}
+#p-kader .tbw{flex:none}
+.nm b{font-size:.98rem}
+#kader td{height:var(--zh,3.1rem)}
+.pick{color:var(--stumm);font-weight:700;font-size:.9rem} .pick b{color:var(--creme);font-weight:700}
+.ovr{font-size:1.25rem;font-weight:700;color:var(--creme)}
+.dz{display:inline-flex;align-items:baseline;gap:.22rem;height:1.35rem;padding:0 .32rem;margin-right:.18rem;border-radius:.2rem;font-size:.82rem;background:rgba(255,255,255,.06);color:var(--leise);border-left:2px solid var(--stumm)}
+.dz b{color:var(--tinte);font-weight:700}
+.dz.h{border-left-color:var(--gut);background:rgba(98,211,148,.1)} .dz.h b{color:var(--gut)}
+.dz.m{border-left-color:var(--blau);background:rgba(127,176,255,.09)}
+.vt{line-height:1.05} .vt b{font-weight:700} .vt small{display:block;font-size:.74rem;color:var(--leise)}
+/* Kaderprofil unter der Tabelle */
+.prof{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,.9fr);grid-template-rows:auto auto;align-content:space-evenly;gap:.7rem 1.3rem;padding:.6rem .9rem .7rem;border-top:1px solid var(--linie-2);background:#0a0e15}
+.abd{grid-column:1/4}
+.abz{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:.2rem}
+.abz div{text-align:center;line-height:1.1;cursor:pointer}
+.abz b{display:block;height:1.5rem;line-height:1.5rem;border-radius:.2rem;font-size:.95rem;font-weight:700;color:#0b0e14}
+.abz small{display:block;font-size:.66rem;color:var(--leise);margin-top:.15rem;white-space:nowrap;overflow:hidden}
+.abz .n0 b{background:var(--warn)} .abz .n1 b{background:#c98a6a} .abz .n2 b{background:#7fb0ff} .abz .n3 b{background:#62d394}
+.vtz{display:grid;grid-template-columns:3.4rem minmax(0,1fr) auto;gap:.5rem;align-items:center;font-size:.9rem;height:1.5rem}
+.vtz i{height:.5rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);display:block} .vtz i b{display:block;height:100%;background:var(--blau)}
+.vtz em{font-style:normal;color:var(--leise);font-size:.8rem}
+.prof h3{margin:0 0 .45rem;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700}
+.axz{display:grid;grid-template-columns:2.4rem 1.4rem minmax(0,1fr) 2rem 5.2rem;gap:.5rem;align-items:center;font-size:.92rem;height:1.5rem}
+.axz i{position:relative;height:.5rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);display:block}
+.axz i b{display:block;height:100%;background:var(--heim)}
+.axz i u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:var(--creme)}
+.axz em{font-style:normal;color:var(--leise);font-size:.8rem;text-align:right}
+.bed{display:flex;flex-direction:column;gap:.3rem;font-size:.9rem}
+.bed div{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.6rem;align-items:baseline;padding:.2rem .5rem;border:1px solid var(--linie);border-radius:.35rem;background:var(--flaeche-2)}
+.bed div span{color:var(--tinte)} .bed div em{font-style:normal;color:var(--leise);font-size:.8rem} .bed div b{color:var(--warn)}
+/* Kaderstaerke (unveraendert aus der App: lv3, rl16, drl-dz) */
+.fb{padding:.75rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column;gap:.7rem}
+.lv3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.4rem;flex:none}
+.lv3 div{padding:.4rem .55rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2);line-height:1.1}
+.lv3 small{display:block;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.lv3 strong{font-size:1.5rem;color:var(--creme)}
+.lv3 em{font-style:normal;font-size:.76rem;color:var(--stumm);display:block}
+.rl32{height:.9rem;flex:none}
+.drl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.25rem .8rem;flex:none}
+.drl-dz{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(0,.8fr) auto auto;gap:.4rem;align-items:center;font-size:.88rem;padding:.12rem 0;border-bottom:1px solid rgba(244,230,196,.06)}
+.drl-dz span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tinte)}
+.drl-dz i{height:.42rem;background:rgba(255,255,255,.08);display:block}
+.drl-dz i b{display:block;height:100%;background:#7fb0ff}
+.drl-dz.top i b{background:var(--gut)} .drl-dz.tief i b{background:var(--warn)}
+.drl-dz em{font-style:normal;color:var(--leise)}
+.drl-dz strong{min-width:2.2em;text-align:right;color:var(--creme)} .drl-dz.top strong{color:var(--gut)}
+.bleibt{flex:none;font-size:.8rem;color:var(--stumm);border-bottom:1px dashed var(--linie-2);padding-bottom:.5rem}
+.drl-dz{cursor:pointer} .drl-dz:hover span{color:var(--gold)} .drl-dz.wahl span{color:var(--gold);font-weight:700}
+.b6{flex:1;min-height:0;display:flex;flex-direction:column;gap:.45rem}
+.b6 .gk{display:flex;gap:.4rem;align-items:baseline} .b6 .gk b{color:var(--gold);font-size:.9rem;letter-spacing:.06em}
+#b6{flex:1;min-height:0;display:grid;grid-template-rows:repeat(6,minmax(0,1fr));gap:.3rem;max-height:21rem}
+.b6z{display:grid;grid-template-columns:1.4rem 2.3rem minmax(0,9rem) minmax(0,1fr) 2.4rem;gap:.6rem;align-items:center;padding:0 .6rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2)}
+.b6z>span{color:var(--stumm);font-weight:700} .b6z img{width:2.1rem;height:2.1rem}
+.b6z i{height:.55rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);display:block} .b6z i b{display:block;height:100%;background:var(--blau)}
+.b6z.h i b{background:var(--gut)} .b6z.n i b{background:var(--stumm)}
+.b6z strong{text-align:right;font-size:1.2rem;color:var(--creme)}
+/* Kasse */
+.ks{display:flex;flex-direction:column;justify-content:space-between;gap:.62rem;padding:.75rem .9rem;flex:1;min-height:0}
+.blk{flex:none}
+.blk>.gk{display:flex;justify-content:space-between;margin-bottom:.3rem} .blk>.gk b{color:var(--creme);letter-spacing:.04em}
+.gross{display:flex;align-items:baseline;gap:.5rem}
+.gross strong{font-size:2.5rem;line-height:.95;color:var(--creme)} .gross small{font-size:.85rem;color:var(--leise)}
+.stp{display:flex;height:.85rem;margin-top:.45rem;transform:skewX(-14deg);overflow:hidden;background:rgba(255,255,255,.08)}
+.stp i{display:block;height:100%} .stp i.a{background:var(--heim)} .stp i.k{background:var(--gut)} .stp i.g{background:var(--blau)} .stp i.l{background:rgba(255,255,255,.1)}
+.leg{display:flex;justify-content:space-between;font-size:.8rem;color:var(--leise);margin-top:.25rem}
+.leg b{color:var(--tinte)}
+.gz{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem;padding:.2rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.94rem;white-space:nowrap}
+.gz span{color:var(--leise);overflow:hidden;text-overflow:ellipsis} .gz span small{font-size:.78rem;color:var(--stumm);margin-left:.3rem}
+.gz b{font-weight:700}
+.frei{display:flex;justify-content:space-between;align-items:center;margin-top:.35rem;padding:.4rem .65rem;border:1px solid rgba(98,211,148,.5);border-radius:.4rem;background:rgba(98,211,148,.09)}
+.frei span{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--gut)} .frei small{display:block;letter-spacing:0;text-transform:none;font-weight:500;color:var(--leise);font-size:.78rem}
+.frei strong{font-size:1.7rem;color:var(--gut);line-height:1}
+.pl{display:grid;grid-template-columns:repeat(14,1fr);gap:.22rem}
+.pl i{height:1.35rem;border-radius:.2rem;border:1px solid var(--linie-2);background:transparent}
+.pl i.p{background:var(--gut);border-color:var(--gut)} .pl i.o{background:var(--blau);border-color:var(--blau)}
+.pl i:nth-child(8){margin-right:.3rem}
+.vg{display:grid;grid-template-columns:5.6rem minmax(0,1fr) 2.3rem 4.6rem;gap:.5rem;align-items:center;font-size:.9rem;height:1.5rem}
+.vg span{color:var(--tinte)} .vg strong{text-align:right;color:var(--creme)} .vg em{font-style:normal;color:var(--leise);font-size:.8rem;text-align:right}
+.akt{display:flex;gap:.5rem;justify-content:flex-end;align-items:center;flex:none}
+.knopf{height:2.5rem;padding:0 .9rem;border:1px solid var(--linie-2);border-radius:.4rem;font-weight:600;display:inline-flex;align-items:center;gap:.4rem}
+.knopf:hover{border-color:var(--gold);color:var(--gold)}
+/* Liga-Tabelle */
+#liga td{height:2.72rem}
+.wp{width:1.9rem;height:1.9rem;border-radius:.3rem;object-fit:cover;border:1px solid var(--linie-2);flex:none}
+.lg{font-size:.7rem;font-weight:700;padding:.05rem .35rem;border-radius:.2rem;background:rgba(69,176,201,.14);color:var(--gast);border:1px solid rgba(69,176,201,.5)}
+.lg.e{background:rgba(242,160,61,.18);color:var(--heim);border-color:rgba(242,160,61,.5)}
+body.liga #p-kader{display:none} body:not(.liga) #p-liga{display:none}
+</style>
+</head>
+<body>
+<div class="demo"><b>Mockup</b> Draft-Ergebnis 21.11. <i class="tr"></i> Ansicht:
+  <a data-a="team">Mein Team</a><a data-a="liga">Liga-Übersicht aller Drafts</a>
+  <i class="tr"></i><span>Jede Tabelle: Klick auf den Spaltenkopf sortiert, zweiter Klick dreht.</span></div>
+<div class="app">
+<div class="railplatz"><nav class="rail" aria-label="Hauptnavigation">
+  <div class="kopf"><span class="logo"><img src="../team-logos/D-P.jpg" alt=""></span><span class="wer"><b>Death Peaches</b><small>Liga 2 · Chris</small></span></div>
+  <span class="grp">Saison</span>
+  <a href="#" title="Start"><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="n">Start</span></a>
+  <a href="#" class="" title="Einsatzliste"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span class="n">Einsatzliste</span></a>
+  <a href="#" title="Arena"><svg class="i" viewBox="0 0 24 24"><path d="M5 4h14v5a7 7 0 0 1-14 0zM9 20h6M12 16v4M5 6H2v2a3 3 0 0 0 3 3M19 6h3v2a3 3 0 0 1-3 3"/></svg><span class="n">Arena</span></a>
+  <a href="#" title="Tabelle"><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg><span class="n">Tabelle</span></a>
+  <span class="grp">Team</span>
+  <a href="#" title="Kader"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.500 7 6M17 5a3 3 0 0 1 0 6M22 19c0-2.500-1.500-4.300-4-5"/></svg><span class="n">Kader</span></a>
+  <a href="#" title="Training"><svg class="i" viewBox="0 0 24 24"><path d="M6 7v10M18 7v10M3 10v4M21 10v4M6 12h12"/></svg><span class="n">Training</span></a>
+  <a href="#" class="an" title="Draft"><svg class="i" viewBox="0 0 24 24"><path d="M4 5h16M4 10h10M4 15h7M17 13l3 3-3 3M14 16h6"/></svg><span class="n">Draft</span></a>
+  <a href="#" title="Transfermarkt"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg><span class="n">Transfermarkt</span></a>
+  <span class="grp">Verein</span>
+  <a href="#" title="Finanzen"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9a3.200 3.200 0 0 0-3-1.500c-1.800 0-3 .900-3 2.200 0 3 6 1.500 6 4.600 0 1.300-1.300 2.200-3 2.200A3.400 3.400 0 0 1 9 15M12 5.500v13"/></svg><span class="n">Finanzen</span></a>
+  <a href="#" title="Inbox"><svg class="i" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3zM3 13h5l1 3h6l1-3h5"/></svg><span class="zahl">3</span><span class="n">Inbox</span></a>
+  <span class="luecke"></span>
+  <a href="#" title="Einstellungen"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg><span class="n">Einstellungen</span></a>
+</nav></div>
+
+<div class="rechts">
+  <header class="band">
+    <div class="ort"><em>Draft <span>· Saison 1 · Liga 2</span></em><h1>Draft beendet</h1></div>
+    <div class="kpis">
+      <div class="kpi"><span>Picks</span><strong class="t">352 <small>in 14 Runden</small></strong></div>
+      <div class="kpi"><span>Teuerster Pick</span><strong class="t">82,7 <small>C · Ivy Sentinel → C-S</small></strong></div>
+      <div class="kpi"><span>Ø Ablöse</span><strong class="t">19,6 <small>C</small></strong></div>
+      <div class="kpi"><span>Noch frei</span><strong class="t">2.632 <small>Spieler am Markt</small></strong></div>
+    </div>
+    <span class="sp"></span>
+    <div class="seg" id="umsch"><button data-a="team">Mein Team</button><button data-a="liga">Liga-Übersicht</button></div>
+    <button class="btn haupt">Weiter zur Saison</button>
+  </header>
+  <div class="en">
+    <section class="pan" id="p-kader">
+      <div class="pk"><h2>Mein Kader nach dem Draft</h2><span class="sp"></span><span class="gk" id="kader-kopf"></span></div>
+      <div class="tbw"><table class="tb" id="kader"></table></div>
+      <div class="prof">
+        <div><h3>Kaderprofil · Ø der vier Achsen gegen Liga 2</h3><div id="achsen"></div></div>
+        <div><h3>Bedarf am Markt · schwächste Disziplinen</h3><div class="bed" id="bedarf"></div></div>
+        <div><h3>Verträge laufen aus</h3><div id="vertraege"></div></div>
+        <div class="abd"><h3>Abdeckung · Spieler mit Eignung ab 45 je Disziplin (ein Spieltag braucht bis zu 6)</h3><div class="abz" id="abdeck"></div></div>
+      </div>
+    </section>
+    <section class="pan" id="p-liga">
+      <div class="pk"><h2>Liga-Übersicht aller Drafts</h2><span class="sp"></span>
+        <div class="seg" id="ligawahl" style="height:1.8rem"><button data-l="2">Liga 2</button><button data-l="1">Liga 1</button><button data-l="0">Alle 32</button></div></div>
+      <div class="tbw"><table class="tb" id="liga"></table></div>
+    </section>
+    <section class="pan">
+      <div class="pk"><h2>Kaderstärke</h2><span class="sp"></span><span class="gk">Ø der besten 6 je Disziplin · Rang unter 32</span></div>
+      <div class="fb">
+        <div class="lv3" id="lv3"></div>
+        <div class="rl16 rl32" id="rl32" style="grid-template-columns:repeat(32,1fr)"></div>
+        <div class="drl" id="drl"></div>
+        <div class="bleibt">Bis hier unverändert wie heute in der App (Kacheln, Rangleiste, 20 Disziplinen mit Rang).</div>
+        <div class="b6"><div class="gk"><span>Optional · meine besten 6 in</span> <b id="b6n"></b><span class="sp"></span><span>Zeile anklicken</span></div><div id="b6"></div></div>
+      </div>
+    </section>
+    <section class="pan">
+      <div class="pk"><h2>Kasse nach dem Draft</h2></div>
+      <div class="ks" id="kasse"></div>
+    </section>
+  </div>
+</div>
+</div>
+<script>
+var SP=[{"n":"Kelektros","s":"kelektros","k":"Charger","r":"Dragon","o":67.9,"mv":65.66,"g":17.18,"c":[74,87,61,46],"d":[63,76,44,62,96,65,81,98,48,94,43,63,62,74,72,47,59,38,93,60],"a":[88,72,70,59,66,81,95,64,12,69,24,73],"ar":["S","A","A","B","A","S","S+","B","F","A","E","A"],"tp":["FiredUp","Healthy"],"tn":["Mercenary","Cruel","Obsessive"],"pot":71.9},{"n":"Brightpaw","s":"brightpaw","k":"Badass","r":"Animal","o":43.3,"mv":25.13,"g":6.8,"c":[40,43,39,52],"d":[43,37,48,44,37,68,40,36,43,43,49,34,41,36,33,59,52,53,34,43],"a":[54,21,64,27,56,20,61,36,82,67,87,40],"ar":["B","E","B","E","B","E","B","D","S","A","S","D"],"tp":["Caring","Loyal"],"tn":["Timid"],"pot":47.3},{"n":"Emilia","s":"emilia","k":"Rogue","r":"Demon","o":31.8,"mv":16.35,"g":4.76,"c":[19,42,29,38],"d":[19,19,27,18,25,51,50,35,46,27,40,34,20,12,9,48,25,48,48,37],"a":[21,5,29,36,63,42,89,73,34,3,74,48],"ar":["E","F","E","D","B","C","S","A","D","F","A","C"],"tp":["Sexy","FiredUp"],"tn":["Diva"],"pot":35.8},{"n":"Elion","s":"elion","k":"Bard","r":"Elf","o":36.6,"mv":19.05,"g":6.15,"c":[29,34,45,45],"d":[35,28,44,30,34,43,43,25,54,26,45,44,42,28,40,47,40,48,26,44],"a":[20,40,57,72,46,42,29,66,60,51,73,21],"ar":["E","D","B","A","C","C","E","A","B","C","A","E"],"tp":["Motivated","Eloquent","FanFavorite"],"tn":["Gambler"],"pot":40.6},{"n":"Seraphina","s":"seraphina","k":"Badass","r":"Human","o":34.7,"mv":17.7,"g":5.19,"c":[28,36,31,45],"d":[35,22,42,37,32,52,43,25,45,30,50,32,26,17,19,48,32,55,28,32],"a":[40,19,50,39,45,43,60,59,71,23,82,15],"ar":["D","E","C","D","C","C","B","B","A","E","S","F"],"tp":["Sexy"],"tn":[],"pot":38.7},{"n":"Knisterl","s":"knisterl","k":"Sprinter","r":"Plant","o":29.5,"mv":15.33,"g":5.43,"c":[21,48,34,25],"d":[9,37,23,8,33,40,63,39,43,24,15,40,25,26,21,37,18,32,63,41],"a":[1,3,69,57,74,16,66,71,18,22,14,99],"ar":[null,null,null,null,null,null,null,null,null,null,null,null],"tp":[],"tn":["Cruel","Obsessive","Scandalous"],"pot":33.5},{"n":"Auraclystis","s":"auraclystis","k":"Berserker","r":"Demon","o":37.7,"mv":19.58,"g":6.19,"c":[35,46,34,41],"d":[34,39,39,33,34,51,56,40,43,42,40,35,26,28,24,48,34,45,47,42],"a":[43,39,48,50,51,6,79,73,46,38,58,50],"ar":["C","D","C","C","C","F","S","A","C","D","B","C"],"tp":["FiredUp","Flexible"],"tn":["Feisty","Timid","Manipulative"],"pot":41.7},{"n":"Jinrai","s":"jinrai","k":"Berserker","r":"Human","o":26.5,"mv":10.08,"g":3.09,"c":[30,30,24,25],"d":[40,32,19,30,43,24,34,25,30,26,33,20,22,24,31,24,21,26,25,18],"a":[52,29,77,31,8,79,17,75,20,11,56,24],"ar":["C","E","A","D","F","S","F","A","E","F","B","E"],"tp":["Diligent","Cool"],"tn":[],"pot":30.5},{"n":"Britney","s":"britney","k":"Berserker","r":"Human","o":26.4,"mv":9.96,"g":3.97,"c":[38,28,22,19],"d":[39,43,18,33,36,20,24,32,18,34,20,17,22,41,37,18,23,17,28,18],"a":[67,34,73,21,9,50,38,27,19,37,28,63],"ar":["A","D","A","E","F","C","D","E","E","D","E","B"],"tp":["Diligent"],"tn":["Feisty","Renegade"],"pot":30.4},{"n":"Bone","s":"bone","k":"Tank","r":"Human","o":20.4,"mv":7.82,"g":2.32,"c":[35,23,14,10],"d":[42,42,8,26,41,17,20,19,11,37,10,8,8,28,34,9,13,9,19,8],"a":[62,69,96,1,1,38,37,20,1,1,21,41],"ar":["B","A","S+","F","F","D","D","E","F","F","E","D"],"tp":[],"tn":["Lazy","Paranoid"],"pot":24.4},{"n":"Thressa","s":"thressa","k":"Badass","r":"Dwarf","o":52.7,"mv":40.11,"g":11.72,"c":[55,50,46,61],"d":[63,54,63,46,55,73,42,41,55,65,46,35,44,48,54,64,81,49,41,44],"a":[51,69,92,25,76,23,36,42,68,68,93,47],"ar":["C","A","S+","E","A","E","D","C","A","A","S+","C"],"tp":["Motivated","Healthy"],"tn":["Gambler","Feisty","Scandalous"],"pot":56.7},{"n":"Ironclaw","s":"ironclaw","k":"Charger","r":"Animal","o":47.8,"mv":31.08,"g":8.23,"c":[55,52,42,42],"d":[56,53,43,52,60,51,48,55,40,64,42,40,42,48,48,42,47,38,48,40],"a":[71,74,71,41,52,51,75,44,42,46,38,55],"ar":["A","A","A","D","C","C","A","C","C","C","D","B"],"tp":["Loyal","Eloquent"],"tn":[],"pot":51.8},{"n":"Glimps","s":"glimps","k":"Sprinter","r":"Plant","o":41.6,"mv":30.75,"g":7.45,"c":[27,59,52,40],"d":[25,26,26,23,58,74,76,44,76,38,36,61,42,25,41,53,34,50,44,42],"a":[9,38,64,58,89,54,81,85,22,49,61,5],"ar":[null,null,null,null,null,null,null,null,null,null,null,null],"tp":["Resourceful","Flexible","Disciplined"],"tn":["FaintHearted","Paranoid"],"pot":45.6},{"n":"Battleborn","s":"battleborn","k":"Warlord","r":"Construct","o":45.6,"mv":31.92,"g":8.64,"c":[69,41,33,29],"d":[53,78,27,65,42,23,24,68,12,64,31,24,41,83,55,18,48,19,50,35],"a":[98,90,24,12,10,56,55,39,24,83,20,90],"ar":["S+","S+","E","F","F","B","B","D","E","S","E","S+"],"tp":["FiredUp","Altruistic"],"tn":["Scandalous","Renegade","Feisty"],"pot":49.6}];
+var DN=["TDM","Mini DM","Battlefield","Gewichtheben","Climbing","Staffel","Time Trial","Spurt","Tennis","Hockey","Showcase","Schach","Takeshi","Breaking","Wettessen","Basketball","Football","Eiskunst","Fechten","I Spy"];
+var DK=["TDM","Mini DM","Battlef.","Heben","Climbing","Staffel","Time Tr.","Spurt","Tennis","Hockey","Showcase","Schach","Takeshi","Breaking","Essen","Basket.","Football","Eiskunst","Fechten","I Spy"];
+var TEAMS=[["A-A","Armageddon Aftermath",2,175,1.2],["B-B","Blazing Beasts",2,185,3.7],["B-P","Black Panthers",1,275,6.4],["C-C","Cash Creators",2,215,9.7],["C-S","Cold Steel",1,315,8.3],["D-L","Dire Legion",2,195,4.9],["D-P","Death Peaches",2,240,3.0],["G-G","Golden Gladiators",1,310,6.7],["H-R","Hell Raisers",1,285,2.1],["L-K","Lost Kingdom",2,225,7.4],["L-R","Last Ride",1,305,3.0],["M-M","Mayhem Mavericks",1,325,5.1],["M-S","Mortal Sin",2,245,6.8],["N-N","Nunchuck Ninjas",1,270,2.9],["N-W","Natures Wrath",1,265,4.1],["P-C","Pirate Crew",2,200,9.3],["P-S","Project Suicide",1,300,3.6],["R-C","Royal Court",2,220,6.8],["R-L","Raging Lunatics",1,295,1.7],["R-R","Riptide Rivers",2,170,7.3],["S-C","Stronghold Crusaders",2,205,5.6],["S-S","Silver Soldiers",1,280,7.4],["T-C","The Chantry",2,210,7.1],["T-G","The Giants",2,230,2.6],["T-T","Terrible Teachers",1,260,8.8],["U-A","Undercover Agents",2,190,4.2],["V-D","Vicious & Delicious",1,250,2.9],["V-V","Vigorous Vikings",2,235,3],["V-W","Vigilante Wranglers",2,180,3.1],["W-L","Wrecking Legionnaires",1,290,10],["W-W","Wicked Wizards",1,255,7.4],["Z-H","Zero Heroes",1,320,2]];
+var STARS=["Ivy Sentinel","Gor'Than Prime","Rahir","Brother Li","Zoey","Thressa","Raid Captain Druzka","Vexon","Ironclaw","Battleborn","Glimps","Slippery Man","Gaius","Headohweh","Veyla","Keldarion Valcrest"];
+function de(n,st){return n.toLocaleString("de-DE",{minimumFractionDigits:st==null?1:st,maximumFractionDigits:st==null?1:st})}
+function note(v){return v>=80?"S":v>=68?"A":v>=56?"B":v>=44?"C":v>=32?"D":v>=20?"E":"F"}
+var saat=21;function zf(){saat=(saat*1103515245+12345)%2147483648;return saat/2147483648}
+function $(s){return document.querySelector(s)}
+
+/* ---------- eigener Kader: die ersten zehn der Datenliste ---------- */
+var MEIN=SP.slice(0,10).sort(function(a,b){return b.mv-a.mv});
+var PICKNR=[7,58,71,122,135,186,199,250,263,314], LAUF=[3,3,2,2,2,1,2,1,1,1];
+MEIN.forEach(function(p,i){p.runde=i+1;p.nr=PICKNR[i];p.lauf=LAUF[i];
+  p.top=p.d.map(function(v,j){return [v,j]}).sort(function(a,b){return b[0]-a[0]}).slice(0,3)});
+var BUDGET=240, FINANZWERT=3.0, QUOTE=.85, GEHALTSTOPF=74, SPIELTAGE=20;
+var abl=MEIN.reduce(function(s,p){return s+p.mv},0), geh=MEIN.reduce(function(s,p){return s+p.g},0), kasse=BUDGET-abl;
+var meinStaerke=DN.map(function(_,j){var w=MEIN.map(function(p){return p.d[j]}).sort(function(a,b){return b-a}).slice(0,6);return w.reduce(function(s,v){return s+v},0)/w.length});
+
+/* ---------- die anderen 31 Teams (erfunden, fest gesaet) ---------- */
+var LIGA=TEAMS.map(function(t){
+  var ich=t[0]==="D-P", l1=t[2]===1, n=ich?10:8+Math.floor(zf()*6);
+  var st=DN.map(function(_,j){return ich?meinStaerke[j]:(l1?51:42)+(zf()-.5)*22});
+  var a=ich?abl:t[3]-(4+zf()*14), g=ich?geh:a*(.27+zf()*.06);
+  return {c:t[0],n:t[1],l:t[2],budget:t[3],picks:n,kader:n,st:st,staerke:st.reduce(function(s,v){return s+v},0)/20,
+    ovr:ich?MEIN.reduce(function(s,p){return s+p.o},0)/10:(l1?43:31)+zf()*7,abl:a,geh:g,kasse:ich?kasse:t[3]-a,
+    teuer:ich?MEIN[0].mv:(l1?48:34)+zf()*34,teuerN:ich?MEIN[0].n:STARS[Math.floor(zf()*STARS.length)],ich:ich};
+});
+LIGA.find(function(t){return t.c==="C-S"}).teuer=82.7;LIGA.find(function(t){return t.c==="C-S"}).teuerN="Ivy Sentinel";
+var ICH=LIGA.find(function(t){return t.ich}), L2=LIGA.filter(function(t){return t.l===2});
+function rang(liste,f,t){return liste.slice().sort(function(a,b){return f(b)-f(a)}).indexOf(t)+1}
+function schnitt(liste,f){return liste.reduce(function(s,t){return s+f(t)},0)/liste.length}
+
+/* ---------- sortierbare Tabelle (Designsystem-Regel: Klick sortiert, zweiter Klick dreht) ---------- */
+function tabelle(el,sp,zeilen,opt){
+  var st={k:opt.start,auf:!!opt.startAuf};
+  function mal(){
+    var s=sp.find(function(x){return x.k===st.k});
+    var z=zeilen().slice().sort(function(a,b){var x=s.w(a),y=s.w(b);var r=typeof x==="string"?x.localeCompare(y,"de"):x-y;return st.auf?r:-r});
+    var h="<colgroup>"+sp.map(function(x){return '<col style="width:'+(x.b||"auto")+'">'}).join("")+"</colgroup><thead><tr>"+
+      sp.map(function(x){return '<th tabindex="0" data-k="'+x.k+'" class="'+(x.a||"")+(x.k===st.k?" so"+(st.auf?" auf":""):"")+'" title="'+(x.tt||x.t)+' – sortieren">'+x.t+"</th>"}).join("")+"</tr></thead><tbody>"+
+      z.map(function(r,i){return '<tr class="'+(opt.kl?opt.kl(r):"")+'">'+sp.map(function(x){return '<td class="'+(x.a||"")+'">'+x.z(r,i)+"</td>"}).join("")+"</tr>"}).join("")+"</tbody>"+
+      (opt.fuss?"<tfoot><tr>"+sp.map(function(x){return '<td class="'+(x.a||"")+'">'+(x.f?x.f(z):"")+"</td>"}).join("")+"</tr></tfoot>":"");
+    el.innerHTML=h;
+    el.querySelectorAll("th").forEach(function(th){
+      function klick(){var k=th.dataset.k;if(st.k===k)st.auf=!st.auf;else{st.k=k;st.auf=!!sp.find(function(x){return x.k===k}).erstAuf}mal()}
+      th.onclick=klick;th.onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();klick()}};
+    });
+    if(opt.nach)opt.nach(z);
+  }
+  mal();return mal;
+}
+function achse(i,name){return {k:"a"+i,t:name,b:"3.55rem",a:"mi",tt:name+" (Note und Wert)",w:function(p){return p.c[i]},
+  z:function(p){return '<span class="ax"><span class="no '+note(p.c[i])+'">'+note(p.c[i])+'</span><b class="t">'+p.c[i]+"</b></span>"},
+  f:function(z){return "Ø "+Math.round(schnitt(z,function(p){return p.c[i]}))}}}
+tabelle($("#kader"),[
+  {k:"nr",t:"Pick",b:"4.7rem",erstAuf:true,w:function(p){return p.nr},z:function(p){return '<span class="pick t"><b>R'+p.runde+"</b> · #"+p.nr+"</span>"},f:function(z){return z.length+" Picks"}},
+  {k:"n",t:"Spieler",erstAuf:true,w:function(p){return p.n},z:function(p){return '<span class="nm"><img class="por" src="../portraits/'+p.s+'.jpg" alt=""><div><b>'+p.n+"</b><small>"+p.k+" · "+p.r+"</small></div></span>"}},
+  {k:"o",t:"OVR",b:"2.9rem",a:"re",tt:"Gesamtwert",w:function(p){return p.o},z:function(p){return '<span class="ovr t">'+Math.round(p.o)+"</span>"},f:function(z){return "Ø "+Math.round(schnitt(z,function(p){return p.o}))}},
+  achse(0,"POW"),achse(1,"SPE"),achse(2,"MEN"),achse(3,"SOC"),
+  {k:"top",t:"Top-Disziplinen · Eignung",b:"14.5rem",tt:"Beste drei Disziplinen (sortiert nach der besten Eignung)",w:function(p){return p.top[0][0]},
+    z:function(p){return p.top.map(function(x){return '<span class="dz '+(x[0]>=65?"h":x[0]>=50?"m":"")+'" title="'+DN[x[1]]+'">'+DK[x[1]]+' <b class="t">'+x[0]+"</b></span>"}).join("")}},
+  {k:"lauf",t:"Vertrag",b:"4.3rem",w:function(p){return p.lauf},z:function(p){return '<span class="vt"><b class="t">'+p.lauf+(p.lauf>1?" Saisons":" Saison")+'</b><small>bis Ende S'+p.lauf+"</small></span>"}},
+  {k:"g",t:"Gehalt/S.",b:"4.1rem",a:"re",tt:"Gehalt je Saison in C",w:function(p){return p.g},z:function(p){return '<b class="t">'+de(p.g)+"</b>"},f:function(){return de(geh)}},
+  {k:"mv",t:"Ablöse",b:"3.7rem",a:"re",tt:"Ablöse in C",w:function(p){return p.mv},z:function(p){return '<b class="t">'+de(p.mv)+"</b>"},f:function(){return de(abl)}}
+],function(){return MEIN},{start:"nr",startAuf:true,fuss:true});
+$("#kader-kopf").textContent=MEIN.length+" Picks · Ablösen "+de(abl)+" C · Gehalt "+de(geh)+" C je Saison";
+/* Zeilenhoehe an die Kadergroesse anpassen (8 bis 14 Spieler ohne Scrollen) */
+(function(){var w=$("#p-kader .tbw"),rem=parseFloat(getComputedStyle(document.documentElement).fontSize);
+  var frei=$("#p-kader").clientHeight/rem-2.6-15.2-1.9-2.5;$("#kader").style.setProperty("--zh",Math.max(2.3,Math.min(3.3,frei/MEIN.length)).toFixed(2)+"rem")})();
+
+/* ---------- Kaderprofil ---------- */
+var ligaAchse=[41,45,43,44];
+$("#achsen").innerHTML=["POW","SPE","MEN","SOC"].map(function(a,i){var v=Math.round(schnitt(MEIN,function(p){return p.c[i]})),d=v-ligaAchse[i];
+  return '<div class="axz"><b>'+a+'</b><span class="no '+note(v)+'">'+note(v)+'</span><i><b style="width:'+v+'%"></b><u style="left:'+ligaAchse[i]+'%" title="Liga-Schnitt"></u></i><b class="t">'+v+'</b><em class="'+(d>=0?"plus":"minus")+'">'+(d>=0?"+":"−")+Math.abs(d)+" zur Liga</em></div>"}).join("");
+var dr=DN.map(function(n,j){return {n:n,j:j,st:meinStaerke[j],rang:LIGA.slice().sort(function(a,b){return b.st[j]-a.st[j]}).indexOf(ICH)+1}});
+$("#bedarf").innerHTML=dr.slice().sort(function(a,b){return b.rang-a.rang}).slice(0,3).map(function(z){
+  var ab=MEIN.filter(function(p){return p.d[z.j]>=45}).length;
+  return "<div><span>"+z.n+'</span><em>'+ab+" Spieler ab Eignung 45</em><b class=\"t\">"+z.rang+".</b></div>"}).join("");
+
+$("#vertraege").innerHTML=[1,2,3].map(function(s){var l=MEIN.filter(function(p){return p.lauf===s}),g=l.reduce(function(x,p){return x+p.g},0);
+  return '<div class="vtz"><b>Ende S'+s+'</b><i><b style="width:'+(l.length/MEIN.length*100)+'%"></b></i><em class="t">'+l.length+" Spieler · "+de(g)+" C Gehalt</em></div>"}).join("");
+$("#abdeck").innerHTML=DN.map(function(n,j){var c=MEIN.filter(function(p){return p.d[j]>=45}).length;
+  return '<div class="n'+(c===0?0:c<=2?1:c<=4?2:3)+'" title="'+n+": "+c+' Spieler ab Eignung 45" data-j="'+j+'"><b class="t">'+c+"</b><small>"+DK[j]+"</small></div>"}).join("");
+/* ---------- Kaderstaerke (wie in der App) ---------- */
+var alle=LIGA.slice().sort(function(a,b){return b.staerke-a.staerke}), rg=alle.indexOf(ICH)+1;
+$("#lv3").innerHTML='<div><small>meine Stärke</small><strong class="t">'+de(ICH.staerke)+'</strong><em>Ø über 20 Disziplinen</em></div><div><small>Rang</small><strong class="t">'+rg+'.</strong><em>von 32</em></div><div><small>Liga-Schnitt</small><strong class="t">'+de(schnitt(LIGA,function(t){return t.staerke}))+"</strong><em>alle Teams</em></div>";
+$("#rl32").innerHTML=alle.map(function(t,i){return '<i class="'+(t.ich?"an":i<8?"o":i>=24?"u":"")+'" title="'+(i+1)+". "+t.n+" · "+de(t.staerke)+'"></i>'}).join("");
+$("#drl").innerHTML=dr.map(function(z){return '<div data-j="'+z.j+'" class="drl-dz'+(z.rang<=5?" top":z.rang>21?" tief":"")+'"><span>'+z.n+'</span><i><b style="width:'+Math.max(4,(33-z.rang)/32*100)+'%"></b></i><em class="t">'+de(z.st)+'</em><strong class="t">'+z.rang+".</strong></div>"}).join("");
+
+function beste6(j){$("#b6n").textContent=DN[j]+" · Stärke "+de(meinStaerke[j]);
+  document.querySelectorAll(".drl-dz").forEach(function(e){e.classList.toggle("wahl",+e.dataset.j===j)});
+  $("#b6").innerHTML=MEIN.slice().sort(function(a,b){return b.d[j]-a.d[j]}).slice(0,6).map(function(p,i){
+    return '<div class="b6z '+(p.d[j]>=65?"h":p.d[j]<45?"n":"")+'"><span class="t">'+(i+1)+'.</span><img class="por" src="../portraits/'+p.s+'.jpg" alt=""><span class="nm"><div><b>'+p.n+"</b><small>"+p.k+'</small></div></span><i><b style="width:'+p.d[j]+'%"></b></i><strong class="t">'+p.d[j]+"</strong></div>"}).join("")}
+document.querySelectorAll(".drl-dz,.abz div").forEach(function(e){e.onclick=function(){beste6(+e.dataset.j)}});beste6(5);
+/* ---------- Kasse ---------- */
+var rueck=(.05+.20*(FINANZWERT-1)/9)*BUDGET, puffer=Math.max(0,.35*geh-rueck), frei=Math.max(0,kasse-rueck-puffer), markt=QUOTE*frei;
+function vg(name,f,einh,hochGut){var r=rang(L2,f,ICH);
+  return '<div class="vg"><span>'+name+'</span><div class="rl16" style="grid-template-columns:repeat(16,1fr)">'+L2.map(function(_,i){return '<i class="'+(i===r-1?"an":"")+'"></i>'}).join("")+'</div><strong class="t">'+r+'.</strong><em class="t">Ø '+de(schnitt(L2,f))+einh+"</em></div>"}
+$("#kasse").innerHTML=
+ '<div class="blk"><div class="gk"><span>Kasse zum Saisonstart</span></div><div class="gross"><strong class="t">'+de(kasse)+' C</strong><small>von '+de(BUDGET,0)+' C Startbudget</small></div>'+
+ '<div class="stp"><i class="a" style="width:'+(abl/BUDGET*100)+'%"></i><i class="k" style="width:'+(kasse/BUDGET*100)+'%"></i></div>'+
+ '<div class="leg"><span>Ablösen <b class="t">−'+de(abl)+' C</b> ('+MEIN.length+' Spieler)</span><span>bleibt <b class="t">'+de(kasse)+" C</b></span></div></div>"+
+ '<div class="blk"><div class="gk"><span>Gehälter je Saison</span><b class="t">'+Math.round(geh/GEHALTSTOPF*100)+' % vom Gehaltstopf</b></div><div class="gross"><strong class="t" style="font-size:1.9rem">'+de(geh)+' C</strong><small>'+de(geh/SPIELTAGE)+" C je Spieltag · "+SPIELTAGE+' Spieltage</small></div>'+
+ '<div class="stp"><i class="g" style="width:'+(geh/GEHALTSTOPF*100)+'%"></i></div>'+
+ '<div class="leg"><span>Gehaltstopf (tragbar) <b class="t">'+de(GEHALTSTOPF)+' C</b></span><span>Luft <b class="t plus">'+de(GEHALTSTOPF-geh)+" C</b></span></div></div>"+
+ '<div class="blk"><div class="gk"><span>Budget &amp; Freigabe</span></div>'+
+ '<div class="gz"><span>Kasse</span><b class="t">'+de(kasse)+" C</b></div>"+
+ '<div class="gz"><span>Rücklage-Ziel<small>'+de(rueck/BUDGET*100)+" % vom Budget · Finanzwert "+de(FINANZWERT)+'</small></span><b class="t">−'+de(rueck)+" C</b></div>"+
+ '<div class="gz"><span>Gehaltspuffer<small>7 Spieltage Gehalt, soweit ungedeckt</small></span><b class="t">'+(puffer>0?"−":"")+de(puffer)+" C</b></div>"+
+ '<div class="gz"><span>Freigabe des Vorstands<small>Vertrauen</small></span><b class="t">× '+Math.round(QUOTE*100)+" %</b></div>"+
+ '<div class="frei"><span>Restbudget für den Markt<small>Transfertopf, sofort verfügbar</small></span><strong class="t">'+de(markt)+" C</strong></div></div>"+
+ '<div class="blk"><div class="gk"><span>Kaderplätze</span><b class="t">'+MEIN.length+" von 14</b></div><div class=\"pl\">"+
+   Array.from({length:14},function(_,i){return '<i class="'+(i<MEIN.length?(i<8?"p":"o"):"")+'"></i>'}).join("")+"</div>"+
+ '<div class="leg"><span>Pflicht <b class="t plus">8 / 8 erfüllt</b></span><span>Optional <b class="t">'+(MEIN.length-8)+" / 6</b> · "+(14-MEIN.length)+" frei</span></div></div>"+
+ '<div class="blk"><div class="gk"><span>Vergleich in Liga 2 · Rang von 16</span><span>Liga-Ø</span></div>'+
+   vg("Kaderstärke",function(t){return t.staerke},"")+vg("Gehaltssumme",function(t){return t.geh}," C")+vg("Ablösen",function(t){return t.abl}," C")+vg("Kasse",function(t){return t.kasse}," C")+vg("Kadergröße",function(t){return t.kader},"")+"</div>"+
+ '<div class="akt"><button class="knopf">Zum Transfermarkt · '+de(markt)+' C frei</button><button class="btn haupt">Weiter</button></div>';
+
+/* ---------- Liga-Uebersicht ---------- */
+var ligaWahl=2, ligaMal=tabelle($("#liga"),[
+  {k:"rg",t:"#",b:"2.4rem",a:"re",erstAuf:true,tt:"Rang nach Kaderstärke",w:function(t){return rang(LIGA,function(x){return x.staerke},t)},z:function(t){return '<span class="t null">'+rang(LIGA.filter(function(x){return !ligaWahl||x.l===ligaWahl}),function(x){return x.staerke},t)+".</span>"}},
+  {k:"n",t:"Team",erstAuf:true,w:function(t){return t.n},z:function(t){return '<span class="nm"><img class="wp" src="../team-logos/'+t.c+'.jpg" alt=""><div><b>'+t.n+'</b></div><span class="lg'+(t.l===1?" e":"")+'">L'+t.l+"</span></span>"}},
+  {k:"p",t:"Picks",b:"3.4rem",a:"re",w:function(t){return t.picks},z:function(t){return '<span class="t">'+t.picks+"</span>"}},
+  {k:"st",t:"Stärke",b:"4rem",a:"re",tt:"Kaderstärke (Ø der besten 6 je Disziplin)",w:function(t){return t.staerke},z:function(t){return '<b class="t">'+de(t.staerke)+"</b>"}},
+  {k:"o",t:"Ø OVR",b:"3.8rem",a:"re",w:function(t){return t.ovr},z:function(t){return '<span class="t">'+de(t.ovr)+"</span>"}},
+  {k:"te",t:"Teuerster Pick",b:"12rem",w:function(t){return t.teuer},z:function(t){return t.teuerN+' <b class="t" style="color:var(--creme)">'+de(t.teuer)+"</b>"}},
+  {k:"a",t:"Ablösen",b:"4.4rem",a:"re",w:function(t){return t.abl},z:function(t){return '<span class="t">'+de(t.abl)+"</span>"}},
+  {k:"g",t:"Gehalt/S.",b:"4.6rem",a:"re",w:function(t){return t.geh},z:function(t){return '<span class="t">'+de(t.geh)+"</span>"}},
+  {k:"k",t:"Kasse",b:"4rem",a:"re",w:function(t){return t.kasse},z:function(t){return '<b class="t">'+de(t.kasse)+"</b>"}}
+],function(){return LIGA.filter(function(t){return !ligaWahl||t.l===ligaWahl})},{start:"st",kl:function(t){return t.ich?"ich":""}});
+document.querySelectorAll("#ligawahl button").forEach(function(b){b.onclick=function(){ligaWahl=+b.dataset.l;zeig()}});
+
+/* ---------- Umschalter ---------- */
+var Q=new URLSearchParams(location.search), ansicht=Q.get("ansicht")==="liga"?"liga":"team";
+if(Q.get("still"))document.body.classList.add("still");
+function zeig(){document.body.classList.toggle("liga",ansicht==="liga");
+  document.querySelectorAll("[data-a]").forEach(function(b){b.classList.toggle("an",b.dataset.a===ansicht)});
+  document.querySelectorAll("#ligawahl button").forEach(function(b){b.classList.toggle("an",+b.dataset.l===ligaWahl)});
+  ligaMal()}
+document.querySelectorAll("[data-a]").forEach(function(b){b.onclick=function(){ansicht=b.dataset.a;zeig()}});
+zeig();
+</script>
+</body>
+</html>

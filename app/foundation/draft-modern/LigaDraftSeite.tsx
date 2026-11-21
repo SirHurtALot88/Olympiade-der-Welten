@@ -29,13 +29,16 @@ import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-d
 import { DraftProfil } from "./DraftProfil";
 import { getTeamTransferWishlistEntries } from "@/lib/scouting/scouting-wishlist-slots";
 import { AmZug, DanachAmZug, DraftBrett, Kopfleiste, LiveTicker, MeinDraft } from "./DraftLive";
-import { AbbruchDialog, AuslassenDialog, Ergebnis, FertigDialog, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
+import { AbbruchDialog, AuslassenDialog, FertigDialog, NachzugPanel, PickTafel, SkipDialog } from "./DraftAnsichten";
+import { ErgebnisSeite } from "./DraftErgebnis";
+import { baueDraftErgebnis } from "./draft-ergebnis";
 import { useLigaDraft } from "./draft-daten";
 import type { DraftKontext, DraftZeile } from "./draft-kontext";
 import { betragC, de, draftKopfSchluessel } from "./draft-format";
 import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil } from "@/app/foundation/shared/klickregel";
 import "@/app/foundation/transfermarkt-modern/transfermarkt-modern.css";
 import "./draft-modern.css";
+import "./draft-ergebnis.css";
 
 export type DraftTaktZustand = { label: string; title: string; statusClass: string; onClick: () => void };
 
@@ -187,6 +190,12 @@ export default function LigaDraftSeite({
             .map((s) => ({ playerId: s.playerId, name: spielerById.get(s.playerId)?.name ?? s.playerId, className: spielerById.get(s.playerId)?.className ?? "", ratings: s.ratings }))
         : [],
     [kaderSicht, ansicht?.mein, spielerById],
+  );
+
+  // „Draft beendet“ (21.11.): die Daten der Ergebnis-Ansicht nur bauen, wenn sie gebraucht wird (Vorstandsrechnung ist nicht billig).
+  const ergebnis = useMemo(
+    () => (ansicht && ansicht.status === "fertig" && ansicht.mein ? baueDraftErgebnis({ gameState, ansicht, disziplinIds: [...officialDisciplineWeightOrder] }) : null),
+    [gameState, ansicht],
   );
 
   const kontext: DraftKontext | null = ansicht
@@ -354,7 +363,15 @@ export default function LigaDraftSeite({
           <DraftLiga k={kontext} gameState={gameState} />
         </div>
       ) : ans === "ende" && ansicht.status === "fertig" ? (
-        <Ergebnis k={kontext} onWeiter={onWeiter} />
+        <ErgebnisSeite
+          k={kontext}
+          daten={ergebnis}
+          onWeiter={onWeiter}
+          onZumMarkt={() => {
+            hostProps.setActiveView("marketV2");
+            onWeiter();
+          }}
+        />
       ) : (
         <div className="dv drf-seite" data-testid="draft-live">
           <div className="folge df">
