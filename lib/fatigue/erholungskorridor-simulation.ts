@@ -8,8 +8,19 @@
  * `applyFatigueAndInjuryAfterMatchday`; die Slots kommen aus dem echten Spielplan-Generator.
  * Docs: `docs/design/fatigue-aktive-erholung-korridor-16-10.md`.
  */
-import type { GameState, LineupDraft, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
+import type {
+  GameState,
+  LineupDraft,
+  Player,
+  PlayerAttributeSheetStats,
+  RosterEntry,
+  SeasonDisciplineScheduleEntry,
+  Team,
+} from "@/lib/data/olyDataTypes";
 import { foundationSeedDisciplines } from "@/lib/data/dataAdapter";
+import { ordneSpielerAufPlaetze } from "@/lib/ai/ai-belastung-platzwahl";
+import { BELASTUNG_KI_LASTGEWICHT } from "@/lib/fatigue/belastung-regel";
+import { playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import {
   applyFatigueAndInjuryAfterMatchday,
   getInjuryRiskPercent,
@@ -41,6 +52,15 @@ export const KORRIDOR_TEST_SLOTS: Array<{ d1: number; d2: number }> = [
 
 export type Slots = Array<{ d1: number; d2: number }>;
 
+export function realSchedule(seed: string, repeat: 1 | 2): SeasonDisciplineScheduleEntry[] {
+  return buildSeasonSeededDisciplineSchedule({
+    saveId: seed,
+    seasonId: "season-1",
+    disciplines: foundationSeedDisciplines,
+    repeat,
+  }).entries.map((entry, index) => ({ ...entry, matchdayId: `md-${index + 1}` }));
+}
+
 export function slotsFromRealSchedule(seed: string, repeat: 1 | 2): Slots {
   const plan = buildSeasonSeededDisciplineSchedule({
     saveId: seed,
@@ -54,8 +74,54 @@ export function slotsFromRealSchedule(seed: string, repeat: 1 | 2): Slots {
   }));
 }
 
-function buildPlayer(id: string, mitTraining: boolean): Player {
+/** Deterministischer Zufall je Spieler (mulberry32 über einen FNV-Hash der ID). */
+function zufallFuer(id: string) {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i += 1) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Attributwerte wie im Bestand: stückweise lineare Verteilung durch die am Live-Spielstand gemessenen
+ * Anteile (docs/design/belastung-resistenz-21-11.md: rund 41 % unter 45, 60 % unter 60, 82 % unter 75).
+ */
+const ATTRIBUT_VERTEILUNG: Array<[number, number]> = [
+  [0, 1],
+  [0.41, 45],
+  [0.6, 60],
+  [0.82, 75],
+  [1, 99],
+];
+
+function zieheAttribut(u: number) {
+  for (let i = 0; i < ATTRIBUT_VERTEILUNG.length - 1; i += 1) {
+    const [p0, w0] = ATTRIBUT_VERTEILUNG[i]!;
+    const [p1, w1] = ATTRIBUT_VERTEILUNG[i + 1]!;
+    if (u <= p1) return Math.round(w0 + ((u - p0) / (p1 - p0)) * (w1 - w0));
+  }
+  return 99;
+}
+
+export function synthetischeAttribute(id: string): PlayerAttributeSheetStats {
+  const zufall = zufallFuer(`attr:${id}`);
+  return Object.fromEntries(
+    playerGeneratorAttributeKeys.map((key) => [key, zieheAttribut(zufall())]),
+  ) as unknown as PlayerAttributeSheetStats;
+}
+
+function buildPlayer(id: string, mitTraining: boolean, mitAttributen = false): Player {
   return {
+    ...(mitAttributen ? { attributeSheetStats: synthetischeAttribute(id) } : {}),
     id,
     name: id,
     rating: 60,
@@ -92,9 +158,27 @@ export type KorridorOptionen = {
    * selbst, genau wie im Spiel.
    */
   gameMode?: "battle" | "manager";
+  /**
+   * Belastungsregel v2 (21.11.): setzt den Saison-Stempel (Battle, 20 Spieltage nötig), gibt den
+   * Spielern Attribute und spielt die echten Disziplinen des Spielplans (`spielplan`, Pflicht).
+   */
+  belastungsRegel?: "v2";
+  /** Echter Spielplan (Disziplin-IDs je Spieltag) — Pflicht unter v2, sonst ungenutzt. */
+  spielplan?: SeasonDisciplineScheduleEntry[];
+  /** Spieler mit Attributen, auch ohne v2 (Vergleich „heute" mit denselben Spielern). */
+  mitAttributen?: boolean;
+  /**
+   * Wie die Gewählten einer Seite auf die Plätze kommen:
+   *   "reihenfolge" — wie gewählt (Standard, bisheriger Basisfall),
+   *   "platzwert"   — nach Rollen-Aufschlag, ohne Last (KI ohne Resistenz),
+   *   "ki"          — Rollen-Aufschlag − BELASTUNG_KI_LASTGEWICHT × Last (die gebaute KI),
+   *   "last"        — rein nach Last (Obergrenze: alle setzen nach Resistenz).
+   */
+  platzwahl?: "reihenfolge" | "platzwert" | "ki" | "last";
 };
 
-function buildLeague(matchdayCount: number, optionen: KorridorOptionen): GameState {
+export function buildKorridorLeague(matchdayCount: number, optionen: KorridorOptionen): GameState {
+  const mitAttributen = Boolean(optionen.mitAttributen || optionen.belastungsRegel === "v2");
   const teams: Team[] = [];
   const players: Player[] = [];
   const rosters: RosterEntry[] = [];
@@ -103,7 +187,7 @@ function buildLeague(matchdayCount: number, optionen: KorridorOptionen): GameSta
     teams.push({ teamId, shortCode: teamId, name: teamId, budget: 50, cash: 50, humanControlled: false } as unknown as Team);
     for (let playerIndex = 0; playerIndex < size; playerIndex += 1) {
       const playerId = `p-${teamIndex}-${playerIndex}`;
-      players.push(buildPlayer(playerId, Boolean(optionen.mitTraining)));
+      players.push(buildPlayer(playerId, Boolean(optionen.mitTraining), mitAttributen));
       rosters.push({ id: `r-${teamIndex}-${playerIndex}`, teamId, playerId } as unknown as RosterEntry);
     }
   });
@@ -119,7 +203,8 @@ function buildLeague(matchdayCount: number, optionen: KorridorOptionen): GameSta
     seasonState: {
       seasonId: "season-1",
       schedule: [],
-      disciplineSchedule: [],
+      disciplineSchedule: optionen.spielplan ?? [],
+      ...(optionen.belastungsRegel === "v2" ? { belastungsRegel: { seasonId: "season-1", version: "v2" as const } } : {}),
       lineupDrafts: [],
       injuryEvents: [],
       playerAvailabilityState: [],
@@ -162,10 +247,12 @@ export type SeasonResult = {
   avgFatigueEnd: number;
   avgFatigueMid: number;
   teamsWithLineupShortfall: number;
+  /** Der Spielstand nach dem letzten Spieltag (für Bit-Gleichheits-Prüfungen). */
+  endState: GameState;
 };
 
 export function runKorridorSeason(saveId: string, slots: Slots, optionen: KorridorOptionen = {}): SeasonResult {
-  let gameState = buildLeague(slots.length, optionen);
+  let gameState = buildKorridorLeague(slots.length, optionen);
   const injuriesByMatchday: number[] = [];
   let rolls = 0;
   let rollsAt80Plus = 0;
@@ -180,9 +267,25 @@ export function runKorridorSeason(saveId: string, slots: Slots, optionen: Korrid
   for (let mdIndex = 0; mdIndex < slots.length; mdIndex += 1) {
     const matchdayId = `md-${mdIndex + 1}`;
     const { d1, d2 } = slots[mdIndex]!;
+    const planEintrag = optionen.spielplan?.[mdIndex] ?? null;
+    const disc1 = planEintrag?.discipline1?.disciplineId ?? "disc-1";
+    const disc2 = planEintrag?.discipline2?.disciplineId ?? "disc-2";
+    const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
+    const ordne = (ids: string[], disciplineId: string, slotCount: number) => {
+      const art = optionen.platzwahl ?? "reihenfolge";
+      if (art === "reihenfolge" || ids.length < 2) return ids;
+      return ordneSpielerAufPlaetze({
+        disciplineId,
+        slotCount,
+        altGrundlast: MATCHDAY_FATIGUE_LOAD,
+        lastGewicht: art === "platzwert" ? 0 : art === "last" ? 1000 : BELASTUNG_KI_LASTGEWICHT,
+        spieler: ids.map((id) => ({ playerId: id, attributeStats: playerById.get(id)?.attributeSheetStats ?? null, lastFaktor: 1 })),
+      });
+    };
     const drafts: LineupDraft[] = gameState.teams.map((team) => {
-      const picked = selectLowestFatigue(gameState, team.teamId, matchdayId, d1 + d2);
-      if (picked.length < d1 + d2) shortfallTeams.add(team.teamId);
+      const gewaehlt = selectLowestFatigue(gameState, team.teamId, matchdayId, d1 + d2);
+      if (gewaehlt.length < d1 + d2) shortfallTeams.add(team.teamId);
+      const picked = [...ordne(gewaehlt.slice(0, d1), disc1, d1), ...ordne(gewaehlt.slice(d1, d1 + d2), disc2, d2)];
       return {
         lineupId: `lineup-${team.teamId}-${matchdayId}`,
         saveId,
@@ -192,14 +295,14 @@ export function runKorridorSeason(saveId: string, slots: Slots, optionen: Korrid
         status: "submitted",
         entries: [
           ...picked.slice(0, d1).map((playerId, slotIndex) => ({
-            disciplineId: "disc-1",
+            disciplineId: disc1,
             disciplineSide: "d1" as const,
             slotIndex,
             playerId,
             activePlayerId: playerId,
           })),
           ...picked.slice(d1, d1 + d2).map((playerId, slotIndex) => ({
-            disciplineId: "disc-2",
+            disciplineId: disc2,
             disciplineSide: "d2" as const,
             slotIndex,
             playerId,
@@ -245,6 +348,7 @@ export function runKorridorSeason(saveId: string, slots: Slots, optionen: Korrid
     avgFatigueEnd: averageFatigue(gameState),
     avgFatigueMid,
     teamsWithLineupShortfall: shortfallTeams.size,
+    endState: gameState,
   };
 }
 

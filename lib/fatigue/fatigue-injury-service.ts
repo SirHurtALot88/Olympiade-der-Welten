@@ -1,4 +1,5 @@
 import type {
+  BelastungsPauseRecord,
   GameState,
   InjuryEventRecord,
   LineupDraft,
@@ -20,9 +21,24 @@ import {
   injuryRiskBands,
   type InjuryRiskBand,
 } from "@/lib/fatigue/fatigue-calibration";
-import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
+import {
+  BELASTUNG_PAUSE_NACH_SPIELTAG,
+  BELASTUNG_V2_AKTIVE_ERHOLUNG,
+  berechneEinsatzLast,
+  istBelastungsStufe,
+  projiziereEinsatzErschoepfung,
+  type BelastungsRegelVersion,
+  type BelastungsStufe,
+} from "@/lib/fatigue/belastung-regel";
+import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
+import {
+  resolveSlotRolesForDiscipline,
+  type MatchdayIntensityStage,
+  type MatchdaySlotRoleDefinition,
+} from "@/lib/lineups/matchday-slot-roles";
+import type { PlayerGeneratorAttributeKey } from "@/lib/player-generator/official-discipline-weights";
 import { slimInjuryEvent } from "@/lib/persistence/save-payload-slimming";
-import { isDoubledBattleSeason } from "@/lib/season/season-discipline-schedule";
+import { getSeasonDisciplineScheduleEntry, isDoubledBattleSeason } from "@/lib/season/season-discipline-schedule";
 import { applyTrainingRecoveryImpact } from "@/lib/training/training-recovery-impact";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft-effects";
@@ -256,6 +272,19 @@ export const MATCHDAY_ACTIVE_RECOVERY = Math.min(
 /** Der Rotations-Aufschlag: was ein Bank-/Verletzten-Spieltag ÜBER die aktive Erholung hinaus gibt. */
 export const MATCHDAY_BENCH_BONUS_RECOVERY = round(BASE_MATCHDAY_RECOVERY - MATCHDAY_ACTIVE_RECOVERY);
 
+/**
+ * Die aktive Erholung DIESER Saison: 4,0 in einer Saison mit Belastungsregel v2 (Chris 21.11., gleicht
+ * die Pause nach Spieltag 10 aus), sonst `MATCHDAY_ACTIVE_RECOVERY` (4,5) — bit-identisch für jede
+ * Saison ohne Stempel. Die Bank-Erholung (Summe beider Teile) bleibt in beiden Fällen 28.
+ */
+export function getMatchdayActiveRecoveryValue(
+  gameState?: Parameters<typeof belastungsRegelFuer>[0] | null,
+): number {
+  return belastungsRegelFuer(gameState) === "v2"
+    ? Math.min(BASE_MATCHDAY_RECOVERY, BELASTUNG_V2_AKTIVE_ERHOLUNG)
+    : MATCHDAY_ACTIVE_RECOVERY;
+}
+
 /** Dreiwertig: explizit an, explizit aus, oder nicht gesetzt (dann entscheidet der Spielstand). */
 function envSwitch(name: string): boolean | null {
   const raw = process.env[name];
@@ -407,10 +436,19 @@ export type InjuryRehearsalOptions = {
   riskPercentOverride?: number;
 };
 
+/** Ein Platz, auf dem der Spieler an diesem Spieltag steht (nur unter Belastungsregel v2 befüllt). */
+type MatchdayUseSlot = {
+  intensity: MatchdayIntensityStage;
+  stufe: BelastungsStufe;
+  strainAttribute: PlayerGeneratorAttributeKey;
+};
+
 type MatchdayUse = {
   teamId: string;
   playerId: string;
   intensity: MatchdayIntensityStage;
+  /** Unter v2 die Plätze des Spielers (eine Seite oder beide); unter der alten Regel leer. */
+  slots: MatchdayUseSlot[];
 };
 
 export type MatchdayInjuryRollKey = `${string}::${string}`;
@@ -448,9 +486,47 @@ function getPlayerMatchdayFatigueLoad(
   player: Pick<Player, "traitsPositive" | "traitsNegative">,
   intensity: MatchdayIntensityStage = "normal",
 ) {
-  return round(
-    MATCHDAY_FATIGUE_LOAD * getPlayerFatigueLoadMultiplier(player) * INTENSITY_FATIGUE_MULT[intensity],
-  );
+  return berechneEinsatzLast({
+    regel: "alt",
+    altGrundlast: MATCHDAY_FATIGUE_LOAD,
+    traitMultiplikator: getPlayerFatigueLoadMultiplier(player),
+    einsatzMultiplikator: INTENSITY_FATIGUE_MULT[intensity],
+  });
+}
+
+/**
+ * Die Last eines EINSATZES über die eine Formel (`berechneEinsatzLast`, lib/fatigue/belastung-regel.ts).
+ *
+ * Alte Regel (jede Saison ohne Stempel): unverändert `getPlayerMatchdayFatigueLoad` — 16 × Trait ×
+ * Einsatz der härteren Seite. Regel v2: je Platz (Grundlast der Stufe + Resistenz-Zusatz) × Trait ×
+ * Einsatz dieser Seite; steht der Spieler auf beiden Seiten, gilt — wie bisher bei der Intensität — die
+ * härtere Last.
+ */
+function getPlayerMatchdayFatigueLoadForUse(
+  player: Pick<Player, "traitsPositive" | "traitsNegative" | "attributeSheetStats">,
+  use: Pick<MatchdayUse, "intensity" | "slots">,
+) {
+  if (use.slots.length === 0) {
+    return getPlayerMatchdayFatigueLoad(player, use.intensity);
+  }
+  const traitMultiplikator = getPlayerFatigueLoadMultiplier(player);
+  let last = 0;
+  for (const slot of use.slots) {
+    const kandidat = berechneEinsatzLast({
+      regel: "v2",
+      altGrundlast: MATCHDAY_FATIGUE_LOAD,
+      traitMultiplikator,
+      einsatzMultiplikator: INTENSITY_FATIGUE_MULT[slot.intensity],
+      slot: { stufe: slot.stufe, resistenz: player.attributeSheetStats?.[slot.strainAttribute] ?? null },
+    });
+    if (kandidat > last) last = kandidat;
+  }
+  return last;
+}
+
+/** Der Trait-Multiplikator der Last — für die Einsatzlisten-Vorschau, die die Last je Platz selbst rechnet. */
+export function getPlayerFatigueLoadTraitMultiplier(player: Pick<Player, "traitsPositive" | "traitsNegative">) {
+  return getPlayerFatigueLoadMultiplier(player);
 }
 
 /**
@@ -467,9 +543,9 @@ function getPlayerMatchdayFatigueDelta(input: {
   gameState: GameState;
   player: Player;
   teamId: string;
-  intensity: MatchdayIntensityStage;
+  use: Pick<MatchdayUse, "intensity" | "slots">;
 }) {
-  const load = getPlayerMatchdayFatigueLoad(input.player, input.intensity);
+  const load = getPlayerMatchdayFatigueLoadForUse(input.player, input.use);
   const credit = getPlayerActiveRecoveryCredit(input.gameState, input.teamId, input.player.trainingMode);
   return credit === 0 ? load : round(load - credit);
 }
@@ -514,14 +590,32 @@ export function projectMatchdayInjuryRisk(input: {
    * damit Anzeige und Buchhaltung nie auseinanderdriften.
    */
   activeRecovery?: number;
+  /**
+   * Belastungsregel v2: der Platz, auf dem der Einsatz stattfände (Stufe und Resistenzwert). Ohne
+   * Angabe oder unter der alten Regel: die platzunabhängige Last (16 × Trait × Einsatz).
+   */
+  regel?: BelastungsRegelVersion;
+  slot?: { stufe: BelastungsStufe; resistenz: number | null | undefined } | null;
 }): MatchdayInjuryRiskProjection {
-  const matchdayLoad = getPlayerMatchdayFatigueLoad(input.player, input.intensity ?? "normal");
+  const intensity = input.intensity ?? "normal";
+  const matchdayLoad =
+    input.regel === "v2" && input.slot && istBelastungsStufe(input.slot.stufe)
+      ? berechneEinsatzLast({
+          regel: "v2",
+          altGrundlast: MATCHDAY_FATIGUE_LOAD,
+          traitMultiplikator: getPlayerFatigueLoadMultiplier(input.player),
+          einsatzMultiplikator: INTENSITY_FATIGUE_MULT[intensity],
+          slot: input.slot,
+        })
+      : getPlayerMatchdayFatigueLoad(input.player, intensity);
   const activeRecovery = Math.max(0, input.activeRecovery ?? 0);
   // Gleiche Rechnung wie im Roll-Loop: getPlayerCurrentFatigue klemmt die aktuelle Fatigue,
   // danach klemmt die Summe erneut — beides hier gespiegelt, damit Randfaelle (>100) identisch fallen.
-  const fatigueBeforeRoll = clampFatigue(
-    clampFatigue(input.currentFatigue) + (activeRecovery === 0 ? matchdayLoad : round(matchdayLoad - activeRecovery)),
-  );
+  const fatigueBeforeRoll = projiziereEinsatzErschoepfung({
+    aktuelleFatigue: input.currentFatigue,
+    last: matchdayLoad,
+    aktiveErholung: activeRecovery,
+  });
   return {
     fatigueBeforeRoll,
     matchdayLoad,
@@ -706,9 +800,9 @@ export const INJURY_RECOVERY_PCT = Math.round(INJURY_RECOVERY_FACTOR * 100);
  * 28 + 2×24 anheben und damit genau den gebäudelosen Verletzungs-Korridor reißen, den der
  * Aufschlag laut `facility-effects.ts` bewusst unangetastet lässt.
  */
-function splitRecovery(totalRecovery: number) {
+function splitRecovery(totalRecovery: number, activeRecoveryValue: number = MATCHDAY_ACTIVE_RECOVERY) {
   const activeShare =
-    BASE_MATCHDAY_RECOVERY > 0 ? MATCHDAY_ACTIVE_RECOVERY / BASE_MATCHDAY_RECOVERY : 0;
+    BASE_MATCHDAY_RECOVERY > 0 ? activeRecoveryValue / BASE_MATCHDAY_RECOVERY : 0;
   const activeRecovery = round(totalRecovery * activeShare, 2);
   return {
     activeRecovery,
@@ -722,7 +816,7 @@ export function calculateTeamRecovery(gameState: GameState, teamId: string) {
   return {
     normalRecovery,
     injuryRecovery: round(normalRecovery * INJURY_RECOVERY_FACTOR, 2),
-    ...splitRecovery(normalRecovery),
+    ...splitRecovery(normalRecovery, getMatchdayActiveRecoveryValue(gameState)),
   };
 }
 
@@ -740,7 +834,7 @@ export function calculatePlayerRecovery(
     // Der Trainingsmodus multipliziert die GESAMTE Erholung; die Zerlegung folgt ihm anteilig,
     // damit „schonend trainieren" auch dem hilft, der spielt — und die Summe die Bank-Erholung
     // weiterhin exakt trifft.
-    ...splitRecovery(modeRecovery.after),
+    ...splitRecovery(modeRecovery.after, getMatchdayActiveRecoveryValue(gameState)),
     trainingMode: trainingMode ?? "mittel",
     trainingRecoveryModifierPct: modeRecovery.modifierPct,
     trainingRecoveryLabel: modeRecovery.label,
@@ -953,6 +1047,9 @@ function collectMatchdayUses(
   const drafts = (gameState.seasonState.lineupDrafts ?? []).filter(
     (draft) => draft.seasonId === seasonId && draft.matchdayId === matchdayId,
   );
+  // Belastungsregel v2: die Last hängt am Platz. Nur dann werden die Rollen aufgelöst — unter der
+  // alten Regel bleibt `slots` leer und die Rechnung bit-identisch.
+  const slotRolle = belastungsRegelFuer(gameState) === "v2" ? buildMatchdaySlotRoleResolver(gameState, matchdayId) : null;
   for (const draft of drafts) {
     for (const entry of draft.entries) {
       if (commitThroughSide === "d1" && entry.disciplineSide !== "d1") continue;
@@ -960,17 +1057,59 @@ function collectMatchdayUses(
       const key = `${draft.teamId}::${entry.playerId}`;
       // Each entry carries its discipline side; the side's intensity lives in the draft modifiers.
       const intensity = normalizeIntensityStage(draft.modifiers?.[entry.disciplineSide]?.intensity);
+      const slot: MatchdayUseSlot | null = slotRolle ? toUseSlot(slotRolle(draft, entry), intensity) : null;
       const existing = byKey.get(key);
       if (!existing) {
-        byKey.set(key, { teamId: draft.teamId, playerId: entry.playerId, intensity });
+        byKey.set(key, { teamId: draft.teamId, playerId: entry.playerId, intensity, slots: slot ? [slot] : [] });
         continue;
       }
       if (INTENSITY_LOAD_RANK[intensity] > INTENSITY_LOAD_RANK[existing.intensity]) {
         existing.intensity = intensity;
       }
+      if (slot) existing.slots.push(slot);
     }
   }
   return [...byKey.values()];
+}
+
+function toUseSlot(role: MatchdaySlotRoleDefinition | null, intensity: MatchdayIntensityStage): MatchdayUseSlot {
+  return {
+    intensity,
+    stufe: role && istBelastungsStufe(role.fatigueProfile) ? role.fatigueProfile : "medium",
+    strainAttribute: role?.strainAttribute ?? "stamina",
+  };
+}
+
+/**
+ * Löst die Slot-Rolle eines Entwurfs-Eintrags auf — dieselbe Rollentabelle wie Einsatzliste und
+ * Wertung (`resolveSlotRolesForDiscipline` mit der Kadergröße des Spielplans, Rückfall: höchster
+ * besetzter Platz bzw. Zahl der Einträge der Seite, wie `calculateSideSlotRoleModifierBreakdown`).
+ */
+export function buildMatchdaySlotRoleResolver(gameState: GameState, matchdayId: string) {
+  const scheduleEntry = getSeasonDisciplineScheduleEntry(gameState, matchdayId);
+  const cache = new Map<string, MatchdaySlotRoleDefinition[]>();
+  return (
+    draft: Pick<LineupDraft, "entries">,
+    entry: Pick<LineupDraft["entries"][number], "disciplineId" | "disciplineSide" | "slotIndex">,
+  ): MatchdaySlotRoleDefinition | null => {
+    const scheduleSlot = entry.disciplineSide === "d1" ? scheduleEntry?.discipline1 : scheduleEntry?.discipline2;
+    const sideEntries = draft.entries.filter(
+      (other) => other.disciplineSide === entry.disciplineSide && other.disciplineId === entry.disciplineId,
+    );
+    const highest = sideEntries.reduce((max, other) => Math.max(max, other.slotIndex), 0);
+    const scheduled =
+      scheduleSlot?.disciplineId === entry.disciplineId && typeof scheduleSlot.playerCount === "number"
+        ? scheduleSlot.playerCount
+        : null;
+    const slotCount = scheduled ?? Math.max(highest + 1, sideEntries.length);
+    const cacheKey = `${entry.disciplineId}::${slotCount}`;
+    let roles = cache.get(cacheKey);
+    if (!roles) {
+      roles = resolveSlotRolesForDiscipline(entry.disciplineId, entry.disciplineId, slotCount);
+      cache.set(cacheKey, roles);
+    }
+    return roles[entry.slotIndex] ?? null;
+  };
 }
 
 function updateAvailability(
@@ -1083,7 +1222,7 @@ export function buildMatchdayInjuryRollMap(input: {
      */
     const matchFatigueNachEinsatz = clampFatigue(
       getPlayerCurrentFatigue(gameState, player, use.teamId) +
-        getPlayerMatchdayFatigueDelta({ gameState, player, teamId: use.teamId, intensity: use.intensity }),
+        getPlayerMatchdayFatigueDelta({ gameState, player, teamId: use.teamId, use }),
     );
     const risikoFatigue = clampFatigue(
       matchFatigueNachEinsatz + getPlayerTrainingFatigueShare(player, gameState.season.id),
@@ -1382,7 +1521,11 @@ function restorePreMatchdayAvailability(input: {
   if (!input.isMatchdayReplay) {
     return input.gameState;
   }
-  const { gameState, seasonId, matchdayId } = input;
+  const { seasonId, matchdayId } = input;
+  // Wurde nach diesem Spieltag schon die Pause gebucht (Belastungsregel v2, Spieltag 10), steht das
+  // Konto auf dem Stand NACH der Pause. Zuerst exakt auf den gespeicherten Vor-Pausen-Stand zurück —
+  // eine Rücknahme über „+ Erholung“ wäre an der 0 geklemmt falsch —, dann wie immer den Spieltag.
+  const gameState = undoBelastungsPause(input.gameState, seasonId, matchdayId);
   const currentAvailability = gameState.seasonState.playerAvailabilityState ?? [];
   if (currentAvailability.length === 0) {
     return gameState;
@@ -1401,9 +1544,9 @@ function restorePreMatchdayAvailability(input: {
   // Same-Day-Malus, keine Verletzung. Im echten Spielstand exakt so gemessen: 1398 D2-Wuerfe,
   // 0 Verletzungen, mittlere `fatigueBefore` 12,1 gegen 24,5 auf D1.
   const appliedThroughSide = getAlreadyAppliedMatchdaySide(gameState, seasonId, matchdayId);
-  const usedIntensityByKey = new Map<string, MatchdayIntensityStage>(
+  const usedByKey = new Map<string, MatchdayUse>(
     collectMatchdayUses(gameState, seasonId, matchdayId, appliedThroughSide).map(
-      (use) => [`${use.teamId}::${use.playerId}`, use.intensity] as const,
+      (use) => [`${use.teamId}::${use.playerId}`, use] as const,
     ),
   );
   // Wer erst auf der NOCH OFFENEN Seite laeuft, wurde vom bisherigen Commit gar nicht
@@ -1451,18 +1594,18 @@ function restorePreMatchdayAvailability(input: {
       matchdayBookkeeping: true,
     });
     const useKey = `${entry.teamId}::${entry.playerId}`;
-    const wasUsedLoop = usedIntensityByKey.has(useKey) && !view.isUnavailable;
+    const wasUsedLoop = usedByKey.has(useKey) && !view.isUnavailable;
     if (wasUsedLoop) {
       // Einsatz-Spieler: erster Apply hat den NETTO-Delta gerechnet (Last, intensitätsskaliert,
       // abzüglich der aktiven Erholung) -> denselben Delta zurücknehmen. Über
       // `getPlayerMatchdayFatigueDelta` ist das per Konstruktion dieselbe Zahl, auch wenn der
       // Schalter zwischendurch umgelegt würde.
-      const intensity = usedIntensityByKey.get(useKey) ?? "normal";
+      const use = usedByKey.get(useKey) ?? { intensity: "normal" as const, slots: [] };
       return {
         ...entry,
         fatigue: clampFatigue(
           entry.fatigue -
-            getPlayerMatchdayFatigueDelta({ gameState, player, teamId: entry.teamId, intensity }),
+            getPlayerMatchdayFatigueDelta({ gameState, player, teamId: entry.teamId, use }),
         ),
       };
     }
@@ -1665,7 +1808,7 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
      */
     const matchFatigueNachEinsatz = clampFatigue(
       getPlayerCurrentFatigue(gameState, player, use.teamId) +
-        getPlayerMatchdayFatigueDelta({ gameState, player, teamId: use.teamId, intensity: use.intensity }),
+        getPlayerMatchdayFatigueDelta({ gameState, player, teamId: use.teamId, use }),
     );
     const risikoFatigue = clampFatigue(
       matchFatigueNachEinsatz + getPlayerTrainingFatigueShare(player, gameState.season.id),
@@ -1740,14 +1883,35 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
     .filter((event) => event.result === "injured")
     .map((event) => buildInjuryHighlight(event, playerNameById.get(event.playerId) ?? event.playerId, input.matchdayResultId));
 
+  // DIE PAUSE NACH SPIELTAG 10 (Belastungsregel v2): erst wenn der Spieltag KOMPLETT gebucht ist.
+  const pause = isBelastungsPauseNachSpieltag(gameState, input.matchdayId) && (input.commitThroughSide ?? "d2") === "d2"
+    ? bucheBelastungsPause({
+        gameState,
+        seasonId: input.seasonId,
+        matchdayId: input.matchdayId,
+        availability: nextAvailability,
+        players: nextPlayers,
+      })
+    : null;
+  if (pause) {
+    nextAvailability = pause.availability;
+  }
+  const bisherigePause = gameState.seasonState.belastungsPause;
+  const naechstePause = pause
+    ? pause.record
+    : bisherigePause && bisherigePause.seasonId === input.seasonId && bisherigePause.nachMatchdayId === input.matchdayId
+      ? null
+      : bisherigePause;
+
   return {
     injuryEvents: newEvents,
     deferredPlayerIds,
     gameState: {
       ...gameState,
-      players: nextPlayers,
+      players: pause ? pause.players : nextPlayers,
       seasonState: {
         ...gameState.seasonState,
+        ...(naechstePause !== bisherigePause ? { belastungsPause: naechstePause } : {}),
         playerAvailabilityState: nextAvailability,
         injuryEvents: [
           ...(gameState.seasonState.injuryEvents ?? []).filter(
@@ -1760,6 +1924,117 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
           ...injuryHighlights,
         ],
       },
+    },
+  };
+}
+
+/**
+ * Liegt nach diesem Spieltag die Pause? Nur unter Belastungsregel v2, nur nach Spieltag 10 und nur,
+ * wenn die Saison danach noch weitergeht (bei 10 Spieltagen wäre sie am Saisonende wirkungslos).
+ */
+export function isBelastungsPauseNachSpieltag(gameState: GameState, matchdayId: string) {
+  if (belastungsRegelFuer(gameState) !== "v2") return false;
+  const ids = gameState.season?.matchdayIds ?? [];
+  return ids.length > BELASTUNG_PAUSE_NACH_SPIELTAG && ids.indexOf(matchdayId) === BELASTUNG_PAUSE_NACH_SPIELTAG - 1;
+}
+
+/** Der Spieltag, nach dem in DIESER Saison die Pause liegt (null ohne Belastungsregel v2). */
+export function getBelastungsPauseMatchdayId(gameState: GameState): string | null {
+  if (belastungsRegelFuer(gameState) !== "v2") return null;
+  const ids = gameState.season?.matchdayIds ?? [];
+  return ids.length > BELASTUNG_PAUSE_NACH_SPIELTAG ? ids[BELASTUNG_PAUSE_NACH_SPIELTAG - 1] ?? null : null;
+}
+
+/**
+ * DIE PAUSE: jeder Kaderspieler bekommt einmal die Erholung eines spielfreien Spieltags —
+ * `calculatePlayerRecovery` (28 + Reha-Zentrum) × Trainingsmodus, Verletzte `injuryRecovery`.
+ *
+ * Zählt NICHT als Spieltag: Sperren hängen an Spieltags-Indizes und bleiben, wie sie sind (wer an
+ * Spieltag 10 verletzt wird, fehlt an Spieltag 11), und die Trainingsschicht wird nicht fortgeschrieben
+ * (`accumulateMatchdayTrainingProgress` läuft je Spieltag, nicht hier). Gebucht wird nur das KONTO
+ * (Match-Fatigue); die Trainingsschicht bleibt stehen, wie im Mockup.
+ */
+function bucheBelastungsPause(input: {
+  gameState: GameState;
+  seasonId: string;
+  matchdayId: string;
+  availability: PlayerAvailabilityStateRecord[];
+  players: Player[];
+}) {
+  const playerIndexById = new Map(input.players.map((player, index) => [player.id, index] as const));
+  const nextPlayers = [...input.players];
+  const eintraege: BelastungsPauseRecord["eintraege"] = [];
+  const nextAvailability = input.availability.map((entry) => {
+    const playerIndex = playerIndexById.get(entry.playerId);
+    if (playerIndex == null || !isActiveRosterPlayer(input.gameState, entry.playerId, entry.teamId)) return entry;
+    const player = nextPlayers[playerIndex];
+    const recovery = calculatePlayerRecovery(input.gameState, entry.teamId, player.trainingMode);
+    const verletzt = isPlayerAvailabilityInjured(entry);
+    const erholung = verletzt ? recovery.injuryRecovery : recovery.normalRecovery;
+    const fatigueVorher = clampFatigue(entry.fatigue);
+    const fatigueNachher = clampFatigue(fatigueVorher - erholung);
+    eintraege.push({
+      playerId: entry.playerId,
+      teamId: entry.teamId,
+      fatigueVorher,
+      erholung,
+      fatigueNachher,
+      ...(verletzt ? { verletzt: true } : {}),
+    });
+    nextPlayers[playerIndex] = { ...player, fatigue: fatigueNachher };
+    return { ...entry, fatigue: fatigueNachher };
+  });
+  return {
+    availability: nextAvailability,
+    players: nextPlayers,
+    record: { seasonId: input.seasonId, nachMatchdayId: input.matchdayId, eintraege } satisfies BelastungsPauseRecord,
+  };
+}
+
+/**
+ * Für die Einsatzliste: wann liegt die Pause und ist sie schon gebucht? null ohne Belastungsregel v2.
+ * Gebucht: die Einträge DIESES Teams (Erholung je Spieler).
+ */
+export function buildBelastungsPauseRef(gameState: GameState, teamId: string) {
+  const nachMatchdayId = getBelastungsPauseMatchdayId(gameState);
+  if (!nachMatchdayId) return null;
+  const pause = gameState.seasonState.belastungsPause;
+  const gebucht = Boolean(pause && pause.seasonId === gameState.season.id && pause.nachMatchdayId === nachMatchdayId);
+  return {
+    nachSpieltag: BELASTUNG_PAUSE_NACH_SPIELTAG,
+    nachMatchdayId,
+    spieltageGesamt: gameState.season.matchdayIds.length,
+    gebucht,
+    ...(gebucht && pause
+      ? {
+          eintraege: pause.eintraege
+            .filter((entry) => entry.teamId === teamId)
+            .map(({ playerId, fatigueVorher, erholung, fatigueNachher, verletzt }) => ({
+              playerId,
+              fatigueVorher,
+              erholung,
+              fatigueNachher,
+              ...(verletzt ? { verletzt } : {}),
+            })),
+        }
+      : {}),
+  };
+}
+
+/** Nimmt eine gebuchte Pause nach `matchdayId` exakt zurück (Konto auf den gespeicherten Vor-Stand). */
+function undoBelastungsPause(gameState: GameState, seasonId: string, matchdayId: string): GameState {
+  const pause = gameState.seasonState.belastungsPause;
+  if (!pause || pause.seasonId !== seasonId || pause.nachMatchdayId !== matchdayId) return gameState;
+  const vorher = new Map(pause.eintraege.map((entry) => [`${entry.teamId}::${entry.playerId}`, entry.fatigueVorher] as const));
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      playerAvailabilityState: (gameState.seasonState.playerAvailabilityState ?? []).map((entry) => {
+        const wert = vorher.get(`${entry.teamId}::${entry.playerId}`);
+        return wert == null ? entry : { ...entry, fatigue: wert };
+      }),
+      belastungsPause: null,
     },
   };
 }

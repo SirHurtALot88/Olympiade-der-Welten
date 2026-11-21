@@ -19,6 +19,10 @@ import { seededFormJitter } from "@/lib/lineups/legacy-lineup-modifiers";
 import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engine";
 import type { DisciplineSide, LegacyLineupEntryInput, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
+import { ordneSpielerAufPlaetze } from "@/lib/ai/ai-belastung-platzwahl";
+import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
+import { MATCHDAY_FATIGUE_LOAD } from "@/lib/fatigue/fatigue-injury-service";
+import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft-effects";
 
 type CaptainSuggestionCandidate = {
   disciplineId: string;
@@ -708,6 +712,8 @@ function buildSideResult(input: {
   plan: SideAllocationPlan;
   pickedCandidates: SideCandidate[];
   lineupStrategy: AiLineupStrategy;
+  /** Nur unter Belastungsregel v2: Plätze nach Platzwert + leicht gewichteter Last besetzen. */
+  belastungsKontext?: LegacyLineupLoadedContext | null;
 }): { entries: LegacyLineupEntryInput[]; warnings: string[]; reasoning: string[] } {
   const { plan, lineupStrategy } = input;
   if (!plan.disciplineId) {
@@ -731,6 +737,29 @@ function buildSideResult(input: {
     }
     return left.playerId.localeCompare(right.playerId);
   });
+
+  if (input.belastungsKontext && picked.length > 1) {
+    const rosterById = new Map((input.belastungsKontext.rosterPlayers ?? []).map((player) => [player.id, player] as const));
+    const reihenfolge = ordneSpielerAufPlaetze({
+      disciplineId,
+      disciplineName: getDisciplineName(input.belastungsKontext, disciplineId),
+      slotCount: plan.playerCount,
+      altGrundlast: MATCHDAY_FATIGUE_LOAD,
+      spieler: picked.map((player) => {
+        const roster = rosterById.get(player.playerId);
+        return {
+          playerId: player.playerId,
+          attributeStats: roster?.attributeStats ?? null,
+          lastFaktor: getPlayerFatigueLoadMultiplier({
+            traitsPositive: roster?.traitsPositive ?? [],
+            traitsNegative: roster?.traitsNegative ?? [],
+          }),
+        };
+      }),
+    });
+    const byId = new Map(picked.map((player) => [player.playerId, player] as const));
+    picked.splice(0, picked.length, ...reihenfolge.map((id) => byId.get(id)!));
+  }
 
   return {
     entries: picked.map((player, index) => ({
@@ -816,12 +845,16 @@ export function buildAiLegacyLineupSuggestion(context: LegacyLineupLoadedContext
   });
 
   const candidateByPlayerId = new Map(allocationPlayers.map((player) => [player.playerId, player]));
+  // Belastungsregel v2 (Saison-Stempel): die KI kennt die Resistenz. Alte Regel: null, alles wie bisher.
+  const belastungsRegel = context.belastungsRegel ?? (context.gameState ? belastungsRegelFuer(context.gameState) : "alt");
+  const belastungsKontext = belastungsRegel === "v2" ? context : null;
   const d1 = buildSideResult({
     plan: d1Plan,
     pickedCandidates: allocation.d1
       .map((playerId) => candidateByPlayerId.get(playerId)?.d1)
       .filter((candidate): candidate is SideCandidate => Boolean(candidate)),
     lineupStrategy,
+    belastungsKontext,
   });
   const d2 = buildSideResult({
     plan: d2Plan,
@@ -829,6 +862,7 @@ export function buildAiLegacyLineupSuggestion(context: LegacyLineupLoadedContext
       .map((playerId) => candidateByPlayerId.get(playerId)?.d2)
       .filter((candidate): candidate is SideCandidate => Boolean(candidate)),
     lineupStrategy,
+    belastungsKontext,
   });
 
   // Audit-Zeile für die globale Zuteilung (bewusst NICHT mit "D1"/"D2" beginnend, damit die

@@ -5,7 +5,7 @@ import type {
   PlayerDisciplinePerformanceRecord,
 } from "@/lib/data/olyDataTypes";
 import {
-  MATCHDAY_ACTIVE_RECOVERY,
+  getMatchdayActiveRecoveryValue,
   MATCHDAY_FATIGUE_LOAD,
   isFatigueActiveRecoveryEnabled,
 } from "@/lib/fatigue/fatigue-injury-service";
@@ -26,7 +26,7 @@ function resolvePreMatchFatigueFromEvent(event: InjuryEventRecord, matchdayLoadD
  */
 export function getMatchdayLoadDeductionForStats(gameState: GameState) {
   return isFatigueActiveRecoveryEnabled(gameState)
-    ? MATCHDAY_FATIGUE_LOAD - MATCHDAY_ACTIVE_RECOVERY
+    ? MATCHDAY_FATIGUE_LOAD - getMatchdayActiveRecoveryValue(gameState)
     : MATCHDAY_FATIGUE_LOAD;
 }
 
