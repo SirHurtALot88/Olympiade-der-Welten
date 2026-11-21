@@ -15,6 +15,7 @@ import type { FoundationRoomContext } from "@/lib/room/foundation-room-context-c
 import { erloesFreigabe } from "@/lib/market/transfermarkt-freigabe";
 import { translateSellBlockingReason } from "@/app/foundation/transfermarkt-v2/transfer-sell-view-labels";
 import { klickAuswahlOderProfil, nameKlickAuswahlUndProfil, useListenTasten } from "@/app/foundation/shared/klickregel";
+import { useTabellenSortierung } from "@/lib/ui/tabellen-sortierung";
 import { betragC, de, jeSpieltag, rangText } from "./tm-format";
 import { postJson, schreibKontext } from "./tm-daten";
 import type { TransfermarktV2RosterRow } from "./tm-typen";
@@ -66,6 +67,30 @@ function Laufzeit({ n }: { n: number | null }) {
   );
 }
 
+/** Sortierbarer Spaltenkopf der Kader-Tabellen: Klick sortiert, nochmal klicken dreht die Richtung. */
+function SK({ k, re, children }: { k: { aktiv: boolean; pfeil: string; ariaSort: "ascending" | "descending" | "none"; onKlick: () => void }; re?: boolean; children: string }) {
+  return (
+    <span
+      className={`${re ? "re " : ""}${k.aktiv ? "so" : ""}`.trim() || undefined}
+      style={{ cursor: "pointer" }}
+      role="button"
+      tabIndex={0}
+      aria-sort={k.ariaSort}
+      title="Klick sortiert · nochmal klicken dreht die Richtung"
+      onClick={k.onKlick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          k.onKlick();
+        }
+      }}
+    >
+      {children}
+      {k.pfeil}
+    </span>
+  );
+}
+
 export default function KaderAnsichten(props: Props) {
   const { modus, rosterRows, teamId } = props;
   const [wahl, setWahl] = useState<string | null>(null);
@@ -76,9 +101,19 @@ export default function KaderAnsichten(props: Props) {
   const [busy, setBusy] = useState(false);
   const schluessel = useRef<string>("");
 
-  const sortiert = useMemo(
-    () => [...rosterRows].sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0)),
-    [rosterRows],
+  // Spaltenköpfe sortieren (Designregel 21.11.): erster Klick Standardrichtung, zweiter dreht. Start: Marktwert absteigend.
+  const { sortiert, kopf } = useTabellenSortierung(
+    rosterRows,
+    {
+      name: { wert: (r) => r.name, standard: "auf" },
+      stamm: { wert: (r) => stammInDisziplinen({ spieler: props.spieler, staerken: props.staerken, teamId, disziplinIds: props.disziplinIds, playerId: r.playerId, ausgeschlossen: props.verletzt }) },
+      mw: { wert: (r) => r.marketValue ?? 0 },
+      gehalt: { wert: (r) => r.salary ?? 0 },
+      pp: { wert: (r) => props.playerRatingsById?.get(r.playerId)?.ppsSeason ?? r.pps ?? null },
+      laufzeit: { wert: (r) => r.contractLength ?? 0 },
+      status: { wert: (r) => ((r.contractLength ?? 0) <= 1 ? 0 : 1), standard: "auf" },
+    },
+    { key: "mw", richtung: "ab" },
   );
   const gewaehlt = sortiert.find((r) => r.playerId === wahl) ?? sortiert[0] ?? null;
   const sortiertIds = useMemo(() => sortiert.map((r) => r.playerId), [sortiert]);
@@ -191,11 +226,11 @@ export default function KaderAnsichten(props: Props) {
           <div className="mz kopf">
             {kopfSpalten ? (
               <>
-                <span /><span>Spieler</span><span>Stamm in</span><span className="re">Marktwert</span><span className="re">je Saison</span><span className="re">je Spieltag</span><span>Saison-PP</span><span title="Form folgt mit Form/Moral">Form</span><span /><span>Restlaufzeit</span>
+                <span /><SK k={kopf("name")}>Spieler</SK><SK k={kopf("stamm")}>Stamm in</SK><SK k={kopf("mw")} re>Marktwert</SK><SK k={kopf("gehalt")} re>je Saison</SK><SK k={kopf("gehalt")} re>je Spieltag</SK><SK k={kopf("pp")}>Saison-PP</SK><span title="Form folgt mit Form/Moral">Form</span><span /><SK k={kopf("laufzeit")}>Restlaufzeit</SK>
               </>
             ) : (
               <>
-                <span /><span>Spieler</span><span>Saison-PP</span><span className="re">je Saison</span><span className="re">je Spieltag</span><span title="Form folgt mit Form/Moral">Form</span><span /><span>Laufzeit</span><span>Status</span><span />
+                <span /><SK k={kopf("name")}>Spieler</SK><SK k={kopf("pp")}>Saison-PP</SK><SK k={kopf("gehalt")} re>je Saison</SK><SK k={kopf("gehalt")} re>je Spieltag</SK><span title="Form folgt mit Form/Moral">Form</span><span /><SK k={kopf("laufzeit")}>Laufzeit</SK><SK k={kopf("status")}>Status</SK><span />
               </>
             )}
           </div>

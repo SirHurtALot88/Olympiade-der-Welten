@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-import { getArenaAxisValueTier, getCoreStatGrade } from "@/lib/matchday-arena/arena-stat-visuals";
+import { getArenaAxisValueTier } from "@/lib/matchday-arena/arena-stat-visuals";
 
 import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 
@@ -26,11 +26,12 @@ type VeloStatOrbitChipProps = {
 export function VeloStatOrbitChip({ axis, value, showGrade = false, showIcon = false, className = "" }: VeloStatOrbitChipProps) {
   const meta = AXIS_META[axis];
   const tier = getArenaAxisValueTier(value);
-  const grade = showGrade ? getCoreStatGrade(value) : null;
+  // `showGrade` bleibt als Prop erhalten (Aufrufer), zeigt aber keine Notenbuchstaben mehr neben der Zahl (Designregel 21.11).
+  void showGrade;
   return (
     <span
       className={`velo-stat-orbit-chip training-v2-rider-orbit-chip ${meta.tone} is-tier-${tier}${className ? ` ${className}` : ""}`}
-      title={`${meta.label} ${formatNlNumber(value, 0)}${grade ? ` (${grade})` : ""}`}
+      title={`${meta.label} ${formatNlNumber(value, 0)}`}
     >
       {showIcon ? (
         <Image
@@ -45,7 +46,6 @@ export function VeloStatOrbitChip({ axis, value, showGrade = false, showIcon = f
         <small>{meta.label}</small>
       )}
       <strong>{formatNlNumber(value, 0)}</strong>
-      {grade ? <span className="velo-stat-orbit-grade">{grade}</span> : null}
     </span>
   );
 }

@@ -62,7 +62,7 @@ import "./transfermarkt-modern.css";
 export type { TransfermarktModernProps } from "./tm-typen";
 
 type Ansicht = "markt" | "verkauf" | "vertraege" | "draft";
-type SortKey = "eignung" | "hebt" | "abloese" | "gehalt" | "potenzial" | "value" | "pow" | "spe" | "men" | "soc" | "fit";
+type SortKey = "eignung" | "hebt" | "abloese" | "gehalt" | "potenzial" | "value" | "pow" | "spe" | "men" | "soc" | "fit" | "name";
 type Zeile = { item: TransfermarktFreeAgentItem; sicht: SpielerSicht };
 
 const SEITE = 15;
@@ -78,6 +78,7 @@ const SORT_LABEL: Record<SortKey, string> = {
   men: "MEN",
   soc: "SOC",
   fit: "Fit",
+  name: "Name",
 };
 /** Nur diese Sortierungen stehen als Knopf in der Filterzeile; Achsen und Fit sortiert man über die Spaltenköpfe. */
 const SORT_KNOEPFE: SortKey[] = ["eignung", "hebt", "abloese", "gehalt", "potenzial", "value", "fit"];
@@ -217,7 +218,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
     }
     setBlatt(0);
   };
-  const kopfPfeil = (k: SortKey) => (sortierung === k ? ((sortierung === "abloese" || sortierung === "gehalt") !== umgekehrt ? " ▲" : " ▼") : "");
+  const kopfPfeil = (k: SortKey) => (sortierung === k ? ((sortierung === "abloese" || sortierung === "gehalt" || sortierung === "name") !== umgekehrt ? " ▲" : " ▼") : "");
   const [blatt, setBlatt] = useState(0);
   const [fokusId, setFokusId] = useState<string | null>(props.initialPlayerId ?? null);
   const [pins, setPins] = useState<string[]>([]);
@@ -306,9 +307,15 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
         case "value": return z.item.marketValueSalaryRatio;
         case "pow": case "spe": case "men": case "soc": return z.sicht.achsen[sortierung].summe ?? z.sicht.achsen[sortierung].sortWert;
         case "fit": return fitSortWert(z.item);
+        case "name": return 0; // alphabetisch, siehe unten
       }
     };
-    const aufsteigend = (sortierung === "abloese" || sortierung === "gehalt") !== umgekehrt;
+    // Kosten: günstig ist besser, der erste Klick auf Ablöse/Gehalt sortiert deshalb aufsteigend (Rang 1 = günstigster). Name: A–Z zuerst.
+    const aufsteigend = (sortierung === "abloese" || sortierung === "gehalt" || sortierung === "name") !== umgekehrt;
+    if (sortierung === "name") {
+      const alpha = [...liste].sort((x, y) => x.item.name.localeCompare(y.item.name, "de"));
+      return umgekehrt ? alpha.reverse() : alpha;
+    }
     return sortiereNachSicht(liste, schluessel, aufsteigend ? 1 : -1);
   }, [zeilen, nurBezahlbar, nurHebt, nurMerkliste, fitNegativ, fitMin, filter, sortierung, umgekehrt, disziplin, cash, wirkungJeZeile, merkliste]);
 
@@ -612,7 +619,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
               <div className="mz kopf">
                 <span />
                 <span>{griff("por")}</span>
-                <span>Spieler · Weg in {disziplinNamen[disziplin]}{griff("nm")}</span>
+                <span className={sortierung === "name" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert nach Name · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("name")} data-testid="tm-kopf-name">Spieler · Weg in {disziplinNamen[disziplin]}{kopfPfeil("name")}{griff("nm")}</span>
                 <span className={sortierung === "eignung" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("eignung")} data-testid="tm-kopf-eignung">Eignung{kopfPfeil("eignung")}{griff("eg")}</span>
                 <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((a) => <i key={a} role="button" title="Achsen-Summe · Klick sortiert, nochmal klicken dreht die Richtung" className={sortierung === a ? "so" : ""} style={{ fontStyle: "normal", cursor: "pointer" }} onClick={() => sortiereNach(a)} data-testid={`tm-kopf-${a}`}>{ACHSEN_LABEL[a]}{kopfPfeil(a)}</i>)}{griff("ax")}</span>
                 <span className={sortierung === "fit" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Team-Fit zu deinem Kader · Klick sortiert, nochmal klicken dreht die Richtung" onClick={() => sortiereNach("fit")} data-testid="tm-kopf-fit">Fit{kopfPfeil("fit")}{griff("fit")}</span>

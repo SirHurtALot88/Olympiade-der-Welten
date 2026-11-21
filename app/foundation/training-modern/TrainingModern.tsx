@@ -115,7 +115,7 @@ function KlasseTag({ klasse }: { klasse: string }) {
     <span
       className="te-klasse"
       style={f ? ({ "--kf": f.farbe } as CSSProperties) : undefined}
-      title={f ? `${klasse} · ${f.achse}` : klasse}
+      data-bc-tip={f ? `${klasse} · ${f.achse}` : klasse}
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -222,7 +222,7 @@ function Belastung({ fatigue, naechste }: { fatigue: number; naechste?: number }
   return (
     <div
       className="te-bel"
-      title={`Belastung ${zahl(fatigue)} · ${zonenText(fatigue)} · Verletzungsrisiko ${zahl(risikoProzent(fatigue), 1)} %`}
+      data-bc-tip={`Belastung ${zahl(fatigue)} · ${zonenText(fatigue)} · Verletzungsrisiko ${zahl(risikoProzent(fatigue), 1)} %`}
     >
       <div className="te-bel__skala" aria-hidden="true">
         <i style={{ width: "25%", background: "#62d394" }} />
@@ -288,7 +288,7 @@ function AttributBalken({
             <i />
             {p.label} <b className="bc-t">{Math.round(p.anteil * 100)}</b>
             {t && marke ? (
-              <em className={`te-marke${t.grund === "maximum" || t.grund === "limit" ? " is-voll" : ""}`} title={bremsGrundText(t)}>
+              <em className={`te-marke${t.grund === "maximum" || t.grund === "limit" ? " is-voll" : ""}`} data-bc-tip={bremsGrundText(t)}>
                 {marke}
               </em>
             ) : null}
@@ -344,7 +344,7 @@ function BremseZeichen({ bremse }: { bremse: BremseKurz | null }) {
     <span
       className={`te-brems${bremse.mitMaximum ? " is-max" : ""}`}
       data-testid="training-bremse-zeichen"
-      title={`${bremse.text}. ${grund}. Davon fließen ${zahl(bremse.umgeleitet, 2)} SP als Nebeneffekt in andere Attribute.`}
+      data-bc-tip={`${bremse.text}. ${grund}. Davon fließen ${zahl(bremse.umgeleitet, 2)} SP als Nebeneffekt in andere Attribute.`}
     >
       ▲ −{bremse.verlustProzent} %
     </span>
@@ -484,7 +484,7 @@ function Halle({
                     type="button"
                     className={`te-hf${gewaehlt === z.playerId ? " is-an" : ""}${istRot(z) ? " is-rot" : ""}${z.verletzt ? " is-reha" : ""}`}
                     onClick={() => onWahl(z.playerId)}
-                    title={`${z.name} · Belastung ${zahl(z.fatigue)}`}
+                    data-bc-tip={`${z.name} · Belastung ${zahl(z.fatigue)}`}
                   >
                     {istRot(z) ? <span className="te-hf__ruf">überlastet</span> : null}
                     <span className="te-hf__fig">
@@ -609,7 +609,7 @@ function KaderTabelle({
         z.gesamt != null && z.potenzial != null ? (
           <span
             className="te-pot"
-            title={`Gesamtwert ${zahl(z.gesamt, 1)} von Potenzial ${zahl(z.potenzial, 1)}.${z.transparenz?.beschleuniger.potenzial != null ? ` Potenzial-Beschleuniger auf den Zuwachs: × ${zahl(z.transparenz.beschleuniger.faktor, 2)}. ${potenzialTipp(z.transparenz)}` : ""}`}
+            data-bc-tip={`Gesamtwert ${zahl(z.gesamt, 1)} von Potenzial ${zahl(z.potenzial, 1)}.${z.transparenz?.beschleuniger.potenzial != null ? ` Potenzial-Beschleuniger auf den Zuwachs: × ${zahl(z.transparenz.beschleuniger.faktor, 2)}. ${potenzialTipp(z.transparenz)}` : ""}`}
           >
             <span className="te-pot__bar">
               <i
@@ -643,7 +643,7 @@ function KaderTabelle({
       ...kopf("wunsch", "Wunsch"),
       render: (z) =>
         z.wunsch ? (
-          <span className={`te-wunsch${z.wunsch === z.modus ? " is-ok" : ""}`} title={z.row.trainingDemand?.detail}>
+          <span className={`te-wunsch${z.wunsch === z.modus ? " is-ok" : ""}`} data-bc-tip={z.row.trainingDemand?.detail}>
             {z.wunsch === z.modus ? "erfüllt" : `will ${z.wunsch.slice(0, 1).toUpperCase()}`}
           </span>
         ) : (
@@ -704,7 +704,7 @@ function Radar({
               type="button"
               className={`te-rk${filter === k.disziplinId ? " is-an" : ""}${k.offen === 0 ? " is-zu" : ""}`}
               aria-pressed={filter === k.disziplinId}
-              title={`${k.label}: ${k.offen} Auftritte offen, ${k.plaetze ?? "?"} Plätze, ${trainieren} trainieren darauf`}
+              data-bc-tip={`${k.label}: ${k.offen} Auftritte offen, ${k.plaetze ?? "?"} Plätze, ${trainieren} trainieren darauf`}
               onClick={() => onFilter(filter === k.disziplinId ? null : k.disziplinId)}
             >
               <b>{k.label.slice(0, 3).toUpperCase()}</b>
@@ -1131,7 +1131,7 @@ function SpielerAnsicht({
                     style={{
                       height: `${v.status === "verletzt" ? 12 : Math.max(8, (v.summe / maxVerlauf) * 100)}%`,
                     }}
-                    title={`Spieltag ${v.spieltag ?? "?"}: ${v.status === "verletzt" ? "verletzt, kein Training" : `${vz(v.summe, 2)} SP · ${v.modus ?? ""}`}`}
+                    data-bc-tip={`Spieltag ${v.spieltag ?? "?"}: ${v.status === "verletzt" ? "verletzt, kein Training" : `${vz(v.summe, 2)} SP · ${v.modus ?? ""}`}`}
                   />
                 ))}
               </div>
@@ -1271,7 +1271,7 @@ function PlanAnsicht({
             className="te-btn te-btn--klein"
             data-testid="training-wuensche-erfuellen"
             disabled={gesperrt || offeneWuensche === 0}
-            title="Setzt bei allen Spielern mit offenem Wunsch die gewünschte Intensität als offene Änderung"
+            data-bc-tip="Setzt bei allen Spielern mit offenem Wunsch die gewünschte Intensität als offene Änderung"
             onClick={() =>
               setEntwurf((alt) => {
                 const neu = { ...alt };
@@ -1310,12 +1310,12 @@ function PlanAnsicht({
                 {z.wunsch ? (
                   <span
                     className={`te-wunsch te-wunsch--klein${(e?.modus ?? z.modus) === z.wunsch ? " is-ok" : ""}`}
-                    title={`Wunsch: ${MODI.find((m) => m.id === z.wunsch)?.name}`}
+                    data-bc-tip={`Wunsch: ${MODI.find((m) => m.id === z.wunsch)?.name}`}
                   >
                     W {MODI.find((m) => m.id === z.wunsch)?.kurz}
                   </span>
                 ) : null}
-                {e ? <i className="te-pl__punkt" title="offene Änderung" /> : null}
+                {e ? <i className="te-pl__punkt" data-bc-tip="offene Änderung" /> : null}
                 <b className="te-pl__modus">{MODI.find((m) => m.id === (e?.modus ?? z.modus))?.kurz}</b>
               </button>
             );
@@ -1433,7 +1433,7 @@ function PlanAnsicht({
                           return br ? (
                             <em
                               className="te-weg__bremse"
-                              title={p.deckeBremst.length > 0 || br ? br.attribute.map(bremsGrundText).join(". ") : undefined}
+                              data-bc-tip={p.deckeBremst.length > 0 || br ? br.attribute.map(bremsGrundText).join(". ") : undefined}
                             >
                               {" "}
                               · {br.text}
@@ -1494,7 +1494,7 @@ function PlanAnsicht({
                   {zeile.wunsch ? (
                     <span className="te-kv">
                       <span>Moral durch den Wunsch</span>
-                      <b className={`bc-t ${ton(wunschFolge(zeile, m.id)?.punkte)}`} title={moralTipp(zeile, m.id) ?? undefined}>
+                      <b className={`bc-t ${ton(wunschFolge(zeile, m.id)?.punkte)}`} data-bc-tip={moralTipp(zeile, m.id) ?? undefined}>
                         {vz(wunschFolge(zeile, m.id)?.punkte, 1)} Moral
                       </b>
                     </span>
@@ -1555,7 +1555,7 @@ function PlanAnsicht({
           {neu ? (
             <div className="te-kv" data-testid="training-vorschau-potenzial">
               <span>Potenzial-Beschleuniger</span>
-              <b className="bc-t" title={potenzialTipp(neu.transparenz)}>
+              <b className="bc-t" data-bc-tip={potenzialTipp(neu.transparenz)}>
                 {jetzt ? `× ${zahl(jetzt.transparenz.beschleuniger.faktor, 2)} → ` : ""}× {zahl(neu.transparenz.beschleuniger.faktor, 2)}
               </b>
             </div>
@@ -1565,7 +1565,7 @@ function PlanAnsicht({
               <span>Bremse durch Limit/Maximum</span>
               <b
                 className={`bc-t ${bremseKurz(neu.transparenz) ? "bc-minus" : "bc-null"}`}
-                title={bremseKurz(neu.transparenz)?.attribute.map(bremsGrundText).join(". ") ?? "Keine Bremse"}
+                data-bc-tip={bremseKurz(neu.transparenz)?.attribute.map(bremsGrundText).join(". ") ?? "Keine Bremse"}
               >
                 {jetzt ? `${bremseKurz(jetzt.transparenz) ? `−${bremseKurz(jetzt.transparenz)!.verlustProzent} %` : "keine"} → ` : ""}
                 {bremseKurz(neu.transparenz) ? `−${bremseKurz(neu.transparenz)!.verlustProzent} %` : "keine"}
@@ -1705,11 +1705,11 @@ export default function TrainingModern(props: TrainingModernProps) {
                 </button>
               ))}
               {onOpenFacilities ? (
-                <button type="button" role="tab" aria-selected={false} onClick={onOpenFacilities} title="Gebäude öffnen">
+                <button type="button" role="tab" aria-selected={false} onClick={onOpenFacilities} data-bc-tip="Gebäude öffnen">
                   Gebäude
                 </button>
               ) : null}
-              <button type="button" role="tab" aria-selected={false} disabled title="kommt: Vergleich mit den KI-Teams">
+              <button type="button" role="tab" aria-selected={false} disabled data-bc-tip="kommt: Vergleich mit den KI-Teams">
                 Liga <small>kommt</small>
               </button>
             </div>

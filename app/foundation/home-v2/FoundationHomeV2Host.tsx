@@ -222,6 +222,7 @@ export default function FoundationHomeV2Host({
         onOpenTraining: () => onNavigateView("trainingCompact"),
         onOpenOffice: () => navigateHomeTab("office"),
         onOpenFacilities: () => onNavigateView("facilitiesOverviewV2"),
+        onOpenFinances: () => onNavigateView("finances"),
         onOpenSeason: () => onNavigateView("seasonV2"),
         onOpenInbox: () => onNavigateView("inboxV2"),
         onOpenBoardObjectives: () => {

@@ -14,6 +14,7 @@ import type { LigaDraftSpielerKarte, LigaDraftZugAnsicht } from "@/lib/draft/lig
 import { ACHSEN_FARBE_HEX, ACHSEN_REIHENFOLGE, DISZIPLIN_NACH_ACHSE, DISZIPLINEN_GEORDNET } from "@/lib/market/disziplin-reihenfolge";
 import { erfuelltFilter, LEERE_FILTER, mindestAchsenZahlLabel, naechsteMindestNote, zaehleAktiveFilter, type WeitereFilter } from "@/lib/market/transfermarkt-weitere-filter";
 import WeitereFilterPanel from "@/app/foundation/transfermarkt-modern/WeitereFilterPanel";
+import { useTabellenSortierung } from "@/lib/ui/tabellen-sortierung";
 import { erfuelltAchsenMinimum, tierBereichSortWert, MARKT_ACHSEN, sortiereNachSicht, type MarktAchse } from "@/lib/market/transfermarkt-sicht";
 import { officialDisciplineWeightLabels } from "@/lib/player-generator/official-discipline-weights";
 import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
@@ -502,7 +503,31 @@ export function LiveTicker({ k, zeig }: { k: DraftKontext; zeig: DraftZeig | nul
 // Draft-Brett
 // ---------------------------------------------------------------------------------------------------------------------
 
-type SortKey = "eignung" | "abloese" | "guenstig" | "gefragt" | "fit" | MarktAchse;
+/** Sortierbarer Spaltenkopf der Pick-Liste: Klick sortiert, nochmal klicken dreht die Richtung. */
+function PickKopf({ k, re, children }: { k: { aktiv: boolean; pfeil: string; ariaSort: "ascending" | "descending" | "none"; onKlick: () => void }; re?: boolean; children: string }) {
+  return (
+    <span
+      className={`${re ? "re " : ""}${k.aktiv ? "so" : ""}`.trim() || undefined}
+      style={{ cursor: "pointer" }}
+      role="button"
+      tabIndex={0}
+      aria-sort={k.ariaSort}
+      title="Klick sortiert · nochmal klicken dreht die Richtung"
+      onClick={k.onKlick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          k.onKlick();
+        }
+      }}
+    >
+      {children}
+      {k.pfeil}
+    </span>
+  );
+}
+
+type SortKey = "eignung" | "abloese" | "guenstig" | "gefragt" | "fit" | "name" | "gehalt" | MarktAchse;
 
 /** Spalten des Draft-Bretts (Breiten in u); per Ziehen anpassbar und je Benutzer gespeichert, getrennt vom Transfermarkt. */
 export const DRAFT_SPALTEN: SpaltenDef[] = [
@@ -540,6 +565,16 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
   const fk = (feld: string) => filterSchluessel("draft-brett", k.saveId, feld);
   const [suche, setSuche] = useGemerkterFilter(fk("suche"), "");
   const [sort, setSort] = useGemerkterFilter<SortKey>(fk("sort"), "eignung");
+  // Name und Gehalt: zweiter Klick dreht die Richtung (Name zuerst A–Z, Gehalt zuerst teuer, dann günstig = besser).
+  const [sortUm, setSortUm] = useState(false);
+  const klickSort2 = (key: "name" | "gehalt") => {
+    if (sort === key) setSortUm((u) => !u);
+    else {
+      setSort(key);
+      setSortUm(false);
+    }
+    setBlatt(0);
+  };
   const [nurLeistbar, setNurLeistbar] = useGemerkterFilter(fk("leistbar"), false);
   const [nurWunsch, setNurWunsch] = useGemerkterFilter(fk("wunsch"), false);
   const [nurScouting, setNurScouting] = useGemerkterFilter(fk("scouting"), false);
@@ -589,6 +624,10 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
           return (a.gefragt[z.item.playerId] ?? 0) * 1000 + (z.item.marketValue ?? 0);
         case "fit":
           return fitSortWert(z.item);
+        case "name":
+          return 0; // alphabetisch, siehe unten
+        case "gehalt":
+          return z.item.salary ?? 0;
         case "pow":
         case "spe":
         case "men":
@@ -596,8 +635,13 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
           return z.sicht.achsen[sort].summe ?? z.sicht.achsen[sort].sortWert;
       }
     };
+    if (sort === "name") {
+      const alpha = [...liste].sort((x, y) => x.item.name.localeCompare(y.item.name, "de"));
+      return sortUm ? alpha.reverse() : alpha;
+    }
+    if (sort === "gehalt") return sortiereNachSicht(liste, schluessel, sortUm ? 1 : -1);
     return sortiereNachSicht(liste, schluessel, sort === "guenstig" ? 1 : -1);
-  }, [k.zeilen, k.wunsch, k.disziplin, suche, nurLeistbar, nurWunsch, nurScouting, fitNegativ, fitMin, achsenMin, weitere, aktiveWeitere, sort, mein, maxAbloese, a.gefragt]);
+  }, [sortUm, k.zeilen, k.wunsch, k.disziplin, suche, nurLeistbar, nurWunsch, nurScouting, fitNegativ, fitMin, achsenMin, weitere, aktiveWeitere, sort, mein, maxAbloese, a.gefragt]);
 
   const seiten = Math.max(1, Math.ceil(gefiltert.length / ZEILEN_JE_BLATT));
   const seite = Math.min(blatt, seiten - 1);
@@ -606,7 +650,24 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
   const sichtbareIds = useMemo(() => (tab === "frei" ? sichtbar.map((z) => z.item.playerId) : []), [tab, sichtbar]);
   useListenTasten({ ids: sichtbareIds, gewaehlt: k.wahl, waehle: k.setWahl, profil: k.profil, aktiv: tastenAktiv && tab === "frei" });
 
-  const picks = useMemo(() => a.verlauf.filter((e) => e.art === "pick").slice().reverse(), [a.verlauf]);
+  const picksRoh = useMemo(() => a.verlauf.filter((e) => e.art === "pick").slice().reverse(), [a.verlauf]);
+  // „Alle Picks“ ist sortierbar (Designregel 21.11.): Standard neueste zuerst, Köpfe sortieren, zweiter Klick dreht.
+  const gehaltVon = (e: (typeof picksRoh)[number]) => {
+    if (!e.playerId) return null;
+    return k.zeilenById.get(e.playerId)?.item.salary ?? kartenInfo(k, e.playerId)?.gehalt ?? null;
+  };
+  const { sortiert: picks, kopf: pickKopf } = useTabellenSortierung(
+    picksRoh,
+    {
+      pick: { wert: (e) => e.pickNr, standard: "auf" },
+      runde: { wert: (e) => (e.quelle === "nachzug" ? 99 : e.runde), standard: "auf" },
+      team: { wert: (e) => k.teamName(e.teamId), standard: "auf" },
+      spieler: { wert: (e) => (e.playerId ? spielerName(k, e.playerId) : null), standard: "auf" },
+      abloese: { wert: (e) => e.abloese ?? null },
+      gehalt: { wert: (e) => gehaltVon(e) },
+    },
+    { key: "pick", richtung: "ab" },
+  );
   const seitenPicks = Math.max(1, Math.ceil(picks.length / 14));
   const seiteP = Math.min(blatt, seitenPicks - 1);
 
@@ -630,7 +691,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
       <section className="pan db" id="l-brett" data-testid="draft-brett">
         {kopf}
         <div className="mt" style={{ ["--zeilen" as string]: 14 }}>
-          <div className="mz pz kopf"><span>Pick</span><span>Runde</span><span /><span>Team</span><span /><span>Spieler</span><span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((x) => <i key={x} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[x]}</i>)}</span><span className="re">Ablöse</span><span className="re">Gehalt</span></div>
+          <div className="mz pz kopf"><PickKopf k={pickKopf("pick")}>Pick</PickKopf><PickKopf k={pickKopf("runde")}>Runde</PickKopf><span /><PickKopf k={pickKopf("team")}>Team</PickKopf><span /><PickKopf k={pickKopf("spieler")}>Spieler</PickKopf><span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((x) => <i key={x} style={{ fontStyle: "normal" }}>{ACHSEN_LABEL[x]}</i>)}</span><PickKopf k={pickKopf("abloese")} re>Ablöse</PickKopf><PickKopf k={pickKopf("gehalt")} re>Gehalt</PickKopf></div>
           {zeilen.map((e) => {
             const info = e.playerId ? kartenInfo(k, e.playerId) : null;
             const z = e.playerId ? k.zeilenById.get(e.playerId) : undefined;
@@ -739,12 +800,12 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
         <div className="mz kopf">
           <span />
           <span>{griff("por")}</span>
-          <span>Spieler{griff("nm")}</span>
+          <span><button type="button" className={sort === "name" ? "so" : ""} onClick={() => klickSort2("name")} title="Klick sortiert · nochmal klicken dreht die Richtung" data-testid="draft-kopf-name">Spieler{sort === "name" ? (sortUm ? " ▴" : " ▾") : ""}</button>{griff("nm")}</span>
           <span>{sk("eignung", `Eignung ${DISZIPLIN_KURZ[k.disziplin] ?? ""}`)}{griff("eg")}</span>
           <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((x) => <i key={x} role="button" title="Achsen-Summe · Klick sortiert" className={sort === x ? "so" : ""} style={{ fontStyle: "normal", cursor: "pointer" }} onClick={() => { setSort(x); setBlatt(0); }} data-testid={`draft-kopf-${x}`}>{ACHSEN_LABEL[x]}{sort === x ? " ▾" : ""}</i>)}{griff("ax")}</span>
           <span>{sk("fit", "Fit")}{griff("fit")}</span>
           <span className="re">{sk(sort === "abloese" ? "guenstig" : "abloese", "Ablöse", "re")}{griff("abl")}</span>
-          <span className="re" title="Jahresgehalt (je Saison)">Gehalt/Sais.{griff("geh")}</span>
+          <span className="re" title="Jahresgehalt (je Saison) · Klick sortiert, nochmal klicken dreht die Richtung"><button type="button" className={`re${sort === "gehalt" ? " so" : ""}`} onClick={() => klickSort2("gehalt")} data-testid="draft-kopf-gehalt">Gehalt/Sais.{sort === "gehalt" ? (sortUm ? " ▴" : " ▾") : ""}</button>{griff("geh")}</span>
           <span>{sk("gefragt", "gefragt")}{griff("gef")}</span>
           <span>{griff("ak")}</span>
         </div>

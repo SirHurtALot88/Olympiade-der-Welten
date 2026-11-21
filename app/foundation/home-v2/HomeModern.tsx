@@ -89,7 +89,7 @@ function BandKacheln({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | nu
         <div className="hm-bk">
           <span className="hm-gk">Punkte</span>
           <strong className="hm-t">{hatWertung ? eigene?.punkte ?? p.points ?? 0 : 0}</strong>
-          <small className="hm-t" title="S-U-N zählt Disziplin-Duelle: Siege, Unentschieden, Niederlagen">
+          <small className="hm-t" data-bc-tip="S-U-N zählt Disziplin-Duelle: Siege, Unentschieden, Niederlagen">
             {eigene?.bilanz ? (
               <>
                 {sunText(eigene.bilanz)} · {duelleText(eigene.bilanz)}
@@ -200,7 +200,7 @@ function KarteDuell({ k, ligaName, onOpen }: { k: SpieltagsKarte; ligaName: stri
       ) : (
         <>
           <div className="hm-lab">
-            <span className="hm-pf" title="Papierform aus der Kaderstärke">
+            <span className="hm-pf" data-bc-tip="Papierform aus der Kaderstärke">
               Kaderstärke {k.papier ? <b className={`hm-${k.papier.ton}`}>{k.papier.wort}</b> : null}
             </span>
             <span className="hm-t">{k.anteil != null ? `Anteil ${de(k.anteil, 0)} %` : "–"}</span>
@@ -341,7 +341,7 @@ function TabellenZeile({ z, index, onOpen }: { z: LigaZeile; index: number; onOp
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{z.name}</span>
         {z.istEigen ? <span className="hm-du">DU</span> : z.istGegner ? <span className="hm-gg">GEGNER</span> : null}
       </span>
-      <span title="Siege-Unentschieden-Niederlagen in Disziplin-Duellen">{z.bilanz ? sunText(z.bilanz) : "0-0-0"}</span>
+      <span data-bc-tip="Siege-Unentschieden-Niederlagen in Disziplin-Duellen">{z.bilanz ? sunText(z.bilanz) : "0-0-0"}</span>
       <span className={ton(z.verhaeltnis)}>{z.rang != null && z.verhaeltnis != null ? vz(z.verhaeltnis) : "–"}</span>
       <span><FormKaestchen form={z.form} /></span>
       <strong>{z.punkte}</strong>
@@ -360,7 +360,7 @@ function Tabelle({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten }) {
       </div>
       <div className="hm-tab hm-t" style={{ gridTemplateRows: `1.7rem repeat(${Math.max(1, n)}, minmax(0, 1fr))` }}>
         <div className="hm-tz hm-kopf">
-          <span>#</span><span>±</span><span>Team</span><span title="Siege-Unentschieden-Niederlagen, gezählt in Disziplin-Duellen">S-U-N</span><span>Verh.</span><span>Form</span><span>Pkt</span>
+          <span>#</span><span>±</span><span>Team</span><span data-bc-tip="Siege-Unentschieden-Niederlagen, gezählt in Disziplin-Duellen">S-U-N</span><span>Verh.</span><span>Form</span><span>Pkt</span>
         </div>
         {sd.zeilen.map((z, i) => (
           <TabellenZeile key={z.teamId} z={z} index={i} onOpen={p.onOpenSeason} />
@@ -508,9 +508,9 @@ function Kader({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) 
   );
 }
 
-/* ------------------------------------------------------------------------------------- Kasse */
+/* ------------------------------------------------------------------------------------- Finanzen (früher „Kasse“) */
 
-function Kasse({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
+function FinanzenKachel({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) {
   const kredit = (p.loanInstallment ?? 0) > 0 || (p.outstandingDebt ?? 0) > 0;
   // Gehalt nach der Regel von Chris: groß je Saison, klein je Spieltag.
   const spieltage = sd?.gesamtSpieltage && sd.gesamtSpieltage > 0 ? sd.gesamtSpieltage : null;
@@ -518,9 +518,9 @@ function Kasse({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten | null }) 
   return (
     <section className="hm-pan hm-p-fin" data-testid="hm-kasse">
       <div className="hm-pk">
-        <h2>Kasse</h2>
+        <h2>Finanzen</h2>
         <span className="hm-sp" />
-        <button type="button" className="hm-mehr" onClick={p.onOpenTeams}>Teams <span aria-hidden="true">›</span></button>
+        <button type="button" className="hm-mehr" onClick={p.onOpenFinances ?? p.onOpenTeams}>Finanzen <span aria-hidden="true">›</span></button>
       </div>
       <div className="hm-pb">
         <div className="hm-kas">
@@ -550,7 +550,7 @@ function Kachel({ d }: { d: DisziplinKachel }) {
   const stil = d.bild ? ({ "--bild": `url("${d.bild}")` } as CSSProperties) : undefined;
   const k = d.ampel ? ` hm-${d.ampel}` : "";
   return (
-    <div className={`hm-dk${k}${d.heute ? " hm-h" : ""}`} style={stil} title={`${d.name}: Kaderstärke-Rang ${d.rang ?? "–"}`}>
+    <div className={`hm-dk${k}${d.heute ? " hm-h" : ""}`} style={stil} data-bc-tip={`${d.name}: Kaderstärke-Rang ${d.rang ?? "–"}`}>
       <small>{d.name}</small>
       <strong className="hm-t">{d.rang ? `${d.rang}.` : "–"}</strong>
       <em className="hm-t">{d.moeglich > 0 ? `${d.punkte} / ${d.moeglich} Pkt` : "noch offen"}</em>
@@ -680,7 +680,7 @@ export default function HomeModern(props: HomeV2ClientProps) {
           <Tabelle p={props} sd={sd} />
           <Entscheidungen p={props} sd={sd} />
           <Kader p={props} sd={sd} />
-          <Kasse p={props} sd={sd} />
+          <FinanzenKachel p={props} sd={sd} />
           <Disziplinen sd={sd} />
           <Band sd={sd} />
         </div>

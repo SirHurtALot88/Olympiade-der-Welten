@@ -482,6 +482,15 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
 
   const [filterWahl, setFilterWahl] = useState<WertungsFilter | null>(props.anfangsFilter ?? null);
   const [sortierung, setSortierung] = useState<WertungsSortierung>("ges");
+  // Zweiter Klick auf dieselbe Spalte dreht die Richtung (Designregel: alle Tabellen sortierbar).
+  const [umgekehrt, setUmgekehrt] = useState(false);
+  const waehleSortierung = (schluessel: WertungsSortierung) => {
+    if (schluessel === sortierung) setUmgekehrt((u) => !u);
+    else {
+      setSortierung(schluessel);
+      setUmgekehrt(false);
+    }
+  };
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
   const [ansicht, setAnsicht] = useState<"wertung" | "begegnungen">(props.anfangsAnsicht ?? "wertung");
 
@@ -490,8 +499,8 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
   const hatMenschen = alleZeilen.some((z) => z.mensch != null);
   const filter = filterWahl ?? startFilter(alleZeilen);
   const zeilen = useMemo(
-    () => sortiereWertungsZeilen(filtereWertungsZeilen(alleZeilen, filter, ownTeamId), sortierung),
-    [alleZeilen, filter, ownTeamId, sortierung],
+    () => sortiereWertungsZeilen(filtereWertungsZeilen(alleZeilen, filter, ownTeamId), sortierung, umgekehrt),
+    [alleZeilen, filter, ownTeamId, sortierung, umgekehrt],
   );
   const auswahlTeamId =
     gewaehlt && zeilen.some((z) => z.teamId === gewaehlt)
@@ -517,7 +526,7 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
   const d2Name = d2?.displayName ?? "Disziplin 2";
   const zeigeLiga = mitLiga && filter === "mensch";
   const beide = mitLiga && filter === "beide";
-  const bloecke = beide ? gruppiereNachLiga(zeilen, ownTeamId, sortierung) : [];
+  const bloecke = beide ? gruppiereNachLiga(zeilen, ownTeamId, sortierung, umgekehrt) : [];
   const gesperrt = !d2Revealed;
 
   const kopf = (schluessel: WertungsSortierung, text: string, klasse?: string) => (
@@ -525,10 +534,11 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
       type="button"
       className={`${klasse ?? ""}${sortierung === schluessel ? " an" : ""}`}
       aria-pressed={sortierung === schluessel}
-      onClick={() => setSortierung(schluessel)}
+      onClick={() => waehleSortierung(schluessel)}
+      title="Klick sortiert, nochmal klicken dreht die Richtung"
     >
       {text}
-      {sortierung === schluessel ? " ▾" : ""}
+      {sortierung === schluessel ? (umgekehrt ? " ▴" : " ▾") : ""}
     </button>
   );
 
@@ -595,7 +605,7 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
                 </div>
                 <div className="hd">
                   {kopf("ges", "#")}
-                  {kopf("ges", "Team")}
+                  {kopf("name", "Team")}
                   {kopf("d1", d1Name)}
                   {kopf("d2", d2Name)}
                   {kopf("ges", "Gesamt", "re")}
@@ -642,7 +652,7 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
           </div>
           <div className="hd">
             {kopf("ges", "#")}
-            {kopf("ges", "Team")}
+            {kopf("name", "Team")}
             {kopf("d1", d1Name)}
             {kopf("d2", d2Name)}
             {kopf("ges", "Gesamt", "re")}
