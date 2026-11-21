@@ -73,7 +73,7 @@ function DisziIcon({ id, name }: { id?: string | null; name?: string | null }) {
   const src = getDisciplineIconSrc(id ?? null, name ?? null);
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img className="sai-icon" src={src} alt="" width={40} height={40} loading="lazy" />
+    <img className="sai-icon" src={src} alt="" width={40} height={40} decoding="async" />
   ) : (
     <span className="sai-icon sai-icon--leer" aria-hidden="true">{(name ?? "?").slice(0, 2).toUpperCase()}</span>
   );
