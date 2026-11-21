@@ -122,8 +122,12 @@ function liga(gameState: GameState, teamId: string): 1 | 2 | null {
   return tier === "liga1" ? 1 : tier === "liga2" ? 2 : null;
 }
 
-function rangIn(werte: readonly number[], mein: number): number {
-  return 1 + werte.filter((w) => w > mein + 1e-9).length;
+/**
+ * Rang 1 = am besten (Chris 21.11.: Standardlogik überall). `weniger_besser` für Kosten
+ * (Gehalt, Ablösen): das günstigste Team ist 1., das teuerste letztes.
+ */
+function rangIn(werte: readonly number[], mein: number, richtung: "mehr_besser" | "weniger_besser" = "mehr_besser"): number {
+  return 1 + werte.filter((w) => (richtung === "mehr_besser" ? w > mein + 1e-9 : w < mein - 1e-9)).length;
 }
 
 export function baueDraftErgebnis(input: {
@@ -284,15 +288,20 @@ export function baueDraftErgebnis(input: {
   };
 
   // ----- Vergleich in der eigenen Liga -----------------------------------------------------------------------------
-  const vgl = (id: ErgebnisVergleich["id"], label: string, f: (t: (typeof ligaTeams)[number]) => number): ErgebnisVergleich => {
+  const vgl = (
+    id: ErgebnisVergleich["id"],
+    label: string,
+    f: (t: (typeof ligaTeams)[number]) => number,
+    richtung: "mehr_besser" | "weniger_besser" = "mehr_besser",
+  ): ErgebnisVergleich => {
     const alle = ligaTeams.map(f);
     const wert = f(meinTeam);
-    return { id, label, wert, rang: rangIn(alle, wert), von: ligaTeams.length, schnitt: mittel(alle) };
+    return { id, label, wert, rang: rangIn(alle, wert, richtung), von: ligaTeams.length, schnitt: mittel(alle) };
   };
   const vergleich = [
     vgl("staerke", "Kaderstärke", (t) => t.kaderStaerke),
-    vgl("gehalt", "Gehaltssumme", (t) => t.gehaltSumme),
-    vgl("abloese", "Ablösen", (t) => t.abloeseSumme),
+    vgl("gehalt", "Gehaltssumme", (t) => t.gehaltSumme, "weniger_besser"),
+    vgl("abloese", "Ablösen", (t) => t.abloeseSumme, "weniger_besser"),
     vgl("kasse", "Kasse", (t) => t.kasse),
     vgl("kader", "Kadergröße", (t) => t.kader),
   ];

@@ -133,6 +133,9 @@ describe("Draft-Ergebnis: Daten", () => {
     const kasse = d.vergleich.find((v) => v.id === "kasse")!;
     expect(kasse).toMatchObject({ rang: 2, von: 2 });
     expect(d.vergleich.find((v) => v.id === "abloese")!.schnitt).toBe(10);
+    // Kosten: günstiger = besser (Chris 21.11.) — T1 zahlt mehr Ablöse/Gehalt als T2 → 2. von 2.
+    expect(d.vergleich.find((v) => v.id === "abloese")!.rang).toBe(2);
+    expect(d.vergleich.find((v) => v.id === "gehalt")!.rang).toBe(2);
   });
 
   it("beste Sechs: nach Eignung sortiert, Stärke wie die Kaderstärke (fehlende Plätze zählen 20)", () => {
