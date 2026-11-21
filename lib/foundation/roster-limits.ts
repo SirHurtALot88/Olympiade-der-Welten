@@ -1,5 +1,6 @@
 import type { GameState, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { getTeamRosterStressRecord } from "@/lib/ai/season-roster-stress-service";
+import { kiMindestKaderFuerRotation, resolveSpitzenbedarf } from "@/lib/ai/ki-schonung-reha-regeln";
 
 export const DEFAULT_ROSTER_MAX = 14;
 /** Fixes Kader-Minimum für jedes Team (unabhängig von Sheet-/Identity-Daten). */
@@ -62,7 +63,11 @@ export function resolvePlannerRosterTargets(
   const base = deriveRosterTargets(teamRow, identityRow);
   const stress = getTeamRosterStressRecord(gameState, teamId);
   const optBump = stress?.optBump ?? 0;
-  const effectiveOpt = Math.min(base.playerMax, base.playerOpt + optBump);
+  // R5 (KI-Schonung 21.11., docs/design/ki-schonung-reha-analyse-21-11.md): Teams unter Spitzenbedarf minus 2 (also unter
+  // 10) haben keine Bank zum Rotieren und tragen die Haelfte der Verletzungen. Der Planer zielt deshalb mindestens auf
+  // diese Groesse; gekauft wird weiter nur im Rahmen des Vorstands (Investitions- und Gehaltstopf) und der Kasse.
+  const rotationsBoden = Math.min(base.playerMax, kiMindestKaderFuerRotation(resolveSpitzenbedarf(gameState)));
+  const effectiveOpt = Math.max(Math.min(base.playerMax, base.playerOpt + optBump), rotationsBoden);
   return {
     playerMin: base.playerMin,
     playerOpt: effectiveOpt,

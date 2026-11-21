@@ -186,10 +186,13 @@ export function FigurBuehne({
   data,
   modell,
   kompakt = false,
+  ohnePortrait = false,
 }: {
   data: PlayerDetailDrawerData;
   modell: SpielerprofilModell;
   kompakt?: boolean;
+  /** Kurzprofil: das Porträt steht daneben im OVR-Rahmen, nicht klein auf der Bühne. */
+  ohnePortrait?: boolean;
 }) {
   const sprite = getFigurSpriteForPlayer(data.playerId);
   const [pose, setPose] = useState<Pose>("walk");
@@ -214,7 +217,7 @@ export function FigurBuehne({
       <div className="spr-fb__ob">
         {!modell.nebel && rang != null ? <span className="spr-fb__rg">PP-Rang Liga #{rang}</span> : null}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        {data.portraitUrl && sprite ? <img className="spr-fb__port" src={data.portraitUrl} alt="" /> : null}
+        {data.portraitUrl && sprite && !ohnePortrait ? <img className="spr-fb__port" src={data.portraitUrl} alt="" /> : null}
       </div>
       <div className="spr-fb__platz" ref={ref}>
         <div className="spr-fb__boden" aria-hidden="true" />
@@ -230,8 +233,8 @@ export function FigurBuehne({
         ) : (
           <div className="spr-fb__ersatz" data-testid="spielerprofil-portrait-ersatz">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {data.portraitUrl ? <img src={data.portraitUrl} alt={data.name} /> : null}
-            <span>Noch keine Pixel-Figur — das Porträt steht an ihrer Stelle.</span>
+            {data.portraitUrl && !ohnePortrait ? <img src={data.portraitUrl} alt={data.name} /> : null}
+            <span>{ohnePortrait ? "Noch keine Pixel-Figur." : "Noch keine Pixel-Figur — das Porträt steht an ihrer Stelle."}</span>
           </div>
         )}
         {modell.verletzung.verletzt ? <div className="spr-fb__band">Verletzt</div> : null}

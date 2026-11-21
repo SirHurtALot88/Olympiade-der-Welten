@@ -1,3 +1,4 @@
+import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import type { FormMoralRegeln } from "@/lib/morale/form-moral-regeln";
 import type { BelastungsRegelVersion } from "@/lib/fatigue/belastung-regel";
 import type {
@@ -659,6 +660,8 @@ export type LegacyResolvePreviewOptions = {
         teamPoints: number;
         arenaMatchSeed: string;
         momente?: ArenaMomentEintrag[];
+        /** ANZEIGE-ZAHL (21.11., Spieltagswertung): Zeitsumme bzw. besiegte Gegner, s. `ErgebnisAnzeigeZahl`. */
+        anzeige?: ErgebnisAnzeigeZahl;
         /**
          * Tasks #116/#118/#119/#126/#127 (Fechten/Showcase/Eiskunstlauf/Tennis/Schach
          * sequenziell+Reveal, Chris 13.10.): die Team-ID des Gegners in GENAU diesem

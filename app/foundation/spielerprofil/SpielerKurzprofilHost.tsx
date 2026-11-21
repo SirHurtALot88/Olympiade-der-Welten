@@ -96,6 +96,7 @@ export default function SpielerKurzprofilHost({
     <SpielerKurzprofil
       data={data}
       ownerId={ownerId}
+      manageableTeamIds={manageableTeamIds}
       aktionen={aktionen}
       onClose={schliesseSpielerKurzprofil}
       onOpenFull={(tab, disziplinId) => {

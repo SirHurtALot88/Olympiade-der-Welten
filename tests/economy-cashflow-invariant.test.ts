@@ -305,6 +305,9 @@ beforeAll(async () => {
 
   for (const [matchdayIndex, matchdayId] of matchdayIds.entries()) {
     const beforeCash = cashByTeamId(persistence.getSaveById(saveId)!.gameState);
+    const facilityEventIdsBefore = new Set(
+      (persistence.getSaveById(saveId)!.gameState.seasonState.facilityEvents ?? []).map((event) => event.eventId),
+    );
 
     const result = await runLocalMatchdayAutoRun(
       {
@@ -341,13 +344,24 @@ beforeAll(async () => {
       );
     }
 
-    const afterCash = cashByTeamId(persistence.getSaveById(saveId)!.gameState);
+    const afterGameState = persistence.getSaveById(saveId)!.gameState;
+    const afterCash = cashByTeamId(afterGameState);
     const cashApplyRan = result.appliedAudits.cashApply != null;
+    // KI-Reha (21.11., lib/ai/ai-reha-bau-service.ts): beim Spieltagsabschluss darf die KI ein Recovery Center
+    // ausbauen. Das ist eine echte, geloggte Buchung (facilityEvents mit `cost`) — sie zaehlt als Buchung, nicht als
+    // „Cash-Aenderung ohne Buchung“.
+    const facilityBookedByTeam = new Map<string, number>();
+    for (const event of afterGameState.seasonState.facilityEvents ?? []) {
+      if (facilityEventIdsBefore.has(event.eventId)) continue;
+      facilityBookedByTeam.set(event.teamId, (facilityBookedByTeam.get(event.teamId) ?? 0) - (event.cost ?? 0));
+      bookings.push({ teamId: event.teamId, amount: -(event.cost ?? 0), system: "facility:ki_reha", note: event.eventId });
+    }
 
     for (const team of gameState.teams) {
       const before = beforeCash.get(team.teamId) ?? 0;
       const after = afterCash.get(team.teamId) ?? 0;
-      cashUnchangedByMatchday.set(`${matchdayId}:${team.teamId}`, Math.abs(after - before) <= SINGLE_BOOKING_TOLERANCE);
+      const gebucht = facilityBookedByTeam.get(team.teamId) ?? 0;
+      cashUnchangedByMatchday.set(`${matchdayId}:${team.teamId}`, Math.abs(after - before - gebucht) <= SINGLE_BOOKING_TOLERANCE);
       // cash_apply ist laut CASH_PRIZE_BENCHMARK_ONLY ein reiner Benchmark-Schritt (siehe Phase 6) —
       // selbst wenn er für diesen Spieltag lief, darf sich am Cash nichts ändern. Für Buchhaltungs-
       // zwecke wird hier daher bewusst KEINE Buchung erzeugt (erwartete Bewegung ist 0).

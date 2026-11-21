@@ -62,8 +62,8 @@ export function VeloAxisRail({
         const delta = entry.reference != null && Number.isFinite(entry.reference) ? entry.value - entry.reference : null;
         const title =
           delta == null
-            ? `${meta.name} ${formatNlNumber(entry.value, 0)} (${grade})`
-            : `${meta.name} ${formatNlNumber(entry.value, 0)} (${grade}) — ${referenceLabel} ${formatNlNumber(
+            ? `${meta.name} ${formatNlNumber(entry.value, 0)}`
+            : `${meta.name} ${formatNlNumber(entry.value, 0)} — ${referenceLabel} ${formatNlNumber(
                 entry.reference ?? 0,
                 0,
               )}, ${delta >= 0 ? "+" : "−"}${formatNlNumber(Math.abs(delta), 0)}`;
@@ -86,7 +86,7 @@ export function VeloAxisRail({
               ) : null}
             </span>
             <span className="velo-axis-rail-value nl-tnum">{formatNlNumber(entry.value, 0)}</span>
-            <span className="velo-axis-rail-grade">{grade}</span>
+            {/* Keine Notenstufe neben der Zahl (Designregel 21.11); die Stufe färbt nur noch die Zeile. */}
           </div>
         );
       })}

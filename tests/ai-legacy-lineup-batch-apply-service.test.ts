@@ -636,6 +636,11 @@ describe("AI legacy lineup form-card planning", () => {
     context.disciplineSidePlayerCounts = {
       "tdm::d1": 6,
     };
+    // KI-Schonung R1: Push gibt es nur mit tiefem Kader (Kader minus Spieltagsbedarf > 1).
+    context.activePlayers = Array.from({ length: 12 }, (_, index) => ({
+      id: `a${index + 1}`,
+      playerId: `p${index + 1}`,
+    })) as unknown as typeof context.activePlayers;
     context.teamDisciplineRanks = {
       tdm: {
         disciplineId: "tdm",
@@ -665,7 +670,7 @@ describe("AI legacy lineup form-card planning", () => {
     expect(modifiers.d1.intensity).toBe("push");
   });
 
-  it("still conserves early weak low-rank windows instead of pushing everything", () => {
+  it("conserves early weak low-rank windows only when the side is already tired (KI-Schonung R2)", () => {
     const context = createContext([]);
     context.matchday = { ...context.matchday, index: 1 };
     context.matchdayContract = {
@@ -691,7 +696,18 @@ describe("AI legacy lineup form-card planning", () => {
       { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 1, playerId: "p2", activePlayerId: "a2" },
     ]);
 
-    expect(modifiers.d1.intensity).toBe("conserve");
+    // Frische Seite: Schonen waere wirkungslos (Risiko 0 unter Fatigue 25) und kostet Score.
+    expect(modifiers.d1.intensity).toBe("normal");
+
+    context.fatigueByPlayerId = {
+      p1: { count: 30 },
+      p2: { count: 34 },
+    } as unknown as typeof context.fatigueByPlayerId;
+    const muede = buildAiLegacyLineupModifiers(context, [
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+      { disciplineId: "tdm", disciplineSide: "d1", slotIndex: 1, playerId: "p2", activePlayerId: "a2" },
+    ]);
+    expect(muede.d1.intensity).toBe("conserve");
   });
 
   it("burns color-matched negatives as forced dump on the last matchday even when they would double the malus", () => {

@@ -1,0 +1,1101 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Office: Vorstand, Ziele, Gespräch, Prämien – modern (Mockup 21.11.)</title>
+<!--
+OFFICE: VORSTAND, ZIELE, GESPRAECH, PRAEMIEN (Fable, 21.11., Welle 5 der Arbeitsliste).
+  Baut auf office-modern-18-11.html (Reiter Vorstand) und vorstandsgespraech-18-11.html auf und fuegt hinzu:
+  Vorstandsziele ohne Widersprueche, Laufzeit-Quote, Lieblingsspieler, Praemien fuer Spieler und Mannschaft.
+  ECHT: Stufen der Freigabe nach Vertrauen 100 / 90 / 80 / 70 / 50 % (ab 7,5 / 5 / 3 / 1,5), Gehaltstopf nie unter 75 %,
+        Pflichtkader 8 nie gesperrt, "Ruecklage anzapfen" bis 50 % des Ziels und -0,25 Vertrauen je Viertel,
+        "Alles auf eine Karte" ab Vertrauen 4 mit 5 % Puffer, Ziel zwei Plaetze besser, +0,75 / -1,0
+        (lib/finance/vorstand-budgetfreigabe.ts, docs/design/finanzen-v2-seite-18-11.md); Zielarten und ihre Titel
+        (lib/board/team-season-objectives-service.ts); hoechstens zwei Gespraeche je Saison, feste Antwort ohne Wuerfel
+        (docs/design/vorstandsgespraech-18-11.md); Spieler, Klassen, Portraits, Logos.
+  NEU / IDEE (im Mockup lila markiert): Widerspruchs-Pruefung der Ziele, Ziel "Vertragslaufzeiten", Ziel "Lieblingsspieler",
+        die Bitten "Ziel tauschen", "Lieblingsspieler freigeben", "Praemientopf", die ganze Seite "Praemien".
+  ERFUNDEN: alle Staende, Betraege, die Punkte der Waage, die Vertrauens-Ereignisse.
+  FESTE VORGABEN, die das Mockup nirgends bricht: der Vorstand verhaengt keine Geldstrafen (ein verfehltes Ziel kostet
+        Vertrauen, also Freigabe), er nimmt kein Geld weg, Gehaelter gross je Saison und klein je Spieltag, Rang 1 = bester.
+  URL: ?ansicht=vorstand|gespraech|praemien  ?lage=ruhig|druck|wind  ?thema=stufe|sonder|anzapf|alles|ziel|liebling|praemie
+       ?biete=zielhoch,rueck,deckel,vertrauen,binden  ?antwort=1  ?annehmen=1  ?still=1 (ohne Mockup-Leiste)
+  Steht im App-Rahmen aus app-rahmen-modern-18-11.html (Schiene, Regieband, Taktgeber: CSS unveraendert uebernommen).
+  Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
+  Erklaerung und offene Fragen: docs/design/office-vorstand-21-11.md
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+/* VOLLE FLAECHE: Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px). Die Wurzelgroesse waechst mit Breite UND Hoehe. */
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)} .acht{color:var(--acht)}
+.demo{height:2.25rem;display:flex;align-items:center;gap:.9rem;padding:0 .9rem 0 5rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .55rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+body.still .demo{display:none}
+
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+/* ICON-SCHIENE: kompakt 4 rem, klappt bei Hover als Ueberlagerung aus (wie PR #1576) */
+.railplatz{position:relative;z-index:60}
+.rail{position:absolute;left:0;top:0;bottom:0;width:4rem;display:flex;flex-direction:column;gap:.2rem;padding:.6rem .6rem;background:#080b11;border-right:1px solid var(--linie);overflow:hidden;transition:width .16s ease,box-shadow .16s ease}
+.rail:hover,body.navauf .rail{width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.6);border-right-color:var(--linie-2)}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.5rem;flex:none}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail .grp{height:1.1rem;padding-left:.2rem;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--stumm);font-weight:700;white-space:nowrap;opacity:0;transition:opacity .16s}
+.rail:hover .grp,body.navauf .rail .grp{opacity:1}
+.rail a{position:relative;height:2.75rem;border-radius:.55rem;display:flex;align-items:center;gap:.85rem;padding-left:.72rem;font-size:1.25rem;color:var(--stumm);white-space:nowrap;flex:none}
+.rail a span.n{font:400 1.06rem/1 var(--haus);color:inherit;opacity:0;transition:opacity .16s}
+.rail:hover a span.n,body.navauf .rail a span.n{opacity:1}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.55rem;bottom:.55rem;width:.19rem;border-radius:2px;background:var(--gold)}
+.rail .zahl{position:absolute;left:1.7rem;top:.2rem;min-width:1rem;height:1rem;border-radius:.5rem;background:var(--warn);color:#fff;font:700 .69rem/1rem var(--zahl);text-align:center;padding:0 .2rem}
+.rail .luecke{flex:1}
+
+main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0}
+/* HERO mit geteilter Disziplin-Kulisse */
+.hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1.6rem;align-items:center;padding:1.05rem 1.5rem 1rem;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:0;z-index:-2;display:grid;grid-template-columns:1fr 1fr}
+.hero .kul i{background-position:center 42%;background-size:cover;filter:saturate(1.1);opacity:.62}
+.hero .kul i:first-child{-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent);margin-right:-12%}
+.hero .kul i:last-child{-webkit-mask-image:linear-gradient(270deg,#000 70%,transparent);mask-image:linear-gradient(270deg,#000 70%,transparent);margin-left:-12%}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.96) 0%,rgba(6,8,12,.72) 30%,rgba(6,8,12,.5) 55%,rgba(6,8,12,.82) 100%),linear-gradient(180deg,rgba(6,8,12,.2) 30%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:1rem}
+.hk .crest{width:5.25rem;height:5.25rem;border-radius:.75rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 .5rem 1.4rem rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk em{font-style:normal;font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.hk h1{margin:.12rem 0 .25rem;font:400 2.5rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hk span.lage{font-size:.97rem;color:var(--leise)} .hk span.lage b{color:var(--creme);font-weight:600}
+.kpis{display:flex;gap:.5rem;justify-content:center;min-width:0}
+.kpi{min-width:7.2rem;padding:.55rem 1.15rem .62rem 1.25rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%)}
+.kpi strong{display:flex;align-items:center;gap:.4rem;font-size:2rem;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap;height:2rem}
+.kpi small{font-size:.82rem;color:var(--leise);white-space:nowrap}
+.kpi.zone{border-top:2px solid var(--gut)}
+.fm{display:inline-flex;gap:.18rem}
+.fm i{width:.82rem;height:.82rem;transform:skewX(-14deg);background:var(--gut);border-radius:1px;flex:none} .fm i.n{background:var(--warn)} .fm i.u{background:var(--stumm)} .fm i.x{background:rgba(255,255,255,.1)}
+.kpi .fm i{width:1rem;height:1rem}
+.cta{display:flex;flex-direction:column;align-items:flex-end;gap:.4rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:3.1rem;padding:0 1.5rem;font-size:1.12rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.haupt:hover{filter:brightness(1.08)}
+.cta small{font-size:.82rem;color:var(--leise)}
+
+/* RASTER: fuellt die Resthoehe, nichts scrollt */
+.raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,1.12fr) minmax(0,1fr) auto auto;gap:.72rem;padding:.8rem 1rem .8rem;min-height:0}
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+#p-tag{grid-column:1/6;grid-row:1} #p-kad{grid-column:1/6;grid-row:2}
+#p-tab{grid-column:6/10;grid-row:1/3}
+#p-ent{grid-column:10/13;grid-row:1} #p-fin{grid-column:10/13;grid-row:2}
+#p-dis{grid-column:1/13;grid-row:3} .ticker{grid-column:1/13;grid-row:4}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.7rem;flex:none}
+.pk h2{min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1} .pk a{font-size:.85rem;font-weight:600;color:var(--gold);white-space:nowrap}
+.pk .marke{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:.12rem .5rem;border-radius:.2rem;background:rgba(242,160,61,.18);color:var(--heim);border:1px solid rgba(242,160,61,.5)}
+.pk .marke.g{background:rgba(69,176,201,.14);color:var(--gast);border-color:rgba(69,176,201,.5)}
+.pb{padding:.75rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* KADER MIT FORM & MORAL */
+.tfk{display:flex;align-items:center;gap:1.1rem;font-size:.88rem;color:var(--leise);white-space:nowrap;flex:none;margin-bottom:.6rem;overflow:hidden}
+.tfk .zz{display:inline-flex;align-items:center;gap:.7rem;padding:.25rem .7rem;border-radius:.4rem;background:var(--flaeche-2);border:1px solid var(--linie)}
+.tfk .zz span{display:inline-flex;align-items:baseline;gap:.25rem} .tfk .zz b{font-size:1.05rem;color:var(--tinte)}
+.pfeil{font-weight:700;letter-spacing:-.12em;font-size:.82em;padding-right:.12em}
+.pfeil.s2,.pfeil.s1{color:var(--gut)} .pfeil.s0{color:var(--stumm);letter-spacing:0} .pfeil.s-1,.pfeil.s-2{color:var(--warn)}
+svg.ges{width:1.25em;height:1.25em;flex:none;vertical-align:-.25em}
+.kk{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.55rem;flex:1;min-height:0}
+.sk{position:relative;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);background:#111;display:block;min-height:0}
+.sk:hover{border-color:var(--gold)}
+.sk img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 18%}
+.sk::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 38%,rgba(4,6,10,.97) 80%)}
+.sk .rg{position:absolute;z-index:1;left:0;top:.5rem;padding:.05rem .6rem .05rem .5rem;background:var(--gold);color:#17120a;font-weight:700;font-size:.88rem;clip-path:polygon(0 0,100% 0,calc(100% - .45rem) 100%,0 100%)}
+.sk .un{position:absolute;z-index:1;left:.5rem;right:.5rem;bottom:.45rem}
+.sk b{display:block;font:400 1.1rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk small{font-size:.78rem;color:var(--leise);white-space:nowrap}
+.sk .ov{display:flex;align-items:center;gap:.22rem;margin-top:.2rem;font-size:.88rem} .sk .ov strong{font-size:1.3rem;line-height:1;color:var(--creme);margin-right:auto}
+.sk .ov .mo{display:inline-flex;align-items:center;gap:.12rem;font-weight:700}
+
+/* KASSE */
+.kas{display:flex;align-items:flex-end;gap:.9rem;flex:none}
+.kas strong{font-size:2.3rem;line-height:.95;color:var(--creme)} .kas small{font-size:.85rem;color:var(--leise);padding-bottom:.15rem}
+.kurve{flex:1;min-height:1.6rem;margin:.35rem 0 .1rem;position:relative}
+.kurve svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.kx{display:flex;justify-content:space-between;font-size:.7rem;color:var(--stumm);letter-spacing:.08em;flex:none;margin-bottom:.3rem}
+.zeile{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:baseline;padding:.2rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.94rem;flex:none;white-space:nowrap}
+.zeile span{overflow:hidden;text-overflow:ellipsis} .zeile small{color:var(--leise);font-size:.8rem;margin-left:.35rem}
+.zeile strong{font-size:1.1rem}
+.zeile.next small{display:block;margin:0}
+.zeile.next{align-items:center;margin-top:.25rem;padding:.3rem .55rem;border:1px solid var(--linie-2);border-radius:.4rem;background:var(--flaeche-2)}
+.apr{flex:none;margin-top:.45rem;font-size:.85rem;color:var(--leise)}
+.apr .kopfz{display:flex;justify-content:space-between} .apr b{color:var(--tinte)}
+.apr .bn{position:relative;height:.5rem;background:rgba(255,255,255,.08);margin-top:.25rem;transform:skewX(-14deg)}
+.apr .bn i{display:block;height:100%;background:var(--gut)} .apr .bn u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:var(--acht)} .apr .bn u+u{background:var(--warn)}
+/* ===================== RAHMEN ===================== */
+.demo{padding-left:.9rem;position:relative;z-index:90}
+.demo i.tr{width:1px;height:1.1rem;background:#2a3344;flex:none}
+.demo a{cursor:pointer}
+.app{grid-template-rows:minmax(0,1fr);transition:grid-template-columns .22s ease}
+body.pin .app{grid-template-columns:15rem minmax(0,1fr)}
+body.arena:not(.rahmen) .app{grid-template-columns:0rem minmax(0,1fr)}
+
+/* --- Schiene --- */
+.rail{gap:.12rem;transition:width .16s ease,box-shadow .16s ease,transform .25s ease}
+body.pin .rail{width:15rem;box-shadow:none}
+body.pin .rail .grp,body.pin .rail a span.n,body.pin .rail .wer{opacity:1}
+.rail .kopf{display:flex;align-items:center;gap:.7rem;margin-bottom:.35rem;flex:none;white-space:nowrap}
+.rail .logo{margin:0;border-color:var(--heim);position:relative;overflow:visible}
+.rail .logo img{border-radius:.5rem}
+.rail .wer{opacity:0;transition:opacity .16s;line-height:1.1}
+.rail:hover .wer,body.navauf .rail .wer{opacity:1}
+.rail .wer b{display:block;font:400 1.05rem/1.1 var(--haus);color:#fff}
+.rail .wer small{font-size:.8rem;color:var(--leise)}
+.rail .grp{height:1rem;margin-top:.25rem}
+.rail a{height:2.55rem;transition:color .12s,background .12s}
+.rail a.an{background:linear-gradient(90deg,rgba(240,195,90,.2),rgba(240,195,90,.04))}
+.rail a.an::before{display:none}
+.rail .marker{position:absolute;left:0;width:.19rem;height:1.5rem;border-radius:0 2px 2px 0;background:var(--gold);box-shadow:0 0 .7rem rgba(240,195,90,.7);transition:top .26s cubic-bezier(.3,1.3,.5,1)}
+.rail .zahl{top:.1rem}
+.rail a.pinan{color:var(--gold)}
+body.arena:not(.rahmen) .rail{transform:translateX(-100%);box-shadow:none}
+body.arena:not(.rahmen) .railplatz:hover .rail,body.arena.griffauf .rail{transform:none;width:15rem;box-shadow:1.2rem 0 2.5rem rgba(0,0,0,.7)}
+body.arena:not(.rahmen) .railplatz:hover .rail .grp,body.arena:not(.rahmen) .railplatz:hover .rail a span.n,body.arena:not(.rahmen) .railplatz:hover .rail .wer{opacity:1}
+/* Griff: der einzige Rest des Rahmens im Arena-Vollbild */
+.griff{display:none;position:absolute;left:0;top:50%;width:.95rem;height:5.5rem;margin-top:-2.75rem;border-radius:0 .5rem .5rem 0;background:rgba(8,11,17,.78);border:1px solid var(--linie-2);border-left:0;place-items:center;color:var(--creme);font-size:.8rem}
+.griff u{position:absolute;right:-.3rem;top:-.3rem;width:.7rem;height:.7rem;border-radius:50%;background:var(--warn);display:none}
+body.arena:not(.rahmen) .griff{display:grid}
+body.arena:not(.rahmen) .railplatz{width:.95rem}
+body.arena:not(.rahmen) .railplatz:hover .griff{display:none}
+body.arena.wartet .griff u{display:block}
+
+.rechts{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:4.5rem minmax(0,1fr);min-width:0;min-height:0;position:relative;transition:grid-template-rows .28s ease}
+body.arena .rechts{grid-template-rows:0rem minmax(0,1fr)}
+
+/* --- Regieband: EINE Zeile fuer Ort, Unterreiter, Seiten-Slot, Saison, Kasse, Suche, Inbox, Weiter --- */
+.band{position:relative;z-index:40;display:flex;align-items:center;gap:.9rem;height:4.5rem;padding:0 1rem 0 1.25rem;border-bottom:1px solid var(--linie);isolation:isolate;white-space:nowrap;transition:transform .28s ease,opacity .2s}
+body.arena .band{transform:translateY(-100%);opacity:0;pointer-events:none}
+.band .bkul{position:absolute;inset:0;z-index:-2;display:grid;grid-template-columns:1fr 1fr;overflow:hidden}
+.band .bkul i{background-position:center 36%;background-size:cover;opacity:.5;transition:background-image .4s}
+.band .bkul i:first-child{-webkit-mask-image:linear-gradient(90deg,#000 70%,transparent);mask-image:linear-gradient(90deg,#000 70%,transparent);margin-right:-12%}
+.band .bkul i:last-child{-webkit-mask-image:linear-gradient(270deg,#000 70%,transparent);mask-image:linear-gradient(270deg,#000 70%,transparent);margin-left:-12%}
+.band::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.97) 0%,rgba(6,8,12,.8) 28%,rgba(6,8,12,.62) 55%,rgba(6,8,12,.9) 100%)}
+.ort{flex:none;min-width:0}
+.ort em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);height:1rem}
+.ort em span{color:var(--stumm)}
+.ort h1{margin:.1rem 0 0;font:400 1.95rem/1.05 var(--haus);color:#fff}
+.ort.neu em,.ort.neu h1{animation:hoch .3s both} .ort.neu h1{animation-delay:.04s}
+@keyframes hoch{from{opacity:0;transform:translateY(.5rem)}to{opacity:1;transform:none}}
+.reiter{display:flex;align-self:stretch;gap:.1rem;flex:none}
+.reiter a{position:relative;display:flex;align-items:flex-end;padding:0 .62rem .85rem;font-size:.9rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--leise)}
+.reiter a:hover{color:var(--tinte)}
+.reiter a.an{color:var(--creme)}
+.reiter a.an::after{content:"";position:absolute;left:.5rem;right:.5rem;bottom:-1px;height:.19rem;background:var(--gold);transform:skewX(-14deg)}
+.slot{flex:1;min-width:0;display:flex;justify-content:center;gap:.45rem;overflow:hidden}
+.slot.neu>*{animation:hoch .3s both} .slot.neu>:nth-child(2){animation-delay:.04s} .slot.neu>:nth-child(3){animation-delay:.08s} .slot.neu>:nth-child(4){animation-delay:.12s}
+.kpi.k{min-width:0;padding:.38rem 1.05rem .42rem 1.1rem}
+.kpi.k .gk{font-size:.64rem;display:block}
+.kpi.k strong{font-size:1.5rem;height:1.6rem}
+.kpi.k strong small{font-weight:500;font-size:.8rem;color:var(--leise)}
+.kpi.k .fm i{width:.82rem;height:.82rem}
+.sl{display:flex;align-items:center;gap:.5rem;padding:.4rem 1.05rem .4rem 1rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%);color:var(--leise)}
+.sl.an{background:linear-gradient(180deg,rgba(240,195,90,.22),rgba(14,19,29,.9));border-top:2px solid var(--gold);color:var(--tinte)}
+.sl u{text-decoration:none;font-weight:700;font-size:.8rem;padding:.1rem .4rem;border:1px solid var(--linie-2);border-radius:.2rem}
+.sl b{display:block;font:400 1.2rem/1 var(--haus);color:inherit}
+.sl small{display:block;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+.sl strong{font-size:1.5rem;line-height:1;color:var(--creme);margin-left:.5rem}
+.regie{display:flex;align-items:center;gap:.55rem;flex:none}
+.chip{display:flex;flex-direction:column;justify-content:center;gap:.22rem;height:3rem;padding:0 .75rem;border-radius:.5rem;background:rgba(14,19,29,.78);border:1px solid var(--linie)}
+.chip:hover,.ikn:hover{border-color:var(--linie-2);background:var(--flaeche-2)}
+.chip .o{display:flex;align-items:baseline;gap:.4rem;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:var(--leise)}
+.chip .o b{font-size:1.12rem;letter-spacing:0;color:var(--creme);font-weight:700;text-transform:none}
+.chip .o span{letter-spacing:0;text-transform:none;font-size:.82rem}
+.tk{display:flex;gap:.14rem}
+.tk i{width:.34rem;height:.5rem;transform:skewX(-14deg);background:rgba(255,255,255,.13);border-radius:1px}
+.tk i.s{background:var(--gut)} .tk i.u{background:var(--acht)} .tk i.n{background:var(--warn)}
+.tk i.j{background:var(--gold);box-shadow:0 0 .4rem var(--gold);height:.7rem;margin-top:-.1rem}
+.ikn{position:relative;width:3rem;height:3rem;border-radius:.5rem;display:grid;place-items:center;font-size:1.2rem;color:var(--leise);background:rgba(14,19,29,.78);border:1px solid var(--linie)}
+.ikn kbd{position:absolute;right:.2rem;bottom:.12rem;font:600 .56rem/1 var(--zahl);color:var(--stumm)}
+.ikn .zahl{position:absolute;right:-.3rem;top:-.3rem;min-width:1.05rem;height:1.05rem;border-radius:.55rem;background:var(--warn);color:#fff;font:700 .7rem/1.05rem var(--zahl);text-align:center;padding:0 .2rem}
+.ikn.wack{animation:wack .5s} @keyframes wack{25%{transform:rotate(-14deg)}60%{transform:rotate(10deg)}}
+
+/* --- Taktgeber: Status + Hauptaktion in einem --- */
+.takt{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:.22rem;width:16rem;margin-left:.25rem}
+.tb{position:relative;height:2.6rem;padding:0 1.3rem;display:flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;font-size:1.02rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%);overflow:hidden;white-space:nowrap}
+.tb:hover{filter:brightness(1.08)}
+.tb .fuell{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--gold);z-index:0}
+.tb>*:not(.fuell){position:relative;z-index:1}
+.ts{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--leise);padding-left:.7rem;overflow:hidden}
+.ts:hover{color:var(--tinte)}
+.ts i{width:.5rem;height:.5rem;border-radius:50%;background:var(--acht);flex:none}
+.ts b{color:var(--tinte);font-weight:600}
+.ts span{overflow:hidden;text-overflow:ellipsis}
+/* gesperrt */
+.takt.zu .tb{background:var(--flaeche-3);color:var(--leise);box-shadow:inset 0 0 0 1px var(--linie-2)}
+.takt.zu .ts i{background:var(--warn)}
+.takt.ruck .tb{animation:ruck .3s} @keyframes ruck{25%{transform:translateX(-.3rem)}75%{transform:translateX(.3rem)}}
+/* Aktion laeuft */
+.takt.laeuft .tb{background:var(--flaeche-3);color:var(--creme);cursor:progress}
+.takt.laeuft .tb .fuell{background:linear-gradient(90deg,rgba(240,195,90,.25),rgba(240,195,90,.6));transition:width .18s linear}
+.takt.laeuft .ts i{background:var(--gold);animation:blink .8s infinite alternate} @keyframes blink{to{opacity:.25}}
+.band .lauf{position:absolute;left:0;right:0;bottom:-1px;height:2px;overflow:hidden;opacity:0}
+.band .lauf::after{content:"";position:absolute;top:0;bottom:0;width:30%;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:lauf 1.1s linear infinite}
+@keyframes lauf{from{left:-30%}to{left:100%}}
+body.s-laeuft .band .lauf{opacity:1}
+/* Spieltag bereit */
+.takt.weiter .tb{animation:puls 1.6s ease-in-out infinite}
+.takt.weiter .tb::after{content:"";position:absolute;top:0;bottom:0;width:2.2rem;left:-3rem;background:linear-gradient(90deg,transparent,rgba(255,255,255,.75),transparent);transform:skewX(-20deg);animation:glanz 2.4s ease-in-out infinite}
+@keyframes glanz{0%,55%{left:-3rem}100%{left:110%}}
+@keyframes puls{50%{filter:brightness(1.18) drop-shadow(0 0 .5rem rgba(240,195,90,.8))}}
+.takt.weiter .ts i{background:var(--gut)}
+.takt.weiter::before{content:"";position:absolute;inset:-.35rem -.3rem 1rem -.3rem;z-index:-1;background:radial-gradient(closest-side,rgba(240,195,90,.35),transparent);animation:blink 1.6s infinite alternate}
+
+/* --- Aufklapper (Ablauf, Inbox) --- */
+.klapp{position:absolute;z-index:70;top:4.2rem;width:23rem;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);box-shadow:0 1.2rem 3rem rgba(0,0,0,.7);display:none;white-space:normal;overflow:hidden}
+.klapp.auf{display:block;animation:hoch .18s both}
+.klapp h3{margin:0;padding:.7rem .9rem .55rem;font:400 1.1rem/1 var(--haus);color:var(--creme);border-bottom:1px solid var(--linie)}
+.klapp h3 small{font:600 .72rem/1 var(--zahl);letter-spacing:.12em;text-transform:uppercase;color:var(--leise);margin-left:.5rem}
+.klapp .ent{max-height:none;min-height:3.2rem;flex:none}
+.klapp .fuss{padding:.5rem .9rem;border-top:1px solid var(--linie);font-size:.82rem;color:var(--leise)}
+#k-ablauf{right:1rem} #k-inbox{right:18rem}
+.ent.ok .tx{color:var(--leise)}
+
+/* --- Buehne und Seitenwechsel --- */
+main.buehne{display:block;position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--grund)}
+.seite{position:absolute;inset:0}
+.seite:not(.an){display:none!important}
+.seite.raus{opacity:0;transform:translateY(-.35rem);transition:opacity .11s ease,transform .11s ease}
+.seite.rein>*{animation:auf .34s cubic-bezier(.2,.8,.3,1) both}
+.seite.rein>:nth-child(2){animation-delay:.03s} .seite.rein>:nth-child(3){animation-delay:.06s} .seite.rein>:nth-child(4){animation-delay:.09s}
+.seite.rein>:nth-child(5){animation-delay:.12s} .seite.rein>:nth-child(6){animation-delay:.15s} .seite.rein>:nth-child(7){animation-delay:.18s}
+@keyframes auf{from{opacity:0;transform:translateY(.9rem)}to{opacity:1;transform:none}}
+/* Sendewisch: nur beim Wechsel in die Arena und zurueck */
+.wisch{position:fixed;inset:0;z-index:200;pointer-events:none;overflow:hidden;display:none}
+.wisch.an{display:block}
+.wisch i{position:absolute;top:-10%;bottom:-10%;width:140%;left:-160%;transform:skewX(-14deg)}
+.wisch i:nth-child(1){background:var(--gold);animation:wisch .72s cubic-bezier(.6,0,.3,1) both}
+.wisch i:nth-child(2){background:#06080c;animation:wisch .72s cubic-bezier(.6,0,.3,1) .07s both}
+.wisch b{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:400 4.2rem/1 var(--haus);color:var(--creme);white-space:nowrap;opacity:0;animation:wtext .72s .07s both}
+.wisch b small{display:block;text-align:center;font:700 1rem/1.6 var(--zahl);letter-spacing:.3em;text-transform:uppercase;color:var(--gold)}
+@keyframes wisch{0%{left:-160%}45%,55%{left:-20%}100%{left:120%}}
+@keyframes wtext{0%,25%{opacity:0}40%,60%{opacity:1}75%,100%{opacity:0}}
+
+/* --- Meldungen (Bauchbinden unten rechts) --- */
+.meld{position:fixed;z-index:80;right:1rem;bottom:1rem;display:flex;flex-direction:column;gap:.5rem;width:24rem}
+.mb{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.7rem;align-items:center;padding:.65rem .9rem .7rem 1rem;background:rgba(12,16,23,.97);border:1px solid var(--linie-2);border-left:.25rem solid var(--gold);border-radius:.35rem;box-shadow:0 .8rem 2rem rgba(0,0,0,.6);animation:mrein .32s cubic-bezier(.2,.8,.3,1) both;overflow:hidden}
+.mb.w{border-left-color:var(--warn)} .mb.g{border-left-color:var(--gut)}
+.mb .ic{font-size:1.4rem;color:var(--gold)} .mb.w .ic{color:var(--warn)} .mb.g .ic{color:var(--gut)}
+.mb b{display:block;font:400 1.08rem/1.15 var(--haus);color:#fff}
+.mb small{font-size:.86rem;color:var(--leise)}
+.mb a{color:var(--gold);font-weight:600;font-size:.86rem}
+.mb u{position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--gold);opacity:.6;animation:ablauf 6s linear both}
+.mb.geht{animation:mraus .25s both}
+@keyframes mrein{from{opacity:0;transform:translateX(2rem)}to{opacity:1;transform:none}}
+@keyframes mraus{to{opacity:0;transform:translateX(2rem)}}
+@keyframes ablauf{from{width:100%}to{width:0}}
+body.arena .meld{display:none}
+
+/* --- Suche (Befehlspalette) --- */
+.schleier{position:fixed;inset:0;z-index:100;background:rgba(2,3,5,.72);display:none;backdrop-filter:blur(3px)}
+.schleier.auf{display:block}
+.pal{position:absolute;left:50%;top:16%;width:38rem;margin-left:-19rem;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);box-shadow:0 2rem 5rem rgba(0,0,0,.8);overflow:hidden;animation:hoch .18s both}
+.pal input{width:100%;height:3.4rem;padding:0 1.1rem;background:none;border:0;border-bottom:1px solid var(--linie);color:var(--tinte);font:500 1.25rem var(--zahl);outline:0}
+.pal .gk{display:block;padding:.6rem 1.1rem .2rem}
+.pal a{display:flex;align-items:center;gap:.7rem;padding:.5rem 1.1rem;font-size:1.05rem;color:var(--tinte)}
+.pal a img{width:1.8rem;height:1.8rem;border-radius:.25rem;object-fit:cover}
+.pal a svg{font-size:1.2rem;color:var(--leise);width:1.8rem}
+.pal a small{margin-left:auto;color:var(--stumm);font-size:.82rem}
+.pal a.an,.pal a:hover{background:rgba(240,195,90,.14)}
+.pal .fuss{display:flex;gap:1.2rem;padding:.5rem 1.1rem;border-top:1px solid var(--linie);font-size:.8rem;color:var(--stumm)}
+/* --- Office als Blatt --- */
+.blatt{position:absolute;right:0;top:0;bottom:0;width:30rem;background:var(--flaeche-1);border-left:1px solid var(--linie-2);box-shadow:-2rem 0 4rem rgba(0,0,0,.7);display:flex;flex-direction:column;animation:brein .26s cubic-bezier(.2,.8,.3,1) both}
+@keyframes brein{from{transform:translateX(100%)}to{transform:none}}
+.blatt .pk{height:4.5rem} .blatt .pk h2{font-size:1.6rem}
+.blatt .ents{flex:none} .blatt .ent{min-height:4.2rem;flex:none}
+.blatt p{margin:auto 1rem 1rem;font-size:.86rem;color:var(--stumm)}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01s!important;animation-iteration-count:1!important;transition-duration:.01s!important}}
+/* ===================== BEREICH ENTWICKLUNG: TRAINING UND GEBAEUDE (neu, 18.11.) ===================== */
+:root{--pow:#e2574c;--spe:#5fc27a;--men:#5aa2e6;--soc:#e8c34a;--reha:#9aa7ba;--z0:#62d394;--z1:#e8c34a;--z2:#f08a3c;--z3:#ff5a52}
+.reiter a small{font-size:.6rem;margin-left:.3rem;padding:.02rem .3rem;border-radius:.6rem;background:var(--warn);color:#fff;letter-spacing:0;align-self:flex-end;margin-bottom:.15rem}
+.takt.warn .ts i{background:var(--warn);animation:blink .7s infinite alternate}
+.seite{display:grid;gap:.72rem;padding:.8rem 1rem}
+.pk small{font-size:.86rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk .seg{margin-left:auto}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.3rem;overflow:hidden;flex:none}
+.seg a{padding:.16rem .6rem;font-size:.82rem;font-weight:700;letter-spacing:.04em;color:var(--leise);border-left:1px solid var(--linie)}
+.seg a:first-child{border-left:0}
+.seg a:hover{color:var(--tinte);background:var(--flaeche-3)}
+.seg a.an{background:var(--gold);color:#17120a}
+.seg a.an.l{background:var(--z0)} .seg a.an.h{background:var(--z2)}
+.seg a.wu{box-shadow:inset 0 -2px 0 var(--gast)}
+.mk{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.1rem .42rem;border-radius:.2rem;border:1px solid var(--linie-2);color:var(--leise);white-space:nowrap}
+.mk.p{color:var(--gut);border-color:rgba(98,211,148,.5);background:rgba(98,211,148,.1)}
+.mk.n{color:var(--gast);border-color:rgba(69,176,201,.5);background:rgba(69,176,201,.1)}
+.mk.w{color:var(--warn);border-color:rgba(255,96,88,.55);background:rgba(255,96,88,.12)}
+.mk.a{color:var(--acht);border-color:rgba(243,181,74,.5);background:rgba(243,181,74,.1)}
+.mk.g{color:var(--gold);border-color:rgba(240,195,90,.55);background:rgba(240,195,90,.12)}
+.mk.neu{color:#c9a7ff;border-color:rgba(201,167,255,.5);background:rgba(201,167,255,.1)}
+.ax{display:inline-block;width:.55rem;height:.55rem;border-radius:1px;transform:skewX(-14deg);flex:none}
+.ax.a0{background:var(--pow)} .ax.a1{background:var(--spe)} .ax.a2{background:var(--men)} .ax.a3{background:var(--soc)}
+.dk{display:inline-block;min-width:2.3rem;text-align:center;font-weight:700;font-size:.8rem;letter-spacing:.04em;padding:.08rem .3rem;border-radius:.2rem;background:var(--flaeche-3);color:var(--creme)}
+.kn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;height:2.3rem;padding:0 1rem;font-weight:700;font-size:.92rem;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--linie-2);border-radius:.3rem;color:var(--creme);white-space:nowrap}
+.kn:hover{border-color:var(--gold);color:#fff}
+.kn.gold{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.kn.rot{background:rgba(255,96,88,.16);border-color:var(--warn);color:#ffd9d6}
+.kn.zu{opacity:.45;cursor:not-allowed}
+.hinw{font-size:.84rem;color:var(--leise);line-height:1.3}
+/* ===================== GEMEINSAME BAUSTEINE DER VIER SEITEN-MOCKUPS (18.11., fehlende Seiten) ===================== */
+:root{--chris:#F2A03D;--franky:#45B0C9;--ramona:#c9a7ff;--ki:#66738a}
+.demo{gap:.6rem}
+.demo .dg{display:inline-flex;gap:.3rem;align-items:center}
+.pb.sc{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2a3344 transparent}
+.pb.eng{padding:.45rem .5rem}
+.pk h2{flex:none}
+.pk small{min-width:0}
+.pk .zz{font-size:.8rem;font-weight:700;color:var(--leise);padding:.05rem .45rem;border:1px solid var(--linie-2);border-radius:.6rem}
+.pk .zz.w{color:#fff;background:var(--warn);border-color:var(--warn)}
+.ptr{width:2.5rem;height:2.5rem;border-radius:.4rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none;background:#111}
+.ptr.k{width:1.9rem;height:1.9rem;border-radius:.3rem}
+.ptr.g{width:5.5rem;height:5.5rem;border-radius:.6rem}
+.lg{width:2.2rem;height:2.2rem;border-radius:.35rem;object-fit:cover;border:1px solid var(--linie-2);flex:none}
+.lg.k{width:1.5rem;height:1.5rem;border-radius:.25rem}
+/* Menschen am Tisch: Chris, Franky, Ramona, KI */
+.mn{display:inline-grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;font-weight:700;font-size:.92rem;color:#0b0e14;flex:none;background:var(--ki)}
+.mn.c{background:var(--chris)} .mn.f{background:var(--franky)} .mn.r{background:var(--ramona)} .mn.k{background:#2a3344;color:var(--leise)}
+.mn.g{width:3rem;height:3rem;font-size:1.4rem}
+.mn.s{width:1.3rem;height:1.3rem;font-size:.7rem}
+/* schraeger Balken */
+.bal{position:relative;height:.5rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);border-radius:1px;min-width:2rem}
+.bal i{display:block;height:100%;background:var(--gold);border-radius:1px}
+.bal i.g{background:var(--gut)} .bal i.w{background:var(--warn)} .bal i.a{background:var(--acht)} .bal i.b{background:var(--gast)}
+.bal u{position:absolute;top:-.2rem;bottom:-.2rem;width:2px;background:#fff}
+.bal s{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(90deg,rgba(240,195,90,.5) 0 2px,transparent 2px 5px)}
+/* Kachel mit Zahl */
+.ka{padding:.5rem .7rem .55rem;background:var(--flaeche-2);border:1px solid var(--linie);border-radius:.45rem;min-width:0}
+.ka strong{display:block;font-size:1.6rem;line-height:1.05;color:var(--creme);white-space:nowrap}
+.ka strong small{font-size:.85rem;font-weight:500;color:var(--leise)}
+.ka small{font-size:.82rem;color:var(--leise)}
+.kas3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.kas2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.kas4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem}
+/* Abschnittstitel in einer Karte */
+.ab{display:flex;align-items:center;gap:.5rem;margin:.75rem 0 .4rem;flex:none}
+.ab:first-child{margin-top:0}
+.ab::after{content:"";flex:1;height:1px;background:var(--linie)}
+.ab b{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700;white-space:nowrap}
+.ab span{font-size:.82rem;color:var(--stumm);white-space:nowrap}
+/* Schalter */
+.sw{position:relative;width:2.9rem;height:1.5rem;border-radius:.2rem;background:var(--flaeche-3);border:1px solid var(--linie-2);flex:none;transform:skewX(-14deg);transition:background .15s}
+.sw::after{content:"";position:absolute;top:.14rem;left:.14rem;width:1.1rem;height:1.1rem;background:var(--leise);border-radius:1px;transition:left .15s,background .15s}
+.sw.an{background:rgba(240,195,90,.3);border-color:var(--gold)} .sw.an::after{left:1.55rem;background:var(--gold)}
+.txt{font-size:.95rem;line-height:1.35;color:var(--leise)} .txt b{color:var(--tinte);font-weight:600}
+.neu-m{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.05rem .35rem;border-radius:.2rem;color:#c9a7ff;border:1px solid rgba(201,167,255,.5);background:rgba(201,167,255,.1);white-space:nowrap;vertical-align:.1em}
+.leer{margin:auto;text-align:center;color:var(--leise);font-size:1rem;max-width:26rem}
+.leer b{display:block;font:400 1.5rem/1.2 var(--haus);color:var(--creme);margin-bottom:.3rem}
+.leer svg{font-size:2.6rem;color:var(--gut);margin-bottom:.4rem}
+
+/* ===================== OFFICE: VORSTAND (21.11.) ===================== */
+:root{--k-rot:#ff7a6e;--k-gruen:#5fd68a;--k-blau:#6fb0ff;--k-gelb:#f3cf5a;--neu:#c9a7ff;--s50:#ff6058;--s70:#ff9a62;--s80:#f3b54a;--s90:#b9d77a;--s100:#62d394}
+.seite.ov{grid-template-columns:29rem minmax(0,1fr) 31rem;grid-template-rows:minmax(0,1fr)}
+.seite.og{grid-template-columns:25rem minmax(0,1fr) 31rem;grid-template-rows:minmax(0,1fr)}
+.seite.op{grid-template-columns:30rem minmax(0,1fr) 27rem;grid-template-rows:minmax(0,1fr)}
+.band .reiter a small{background:none;margin-left:.35rem;font-size:.7rem;padding:.02rem .3rem;border-radius:.2rem;color:var(--leise);border:1px solid var(--linie-2);letter-spacing:.06em}
+.kls{display:inline-flex;align-items:center;gap:.25rem;font-weight:700;font-size:.9rem;color:var(--kf,var(--leise));white-space:nowrap}
+.kls img{width:1.05rem;height:1.05rem;object-fit:contain;display:inline-block}
+.mk{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.03rem .34rem;border-radius:.2rem;border:1px solid var(--linie-2);color:var(--leise);white-space:nowrap}
+.mk.gut{color:var(--gut);border-color:rgba(98,211,148,.55);background:rgba(98,211,148,.09)}
+.mk.warn{color:var(--acht);border-color:rgba(243,181,74,.55);background:rgba(243,181,74,.09)}
+.mk.rot{color:var(--warn);border-color:rgba(255,96,88,.6);background:rgba(255,96,88,.1)}
+.mk.neu{color:var(--neu);border-color:rgba(201,167,255,.5);background:rgba(201,167,255,.1)}
+.mk.gold{color:var(--gold);border-color:rgba(240,195,90,.6)}
+.pk .mk{flex:none}
+.klein{display:block;font-size:.8rem;font-weight:500;color:var(--leise);line-height:1.15}
+/* Vertrauen */
+.wer{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.8rem;align-items:center;flex:none}
+.wer .wp{width:4rem;height:4rem;border-radius:50%;overflow:hidden;border:2px solid var(--gold);flex:none}
+.wer .wp img{width:100%;height:100%;object-fit:cover}
+.wer>span>b{display:block;font:400 1.4rem/1.1 var(--haus);color:#fff}
+.wer small{font-size:.9rem;color:var(--leise);line-height:1.25;display:block}
+.uhr{position:relative;flex:none;height:11.2rem;margin:.5rem 0 .2rem}
+.uhr svg{position:absolute;left:50%;top:0;height:100%;transform:translateX(-50%);overflow:visible}
+.uhr .wert{position:absolute;left:0;right:0;bottom:.1rem;text-align:center;line-height:1}
+.uhr .wert strong{font-size:4rem;color:var(--creme)} .uhr .wert span{font-size:1.2rem;color:var(--leise)}
+.uhr .wert em{display:block;font-style:normal;font-size:.92rem;color:var(--leise);margin-top:.25rem}
+.leiter{display:flex;flex-direction:column;gap:.2rem;flex:none}
+.spr{display:grid;grid-template-columns:.5rem 6.2rem 1fr 1fr;gap:.6rem;align-items:center;height:2rem;padding:0 .6rem 0 0;border:1px solid transparent;border-radius:.35rem;font-size:.95rem;color:var(--leise)}
+.spr i{align-self:stretch;border-radius:.3rem 0 0 .3rem;background:var(--sf)}
+.spr b{color:var(--tinte);font-size:1.1rem}
+.spr.kopf{height:1.3rem;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--stumm)}
+.spr.an{border-color:var(--gold);background:linear-gradient(90deg,rgba(240,195,90,.16),transparent)}
+.spr.an span:nth-child(2){color:var(--creme);font-weight:700}
+.bew{display:grid;grid-template-columns:3rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.3rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.95rem;flex:none}
+.bew:first-of-type{border-top:0}
+.bew span:first-child{font-size:.72rem;letter-spacing:.08em;color:var(--stumm);font-weight:700;text-transform:uppercase}
+.bew b{font-size:1.05rem}
+.rgz{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.2rem .8rem;align-items:center;font-size:.95rem;color:var(--leise);flex:none;padding:.22rem 0}
+.rgz b{color:var(--creme);font-size:1.1rem} .rgz small{color:var(--stumm);font-size:.82rem}
+/* Ziele */
+.pruef{display:flex;flex-wrap:wrap;align-items:center;gap:.7rem;padding:.5rem .8rem;border:1px solid rgba(98,211,148,.4);background:rgba(98,211,148,.07);border-radius:.45rem;font-size:.95rem;color:var(--leise);flex:none}
+.pruef svg{font-size:1.4rem;color:var(--gut)}
+.pruef b{color:var(--tinte);font-weight:600}
+.pruef .pp{display:flex;gap:.3rem;margin-left:auto;flex:none}
+.pruef .pp span{font-size:.78rem;font-weight:700;padding:.08rem .45rem;border-radius:1rem;border:1px solid rgba(98,211,148,.45);color:var(--gut);white-space:nowrap}
+.zg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:.6rem;flex:1;min-height:0;margin:.6rem 0}
+.zk{position:relative;display:flex;flex-direction:column;padding:.75rem .9rem .7rem 1.05rem;border:1px solid var(--linie);border-radius:.5rem;background:var(--flaeche-2);min-height:0;overflow:hidden}
+.zk::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.25rem;background:var(--gut)}
+.zk.gef::before{background:var(--acht)}
+.zk .zo{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}
+.zk .zo .ar{font-size:.7rem;letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:var(--stumm);margin-right:auto}
+.zk h3{margin:.35rem 0 .2rem;font:400 1.32rem/1.15 var(--haus);color:#fff}
+.zk p{margin:0;font-size:.93rem;line-height:1.3;color:var(--leise)}
+.zk p b{color:var(--tinte);font-weight:600}
+.zk .mi{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.9rem;align-items:end;margin-top:auto;padding-top:.5rem}
+.zk .st strong{display:block;font-size:2.1rem;line-height:1;color:var(--creme);text-align:right;white-space:nowrap}
+.zk .st small{display:block;font-size:.85rem;color:var(--leise);text-align:right;white-space:nowrap}
+.zk .bal{margin-bottom:.45rem}
+.zk .lo{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.5rem;padding-top:.45rem;border-top:1px solid rgba(244,230,196,.08);font-size:.84rem;color:var(--leise);align-items:center}
+.zk .lo i{font-style:normal;font-weight:700;padding:.02rem .4rem;border-radius:.2rem;background:var(--flaeche-3);border:1px solid var(--linie);white-space:nowrap}
+.zk .lo i.p{color:var(--gut)} .zk .lo i.m{color:var(--warn)}
+.lfz{display:flex;align-items:flex-end;gap:.5rem;height:3.2rem}
+.lfz div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.1rem;height:100%}
+.lfz div i{width:100%;background:var(--gast);border-radius:.15rem .15rem 0 0;min-height:.2rem}
+.lfz div.a i{background:var(--warn)}
+.lfz div small{font-size:.74rem;color:var(--leise);white-space:nowrap}
+.lfz div b{font-size:.9rem;color:var(--tinte)}
+.lieb{display:flex;align-items:center;gap:.7rem}
+.lieb>img{width:3.6rem;height:3.6rem;border-radius:.5rem;object-fit:cover;object-position:center 18%;border:1px solid var(--k-gelb)}
+.lieb b{display:block;font:400 1.2rem/1.1 var(--haus);color:#fff}
+.verw{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.7rem;align-items:center;padding:.5rem .8rem;border:1px dashed rgba(201,167,255,.45);border-radius:.45rem;font-size:.92rem;line-height:1.3;color:var(--leise);flex:none}
+.verw svg{font-size:1.3rem;color:var(--neu)}
+.verw b{color:var(--tinte);font-weight:600} .verw s{color:var(--stumm)}
+/* Budget */
+.qb{display:grid;grid-template-columns:auto minmax(0,1fr);gap:1rem;align-items:center;flex:none}
+.qb strong{font-size:4.2rem;line-height:.95;color:var(--qf,var(--creme))}
+.qb p{margin:0;font-size:.95rem;line-height:1.3;color:var(--leise)} .qb p b{color:var(--tinte);font-weight:600}
+.stap{display:flex;height:1.5rem;border-radius:.25rem;overflow:hidden;transform:skewX(-14deg);margin:.2rem .2rem .45rem;flex:none}
+.stap i{display:block;height:100%}
+.leg{display:grid;grid-template-columns:.7rem minmax(0,1fr) auto;gap:.15rem .55rem;align-items:center;font-size:.93rem;color:var(--leise);flex:none}
+.leg i{width:.7rem;height:.7rem;transform:skewX(-14deg);border-radius:1px}
+.leg b{color:var(--tinte);font-size:1.02rem;text-align:right}
+.topf{padding:.55rem .75rem .6rem;background:var(--flaeche-2);border:1px solid var(--linie);border-radius:.45rem;min-width:0}
+.topf>span{display:block;font-size:.8rem;color:var(--leise)}
+.topf strong{display:block;font-size:1.9rem;line-height:1.05;color:var(--creme);white-space:nowrap}
+.topf.zu strong{color:var(--warn)}
+.sow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.2rem .7rem;align-items:center;padding:.55rem .75rem;border:1px solid var(--linie-2);border-radius:.5rem;background:var(--flaeche-2);margin-bottom:.4rem;flex:none;width:100%}
+.sow:hover{border-color:var(--gold)}
+.sow>svg{grid-row:1/3;font-size:1.5rem;color:var(--gold)}
+.sow b{font-size:1.08rem;color:var(--tinte)}
+.sow small{grid-column:2;font-size:.88rem;line-height:1.25;color:var(--leise)}
+.sow .kn{grid-row:1/3;grid-column:3;height:2rem;padding:0 .7rem;font-size:.8rem}
+.sow.zu{opacity:.6} .sow.zu>svg{color:var(--stumm)}
+.ruf{margin-top:auto;display:flex;flex-direction:column;gap:.4rem;flex:none;padding-top:.6rem}
+.ruf .btn.haupt{width:100%;height:3.2rem}
+.ruf small{font-size:.88rem;color:var(--leise);text-align:center}
+.gz{display:inline-flex;gap:.25rem;vertical-align:middle}
+.gz i{width:1.3rem;height:.5rem;transform:skewX(-14deg);background:rgba(255,255,255,.14);border-radius:1px}
+.gz i.v{background:var(--gold)}
+/* Gespraech */
+.regel{display:grid;grid-template-columns:1.3rem minmax(0,1fr);gap:.5rem;align-items:start;padding:.3rem 0;font-size:.93rem;line-height:1.3;color:var(--leise);flex:none}
+.regel svg{color:var(--gut);margin-top:.15rem}
+.regel b{color:var(--tinte);font-weight:600}
+.chat{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:.5rem;padding:.2rem .2rem .7rem;overflow:hidden}
+.bl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.6rem;align-items:end;max-width:82%}
+.bl .wp{width:2.4rem;height:2.4rem;border-radius:50%;overflow:hidden;border:1px solid var(--gold);flex:none}
+.bl .wp img{width:100%;height:100%;object-fit:cover}
+.bl .tx{padding:.55rem .8rem .6rem;border-radius:.7rem .7rem .7rem .15rem;background:var(--flaeche-3);border:1px solid var(--linie);font-size:1rem;line-height:1.35;color:var(--tinte)}
+.bl .tx em{display:block;font-style:normal;font-size:.68rem;letter-spacing:.13em;text-transform:uppercase;font-weight:700;color:var(--gold);margin-bottom:.15rem}
+.bl .tx .fo{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem}
+.bl .tx .fo i,.fo2 i{font-style:normal;font-size:.82rem;font-weight:700;padding:.02rem .4rem;border-radius:.2rem;background:rgba(0,0,0,.25);border:1px solid var(--linie);white-space:nowrap}
+.fo i.p,.fo2 i.p{color:var(--gut)} .fo i.m,.fo2 i.m{color:var(--warn)} .fo i.n,.fo2 i.n{color:var(--leise)}
+.bl.ich{align-self:flex-end;grid-template-columns:minmax(0,1fr) auto}
+.bl.ich .tx{border-radius:.7rem .7rem .15rem .7rem;background:linear-gradient(180deg,rgba(242,160,61,.2),rgba(242,160,61,.08));border-color:rgba(242,160,61,.45)}
+.bl.ich .tx em{color:var(--heim)}
+.bl.ja .tx{border-color:rgba(98,211,148,.6);background:rgba(98,211,148,.1)} .bl.ja .tx em{color:var(--gut)}
+.bl.nein .tx{border-color:rgba(255,96,88,.6);background:rgba(255,96,88,.09)} .bl.nein .tx em{color:var(--warn)}
+.bl.geg .tx{border-color:rgba(243,181,74,.6);background:rgba(243,181,74,.09)} .bl.geg .tx em{color:var(--acht)}
+.sys{align-self:center;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--stumm);padding:.1rem .8rem;border:1px solid var(--linie);border-radius:1rem}
+.pult{flex:none;border-top:1px solid var(--linie);padding-top:.65rem}
+.pult .ab{margin-top:0}
+.bitten{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem}
+.bi2{display:flex;flex-direction:column;gap:.15rem;padding:.5rem .65rem .55rem;border:1px solid var(--linie-2);border-radius:.5rem;background:var(--flaeche-2);min-width:0;text-align:left}
+.bi2:hover{border-color:var(--gold);background:var(--flaeche-3)}
+.bi2 svg{font-size:1.3rem;color:var(--gold)}
+.bi2 b{font-size:1.02rem;line-height:1.15;color:var(--tinte)}
+.bi2 small{font-size:.84rem;line-height:1.2;color:var(--leise)}
+.bi2 .mk{align-self:flex-start;margin-top:.15rem}
+.bi2.zu{opacity:.5;cursor:not-allowed} .bi2.zu svg{color:var(--stumm)}
+.zus{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.4rem}
+.zu2{display:flex;flex-direction:column;gap:.12rem;padding:.45rem .6rem .5rem;border:1px solid var(--linie-2);border-radius:.5rem;background:var(--flaeche-2);min-width:0;text-align:left}
+.zu2:hover{border-color:var(--gold)}
+.zu2 b{font-size:.98rem;line-height:1.15;color:var(--tinte);display:flex;justify-content:space-between;gap:.4rem}
+.zu2 b u{text-decoration:none;color:var(--gold)}
+.zu2 small{font-size:.82rem;line-height:1.2;color:var(--leise)}
+.zu2.an{border-color:var(--gold);background:linear-gradient(180deg,rgba(240,195,90,.22),rgba(240,195,90,.06))}
+.zu2.zu{opacity:.45;cursor:not-allowed}
+.waage{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.9rem;align-items:center;margin-top:.6rem}
+.waage .wb{position:relative;height:1.1rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);border-radius:2px}
+.waage .wb i{display:block;height:100%;background:var(--acht);border-radius:2px;transition:width .2s}
+.waage .wb.ok i{background:var(--gut)} .waage .wb.fern i{background:var(--warn)}
+.waage .wb u{position:absolute;top:-.3rem;bottom:-.3rem;width:2px;background:#fff}
+.waage .wt{font-size:.92rem;color:var(--leise);margin-top:.3rem} .waage .wt b{color:var(--tinte)}
+.waage .kns{display:flex;gap:.4rem}
+.va{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:.25rem .6rem;align-items:baseline;padding:.42rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.98rem;color:var(--leise);flex:none}
+.va:first-of-type{border-top:0}
+.va span.v{color:var(--stumm)} .va svg{color:var(--stumm);font-size:.8rem}
+.va b{font-size:1.2rem;color:var(--creme);min-width:4.2rem;text-align:right}
+.va b.p{color:var(--gut)} .va b.m{color:var(--warn)}
+.va small{grid-column:1/5;font-size:.82rem;color:var(--stumm);margin-top:-.2rem}
+.bind{display:grid;grid-template-columns:1.2rem minmax(0,1fr);gap:.5rem;font-size:.92rem;line-height:1.3;color:var(--leise);padding:.22rem 0;flex:none}
+.bind svg{color:var(--acht);margin-top:.15rem} .bind b{color:var(--tinte);font-weight:600}
+/* Praemien */
+.pr{padding:.7rem .85rem .75rem;border:1px solid var(--linie);border-radius:.5rem;background:var(--flaeche-2);margin-bottom:.5rem;flex:none}
+.pr h3{margin:0 0 .15rem;font:400 1.25rem/1.15 var(--haus);color:#fff;display:flex;align-items:center;gap:.5rem}
+.pr h3 svg{color:var(--gold);font-size:1.2rem}
+.pr p{margin:0 0 .5rem;font-size:.92rem;line-height:1.3;color:var(--leise)}
+.pr .seg3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--linie-2);border-radius:.4rem;overflow:hidden}
+.pr .seg3 a{padding:.38rem .3rem .42rem;text-align:center;border-left:1px solid var(--linie);color:var(--leise)}
+.pr .seg3 a:first-child{border-left:0}
+.pr .seg3 a b{display:block;font-size:1.05rem;color:var(--tinte)} .pr .seg3 a small{font-size:.8rem}
+.pr .seg3 a.an{background:linear-gradient(180deg,rgba(240,195,90,.3),rgba(240,195,90,.1));box-shadow:inset 0 -.19rem 0 var(--gold)}
+.pr .seg3 a.an b{color:var(--gold)}
+.pr .fo2{display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.5rem}
+table.ptb{width:100%;border-collapse:collapse;font-size:1rem}
+.ptb th{position:sticky;top:0;text-align:left;padding:.35rem .5rem;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--leise);border-bottom:1px solid var(--linie-2);background:var(--flaeche-1);white-space:nowrap;cursor:pointer;user-select:none}
+.ptb th:hover{color:var(--tinte)} .ptb th.an{color:var(--gold)}
+.ptb th.r,.ptb td.r{text-align:right}
+.ptb td{padding:.3rem .5rem;border-bottom:1px solid rgba(244,230,196,.07);vertical-align:middle;white-space:nowrap;height:5.05rem}
+.ptb tr:hover td{background:rgba(255,255,255,.025)}
+.ptb .nm{display:flex;align-items:center;gap:.6rem}
+.ptb .nm b{font:400 1.12rem/1.1 var(--haus);color:#fff;display:block}
+.ptb .nm small{font-size:.8rem;color:var(--leise)}
+.ptb .gr{font-size:1.25rem;font-weight:700;color:var(--creme);line-height:1.05}
+.ptb .mo{display:inline-flex;align-items:center;gap:.3rem;font-weight:700;font-size:1.1rem}
+.kl2{display:inline-flex;align-items:center;gap:.35rem;height:2rem;padding:0 .6rem;border:1px solid var(--linie-2);border-radius:.35rem;font-size:.9rem;font-weight:600;color:var(--leise);min-width:9.2rem;justify-content:space-between}
+.kl2:hover{border-color:var(--gold);color:var(--tinte)}
+.kl2.an{border-color:rgba(240,195,90,.7);color:var(--gold);background:rgba(240,195,90,.1)}
+.kl2 svg{font-size:.8rem}
+.meter{position:relative;height:1.3rem;background:rgba(255,255,255,.08);transform:skewX(-14deg);border-radius:2px;display:flex;overflow:hidden;flex:none;margin:.3rem .2rem .5rem}
+.meter i{display:block;height:100%}
+.idee{display:flex;gap:.5rem;align-items:flex-start;padding:.5rem .65rem;border:1px dashed rgba(201,167,255,.45);border-radius:.4rem;font-size:.88rem;line-height:1.3;color:var(--leise);flex:none}
+.idee svg{color:var(--neu);margin-top:.15rem}
+.idee b{color:var(--tinte);font-weight:600}
+.kas4.weg .ka small:first-child{display:block;color:var(--tinte);font-size:.95rem;font-weight:600;margin-bottom:.1rem}
+.kas4.weg .ka small:first-child b{display:inline-grid;place-items:center;width:1.25rem;height:1.25rem;border-radius:50%;background:var(--gold);color:#17120a;font-size:.8rem;margin-right:.25rem}
+.kas4.weg .ka small{display:block;line-height:1.25}
+.saal{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1rem;align-items:center;flex:none;height:11.5rem;padding:1rem 1.2rem;border:1px solid var(--linie);border-radius:.55rem;overflow:hidden;isolation:isolate;margin-bottom:.7rem}
+.saal .bg{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.9),rgba(6,8,12,.45) 55%,rgba(6,8,12,.85)),url(../sprites/kulissen/speed-schach/zug.jpg) center 40%/cover}
+.saal .wp{width:5.2rem;height:5.2rem;border-radius:50%;overflow:hidden;border:2px solid var(--gold);box-shadow:0 0 1.6rem rgba(240,195,90,.35)}
+.saal .wp img{width:100%;height:100%;object-fit:cover}
+.saal em{display:block;font-style:normal;font-size:.75rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.saal b{display:block;font:400 2.1rem/1.1 var(--haus);color:#fff}
+.stp{display:flex;align-items:center;gap:.5rem}
+.stp span{display:flex;align-items:center;gap:.4rem;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--stumm)}
+.stp span u{text-decoration:none;display:grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:50%;border:1px solid var(--linie-2);font-size:.95rem;color:var(--leise)}
+.stp span.an{color:var(--creme)} .stp span.an u{background:var(--gold);border-color:var(--gold);color:#17120a}
+.stp span.ok{color:var(--gut)} .stp span.ok u{border-color:var(--gut);color:var(--gut)}
+.stp i{width:1.6rem;height:1px;background:var(--linie-2)}
+
+.zk p.hint{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.35rem;margin-top:.45rem;padding:.35rem .5rem;border-radius:.35rem;background:rgba(240,195,90,.07);border:1px solid rgba(240,195,90,.2);font-size:.9rem}
+.zk p.hint svg{color:var(--gold);margin-top:.2rem}
+.kas3.typ{flex:none} .kas3.typ .ka{opacity:.6} .kas3.typ .ka.an{opacity:1;border-color:var(--gold);background:linear-gradient(180deg,rgba(240,195,90,.16),var(--flaeche-2))}
+.kas3.typ .ka small{display:block;line-height:1.2}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-spieler" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 3.5-7 8-7s8 2.5 8 7"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-bau" viewBox="0 0 24 24"><path d="M3 21V10l9-6 9 6v11M3 21h18M9 21v-7h6v7"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3zM12 13v7"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-l" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-karte" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M12 8v8M8 12h8"/></symbol>
+  <symbol id="i-rank" viewBox="0 0 24 24"><path d="M8 21V9h8v12M2 21v-7h6M16 21v-9h6v9M1 21h22"/></symbol>
+  <symbol id="i-kal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-buero" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V4h6v3M3 13h18"/></symbol>
+  <symbol id="i-flagge" viewBox="0 0 24 24"><path d="M5 21V4h13l-3 4 3 4H5"/></symbol>
+  <symbol id="i-glocke" viewBox="0 0 24 24"><path d="M6 17V11a6 6 0 0112 0v6l2 2H4zM10 21h4"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+  <symbol id="i-ton" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM17 9c1.5 1.5 1.5 4.5 0 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-rahmen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16"/></symbol>
+  <symbol id="i-stern" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/></symbol>
+  <symbol id="i-waage" viewBox="0 0 24 24"><path d="M12 4v16M6 20h12M4 8h16M4 8l-2 6h6zM20 8l-2 6h6z"/></symbol>
+  <symbol id="i-schloss" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+  <symbol id="i-kreuz" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><path d="M4 12a8 8 0 108-8M4 5v4h4M12 8v5l3 2"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v5M12 18v.5"/></symbol>
+  <symbol id="i-hoch" viewBox="0 0 24 24"><path d="M12 20V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-werk" viewBox="0 0 24 24"><path d="M14 6a4 4 0 005 5l-9 9-4-4 9-9zM5 19l-2 2"/></symbol>
+  <symbol id="i-herz" viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"/></symbol>
+  <symbol id="i-ziel" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4"/></symbol>
+  <symbol id="i-ki" viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="12" rx="2"/><path d="M12 7V3M9 12v2M15 12v2M2 12v3M22 12v3"/></symbol>
+  <symbol id="i-g0" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-g1" viewBox="0 0 24 24"><path d="M3 18v-6h18v6M3 12V7M7 12V9h5v3M3 20v-2M21 20v-2"/></symbol>
+  <symbol id="i-g2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-g3" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-g4" viewBox="0 0 24 24"><path d="M4 9l2-5h12l2 5M4 9v11h16V9M4 9h16M9 20v-6h6v6"/></symbol>
+  <symbol id="i-g5" viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="10" ry="6"/><ellipse cx="12" cy="12" rx="5" ry="2.5"/></symbol>
+  <symbol id="i-g6" viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5zM6 11v5c3 3 9 3 12 0v-5M22 9v6"/></symbol>
+  <symbol id="i-g7" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/></symbol>
+  <symbol id="i-rad" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-pokal" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 01-10 0zM7 5H4a3 3 0 003 4M17 5h3a3 3 0 01-3 4M12 14v3M8 20h8"/></symbol>
+  <symbol id="i-vertrag" viewBox="0 0 24 24"><path d="M6 3.5h9l4 4v13H6zM14.5 3.5V8H19M9 12h6M9 15.5h4"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M12 6.5l-3.5 3a1.6 1.6 0 002.2 2.3L13 9.5l5 4.5M2.5 7L7 5l5 1.5L17 5l4.5 2M6 13l4 4a1.5 1.5 0 002.1-2.1"/></symbol>
+  <symbol id="i-zeitung" viewBox="0 0 24 24"><path d="M4 5h13v14H6a2 2 0 01-2-2zM17 9h3v8a2 2 0 01-2 2h-1M7 9h7M7 12.5h7M7 16h4"/></symbol>
+  <symbol id="i-auge" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-nebel" viewBox="0 0 24 24"><path d="M4 8h13M7 12h13M4 16h10M17 16h3"/></symbol>
+  <symbol id="i-griff" viewBox="0 0 24 24"><path d="M9 6v.1M15 6v.1M9 12v.1M15 12v.1M9 18v.1M15 18v.1"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H5zM8 3v6h8V3M8 21v-7h8v7"/></symbol>
+  <symbol id="i-uhr" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-kopie" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/></symbol>
+  <symbol id="i-muell" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-krone" viewBox="0 0 24 24"><path d="M3 18l-1-10 6 4 4-7 4 7 6-4-1 10zM3 21h18"/></symbol>
+  <symbol id="i-u" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-o" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+</defs></svg>
+
+<div class="demo" id="demo"></div>
+
+<div class="app">
+  <div class="railplatz">
+    <nav class="rail" id="rail" aria-label="Hauptnavigation">
+      <i class="marker" id="marker"></i>
+      <div class="kopf"><span class="logo" title="Aktives Team wechseln"><img src="../team-logos/V-W.jpg" alt=""></span><span class="wer"><b>Vigilante Wranglers</b><small>4. in Liga 2 (Saison 1) · Team wechseln ▾</small></span></div>
+      <div class="grp">Spieltag</div>
+      <a><svg class="i"><use href="#i-home"/></svg><span class="n">Home</span></a>
+      <a><svg class="i"><use href="#i-post"/></svg><span class="zahl" id="r-post">9</span><span class="n">Inbox</span></a>
+      <a><svg class="i"><use href="#i-liste"/></svg><span class="n">Einsatzliste</span></a>
+      <a><svg class="i"><use href="#i-arena"/></svg><span class="n">Arena</span></a>
+      <a><svg class="i"><use href="#i-tab"/></svg><span class="n">Saisonstand</span></a>
+      <div class="grp">Team</div>
+      <a><svg class="i"><use href="#i-team"/></svg><span class="n">Teams</span></a>
+      <a><svg class="i"><use href="#i-spieler"/></svg><span class="n">Spieler</span></a>
+      <a><svg class="i"><use href="#i-train"/></svg><span class="n">Entwicklung</span></a>
+      <div class="grp">Markt</div>
+      <a><svg class="i"><use href="#i-markt"/></svg><span class="n">Transfermarkt</span></a>
+      <a><svg class="i"><use href="#i-scout"/></svg><span class="n">Scouting</span></a>
+      <a><svg class="i"><use href="#i-geld"/></svg><span class="n">Finanzen</span></a>
+      <div class="grp">Welt</div>
+      <a><svg class="i"><use href="#i-rank"/></svg><span class="n">Ranks</span></a>
+      <a><svg class="i"><use href="#i-kal"/></svg><span class="n">Spielplan</span></a>
+      <span class="luecke"></span>
+      <a><svg class="i"><use href="#i-buero"/></svg><span class="n">Office</span></a>
+      <a><svg class="i"><use href="#i-rad"/></svg><span class="n">Einstellungen</span></a>
+      <a><svg class="i"><use href="#i-flagge"/></svg><span class="n">Fehler melden</span></a>
+      <a><svg class="i"><use href="#i-pin"/></svg><span class="n">Schiene anheften</span></a>
+    </nav>
+  </div>
+
+  <div class="rechts">
+    <header class="band" id="band">
+      <div class="bkul"><i style="background-image:url(../sprites/kulissen/speed-schach/zug.jpg)"></i><i style="background-image:url(../sprites/kulissen/i-spy/lostplace.jpg)"></i></div>
+      <div class="ort" id="ort"><em id="b-krume"></em><h1 id="b-titel"></h1></div>
+      <nav class="reiter" id="b-reiter"></nav>
+      <div class="slot" id="b-slot"></div>
+      <div class="regie">
+        <a class="chip" title="Spielplan"><span class="o">Saison 2 · Spieltag <b class="t">1</b><span>/ 20</span></span><span class="tk" id="b-tk"></span></a>
+        <a class="chip" title="Finanzen"><span class="o">Kasse</span><span class="o"><b class="t">96,0 C</b></span></a>
+        <a class="ikn" title="Suche"><svg class="i"><use href="#i-scout"/></svg><kbd>⌘K</kbd></a>
+        <a class="ikn" title="Meldungen"><svg class="i"><use href="#i-glocke"/></svg><span class="zahl" id="b-gz">2</span></a>
+        <div class="takt" id="takt">
+          <button class="tb" id="tb" data-tu="takt"><span class="fuell"></span><span id="tbt"></span><svg class="i"><use href="#i-r"/></svg></button>
+          <button class="ts" id="ts"></button>
+        </div>
+      </div>
+      <i class="lauf"></i>
+    </header>
+
+<main class="buehne" id="buehne">
+      <div class="seite ov" id="s-vorstand">
+        <section class="pan" id="v-vertrauen"></section>
+        <section class="pan" id="v-ziele"></section>
+        <section class="pan" id="v-budget"></section>
+      </div>
+      <div class="seite og" id="s-gespraech">
+        <section class="pan" id="g-wer"></section>
+        <section class="pan" id="g-verlauf"></section>
+        <section class="pan" id="g-folgen"></section>
+      </div>
+      <div class="seite op" id="s-praemien">
+        <section class="pan" id="p-team"></section>
+        <section class="pan" id="p-spieler"></section>
+        <section class="pan" id="p-kosten"></section>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="meld" id="meld"></div>
+
+<script>
+"use strict";
+/* ---------- Helfer (wie app-rahmen-modern-18-11 / training-modern-18-11) ---------- */
+var q=new URLSearchParams(location.search);
+var $=function(id){return document.getElementById(id)};
+function de(x,nk){return x.toFixed(nk==null?1:nk).replace(".",",")}
+function vz(x,nk){var r=+x.toFixed(nk==null?1:nk);return (r>0?"+":r<0?"−":"±")+de(Math.abs(x),nk)}
+function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>'}
+function schluessel(n){return n.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
+function port(n){return "../portraits/"+schluessel(n)+".jpg"}
+function logo(k){return "../team-logos/"+k+".jpg"}
+function kl(x,a,b){return Math.max(a,Math.min(b,x))}
+function pfeil(s){return '<span class="pfeil s'+s+'" title="Form">'+({"2":"▲▲","1":"▲","0":"–","-1":"▼","-2":"▼▼"})[s]+'</span>'}
+function moralFarbe(w){var R=[255,96,88],B=[243,181,74],G=[98,211,148],a=w<50?R:B,b=w<50?B:G,t=w<50?w/50:(w-50)/50;return "rgb("+[0,1,2].map(function(i){return Math.round(a[i]+(b[i]-a[i])*t)}).join(",")+")"}
+function gesicht(w){var m=kl((w-50)/50,-1,1),f=moralFarbe(w),y=15+m*-1.2,c=y+m*4.2;
+  return '<svg class="ges" viewBox="0 0 24 24" aria-label="Moral '+w+'"><title>Moral '+w+'</title><circle cx="12" cy="12" r="10" fill="'+f+'" fill-opacity=".16" stroke="'+f+'" stroke-width="2"/><circle cx="8.6" cy="9.6" r="1.3" fill="'+f+'"/><circle cx="15.4" cy="9.6" r="1.3" fill="'+f+'"/><path d="M7.6 '+y.toFixed(1)+' Q12 '+c.toFixed(1)+' 16.4 '+y.toFixed(1)+'" fill="none" stroke="'+f+'" stroke-width="2" stroke-linecap="round"/></svg>'}
+function mensch(w,kl2){var m={c:"C",f:"F",r:"R",k:"KI"}[w];return '<span class="mn '+w+(kl2?" "+kl2:"")+'" title="'+({c:"Chris",f:"Franky",r:"Ramona",k:"KI"})[w]+'">'+m+'</span>'}
+var HEUTE=1;
+
+/* ---------- Rahmen: Ort, Reiter, Slot, Taktgeber, Demo-Leiste ---------- */
+var RAHMEN={rail:"",krume:"",titel:"",reiter:[],demo:[],notiz:""};
+function rahmenStart(o){RAHMEN=o;
+  var tk="",e=[];for(var i=1;i<=20;i++)tk+='<i class="'+(i<HEUTE?e[i-1]:i===HEUTE?"j":"")+'"></i>';$("b-tk").innerHTML=tk;
+  [].forEach.call(document.querySelectorAll("#rail a"),function(a){var n=a.querySelector(".n");if(n&&n.textContent===o.rail){a.classList.add("an");a.id="railan"}});
+  if(q.get("still")==="1")document.body.classList.add("still");
+  if(q.get("nav")==="auf")document.body.classList.add("navauf");
+}
+function rahmenZeichne(z){
+  $("b-krume").innerHTML=RAHMEN.krume;$("b-titel").textContent=RAHMEN.titel;
+  $("b-reiter").innerHTML=RAHMEN.reiter.map(function(r){return '<a data-s="ans:'+r[0]+'"'+(z.ans===r[0]?' class="an"':'')+'>'+r[1]+(r[2]?'<small>'+r[2]+'</small>':'')+'</a>'}).join("");
+  $("demo").innerHTML='<b>Mockup 21.11. · '+RAHMEN.titel+'</b>'+RAHMEN.demo.map(function(g){
+    return '<span>'+g[0]+'</span><span class="dg">'+g[2].map(function(w){return '<a data-s="'+g[1]+':'+w[0]+'"'+(String(z[g[1]])===String(w[0])?' class="an"':'')+'>'+w[1]+'</a>'}).join("")+'</span><i class="tr"></i>'}).join("")+'<span>'+RAHMEN.notiz+'</span>';
+  var m=$("marker"),a=$("railan");if(a)m.style.top=(a.offsetTop+a.offsetHeight/2-m.offsetHeight/2)+"px";
+  [].forEach.call(document.querySelectorAll(".seite"),function(s){s.classList.toggle("an",s.id==="s-"+z.ans)});
+}
+function takt(text,status,art,tu){var t=$("takt");t.className="takt"+(art?" "+art:"");$("tbt").textContent=text;$("ts").innerHTML='<i></i><span>'+status+'</span>';$("tb").dataset.tu=tu||"takt"}
+function slot(teile){$("b-slot").innerHTML=teile.map(function(k){return '<div class="kpi k'+(k[3]?" zone":"")+'"><span class="gk">'+k[0]+'</span><strong class="t"'+(k[2]?' style="color:'+k[2]+'"':'')+'>'+k[1]+'</strong></div>'}).join("")}
+function melde(titel,text,art){var d=document.createElement("div");d.className="mb "+(art||"");d.innerHTML='<span class="ic">'+ic(art==="w"?"warn":"check")+'</span><span><b>'+titel+'</b><small>'+text+'</small></span><u></u>';$("meld").appendChild(d);
+  setTimeout(function(){d.classList.add("geht");setTimeout(function(){d.remove()},260)},4200)}
+function urlSetzen(z,schl){var p=new URLSearchParams(location.search);schl.forEach(function(k){p.set(k[1],z[k[0]])});try{history.replaceState(null,"","?"+p.toString())}catch(e){}}
+/* Klicks: data-s="schluessel:wert" setzt Zustand, data-tu="aktion[:arg]" ruft TU[aktion](arg) */
+function klicks(z,zeichne,TU){document.addEventListener("click",function(ev){
+  var a=ev.target.closest("[data-s],[data-tu]");if(!a)return;
+  if(a.dataset.s){var i=a.dataset.s.indexOf(":"),k=a.dataset.s.slice(0,i),v=a.dataset.s.slice(i+1);z[k]=/^-?\d+$/.test(v)?+v:v;if(TU&&TU["_"+k])TU["_"+k](v);zeichne();return}
+  var t=a.dataset.tu.split(":");if(TU&&TU[t[0]]){TU[t[0]](t[1],a);zeichne()}
+})}
+window.addEventListener("resize",function(){var m=$("marker"),a=$("railan");if(a)m.style.top=(a.offsetTop+a.offsetHeight/2-m.offsetHeight/2)+"px"});
+
+/* ---------- Office: Stufen und Sonderwege wie lib/finance/vorstand-budgetfreigabe.ts, Staende und Betraege erfunden ---------- */
+var KLF={Hero:"gelb",Bard:"gelb",Badass:"gelb",Tactician:"gelb",Templar:"blau",Mage:"blau",Overseer:"blau",Sprinter:"gruen",Rogue:"gruen",Charger:"gruen",Berserker:"rot",Warlord:"rot",Tank:"rot"};
+function kls(k){return '<span class="kls" style="--kf:var(--k-'+KLF[k]+')" title="Klasse '+k+'"><img src="../class-icons/'+k+'.png" alt="">'+k+'</span>'}
+function c(x,nk){return de(x,nk)+" C"}
+function vd(v){return de(v,Math.round(Math.abs(v)*100)%10?2:1)}
+function vzd(v){return vz(v,Math.round(Math.abs(v)*100)%10?2:1)}
+var TEAM="V-W";
+/* Kader: Name, Klasse, Gesamt, Gehalt je Saison, Vertrag bis Saison, Moral, erwartete Einsaetze, erwartete Spieltage mit >= 4 PP */
+var KADER=[["Karthogg","Hero",53.0,10.2,2,71,34,6],["Kati","Bard",53.0,9.8,3,66,32,5],["Aerin","Bard",49.9,10.1,2,38,22,3],["Kaylen","Templar",47.7,8.6,3,58,30,3],["Lexa","Sprinter",45.9,8.2,2,63,31,3],
+  ["Abe Lincoln","Templar",45.9,8.0,4,55,24,2],["Krolach","Templar",45.8,7.9,3,52,26,2],["Johanna","Templar",44.0,7.4,2,60,27,1],["Xelara","Bard",40.4,6.4,3,44,18,1],["Jorund","Bard",37.9,5.5,4,49,14,0]];
+var GEH=KADER.reduce(function(s,p){return s+p[3]},0),KASSE=96,GBUD=95,RUE=+(0.2*GEH).toFixed(1),PUF=+(7/20*GEH-RUE).toFixed(1),VERF=KASSE-RUE-PUF;
+var STUFEN=[[7.5,1,"ab 7,5","s100"],[5,.9,"5 bis unter 7,5","s90"],[3,.8,"3 bis unter 5","s80"],[1.5,.7,"1,5 bis unter 3","s70"],[-1,.5,"unter 1,5","s50"]];
+function stufe(v){for(var i=0;i<STUFEN.length;i++)if(v>=STUFEN[i][0])return STUFEN[i];return STUFEN[4]}
+function pz(q){return Math.round(q*100)+" %"}
+var LAGEN={
+ ruhig:{v:6.2,wer:"Der Kaufmann",satz:"Der Vorstand ist zufrieden. Drei von vier Zielen liegen auf Kurs.",rang:5,gef:[0,0,1,0],plus:0,
+   bew:[["S1 Ende","Ziel „Top 6 erreichen“ erfüllt (Rang 4)",0.5],["S1 Ende","Ziel „Cash-Reserve halten“ erfüllt",0.5],["S1 Ende","Ziel „höchstens 3x gegen Schwächere“ verfehlt",-0.4],["S1 ST 20","Sieg gegen Royal Court (Favorit)",0.2],["S1 ST 19","Niederlage gegen Blazing Beasts (schwächer)",-0.4]],
+   gruss:"Solide erste Saison. Die Freigabe steht bei 90 %. Wenn du mehr brauchst, sag, wofür, und was du dafür zusagst."},
+ druck:{v:2.6,wer:"Der Kaufmann",satz:"Der Vorstand ist unzufrieden. Zwei Ziele wurden verfehlt, zwei sind gefährdet.",rang:14,gef:[1,0,1,0],plus:3,
+   bew:[["S1 Ende","Ziel „Top 6 erreichen“ verfehlt (Rang 11)",-0.8],["S1 Ende","Ziel „höchstens 3x gegen Schwächere“ verfehlt",-0.4],["S1 Ende","Ziel „Cash-Reserve halten“ erfüllt",0.5],["S1 ST 20","Niederlage gegen Pirate Crew (schwächer)",-0.4],["S1 ST 18","Rücklage angezapft (ein Viertel)",-0.25]],
+   gruss:"Die Saison war unter unseren Erwartungen. Wir nehmen dir nichts weg, aber wir geben vorerst nur 70 % frei. Überzeug uns."},
+ wind:{v:8.1,wer:"Der Kaufmann",satz:"Der Vorstand steht voll hinter dir. Alle vier Ziele liegen auf Kurs.",rang:2,gef:[0,0,0,0],plus:-2,
+   bew:[["S1 Ende","Ziel „Top 6 erreichen“ übertroffen (Rang 2)",0.8],["S1 Ende","Ziel „Cash-Reserve halten“ erfüllt",0.5],["S1 Ende","Ziel „höchstens 3x gegen Schwächere“ erfüllt",0.5],["S1 ST 20","Sieg gegen Royal Court (Favorit)",0.2],["S1 ST 17","Niederlage gegen Armageddon Aftermath (schwächer)",-0.4]],
+   gruss:"Starke Saison. Du hast die volle Freigabe. Wenn du den Titel angreifen willst, reden wir darüber."}
+};
+/* ---------- Gespraech: Bitten und Zusagen (Punkte der Waage erfunden, Regel: feste Antwort ohne Wuerfel) ---------- */
+var BITTEN=[
+ {id:"stufe",i:"hoch",t:"Freigabe anheben",k:"Eine Stufe mehr für die ganze Saison.",satz:"Ich möchte eine Stufe mehr Freigabe für diese Saison.",bedarf:10},
+ {id:"sonder",i:"geld",t:"Sonderbudget Gehalt",k:"Einmalig 4,0 C aus dem Vorbehalt in den Gehaltstopf.",satz:"Ich brauche einmalig 4,0 C mehr Gehaltsbudget für die Verlängerungen.",bedarf:5},
+ {id:"anzapf",i:"schloss",t:"Notrücklage anzapfen",k:"Ein Viertel des Ziels. Kostet Vertrauen, keine Zusage.",satz:"Ich möchte ein Viertel der Notrücklage nutzen.",bedarf:0},
+ {id:"alles",i:"stern",t:"Alles auf eine Karte",k:"100 %, Rücklage frei, 5 % Puffer. Ziel zwei Plätze besser.",satz:"Ich will diese Saison alles auf eine Karte setzen.",bedarf:0},
+ {id:"ziel",i:"ziel",t:"Ziel tauschen",k:"Ein Ziel, das nicht zum Kader passt, gegen ein anderes.",satz:"Das Ziel „Vertragslaufzeiten“ passt nicht zu meinem Plan. Ich bitte um ein anderes.",bedarf:4,neu:1},
+ {id:"liebling",i:"krone",t:"Lieblingsspieler freigeben",k:"Karthogg verkaufen dürfen, ohne dass es Vertrauen kostet.",satz:"Ich möchte Karthogg verkaufen dürfen, wenn ein gutes Angebot kommt.",bedarf:8,neu:1},
+ {id:"praemie",i:"pokal",t:"Prämientopf",k:"2,0 C aus dem Vorbehalt, zweckgebunden für Prämien.",satz:"Ich möchte 2,0 C für Prämien an die Mannschaft.",bedarf:5,neu:1}
+];
+var ZUSAGEN=[
+ {id:"zielhoch",t:"Höheres Saisonziel",p:6,k:"Top 5 statt Top 6. Verfehlt: −0,5 Vertrauen.",nicht:["alles"]},
+ {id:"rueck",t:"Rückzahlung aus Verkäufen",p:4,k:"Die Hälfte der Erlöse dieses Fensters geht in den Vorbehalt zurück.",nicht:["anzapf"]},
+ {id:"deckel",t:"Gehaltsdeckel",p:4,k:"Das Gehaltsbudget wächst diese Saison nicht mit.",nicht:["sonder","praemie"]},
+ {id:"vertrauen",t:"Vertrauen einsetzen",p:3,k:"Sofort −0,25 Vertrauen.",nicht:[]},
+ {id:"binden",t:"Karthogg verlängern",p:3,k:"Den Lieblingsspieler bis Saison 4 binden.",nicht:["liebling"],neu:1}
+];
+function bitte(id){return BITTEN.filter(function(b){return b.id===id})[0]}
+function zusage(id){return ZUSAGEN.filter(function(z){return z.id===id})[0]}
+var Z={ans:q.get("ansicht")||"vorstand",lage:q.get("lage")||"ruhig",thema:q.get("thema")||"",biete:{},phase:"",gespr:0,
+  sieg:1,zielp:0,derby:0,kl:{Karthogg:2,Kati:1},sp:"gehalt",sr:-1};
+(q.get("biete")||"").split(",").forEach(function(k){if(zusage(k))Z.biete[k]=1});
+function L(){return LAGEN[Z.lage]}
+function summe(){return ZUSAGEN.reduce(function(s,z){return s+(Z.biete[z.id]?z.p:0)},0)}
+function bedarf(){var b=bitte(Z.thema);return b&&b.bedarf?Math.max(1,b.bedarf+L().plus):0}
+function sperre(b){var l=L(),q0=stufe(l.v)[1];
+  if(b.id==="stufe"&&q0>=1)return "Du hast schon 100 %.";
+  if((b.id==="sonder"||b.id==="praemie")&&q0>=1)return "Bei 100 % gibt es keinen Vorbehalt.";
+  if(b.id==="alles"&&l.v<4)return "Erst ab Vertrauen 4.";
+  return ""}
+function urteil(){var b=bitte(Z.thema);if(!b)return "";if(sperre(b))return "nein";if(!b.bedarf)return "ja";var s=summe(),n=bedarf();return s>=n?"ja":s>=n-4?"geg":"nein"}
+function gegenZusage(){var fehlt=bedarf()-summe();return ZUSAGEN.filter(function(z){return !Z.biete[z.id]&&z.nicht.indexOf(Z.thema)<0&&z.p>=fehlt}).sort(function(a,b){return a.p-b.p})[0]}
+/* Stand der Toepfe: vor (ohne Gespraech) und nach (mit vereinbartem oder entworfenem Anliegen) */
+function stand(mit){var l=L(),v=l.v,q0=stufe(v)[1],s={v:v,q:q0,rue:RUE,puf:PUF,ziel:"Top 6",zusatzG:0,zusatzT:0,alles:false,praemie:0};
+  if(mit&&Z.thema&&urteil()!=="nein"||mit&&Z.phase==="ja"){
+    if(Z.thema==="stufe")s.q=STUFEN[Math.max(0,STUFEN.indexOf(stufe(v))-1)][1];
+    if(Z.thema==="sonder")s.zusatzG=Math.min(4,(1-q0)*VERF);
+    if(Z.thema==="praemie")s.praemie=Math.min(2,(1-q0)*VERF);
+    if(Z.thema==="anzapf"){s.rue=RUE*.75;s.zusatzT=RUE*.25*q0;s.v=v-0.25}
+    if(Z.thema==="alles"){s.alles=true;s.q=1;s.ziel="Top 4"}
+    if(Z.biete.zielhoch&&Z.thema!=="alles")s.ziel="Top 5";
+    if(Z.biete.vertrauen)s.v-=0.25}
+  if(s.alles){s.tT=KASSE*.95;s.vorb=0;s.rueB=0;s.pufB=KASSE*.05}
+  else{var verf=KASSE-RUE-PUF;s.tT=s.q*verf+s.zusatzT-s.zusatzG-s.praemie;s.vorb=(1-s.q)*verf;s.rueB=s.rue;s.pufB=PUF;
+    if(s.zusatzG||s.praemie){s.tT=s.q*verf;s.vorb=(1-s.q)*verf-s.zusatzG-s.praemie}}
+  s.gq=Math.max(s.q,.75);s.gFrei=Math.max(0,s.gq*GBUD-GEH)+s.zusatzG;s.gSoll=s.gq*GBUD;return s}
+
+/* ================= Ansicht 1: Vorstand und Ziele ================= */
+function bogen(v){var cx=120,cy=118,r=100,h="";function pt(w){var a=Math.PI*(1-w/10);return [cx+r*Math.cos(a),cy-r*Math.sin(a)]}
+  var gr=[[0,1.5,"s50"],[1.5,3,"s70"],[3,5,"s80"],[5,7.5,"s90"],[7.5,10,"s100"]];
+  gr.forEach(function(g){var a=pt(g[0]+.04),b=pt(g[1]-.04),an=v>=g[0]&&(v<g[1]||g[1]===10);
+    h+='<path d="M'+a[0].toFixed(1)+' '+a[1].toFixed(1)+' A'+r+' '+r+' 0 0 1 '+b[0].toFixed(1)+' '+b[1].toFixed(1)+'" fill="none" stroke="var(--'+g[2]+')" stroke-width="'+(an?16:9)+'" opacity="'+(an?1:.38)+'"/>'});
+  [0,1.5,3,5,7.5,10].forEach(function(w){var a=Math.PI*(1-w/10),x=cx+(r+19)*Math.cos(a),y=cy-(r+19)*Math.sin(a);h+='<text x="'+x.toFixed(1)+'" y="'+(y+4).toFixed(1)+'" text-anchor="middle" font-size="11" font-weight="700" fill="#9aa7ba" font-family="Barlow Condensed">'+String(w).replace(".",",")+'</text>'});
+  var n=Math.PI*(1-v/10),x1=cx+(r-16)*Math.cos(n),y1=cy-(r-16)*Math.sin(n),x2=cx+(r+12)*Math.cos(n),y2=cy-(r+12)*Math.sin(n);
+  h+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>';
+  return '<svg viewBox="-10 -6 260 134" aria-hidden="true">'+h+'</svg>'}
+function zeichneVertrauen(){var l=L(),st=stufe(l.v),i=STUFEN.indexOf(st),hoeher=i>0?STUFEN[i-1]:null,tiefer=i<4?st:null;
+  var h='<div class="pk"><h2>Vertrauen des Vorstands</h2><span class="sp"></span><span class="mk">0 bis 10</span></div><div class="pb">';
+  h+='<div class="wer"><span class="wp"><img src="'+logo(TEAM)+'" alt=""></span><span><b>'+l.wer+'</b><small>Vorstand der Vigilante Wranglers · Sparneigung 5,5 · wägt alles ähnlich</small></span></div>';
+  h+='<div class="uhr">'+bogen(l.v)+'<div class="wert"><strong class="t">'+de(l.v)+'</strong><span> / 10</span></div></div><p class="txt" style="margin:0 0 .2rem;text-align:center;flex:none">'+l.satz+'</p>';
+  h+='<div class="ab"><b>Was das Vertrauen freigibt</b><span>'+(hoeher?"noch +"+de(hoeher[0]-l.v)+" bis "+pz(hoeher[1]):"höchste Stufe")+'</span></div><div class="leiter">'+
+    '<div class="spr kopf"><i style="background:none"></i><span>Vertrauen</span><span>Ablösen, Gebäude</span><span>Gehälter</span></div>'+
+    STUFEN.map(function(s){return '<div class="spr'+(s===st?" an":"")+'" style="--sf:var(--'+s[3]+')"><i></i><span>'+s[2]+'</span><span><b class="t">'+pz(s[1])+'</b></span><span><b class="t">'+pz(Math.max(s[1],.75))+'</b></span></div>'}).join("")+'</div>';
+  h+='<div class="ab"><b>Was es bewegt hat</b><span>letzte 5</span></div>'+l.bew.map(function(b){return '<div class="bew"><span>'+b[0]+'</span><span>'+b[1]+'</span><b class="t '+(b[2]>0?"plus":"minus")+'">'+vzd(b[2])+'</b></div>'}).join("");
+  h+='<div class="ab"><b>In Liga 2</b><span>Rang 1 = bester</span></div>'+
+    '<div class="rgz"><span>Vertrauen des Vorstands <small>höchstes = 1.</small></span><b class="t">'+l.rang+'. von 16</b></div>'+
+    '<div class="rgz"><span>Gehaltskosten <small>günstigstes = 1.</small></span><b class="t">7. von 16</b></div>'+
+    '<div class="rgz"><span>Kaderstärke, beste 6 <small>stärkstes = 1.</small></span><b class="t">5. von 16</b></div>';
+  $("v-vertrauen").innerHTML=h+'</div>'}
+function zielKarte(i,o){var gef=L().gef[i];
+  return '<div class="zk'+(gef?" gef":"")+'"><div class="zo"><span class="ar">'+o.art+'</span>'+(o.neu?'<span class="mk neu">neu</span>':'')+'<span class="mk">'+o.lauf+'</span><span class="mk '+(gef?"warn":"gut")+'">'+(gef?"gefährdet":"auf Kurs")+'</span></div>'+
+    '<h3>'+o.t+'</h3><p>'+o.p+'</p><p class="hint">'+ic("r")+'<span><b>Hinweis des Vorstands:</b> '+o.hint+'</span></p><div class="mi"><div>'+o.mitte+'</div><div class="st"><strong class="t">'+o.ist+'</strong><small>'+o.soll+'</small></div></div>'+
+    '<div class="lo">Erfüllt <i class="p">'+o.plus+'</i>'+(o.geld?'<i class="p">'+o.geld+'</i>':'')+' Verfehlt <i class="m">'+o.minus+'</i><span>kein Geldabzug</span></div></div>'}
+function zeichneZiele(){var l=L(),ok=4-l.gef.reduce(function(a,b){return a+b},0),ersteGef=l.gef[0];
+  var h='<div class="pk"><h2>Vorstandsziele</h2><small style="color:var(--leise)">Saison 2 · vier Ziele, als Satz geprüft</small><span class="sp"></span><span class="mk '+(ok===4?"gut":"warn")+'">'+ok+' von 4 auf Kurs</span></div><div class="pb">';
+  h+='<div class="pruef">'+ic("check")+'<span><b>Widerspruchs-Prüfung bestanden.</b> Kein Ziel verlangt, was ein anderes verbietet.</span><span class="pp"><span>Sport ↔ Kasse</span><span>Sport ↔ Verträge</span><span>Kasse ↔ Verträge</span><span>Liebling ↔ Verkauf</span></span></div>';
+  h+='<div class="zg">'+
+   zielKarte(0,{art:"Sport · verbindlich",lauf:"diese Saison",t:"Top 6 erreichen",p:"Rang in Liga 2 am Saisonende. Nach Kaderstärke (beste 6) erwartet der Vorstand <b>Rang 5</b>.",
+     mitte:'<div class="bal"><i class="'+(ersteGef?"a":"g")+'" style="width:'+(ersteGef?48:72)+'%"></i><u style="left:66%"></u></div><span class="klein">Erwartung nach Kaderstärke: '+(ersteGef?"Rang 8":"Rang 5")+' · Ziel Rang 6</span>',
+     ist:(ersteGef?"8.":"5."),soll:"erwartet · Ziel 6.",hint:"Auf Showcase und Hockey holst du die meisten Punkte. Dort die Besten aufstellen.",plus:"+0,5 Vertrauen",geld:"+1,5 C Prämie",minus:"−0,8 Vertrauen"})+
+   zielKarte(1,{art:"Finanzen",lauf:"diese Saison",t:"Cash-Reserve von 15 C halten",p:"Die Kasse bleibt am Saisonende über 15 C. Hochrechnung, die Einnahmen kommen je Spieltag.",
+     mitte:'<div class="bal"><i class="g" style="width:84%"></i><u style="left:31%"></u></div><span class="klein">Hochrechnung Saisonende 40,5 C · Ziel 15 C</span>',
+     ist:"40,5 C",soll:"hochgerechnet",hint:"Erfüllt, solange die Kasse über 15 C bleibt. Ein Gebäude-Ausbau für 13 C ist drin.",plus:"+0,5 Vertrauen",geld:"+1,5 C Prämie",minus:"−0,4 Vertrauen"})+
+   zielKarte(2,{art:"Kader · Laufzeit-Quote",lauf:"bis Ende Saison 3",neu:1,t:"Vertragslaufzeiten: höchstens 3 von 10 enden zugleich",p:"Der Vorstand will keinen Kader, der auf einen Schlag ausläuft. Am Ende von Saison 2 enden heute <b>4 Verträge</b>.",
+     mitte:'<div class="lfz"><div class="a"><b class="t">4</b><i style="height:80%"></i><small>Ende S2</small></div><div><b class="t">4</b><i style="height:80%"></i><small>Ende S3</small></div><div><b class="t">2</b><i style="height:40%"></i><small>Ende S4</small></div></div>',
+     ist:"4",soll:"höchstens 3",hint:"Eine Verlängerung im Fenster am Saisonende genügt. Lexa und Johanna fordern am wenigsten.",plus:"+0,3 Vertrauen",minus:"−0,3 Vertrauen"})+
+   zielKarte(3,{art:"Kabine · Lieblingsspieler",lauf:"solange im Kader",neu:1,t:"Karthogg bleibt und spielt",p:"Der Liebling des Vorstands: dein Bester der letzten Saison. Ein Verkauf kostet <b>−1,0 Vertrauen</b>, eine Verlängerung bringt <b>+0,3</b>.",
+     mitte:'<div class="lieb"><img src="'+port("Karthogg")+'" alt=""><span><b>Karthogg</b>'+kls("Hero")+'<span class="klein">Vertrag bis Ende Saison 2 · 0 von 12 Einsätzen</span></span></div>',
+     ist:"0",soll:"von 12 Einsätzen",hint:"Zwölf Einsätze sind bei 40 Vergleichen leicht. Teuer wird nur ein Verkauf.",plus:"+0,3 Vertrauen",minus:"−0,3 Vertrauen"})+'</div>';
+  h+='<div class="kas4 weg" style="flex:none;margin-bottom:.6rem">'+[["1","Erwartung","aus der Kaderstärke der besten 6, nie aus den Einsatzplätzen"],["2","Ein Ziel je Bereich","Sport, Finanzen, Kader, Kabine; nur ein Rang-Ziel ist verbindlich"],["3","Paarprüfung","verlangt eines, was ein anderes verbietet, fliegt es raus"],["4","Laufzeit","jedes Ziel sagt, bis wann es gilt und wann abgerechnet wird"]].map(function(x){return '<div class="ka"><small><b class="t">'+x[0]+'</b> '+x[1]+'</small><small>'+x[2]+'</small></div>'}).join("")+'</div>';
+  h+='<div class="verw">'+ic("waage")+'<span><b>Bei der Vergabe verworfen:</b> <s>Netto-Transferausgaben: Ligarang 1 bis 4</s> — widerspricht „Top 6 erreichen“, solange der Kader unter Soll-Größe ist. Ersetzt durch „Cash-Reserve von 15 C halten“. <span class="mk neu">neu</span></span></div>';
+  h+='<div class="kas3" style="margin-top:.6rem;flex:none"><div class="ka"><small>Abrechnung am Saisonende</small><strong class="t '+(ok>=2?"plus":"minus")+'">'+vz(ok*0.4-(4-ok)*0.4)+' <small>Vertrauen</small></strong><small>Stand heute hochgerechnet</small></div>'+
+    '<div class="ka"><small>Zielprämien</small><strong class="t">'+c((2-l.gef[0]-l.gef[1])*1.5)+'</strong><small>je erfülltem Ziel 1,5 C, nie ein Abzug</small></div>'+
+    '<div class="ka"><small>Freigabe Saison 3</small><strong class="t">'+pz(stufe(l.v+ok*0.4-(4-ok)*0.4)[1])+'</strong><small>wenn es so bleibt</small></div></div>';
+  $("v-ziele").innerHTML=h+'</div>'}
+function gz(n){return '<span class="gz"><i'+(n>0?' class="v"':'')+'></i><i'+(n>1?' class="v"':'')+'></i></span>'}
+function zeichneBudget(){var s=stand(Z.phase==="ja"),l=L(),sf=stufe(l.v)[3];
+  var h='<div class="pk"><h2>Freigabe und Budgets</h2><span class="sp"></span><a data-tu="hin:Finanzen">Finanzen '+ic("r")+'</a></div><div class="pb">';
+  h+='<div class="qb" style="--qf:var(--'+(s.q>=1?"s100":sf)+')"><strong class="t">'+pz(s.q)+'</strong><p><b>Der Vorstand nimmt nichts weg.</b> Das Geld bleibt auf dem Konto; nur dieser Anteil darf für Ablösen, Gebäude und Gehälter ausgegeben werden. Die Sperre ist hart, für Mensch und KI gleich.</p></div>';
+  h+='<div class="ab"><b>Kasse '+c(KASSE)+'</b><span>wie sie aufgeteilt ist</span></div>';
+  var t=[["Transfer- und Investitionstopf, frei",s.tT,"var(--gut)"],["Vorbehalt des Vorstands",s.vorb,"var(--acht)"],["Gehaltspuffer, 7 Spieltage",s.pufB,"var(--gast)"],["Notrücklage",s.rueB,"var(--stumm)"]];
+  h+='<div class="stap">'+t.map(function(x){return '<i style="width:'+(x[1]/KASSE*100).toFixed(1)+'%;background:'+x[2]+'"></i>'}).join("")+'</div><div class="leg">'+t.map(function(x){return '<i style="background:'+x[2]+'"></i><span>'+x[0]+'</span><b class="t">'+c(x[1])+'</b>'}).join("")+'</div>';
+  h+='<div class="kas2" style="margin-top:.65rem;flex:none"><div class="topf"><span>Transfer- und Investitionstopf</span><strong class="t">'+c(s.tT)+'</strong><span class="klein">Ablösen, Gebäude · Verkaufserlöse zu 100 % frei</span></div>'+
+    '<div class="topf'+(s.gFrei<=0?" zu":"")+'"><span>Gehaltstopf, frei</span><strong class="t">'+c(s.gFrei)+'</strong><span class="klein">'+(s.gFrei<=0?'Kader über dem freigegebenen Budget: keine Gehaltserhöhung. Bestand und Pflichtkader 8 bleiben unberührt.':'je Saison · '+c(s.gFrei/20,2)+' je Spieltag · Quote '+pz(s.gq)+', nie unter 75 %')+'</span></div></div>';
+  h+='<div class="ab"><b>Sonderwege</b><span>im Transferfenster, ab Saison 2</span></div>';
+  h+='<button class="sow" data-tu="thema:anzapf">'+ic("schloss")+'<b>Notrücklage anzapfen</b><small>Bis '+c(RUE*.5)+' (die Hälfte des Ziels). Kostet 0,25 Vertrauen je Viertel, wirksam bei der nächsten Festlegung.</small><span class="kn">Fragen</span></button>';
+  var az=l.v<4;h+='<button class="sow'+(az?" zu":"")+'" data-tu="thema:alles">'+ic("stern")+'<b>Alles auf eine Karte</b><small>'+(az?"Erst ab Vertrauen 4. ":"")+'100 % in beiden Töpfen, Rücklage frei, 5 % Puffer. Ziel zwei Plätze besser: erreicht +0,75, verfehlt −1,0 Vertrauen.</small><span class="kn'+(az?" zu":"")+'">Fragen</span></button>';
+  h+='<div class="sow" style="cursor:default">'+ic("herz")+'<b>Notfall-Antrag</b><small>Bei einer Geldnotlage gibt der Vorstand die Rücklage frei, bevor ein Kredit nötig wird. Kostet kein Vertrauen und zählt nicht als Gespräch.</small><span class="mk gut">immer möglich</span></div>';
+  h+='<div class="ab"><b>Was gegen welchen Topf zählt</b></div>'+[["Ablöse, Gebäude (Bau, Ausbau)","Transfertopf"],["Neues Gehalt, Gehaltserhöhung","Gehaltstopf"],["Prämien <span class=\"mk neu\">Idee</span>","Gehaltstopf"],["Verkaufserlös","zu 100 % frei"],["Gehalt eines verkauften Spielers","zu 100 % zurück"]].map(function(x){return '<div class="rgz"><span>'+x[0]+'</span><b style="font-size:.98rem">'+x[1]+'</b></div>'}).join("");
+  h+='<div class="ruf"><button class="btn haupt" data-s="ans:gespraech">'+ic("buero")+'Mit dem Vorstand sprechen</button><small>Gespräche diese Saison '+gz(Z.gespr)+' <b class="t" style="color:var(--tinte)">'+Z.gespr+' von 2</b> · das zweite geht auch in der Saison</small></div>';
+  $("v-budget").innerHTML=h+'</div>'}
+
+/* ================= Ansicht 2: Gespraech ================= */
+function zeichneWer(){var l=L();
+  var h='<div class="pk"><h2>Dein Gegenüber</h2><span class="sp"></span><span class="mk gold">Gespräch '+Math.min(2,Z.gespr+(Z.phase?0:1))+' von 2</span></div><div class="pb">';
+  h+='<div class="wer"><span class="wp"><img src="'+logo(TEAM)+'" alt=""></span><span><b>'+l.wer+'</b><small>Vertrauen <b class="t" style="color:var(--creme)">'+de(l.v)+'</b> von 10 · Freigabe <b class="t" style="color:var(--creme)">'+pz(stufe(l.v)[1])+'</b></small></span></div>';
+  h+='<p class="txt" style="margin:.7rem 0 0">Der Vorstand antwortet <b>fest, ohne Würfel</b>. Du siehst seine Einschätzung, bevor du den Antrag stellst. Fragen kostet nie Vertrauen, aber jeder gestellte Antrag verbraucht eines von zwei Gesprächen.</p>';
+  h+='<div class="ab"><b>Was ihm wichtig ist</b></div>'+[["Höheres Saisonziel",6],["Rückzahlung aus Verkäufen",4],["Gehaltsdeckel",4],["Vertrauen einsetzen",3],["Liebling binden",3]].map(function(x){return '<div class="rgz"><span>'+x[0]+'</span><b class="t">'+x[1]+' Punkte</b></div>'}).join("");
+  h+='<div class="ab"><b>Wer dir gegenübersitzt</b><span>aus der Sparneigung des Teams</span></div><div class="kas3 typ">'+[["Antreiber","unter 3,5","will höhere Ziele"],["Kaufmann","3,5 bis 7","wägt alles ähnlich"],["Kassenwart","ab 7","will Rückzahlung, Deckel"]].map(function(x,i){return '<div class="ka'+(i===1?" an":"")+'"><small>'+x[1]+'</small><strong style="font-size:1.15rem">'+x[0]+'</strong><small>'+x[2]+'</small></div>'}).join("")+'</div>';
+  h+='<div class="ab"><b>Wann du sprechen kannst</b></div>'+[["Transferfenster vor Spieltag 1","alle Anliegen"],["In der Saison, vor einem Spieltag","ohne „Alles auf eine Karte“"],["Notfall-Antrag bei Geldnotlage","jederzeit, zählt nicht mit"],["Saison 1","nicht nötig, alles frei"]].map(function(x){return '<div class="rgz"><span>'+x[0]+'</span><b style="font-size:.95rem">'+x[1]+'</b></div>'}).join("");
+  h+='<div class="ab"><b>Was nie zur Debatte steht</b></div>'+
+    [["Keine Geldstrafen.","Ein verfehltes Ziel kostet Vertrauen, also Freigabe. Nie Geld."],["Er nimmt nichts weg.","Gesperrtes Geld bleibt auf deinem Konto."],["Gehaltstopf mindestens 75 %.","Auch in der Sparauflage."],["Pflichtkader 8 ist nie gesperrt.","Für Mensch und KI gleich."],["Verkaufserlöse sind zu 100 % frei.","Außer du sagst die Rückzahlung selbst zu."]].map(function(r){return '<div class="regel">'+ic("check")+'<span><b>'+r[0]+'</b> '+r[1]+'</span></div>'}).join("");
+  $("g-wer").innerHTML=h+'</div>'}
+function folgenChips(vor,nach){var f=[];
+  if(nach.q!==vor.q)f.push(["p","Freigabe "+pz(vor.q)+" → "+pz(nach.q)]);
+  if(Math.abs(nach.tT-vor.tT)>.05)f.push(["p","Transfertopf "+vz(nach.tT-vor.tT)+" C"]);
+  if(Math.abs(nach.gFrei-vor.gFrei)>.05)f.push(["p","Gehaltstopf "+vz(nach.gFrei-vor.gFrei)+" C"]);
+  if(nach.praemie)f.push(["p","Prämientopf +"+de(nach.praemie)+" C"]);
+  if(nach.v!==vor.v)f.push(["m","Vertrauen "+vzd(nach.v-vor.v)]);
+  if(nach.ziel!==vor.ziel)f.push(["m","Saisonziel "+vor.ziel+" → "+nach.ziel]);
+  if(Z.thema==="ziel")f.push(["p","Ziel „Vertragslaufzeiten“ entfällt"],["n","neu: „Gewinne 4 Spieltage über deine SOC-Achse“"]);
+  if(Z.thema==="liebling")f.push(["p","Verkauf von Karthogg ohne −1,0"],["n","Ziel „Karthogg bleibt“ entfällt"]);
+  if(Z.thema==="alles")f.push(["n","erreicht +0,75 · verfehlt −1,0"]);
+  if(Z.biete.rueck)f.push(["m","½ der Verkaufserlöse zurück"]);
+  if(Z.biete.deckel)f.push(["m","Gehaltsbudget fest"]);
+  if(Z.biete.binden)f.push(["n","Karthogg bis Saison 4"]);
+  return f}
+function chips(f){return '<span class="fo">'+f.map(function(x){return '<i class="'+x[0]+'">'+x[1]+'</i>'}).join("")+'</span>'}
+function vBlase(kl,kopf,text,extra){return '<div class="bl '+kl+'"><span class="wp"><img src="'+logo(TEAM)+'" alt=""></span><div class="tx"><em>'+kopf+'</em>'+text+(extra||"")+'</div></div>'}
+function iBlase(text,extra){return '<div class="bl ich"><div class="tx"><em>Du</em>'+text+(extra||"")+'</div>'+mensch("c")+'</div>'}
+function zeichneVerlauf(){var l=L(),b=bitte(Z.thema),vor=stand(false),nach=stand(true),u=urteil(),s=summe(),n=bedarf();
+  var h='<div class="pk"><h2>Gespräch mit dem Vorstand</h2><small style="color:var(--leise)">Transferfenster vor Spieltag 1</small><span class="sp"></span>'+(Z.thema?'<a data-tu="neu">Neu beginnen</a>':'')+'</div><div class="pb">';
+  var schritt=!b||sperre(b)?1:!Z.phase?2:3;
+  h+='<div class="saal"><i class="bg"></i><span class="wp"><img src="'+logo(TEAM)+'" alt=""></span><div><em>Vorstandssitzung · Saison 2</em><b>'+(schritt===1?"Worum geht es dir?":schritt===2?b.t:Z.phase==="ja"?"Vereinbart":Z.phase==="geg"?"Gegenangebot":"Abgelehnt")+'</b></div>'+
+    '<div class="stp">'+[["1","Bitte"],["2","Zusagen"],["3","Antwort"]].map(function(x,i){return '<span class="'+(schritt===i+1?"an":schritt>i+1?"ok":"")+'"><u class="t">'+(schritt>i+1?ic("check"):x[0])+'</u>'+x[1]+'</span>'}).join("<i></i>")+'</div></div><div class="chat">';
+  h+=vBlase("",l.wer,l.gruss);
+  if(b){h+=iBlase(b.satz);
+    var sp=sperre(b);
+    if(sp)h+=vBlase("nein","Geht nicht",sp+" Das Gespräch ist nicht verbraucht.");
+    else if(!Z.phase)h+=vBlase("",l.wer+" · Einschätzung",b.bedarf?("Darüber können wir reden. Ich will dafür Zusagen im Wert von <b>"+n+" Punkten</b> sehen."+(l.plus>0?" Bei eurem Stand verlange ich mehr als sonst.":l.plus<0?" Bei eurem Stand komme ich euch entgegen.":"")):(Z.thema==="anzapf"?"Die Rücklage ist für Notlagen da. Als Wunsch steht sie dir zu, kostet aber <b>0,25 Vertrauen</b> je Viertel.":"Mit Vertrauen "+de(l.v)+" trage ich das mit. Dann gilt: Ziel zwei Plätze besser."),chips(folgenChips(vor,nach)));
+    if(Z.phase){var zs=ZUSAGEN.filter(function(z){return Z.biete[z.id]}).map(function(z){return z.t});
+      h+=iBlase(zs.length?"Ich sage zu: "+zs.join(", ")+".":"Ich stelle den Antrag ohne Zusage.");
+      if(Z.phase==="ja")h+=vBlase("ja","Zustimmung","Einverstanden. Das gilt ab sofort und steht im Protokoll.",chips(folgenChips(vor,nach)))+'<span class="sys">Vereinbart · Gespräch '+Z.gespr+' von 2 verbraucht</span>';
+      if(Z.phase==="geg"){var g=gegenZusage();h+=vBlase("geg","Gegenangebot",g?"Das reicht mir nicht ganz. Mit der Zusage <b>„"+g.t+"“</b> dazu sind wir uns einig.":"Das reicht mir nicht, und ich sehe nichts mehr, was du noch zusagen könntest.")}
+      if(Z.phase==="nein")h+=vBlase("nein","Ablehnung","Dafür bietest du zu wenig: "+s+" von "+n+" Punkten. Die Freigabe bleibt bei "+pz(vor.q)+". Es kostet dich kein Vertrauen und kein Geld.")+'<span class="sys">Abgelehnt · Gespräch '+Z.gespr+' von 2 verbraucht</span>'}}
+  h+='</div><div class="pult">';
+  if(!b||sperre(b)){h+='<div class="ab"><b>Worum bittest du?</b><span>ein Anliegen je Gespräch</span></div><div class="bitten">'+BITTEN.map(function(x){var sp2=sperre(x);
+      return '<button class="bi2'+(sp2?" zu":"")+'" '+(sp2?'title="'+sp2+'"':'data-tu="thema:'+x.id+'"')+'>'+ic(x.i)+'<b>'+x.t+'</b><small>'+(sp2||x.k)+'</small>'+(x.neu?'<span class="mk neu">neu</span>':'')+'</button>'}).join("")+
+      '<div class="idee" style="align-self:stretch;align-items:center">'+ic("stern")+'<span>Lila markierte Bitten sind Ideen dieser Runde (Welle 5).</span></div></div>'}
+  else if(!Z.phase){
+    if(b.bedarf){h+='<div class="ab"><b>Was sagst du dafür zu?</b><span>frei wählbar · keine Zusage kostet Geld vom Konto</span></div><div class="zus">'+ZUSAGEN.map(function(z){var nicht=z.nicht.indexOf(Z.thema)>=0;
+        return '<button class="zu2'+(Z.biete[z.id]?" an":"")+(nicht?" zu":"")+'" '+(nicht?'title="Widerspricht deiner Bitte"':'data-tu="biete:'+z.id+'"')+'><b>'+z.t+'<u class="t">'+z.p+'</u></b><small>'+(nicht?"Widerspricht deiner Bitte.":z.k)+'</small></button>'}).join("")+'</div>';
+      h+='<div class="waage"><div><div class="wb '+(u==="ja"?"ok":u==="nein"?"fern":"")+'"><i style="width:'+Math.min(100,s/Math.max(n,1)*100/1.25)+'%"></i><u style="left:80%"></u></div><div class="wt">Du bietest <b class="t">'+s+'</b> von <b class="t">'+n+'</b> Punkten · Einschätzung: <b style="color:'+(u==="ja"?"var(--gut)":u==="geg"?"var(--acht)":"var(--warn)")+'">'+({ja:"er stimmt zu",geg:"er macht ein Gegenangebot",nein:"er lehnt ab"})[u]+'</b></div></div>'+
+        '<div class="kns"><button class="kn" data-tu="neu">Andere Bitte</button><button class="kn gold" data-tu="antrag">Antrag stellen '+ic("r")+'</button></div></div>'}
+    else h+='<div class="waage"><div class="wt" style="margin:0">Keine Verhandlung nötig. Der Preis steht fest und oben in der Einschätzung.</div><div class="kns"><button class="kn" data-tu="neu">Andere Bitte</button><button class="kn gold" data-tu="antrag">Antrag stellen '+ic("r")+'</button></div></div>'}
+  else if(Z.phase==="geg"&&gegenZusage())h+='<div class="waage"><div class="wt" style="margin:0">Nimmst du an, kommt die Zusage <b>„'+gegenZusage().t+'“</b> dazu. Lehnst du ab, bleibt alles, wie es ist. Das Gespräch ist in beiden Fällen verbraucht.</div><div class="kns"><button class="kn" data-tu="ablehnen">Ablehnen</button><button class="kn gold" data-tu="annehmen">Gegenangebot annehmen '+ic("check")+'</button></div></div>';
+  else h+='<div class="waage"><div class="wt" style="margin:0">'+(Z.gespr<2?"Dir bleibt noch <b>ein Gespräch</b> in dieser Saison. Der Notfall-Antrag bei einer Geldnotlage zählt nicht mit.":"Beide Gespräche dieser Saison sind verbraucht. Der Notfall-Antrag bleibt möglich.")+'</div><div class="kns"><button class="kn" data-s="ans:vorstand">Zum Vorstand</button>'+(Z.gespr<2?'<button class="kn gold" data-tu="neu">Zweites Gespräch</button>':'')+'</div></div>';
+  $("g-verlauf").innerHTML=h+'</div></div>'}
+function va(name,a,b,klein,gutWennMehr){var gleich=a===b;
+  return '<div class="va"><span>'+name+'</span><span class="v t">'+a+'</span>'+ic("r")+'<b class="t'+(gleich?"":gutWennMehr?" p":" m")+'">'+b+'</b>'+(klein?'<small>'+klein+'</small>':'')+'</div>'}
+function zeichneFolgen(){var vor=stand(false),nach=stand(true),fest=Z.phase==="ja";
+  var h='<div class="pk"><h2>Folgen</h2><small style="color:var(--leise)">'+(fest?"vereinbart":Z.thema?"wenn er zustimmt":"noch kein Anliegen")+'</small><span class="sp"></span><span class="mk">vorher → nachher</span></div><div class="pb">';
+  h+=va("Vertrauen",vd(vor.v),vd(nach.v),"wirksam bei der nächsten Festlegung",nach.v>vor.v)+va("Freigabe",pz(vor.q),pz(nach.q),"",nach.q>vor.q)+
+    va("Transfer- und Investitionstopf",c(vor.tT),c(nach.tT),"Ablösen und Gebäude",nach.tT>vor.tT)+va("Gehaltstopf, frei",c(vor.gFrei),c(nach.gFrei),"je Saison · "+c(nach.gFrei/20,2)+" je Spieltag",nach.gFrei>vor.gFrei)+
+    va("Vorbehalt des Vorstands",c(vor.vorb),c(nach.vorb),"bleibt auf dem Konto",nach.vorb<vor.vorb)+va("Notrücklage",c(vor.rueB),c(nach.rueB),"",false)+va("Saisonziel",vor.ziel,nach.ziel,"",false);
+  function stap(s2){return '<div class="stap" style="margin:.1rem .2rem .25rem">'+[[s2.tT,"var(--gut)"],[s2.vorb,"var(--acht)"],[s2.pufB,"var(--gast)"],[s2.rueB,"var(--stumm)"]].map(function(x){return '<i style="width:'+(x[0]/KASSE*100).toFixed(1)+'%;background:'+x[1]+'"></i>'}).join("")+'</div>'}
+  h+='<div class="ab"><b>Kasse '+c(KASSE)+'</b><span>oben vorher, unten nachher</span></div>'+stap(vor)+stap(nach)+'<div class="leg" style="display:flex;flex-wrap:wrap;gap:.15rem .45rem"><i style="background:var(--gut)"></i><span>frei</span><i style="background:var(--acht)"></i><span>Vorbehalt</span><i style="background:var(--gast)"></i><span>Gehaltspuffer</span><i style="background:var(--stumm)"></i><span>Notrücklage</span></div>';
+  var bi=ZUSAGEN.filter(function(z){return Z.biete[z.id]});
+  h+='<div class="ab"><b>Woran du dich bindest</b><span>'+bi.length+'</span></div>'+(bi.length?bi.map(function(z){return '<div class="bind">'+ic("schloss")+'<span><b>'+z.t+'.</b> '+z.k+'</span></div>'}).join(""):'<p class="txt" style="margin:0;font-size:.92rem">Noch keine Zusage gewählt.</p>');
+  h+='<div class="ab"><b>Protokoll Saison 2</b><span>'+gz(Z.gespr)+'</span></div>'+(Z.gespr?'<div class="bew"><span>vor ST 1</span><span>'+bitte(Z.thema).t+'</span><b class="'+(Z.phase==="ja"?"plus":"minus")+'" style="font-size:.9rem">'+(Z.phase==="ja"?"vereinbart":Z.phase==="geg"?"offen":"abgelehnt")+'</b></div>':'<p class="txt" style="margin:0;font-size:.92rem">Noch kein Gespräch geführt.</p>');
+  h+='<div class="idee" style="margin-top:auto">'+ic("ki")+'<span><b>Mehrspieler:</b> jedes Team führt seine eigenen zwei Gespräche. Ist „Käufe, Verkäufe, Verträge“ an die KI delegiert, spricht die KI nach denselben Regeln; was du selbst vereinbart hast, überschreibt sie nicht.</span></div>';
+  $("g-folgen").innerHTML=h+'</div>'}
+
+/* ================= Ansicht 3: Praemien (Konzeptidee) ================= */
+var SIEG=[[0,"Aus","0 C",0],[.01,"0,01 C","je Sieg und Einsatz",1],[.02,"0,02 C","je Sieg und Einsatz",2]],ZIELP=[[0,"Aus","0 C",0],[2,"2,0 C","bei Top 6",5],[4,"4,0 C","bei Top 6",8]],DERBY=[[0,"Aus","0 C",0],[.5,"0,5 C","nur Spieltag 1",3],[1,"1,0 C","nur Spieltag 1",5]];
+var KLAUS=[["Keine",""],["Einsatzprämie","0,02 C je Einsatz"],["Leistungsprämie","0,2 C je Spieltag ab 4 PP"],["Treueprämie","10 % Jahresgehalt bei Verlängerung"]];
+function klKosten(p){var k=Z.kl[p[0]]||0;return k===1?p[6]*.02:k===2?p[7]*.2:k===3?p[3]*.1:0}
+function klMoral(p){var k=Z.kl[p[0]]||0;return k===1?2:k===2?4:k===3?10:0}
+function praemienSumme(){var sieg=SIEG[Z.sieg][0]*22*6,derby=DERBY[Z.derby][0],sp=KADER.reduce(function(s,p){return s+klKosten(p)},0);return {sieg:sieg,derby:derby,sp:sp,fest:sieg+derby+sp,bedingt:ZIELP[Z.zielp][0]}}
+function seg3(schl,arr){return '<div class="seg3">'+arr.map(function(a,i){return '<a data-s="'+schl+':'+i+'"'+(Z[schl]===i?' class="an"':'')+'><b class="t">'+a[1]+'</b><small>'+a[2]+'</small></a>'}).join("")+'</div>'}
+function zeichneTeamPraemien(){var su=praemienSumme();
+  var h='<div class="pk"><h2>Mannschaftsprämien</h2><span class="sp"></span><span class="mk neu">Idee</span></div><div class="pb">';
+  h+='<div class="pr"><h3>'+ic("pokal")+'Siegprämie</h3><p>Für jeden gewonnenen Vergleich bekommt jeder eingesetzte Spieler einen festen Betrag. Gebucht je Spieltag.</p>'+seg3("sieg",SIEG)+
+    '<div class="fo2"><i class="'+(Z.sieg?"m":"n")+'">erwartet '+c(su.sieg)+' je Saison</i><i class="'+(Z.sieg?"p":"n")+'">'+(Z.sieg?"Moral +"+SIEG[Z.sieg][3]+" je Sieg, nur Eingesetzte":"keine Wirkung")+'</i></div></div>';
+  h+='<div class="pr"><h3>'+ic("ziel")+'Prämie fürs Saisonziel</h3><p>Erreicht das Team das verbindliche Ziel des Vorstands, wird der Topf am Saisonende unter allen aufgeteilt. Sonst wird nichts fällig.</p>'+seg3("zielp",ZIELP)+
+    '<div class="fo2"><i class="n">nur bei Erfolg '+c(su.bedingt)+'</i><i class="'+(Z.zielp?"p":"n")+'">'+(Z.zielp?"Moral +"+ZIELP[Z.zielp][3]+" für alle am Saisonende":"keine Wirkung")+'</i>'+(Z.zielp?'<i class="p">Verlängerung: Forderung −3 %</i>':'')+'</div></div>';
+  h+='<div class="pr"><h3>'+ic("stern")+'Sonderprämie für einen Spieltag</h3><p>Einmalig für den nächsten Spieltag, zum Beispiel vor einem Vergleich gegen einen Favoriten. Wird fällig, ob gewonnen wird oder nicht.</p>'+seg3("derby",DERBY)+
+    '<div class="fo2"><i class="'+(Z.derby?"m":"n")+'">sofort '+c(su.derby)+'</i><i class="'+(Z.derby?"p":"n")+'">'+(Z.derby?"Moral +"+DERBY[Z.derby][3]+" an Spieltag 1, alle Eingesetzten":"keine Wirkung")+'</i></div></div>';
+  h+='<div class="ab"><b>Regeln (Vorschlag)</b></div>'+[["Zahlt aus dem Gehaltstopf.","Die Freigabe des Vorstands gilt auch hier, hart, für Mensch und KI."],["Nur wer spielt, verdient.","Verletzte sind nicht einsetzbar und bekommen keine Sieg- oder Einsatzprämie."],["Gebucht je Spieltag.","Wie Gehalt und Sponsor-Rate; die Saisonziel-Prämie erst mit der Abrechnung."],["Je Team getrennt, delegierbar.","Gehört zum Bereich „Käufe, Verkäufe, Verträge“; die KI nutzt dieselben Prämien."]].map(function(r){return '<div class="regel">'+ic("check")+'<span><b>'+r[0]+'</b> '+r[1]+'</span></div>'}).join("");
+  h+='<div class="idee" style="margin-top:auto">'+ic("stern")+'<span><b>Prämien bewegen die Moral, nie direkt die Leistung.</b> Die Moral wirkt wie heute über Form und Moral auf die Eignung; die Rangtreue der Disziplinen bleibt unberührt.</span></div>';
+  $("p-team").innerHTML=h+'</div>'}
+var SPALTEN=[["name","Spieler"],["gesamt","Gesamt",1],["moral","Moral"],["gehalt","Gehalt",1],["bis","Vertrag bis"],["kl","Prämie"],["kosten","erwartet",1],["wirkung","Wirkung",1]];
+function zeichneSpielerPraemien(){
+  var l=KADER.slice().sort(function(a,b){var w={name:function(p){return p[0]},gesamt:function(p){return p[2]},moral:function(p){return p[5]},gehalt:function(p){return p[3]},bis:function(p){return p[4]},kl:function(p){return Z.kl[p[0]]||0},kosten:klKosten,wirkung:klMoral}[Z.sp],x=w(a),y=w(b);return (x<y?-1:x>y?1:0)*Z.sr});
+  var h='<div class="pk"><h2>Spielerprämien</h2><small style="color:var(--leise)">eine Klausel je Spieler · Klick auf die Spalte sortiert</small><span class="sp"></span><span class="mk neu">Idee</span></div><div class="pb eng" style="padding-top:0"><table class="ptb"><thead><tr>'+
+    SPALTEN.map(function(s){return '<th class="'+(s[2]?"r ":"")+(Z.sp===s[0]?"an":"")+'" data-tu="sort:'+s[0]+'">'+s[1]+(Z.sp===s[0]?(Z.sr<0?" ▼":" ▲"):"")+'</th>'}).join("")+'</tr></thead><tbody>';
+  h+=l.map(function(p){var k=Z.kl[p[0]]||0,ko=klKosten(p),mo=klMoral(p),lieb=p[0]==="Karthogg";
+    return '<tr><td><span class="nm"><img class="ptr" src="'+port(p[0])+'" alt=""><span><b>'+p[0]+'</b><small>'+(lieb?'<span class="mk gold">Liebling des Vorstands</span>':'')+'</small></span></span></td>'+
+      '<td class="r"><span class="gr t">'+de(p[2])+'</span><span class="klein">'+kls(p[1])+'</span></td>'+
+      '<td><span class="mo t" style="color:'+moralFarbe(p[5])+'">'+gesicht(p[5])+p[5]+'</span></td>'+
+      '<td class="r"><span class="gr t">'+c(p[3])+'</span><span class="klein t">'+c(p[3]/20,2)+' je Spieltag</span></td>'+
+      '<td><span class="t">Ende Saison '+p[4]+'</span></td>'+
+      '<td><button class="kl2'+(k?" an":"")+'" data-tu="klausel:'+p[0]+'" title="'+KLAUS[k][1]+'">'+KLAUS[k][0]+ic("u")+'</button><span class="klein">'+(KLAUS[k][1]||"klicken zum Wechseln")+'</span></td>'+
+      '<td class="r"><span class="gr t'+(ko?"":" null")+'">'+(ko?c(ko,2):"–")+'</span><span class="klein">'+(k===3?"einmalig":"je Saison")+'</span></td>'+
+      '<td class="r"><span class="gr t '+(mo?"plus":"null")+'">'+(mo?"+"+mo:"–")+'</span><span class="klein">Moral'+(k===3?" · Forderung −5 %":"")+'</span></td></tr>'}).join("");
+  $("p-spieler").innerHTML=h+'</tbody></table></div>'}
+function zeichneKosten(){var s=stand(false),su=praemienSumme(),frei=s.gFrei,ueber=su.fest>frei+1e-9,max=Math.max(frei,su.fest,0.1)*1.15;
+  var mAlt=Math.round(KADER.reduce(function(a,p){return a+p[5]},0)/KADER.length),mNeu=Math.round(mAlt+SIEG[Z.sieg][3]*1.5+KADER.reduce(function(a,p){return a+klMoral(p)},0)/KADER.length);
+  var h='<div class="pk"><h2>Kosten und Wirkung</h2><span class="sp"></span><span class="mk '+(ueber?"rot":"gut")+'">'+(ueber?"über dem Topf":"im Rahmen")+'</span></div><div class="pb">';
+  h+='<div class="ab"><b>Zahlt aus dem Gehaltstopf</b><span>Quote '+pz(s.gq)+'</span></div><div class="meter"><i style="width:'+(Math.min(su.fest,frei)/max*100).toFixed(1)+'%;background:var(--gold)"></i>'+(ueber?'<i style="width:'+((su.fest-frei)/max*100).toFixed(1)+'%;background:var(--warn)"></i>':'<i style="width:'+((frei-su.fest)/max*100).toFixed(1)+'%;background:rgba(98,211,148,.45)"></i>')+'</div>';
+  h+='<div class="kas2" style="flex:none"><div class="topf"><span>Gehaltstopf, frei</span><strong class="t">'+c(frei)+'</strong><span class="klein">je Saison · '+c(frei/20,2)+' je Spieltag</span></div><div class="topf'+(ueber?" zu":"")+'"><span>Prämien, fest geplant</span><strong class="t">'+c(su.fest)+'</strong><span class="klein">je Saison · '+c(su.fest/20,2)+' je Spieltag</span></div></div>';
+  h+='<div class="ab"><b>Woraus die Summe besteht</b></div>'+[["Siegprämie, erwartet",su.sieg],["Sonderprämie Spieltag 1",su.derby],["Spielerklauseln, erwartet",su.sp]].map(function(x){return '<div class="rgz"><span>'+x[0]+'</span><b class="t">'+c(x[1])+'</b></div>'}).join("")+
+    '<div class="rgz"><span>Prämie fürs Saisonziel <small>nur bei Erfolg, am Saisonende</small></span><b class="t" style="color:var(--leise)">'+c(su.bedingt)+'</b></div>';
+  h+='<div class="ab"><b>Was es bringt</b></div><div class="rgz"><span>Moral im Kader <small>Mittel, hochgerechnet</small></span><b class="t">'+gesicht(mAlt)+' '+mAlt+' → '+gesicht(mNeu)+' <span style="color:'+moralFarbe(mNeu)+'">'+mNeu+'</span></b></div>'+
+    '<div class="rgz"><span>Vorstand <small>Prämien bewegen sein Vertrauen nicht</small></span><b class="t">±0,0</b></div>';
+  var gew=KADER.filter(function(p){return klMoral(p)}).sort(function(a,b){return klMoral(b)-klMoral(a)});
+  h+='<div class="ab"><b>Klauseln im Kader</b><span>'+gew.length+' von 10</span></div>'+(gew.length?gew.map(function(p){var n=Math.min(100,p[5]+klMoral(p));return '<div class="rgz"><span style="display:flex;align-items:center;gap:.5rem"><img class="ptr k" src="'+port(p[0])+'" alt=""><span style="color:var(--tinte)">'+p[0]+'</span>'+kls(p[1])+'</span><b class="t">'+gesicht(p[5])+' '+p[5]+' → '+gesicht(n)+' <span style="color:'+moralFarbe(n)+'">'+n+'</span></b></div>'}).join(""):'<p class="txt" style="margin:0;font-size:.92rem">Noch keine Klausel vergeben.</p>');
+  h+='<div class="ruf">'+(ueber?'<p class="txt" style="margin:0;font-size:.9rem;color:#ffd9d6">Die Sperre ist hart: fest geplante Prämien über dem freien Gehaltstopf lassen sich nicht speichern. Weniger wählen oder den Vorstand um einen Prämientopf bitten.</p><button class="btn haupt" data-tu="thema:praemie">'+ic("buero")+'Vorstand um Prämientopf bitten</button>':'<button class="btn haupt" data-tu="speichern">'+ic("check")+'Prämien festlegen</button>')+
+    '<small>Gilt ab dem nächsten Spieltag · jederzeit änderbar, schon Gezahltes bleibt gezahlt</small></div>';
+  $("p-kosten").innerHTML=h+'</div>'}
+
+/* ---------- Rahmen und Aktionen ---------- */
+function zeichne(){var l=L(),s=stand(Z.phase==="ja"),ok=4-l.gef.reduce(function(a,b){return a+b},0);
+  RAHMEN.reiter=[["vorstand","Vorstand und Ziele"],["gespraech","Gespräch",(2-Z.gespr)+" frei"],["praemien","Prämien","Idee"]];
+  rahmenZeichne(Z);
+  slot([["Vertrauen",vd(s.v)+' <small>/ 10</small>',"var(--"+stufe(l.v)[3]+")"],["Freigabe",pz(s.q),null],["Ziele auf Kurs",ok+' <small>/ 4</small>',ok===4?"var(--gut)":null],["Gespräche",Z.gespr+' <small>/ 2</small>',null]]);
+  takt("Weiter: Transfermarkt","Transferfenster offen · <b>vor Spieltag 1</b>","");
+  if(Z.ans==="vorstand"){zeichneVertrauen();zeichneZiele();zeichneBudget()}
+  else if(Z.ans==="gespraech"){zeichneWer();zeichneVerlauf();zeichneFolgen()}
+  else{zeichneTeamPraemien();zeichneSpielerPraemien();zeichneKosten()}
+  urlSetzen(Z,[["ans","ansicht"],["lage","lage"]])}
+function neu(){Z.thema="";Z.biete={};Z.phase=""}
+var TU={
+  thema:function(id){if(Z.phase&&Z.gespr>=2){melde("Kein Gespräch mehr frei","Beide Gespräche dieser Saison sind verbraucht.","w");return}
+    var b=bitte(id);Z.ans="gespraech";if(Z.phase)neu();Z.biete={};Z.thema=id;if(sperre(b))melde(b.t,sperre(b),"w")},
+  biete:function(id){if(Z.biete[id])delete Z.biete[id];else Z.biete[id]=1},
+  antrag:function(){Z.phase=urteil();Z.gespr=Math.min(2,Z.gespr+1);if(Z.phase==="ja")melde("Vorstand stimmt zu",bitte(Z.thema).t+" ist vereinbart.","g");else if(Z.phase==="nein")melde("Vorstand lehnt ab","Es kostet dich kein Vertrauen und kein Geld.","w")},
+  annehmen:function(){var g=gegenZusage();if(g){Z.biete[g.id]=1;Z.phase="ja";melde("Gegenangebot angenommen",bitte(Z.thema).t+" ist vereinbart.","g")}},
+  ablehnen:function(){Z.phase="nein"},
+  neu:function(){if(Z.gespr>=2&&Z.phase){melde("Kein Gespräch mehr frei","Beide Gespräche dieser Saison sind verbraucht.","w");return}neu()},
+  klausel:function(n){Z.kl[n]=((Z.kl[n]||0)+1)%4},
+  sort:function(k){if(Z.sp===k)Z.sr=-Z.sr;else{Z.sp=k;Z.sr=k==="name"||k==="bis"?1:-1}},
+  speichern:function(){melde("Prämien festgelegt","Gilt ab Spieltag 1. Im Mockup wird nichts gespeichert.","g")},
+  hin:function(w){melde("Öffnet: "+w,"Im Mockup bleibt das Office stehen.")},
+  takt:function(){melde("Weiter","Im Mockup endet der Weg hier.")},
+  _lage:function(){neu();Z.gespr=0},
+  _sieg:function(){},_zielp:function(){},_derby:function(){}
+};
+rahmenStart({rail:"Office",krume:"Manager-Zentrale <span>· Vigilante Wranglers</span>",titel:"Office",reiter:[],
+  demo:[["Ansicht","ans",[["vorstand","Vorstand und Ziele"],["gespraech","Gespräch"],["praemien","Prämien"]]],["Lage","lage",[["ruhig","Zufrieden 6,2"],["druck","Unter Druck 2,6"],["wind","Rückenwind 8,1"]]]],
+  notiz:"Die graue Leiste gehört nicht zum UI. Stufen und Sonderwege wie im Spiel · lila = neu oder Idee · alle Stände und Beträge erfunden."});
+if(Z.thema&&!bitte(Z.thema))Z.thema="";
+if(Z.thema&&q.get("antwort")==="1"){TU.antrag();if(q.get("annehmen")==="1"&&Z.phase==="geg")TU.annehmen()}
+[].forEach.call(document.querySelectorAll(".mb"),function(m){m.remove()});
+klicks(Z,zeichne,TU);zeichne();
+</script>
+</body>
+</html>

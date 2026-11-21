@@ -234,6 +234,10 @@ export function pruefeRohesDuellErgebnis(roh: unknown, kontext: string): RoherBr
     }
   }
   if (r.gesamtKg !== undefined && !istZahlenpaar(r.gesamtKg)) throw fehler("`gesamtKg` ist kein Zahlenpaar");
+  if (r.anzeige !== undefined) {
+    const an = r.anzeige as Record<string, unknown> | null;
+    if (!an || (an.art !== "zeit" && an.art !== "besiegt") || !istZahlenpaar(an.werte)) throw fehler("`anzeige` ist ungueltig");
+  }
   if (r.momente !== undefined) {
     if (!Array.isArray(r.momente)) throw fehler("`momente` ist kein Array");
     for (const moment of r.momente) {

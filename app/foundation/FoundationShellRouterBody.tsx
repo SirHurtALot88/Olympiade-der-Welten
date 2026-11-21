@@ -1903,6 +1903,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onOpenMarket: () => setFoundationView("marketV2", setActiveView, { push: true }),
               onOpenTraining: () => setFoundationView("trainingCompact", setActiveView, { push: true }),
               onOpenOffice: () => navigateHomeTab("office"),
+              onOpenFinances: () => setFoundationView("finances", setActiveView, { push: true }),
               onOpenSeason: () => setFoundationView("seasonV2", setActiveView, { push: true }),
               // Aufgaben (Inbox) wird von Home aus geöffnet — History-Push, damit
               // Zurück verlässlich auf Home zurückführt statt auf den zuvor

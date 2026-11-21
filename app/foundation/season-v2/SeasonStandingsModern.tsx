@@ -65,7 +65,7 @@ import "./saisonstand-modern.css";
 type Zeile = SeasonV2StandingsRow;
 type Ansicht = "tabelle" | "matrix" | "verlauf" | "spieltage" | "bestenliste";
 type Satz = "sport" | "verein";
-type SortKey = "rank" | "team" | "verh" | "points" | "pow" | "spe" | "men" | "soc" | "kader" | "mw" | "cash" | "sponsor" | "salary" | "gebaeude" | "transfer" | "guv";
+type SortKey = "rank" | "team" | "verh" | "points" | "pow" | "spe" | "men" | "soc" | "kader" | "mw" | "cash" | "sponsor" | "salary" | "gebaeude" | "transfer" | "guv" | "formRest" | "bew" | "sun" | "form" | "abst";
 
 const ZAHL = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 1 });
 const zahl = (w: number | null | undefined) => (w == null || !Number.isFinite(w) ? "–" : ZAHL.format(w));
@@ -145,6 +145,7 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     standingsRows: standingsRowsRoh,
     rivalTeamIds,
     teamBilanzByTeamId,
+    teamFormCardBonusByTeamId,
     teamStrengthRankByTeamId,
     spielplanDisziplinen,
     teamStrengthValueByTeamId,
@@ -179,6 +180,15 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
   const [blattOffen, setBlattOffen] = useState(false);
   const [matrixModus, setMatrixModus] = useState<"punkte" | "staerke">("punkte");
   const [matrixSort, setMatrixSort] = useState<string | null>(null);
+  /** Richtung der Matrix-Sortierung; ein zweiter Klick auf dieselbe Spalte dreht (statt die Sortierung aufzuheben). */
+  const [matrixAuf, setMatrixAuf] = useState(false);
+  const klickMatrix = (key: string, startAuf = false) => {
+    if (matrixSort === key) setMatrixAuf((a) => !a);
+    else {
+      setMatrixSort(key);
+      setMatrixAuf(startAuf);
+    }
+  };
   const [verlaufModus, setVerlaufModus] = useState<"rang" | "punkte">("rang");
   const [gewaehlterSpieltag, setSpieltagId] = useState<string | null>(null);
   const [kontextTab, setKontextTab] = useState<"karte" | "showdown">("karte");
@@ -286,6 +296,18 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     [hatLiga, nachLiga, zeilenFuer],
   );
 
+  const formSinnvoll = useMemo(() => istDuellVerlauf(verlauf), [verlauf]);
+  const formVon = useCallback((teamId: string) => (formSinnvoll ? formAusVerlauf(verlauf?.byTeamId[teamId]) : []), [verlauf, formSinnvoll]);
+  /** Formpunkte (Karten-Tank) je Team: gezeigt = gebucht, gleiche Quelle wie die Klassik-Ansicht (`buildSeasonFormCardBonusByTeamId`). */
+  const formPunkteVon = useCallback(
+    (teamId: string) => {
+      const e = teamFormCardBonusByTeamId?.get(teamId);
+      return e && e.poolCards > 0 ? e : null;
+    },
+    [teamFormCardBonusByTeamId],
+  );
+  const hatFormPunkte = useMemo(() => standingsRows.some((z) => formPunkteVon(z.teamId) != null), [standingsRows, formPunkteVon]);
+
   const sichtbareZeilen = useMemo(() => {
     const basis = zeilenFuer(aktiveLiga);
     if (sort.key === "rank" && sort.dir === "asc") return basis;
@@ -304,6 +326,22 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
         case "gebaeude": return z.buildingCost ?? Number.NEGATIVE_INFINITY;
         case "transfer": return z.transferNet ?? Number.NEGATIVE_INFINITY;
         case "guv": return z.guv ?? Number.NEGATIVE_INFINITY;
+        case "formRest": return formPunkteVon(z.teamId)?.remainingPositive ?? Number.NEGATIVE_INFINITY;
+        // ± = Platzbewegung zum Spieltag davor; S-U-N nach Siegen, dann Unentschieden; Form = Punkte der letzten Spieltage.
+        case "bew": return z.fieldRaceRankDelta ?? Number.NEGATIVE_INFINITY;
+        case "sun": {
+          const b = teamBilanzByTeamId?.get(z.teamId);
+          return b ? b.siege * 1000 + b.unentschieden : Number.NEGATIVE_INFINITY;
+        }
+        case "form": {
+          const f = formVon(z.teamId);
+          return f.length > 0 ? f.reduce((x, e) => x + e.punkte, 0) : Number.NEGATIVE_INFINITY;
+        }
+        // Abstand zum Tabellenführer: kleiner ist besser, deshalb als negativer Wert (absteigend = knapp vorn zuerst).
+        case "abst": {
+          if (z.points == null) return Number.NEGATIVE_INFINITY;
+          return -(abstandZumFuehrer(z, ligaDerZeile(z)) ?? 0);
+        }
       }
     };
     const faktor = sort.dir === "asc" ? 1 : -1;
@@ -313,13 +351,11 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
       const d = typeof x === "string" || typeof y === "string" ? String(x).localeCompare(String(y), "de-DE") : (x as number) - (y as number);
       return d !== 0 ? d * faktor : (a.rank ?? 999) - (b.rank ?? 999);
     });
-  }, [zeilenFuer, aktiveLiga, sort, bereichWert]);
+  }, [zeilenFuer, aktiveLiga, sort, bereichWert, formPunkteVon, formVon, teamBilanzByTeamId, ligaDerZeile]);
 
   const klickSort = (key: SortKey, standardRichtung: "asc" | "desc" = "desc") =>
     setSort((alt) => (alt.key === key ? { key, dir: alt.dir === "asc" ? "desc" : "asc" } : { key, dir: standardRichtung }));
 
-  const formSinnvoll = useMemo(() => istDuellVerlauf(verlauf), [verlauf]);
-  const formVon = useCallback((teamId: string) => (formSinnvoll ? formAusVerlauf(verlauf?.byTeamId[teamId]) : []), [verlauf, formSinnvoll]);
   // Platzentwicklung je Team (Rang innerhalb der eigenen Liga je GEWERTETEM Spieltag) für die Sparkline.
   const linienJeTeam = useMemo(() => {
     if (!verlauf) return new Map<string, Array<number | null>>();
@@ -381,6 +417,22 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     );
   };
 
+  const formPunkteZelle = (z: Zeile) => {
+    const e = formPunkteVon(z.teamId);
+    if (!e) return <span className="bc-null">–</span>;
+    const tip = [
+      `Formpunkte: ${zahl(e.remainingPositive)} von ${zahl(e.poolPositive)} noch nicht eingesetzt`,
+      `${e.cards} von ${e.poolCards} Karten gespielt`,
+      e.remainingNegative < 0 ? `offene Minuskarten ${zahl(e.remainingNegative)} kosten am Saisonende Punkte` : null,
+      "Ungespielte Pluskarten verfallen am Saisonende",
+    ].filter(Boolean).join("\n");
+    return (
+      <span className="bc-t ssm-formpkt" data-testid="ssm-formpunkte" data-bc-tip={tip}>
+        {zahl(e.remainingPositive)}<small> / {zahl(e.poolPositive)}</small>
+      </span>
+    );
+  };
+
   const verlaufZelle = (z: Zeile) => {
     const raenge = linienJeTeam.get(z.teamId);
     const gruppe = ligaDerZeile(z);
@@ -432,19 +484,20 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     });
     return [
       { key: "rang", kopf: "#", breite: "46px", ...sk("rank", "asc"), render: rangZelle },
-      ...(phone ? [] : [{ key: "bew", kopf: "±", breite: "40px", render: bewegungZelle } as BcTableColumn<Zeile>]),
+      ...(phone ? [] : [{ key: "bew", kopf: "±", breite: "40px", ...sk("bew"), render: bewegungZelle } as BcTableColumn<Zeile>]),
       { key: "team", kopf: "Team", breite: "minmax(0,1fr)", ...sk("team", "asc"), render: teamZelle },
-      { key: "sun", kopf: "S-U-N", breite: phone ? "58px" : "64px", rechts: true, render: bilanzZelle },
+      { key: "sun", kopf: "S-U-N", breite: phone ? "58px" : "64px", rechts: true, ...sk("sun"), render: bilanzZelle },
       ...(hatVerhaeltnis && !phone ? [{ key: "verh", kopf: "Verh.", breite: "52px", rechts: true, ...sk("verh"), render: (z: Zeile) => <span className={`bc-t ${z.verhaeltnis != null && z.verhaeltnis < 0 ? "bc-minus" : z.verhaeltnis != null && z.verhaeltnis > 0 ? "bc-plus" : ""}`}>{vz(z.verhaeltnis)}</span> } as BcTableColumn<Zeile>] : []),
-      ...(formSinnvoll ? [{ key: "form", kopf: "Form", breite: phone ? "76px" : "100px", render: formZelle } as BcTableColumn<Zeile>] : []),
+      ...(formSinnvoll ? [{ key: "form", kopf: "Form", breite: phone ? "76px" : "100px", ...sk("form"), render: formZelle } as BcTableColumn<Zeile>] : []),
+      ...(hatFormPunkte && !phone ? [{ key: "formpkt", kopf: "Formpkt.", breite: "76px", rechts: true, ...sk("formRest"), render: formPunkteZelle } as BcTableColumn<Zeile>] : []),
       ...(hatSparkline && !phone ? [{ key: "verlauf", kopf: "Verlauf", breite: "92px", rechts: true, render: verlaufZelle } as BcTableColumn<Zeile>] : []),
       ...(phone ? [] : (["pow", "spe", "men", "soc"] as const).map(bereich)),
       ...(hatGegner && !phone ? [{ key: "naech", kopf: "Nä.", breite: "40px", render: gegnerZelle } as BcTableColumn<Zeile>] : []),
-      ...(hatWertung && !phone ? [{ key: "abst", kopf: "Abst.", breite: "50px", rechts: true, render: abstandZelle } as BcTableColumn<Zeile>] : []),
+      ...(hatWertung && !phone ? [{ key: "abst", kopf: "Abst.", breite: "50px", rechts: true, ...sk("abst"), render: abstandZelle } as BcTableColumn<Zeile>] : []),
       { key: "pkt", kopf: "Pkt", breite: "52px", rechts: true, ...sk("points"), render: (z) => <strong className="ssm-pkt bc-t">{zahl(z.points)}</strong> },
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone, hatWertung, hatVerhaeltnis, formSinnvoll, teamBilanzByTeamId, sort, aktiveLiga, isSeasonEnded, rivalTeamIds, formVon, bereichsRaenge, hatSparkline, hatGegner, linienJeTeam, gegnerVon, standingsRows, nachLiga, bereichWert]);
+  }, [phone, hatWertung, hatVerhaeltnis, formSinnvoll, hatFormPunkte, formPunkteVon, teamBilanzByTeamId, sort, aktiveLiga, isSeasonEnded, rivalTeamIds, formVon, bereichsRaenge, hatSparkline, hatGegner, linienJeTeam, gegnerVon, standingsRows, nachLiga, bereichWert]);
 
   const spaltenVerein = useMemo<BcTableColumn<Zeile>[]>(() => {
     const sk = (key: SortKey, d: "asc" | "desc" = "desc") => ({ onKopf: () => klickSort(key, d), aktiv: sort.key === key });
@@ -581,6 +634,9 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
         <div><dt>Punkte</dt><dd className="bc-t">{zahl(kartenTeam.points)}</dd></div>
         <div><dt>S-U-N</dt><dd className="bc-t">{teamBilanzByTeamId?.get(kartenTeam.teamId) ? formatiereBilanz(teamBilanzByTeamId.get(kartenTeam.teamId)!) : "–"}</dd></div>
         {hatVerhaeltnis ? <div><dt>Verh.</dt><dd className="bc-t">{vz(kartenTeam.verhaeltnis)}</dd></div> : null}
+        {formPunkteVon(kartenTeam.teamId) ? (
+          <div data-bc-tip="Noch nicht eingesetzte Formpunkte (Pluskarten) von allen der Saison; ungespielte verfallen am Saisonende"><dt>Formpkt.</dt><dd className="bc-t">{zahl(formPunkteVon(kartenTeam.teamId)!.remainingPositive)} / {zahl(formPunkteVon(kartenTeam.teamId)!.poolPositive)}</dd></div>
+        ) : null}
       </dl>
       {stehtBlock(stehtAuf)}
       {kartenKader.length > 0 ? (
@@ -626,9 +682,12 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
   const matrixZeilen = useMemo(() => {
     const basis = zeilenFuer(aktiveLiga);
     if (!matrixSort) return basis;
+    const faktor = matrixAuf ? -1 : 1;
+    if (matrixSort === "__team") return [...basis].sort((a, b) => a.teamName.localeCompare(b.teamName, "de") * -faktor);
+    if (matrixSort === "__pkt") return [...basis].sort((a, b) => ((b.points ?? -1) - (a.points ?? -1)) * faktor || (a.rank ?? 999) - (b.rank ?? 999));
     const key = matrixSort as SeasonDisciplineKey;
-    return [...basis].sort((a, b) => (disziplinWert(b, key) ?? -1) - (disziplinWert(a, key) ?? -1) || (a.rank ?? 999) - (b.rank ?? 999));
-  }, [zeilenFuer, aktiveLiga, matrixSort, disziplinWert]);
+    return [...basis].sort((a, b) => ((disziplinWert(b, key) ?? -1) - (disziplinWert(a, key) ?? -1)) * faktor || (a.rank ?? 999) - (b.rank ?? 999));
+  }, [zeilenFuer, aktiveLiga, matrixSort, matrixAuf, disziplinWert]);
   const matrixSpalten = useMemo(() => {
     const m: Partial<Record<SeasonDisciplineKey, Array<number | null | undefined>>> = {};
     const basis = zeilenFuer(aktiveLiga);
@@ -666,7 +725,11 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
       <table className="ssm-matrix" data-testid="ssm-matrix">
         <thead>
           <tr>
-            <th className="ssm-matrix__team">Team</th>
+            <th className="ssm-matrix__team">
+              <button type="button" className={matrixSort === "__team" ? "is-an" : undefined} onClick={() => klickMatrix("__team", true)} data-bc-tip="Nach Teamname sortieren, nochmal klicken dreht die Richtung">
+                Team{matrixSort === "__team" ? (matrixAuf ? " ▴" : " ▾") : ""}
+              </button>
+            </th>
             {SEASON_DISCIPLINE_AREA_GROUPS_IN_STANDARD_ORDER.map((g, gi) => (
               <Fragment key={g.id}>
                 {gi > 0 ? <th className="ssm-matrix__luecke" aria-hidden /> : null}
@@ -674,7 +737,11 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
               </Fragment>
             ))}
             <th className="ssm-matrix__luecke" aria-hidden />
-            <th>Pkt</th>
+            <th>
+              <button type="button" className={matrixSort === "__pkt" ? "is-an" : undefined} onClick={() => klickMatrix("__pkt")} data-bc-tip="Nach Punkten sortieren, nochmal klicken dreht die Richtung">
+                Pkt{matrixSort === "__pkt" ? (matrixAuf ? " ▴" : " ▾") : ""}
+              </button>
+            </th>
           </tr>
           <tr>
             <th className="ssm-matrix__team" />
@@ -683,8 +750,8 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
                 {gi > 0 ? <th className="ssm-matrix__luecke" aria-hidden /> : null}
                 {g.keys.map((key) => (
                   <th key={key} className={`ssm-matrix__diszi ssm-bereich-${g.id}${naechsteDisziplinen.has(SEASON_DISCIPLINE_KEY_TO_CATALOG_ID[key]) ? " is-naechster" : ""}`}>
-                    <button type="button" className={matrixSort === key ? "is-an" : undefined} onClick={() => setMatrixSort((a) => (a === key ? null : key))} data-bc-tip="Nach dieser Disziplin sortieren">
-                      {SEASON_DISCIPLINE_LABELS[key]}
+                    <button type="button" className={matrixSort === key ? "is-an" : undefined} onClick={() => klickMatrix(key)} data-bc-tip="Nach dieser Disziplin sortieren, nochmal klicken dreht die Richtung">
+                      {SEASON_DISCIPLINE_LABELS[key]}{matrixSort === key ? (matrixAuf ? " ▴" : " ▾") : ""}
                     </button>
                   </th>
                 ))}

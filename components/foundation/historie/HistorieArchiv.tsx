@@ -14,6 +14,7 @@ import {
 import { leseSaisonHistorie } from "@/lib/persistence/foundation-season-history-projection";
 import { saisonNummer } from "@/lib/foundation/transfer-window-zuordnung";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { useTabellenSortierung } from "@/lib/ui/tabellen-sortierung";
 
 import HistorieBlatt from "./HistorieBlatt";
 import HistorieZeitleiste, { baueZeitleistenGlieder, type HistorieLiveSaison } from "./HistorieZeitleiste";
@@ -46,7 +47,7 @@ export function useHistorieDaten(gameState: GameState) {
 
 type Sicht = "sport" | "geld";
 
-function ligaKarte({
+function LigaKarte({
   saison,
   liga,
   sicht,
@@ -62,30 +63,55 @@ function ligaKarte({
   onTeam: (teamId: string) => void;
 }) {
   const geld = sicht === "geld";
+  // Alle Spalten sortierbar (Designregel 21.11.): Rang aufsteigend (1 ist der beste), Kosten (Gehalt) günstig zuerst.
+  const { sortiert: zeilenSortiert, kopf: sk } = useTabellenSortierung(
+    liga.zeilen,
+    {
+      rang: { wert: (z) => z.rank, standard: "auf" },
+      team: { wert: (z) => z.teamName, standard: "auf" },
+      kasse: { wert: (z) => z.cash },
+      gehalt: { wert: (z) => z.salary, standard: "auf" },
+      mw: { wert: (z) => z.marketValue },
+      guv: { wert: (z) => z.guv },
+      transfers: { wert: (z) => (z.seasonNummer === 1 ? null : z.transferNet) },
+      punkte: { wert: (z) => z.points },
+      pow: { wert: (z) => z.pow },
+      spe: { wert: (z) => z.spe },
+      men: { wert: (z) => z.men },
+      soc: { wert: (z) => z.soc },
+      start: { wert: (z) => z.startplatz, standard: "auf" },
+      diff: { wert: (z) => z.rankDiff },
+    },
+    null,
+  );
+  const mk = (key: Parameters<typeof sk>[0]) => {
+    const k = sk(key);
+    return { onKlick: k.onKlick, aktiv: k.aktiv, auf: k.richtung === "auf" };
+  };
   const cols = geld
     ? "2rem minmax(0,1fr) 4.7rem 4.7rem 5.1rem 4.7rem 5.4rem"
     : "2rem minmax(0,1fr) 4.2rem 2.8rem 2.8rem 2.8rem 2.8rem 3.1rem 3rem";
   const ligaNr = liga.liga;
   const kopf = geld
     ? [
-        { text: "#" },
-        { text: "Team", links: true },
-        { text: "Kasse" },
-        { text: "Gehalt" },
-        { text: "Marktwert" },
-        { text: "GuV" },
-        { text: "Transfers" },
+        { text: "#", ...mk("rang") },
+        { text: "Team", links: true, ...mk("team") },
+        { text: "Kasse", ...mk("kasse") },
+        { text: "Gehalt", ...mk("gehalt") },
+        { text: "Marktwert", ...mk("mw") },
+        { text: "GuV", ...mk("guv") },
+        { text: "Transfers", ...mk("transfers") },
       ]
     : [
-        { text: "#" },
-        { text: "Team", links: true },
-        { text: "Punkte" },
-        { text: <span className="ap">POW</span> },
-        { text: <span className="as">SPE</span> },
-        { text: <span className="am">MEN</span> },
-        { text: <span className="ao">SOC</span> },
-        { text: "Start" },
-        { text: "±" },
+        { text: "#", ...mk("rang") },
+        { text: "Team", links: true, ...mk("team") },
+        { text: "Punkte", ...mk("punkte") },
+        { text: <span className="ap">POW</span>, ...mk("pow") },
+        { text: <span className="as">SPE</span>, ...mk("spe") },
+        { text: <span className="am">MEN</span>, ...mk("men") },
+        { text: <span className="ao">SOC</span>, ...mk("soc") },
+        { text: "Start", ...mk("start") },
+        { text: "±", ...mk("diff") },
       ];
   return (
     <section className="pan" key={`liga-${ligaNr}`} data-testid={`historie-liga-${ligaNr ?? 0}`}>
@@ -105,7 +131,7 @@ function ligaKarte({
       </div>
       <div className="tl">
         <ThZeile raster={cols} spalten={kopf} />
-        {liga.zeilen.map((zeile) => {
+        {zeilenSortiert.map((zeile) => {
           const zone = zeile.meister ? " zm" : zeile.abstieg ? " zd" : zeile.aufstieg ? " zu" : "";
           return (
             <div
@@ -274,7 +300,7 @@ export default function HistorieArchiv({ gameState, ownTeamId, onOpenTeam, onWec
       />
       {saison.ligen.map((liga) => (
         <Fragment key={liga.liga ?? 0}>
-          {ligaKarte({ saison, liga, sicht, onSicht: setSicht, ownTeamId, onTeam: setBlattTeam })}
+          <LigaKarte saison={saison} liga={liga} sicht={sicht} onSicht={setSicht} ownTeamId={ownTeamId} onTeam={setBlattTeam} />
         </Fragment>
       ))}
       <div className="spalte">

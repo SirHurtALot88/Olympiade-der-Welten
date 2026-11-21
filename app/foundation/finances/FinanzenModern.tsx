@@ -18,6 +18,7 @@ import { ALLES_PUFFER_ANTEIL, type VorstandBudgetStand } from "@/lib/finance/vor
 import { verkaufserloeseFreiAnteil } from "@/lib/market/transferfenster-gemeinsam";
 import { vorstandFordertAlleAufEineKarte } from "@/lib/finance/vorstand-budget-aktionen";
 import { getStaticTeamLogoUrl } from "@/lib/data/mediaAssets";
+import { useTabellenSortierung } from "@/lib/ui/tabellen-sortierung";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import type { FinanceLeagueTableRow, FinancesViewModel } from "@/lib/foundation/finances/finances-types";
@@ -154,7 +155,7 @@ function Kassenverlauf({
             className={`fin-spalte${i === jetzt ? " is-jetzt" : ""}${gew === i ? " is-gew" : ""}`}
             style={{ left: `${(i / n) * 100}%`, width: `${100 / n}%` }}
             aria-label={`${p.art === "ende" ? "Saisonende" : p.art === "start" ? "Start" : `Spieltag ${p.label}`}: Kasse ${C(p.kasse)}`}
-            title={`${p.art === "ende" ? "Saisonende" : p.art === "start" ? "Start" : `Spieltag ${p.label}`} · ${C(p.kasse)}${p.gebucht ? "" : " (Prognose)"}`}
+            data-bc-tip={`${p.art === "ende" ? "Saisonende" : p.art === "start" ? "Start" : `Spieltag ${p.label}`} · ${C(p.kasse)}${p.gebucht ? "" : " (Prognose)"}`}
             onClick={() => onWahl(i)}
           />
         ))}
@@ -200,7 +201,7 @@ function BewegungsBalken({ verlauf, gew, onWahl }: { verlauf: VerlaufPunkt[]; ge
               type="button"
               className={`${p.gebucht ? "" : "is-prog "}${gew === i ? "is-gew" : ""}`}
               onClick={() => onWahl(i)}
-              title={`${p.art === "ende" ? "Saisonende" : p.art === "start" ? "Start" : `Spieltag ${p.label}`}: ${Cv(p.bewegung)}${p.gebucht ? "" : " (Prognose)"}`}
+              data-bc-tip={`${p.art === "ende" ? "Saisonende" : p.art === "start" ? "Start" : `Spieltag ${p.label}`}: ${Cv(p.bewegung)}${p.gebucht ? "" : " (Prognose)"}`}
               aria-label={`${p.label}: ${Cv(p.bewegung)}`}
             >
               {Math.abs(p.bewegung) > 0.004 ? <i className={p.bewegung < 0 ? "is-minus" : ""} style={{ height: `${Math.max(4, h)}%` }} /> : null}
@@ -246,7 +247,7 @@ function Uebersicht({ m, gew, setGew }: { m: FinanzSeiteModell; gew: number; set
         </div>
       </div>
       {m.finanzen?.kaderaufbau ? (
-        <div className="fin-hinweis" data-testid="fin-kaderaufbau" title="Saison 1: der Kader wird aus dem Startbudget aufgebaut. Das ist keine Transferbilanz — die beginnt mit dem Transferfenster vor Saison 2.">
+        <div className="fin-hinweis" data-testid="fin-kaderaufbau" data-bc-tip="Saison 1: der Kader wird aus dem Startbudget aufgebaut. Das ist keine Transferbilanz — die beginnt mit dem Transferfenster vor Saison 2.">
           <b>Kaderaufbau aus dem Startbudget</b>
           <span>
             Startkader {Cv(-m.finanzen.kaderaufbau.buyTotal)} ({m.finanzen.kaderaufbau.buyCount} Spieler) · Kaderaufbau {Cv(m.finanzen.kaderaufbau.net)}
@@ -290,8 +291,45 @@ const ART_TEXT: Record<string, string> = {
   kaderaufbau: "Kaderaufbau aus dem Startbudget",
 };
 
+/** Sortierbarer Spaltenkopf der Finanz-Tabellen: Klick sortiert, zweiter Klick dreht (Designregel 21.11.). */
+function FinKopf({
+  text,
+  kopf,
+  re,
+  titel,
+}: {
+  text: string;
+  kopf: { aktiv: boolean; pfeil: string; ariaSort: "ascending" | "descending" | "none"; onKlick: () => void };
+  re?: boolean;
+  titel?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`fin-sk${re ? " fin-re" : ""}${kopf.aktiv ? " is-an" : ""}`}
+      onClick={kopf.onKlick}
+      aria-sort={kopf.ariaSort}
+      data-bc-tip={titel ?? "Klick sortiert, nochmal klicken dreht die Richtung"}
+    >
+      {text}
+      {kopf.pfeil}
+    </button>
+  );
+}
+
 function Kontoauszug({ m, gew, onZeile }: { m: FinanzSeiteModell; gew: string | null; onZeile: (id: string) => void }) {
-  const zeilen = m.kontoauszug.zeilen;
+  // Die Zeilen-ID hängt an der Ausgangsposition, damit die Auswahl beim Umsortieren stehen bleibt.
+  const roh = useMemo(() => m.kontoauszug.zeilen.map((z, i) => ({ z, id: `${z.zeit ?? "x"}-${i}`, i })), [m.kontoauszug.zeilen]);
+  const { sortiert: zeilen, kopf } = useTabellenSortierung(
+    roh,
+    {
+      wann: { wert: (r) => r.i, standard: "auf" },
+      art: { wert: (r) => ART_TEXT[r.z.art] ?? r.z.art, standard: "auf" },
+      posten: { wert: (r) => r.z.text, standard: "auf" },
+      betrag: { wert: (r) => r.z.betrag },
+    },
+    null,
+  );
   const prog = m.verlauf[m.verlauf.length - 1]!;
   const cols = "minmax(86px,0.7fr) minmax(110px,0.9fr) minmax(0,2.2fr) minmax(90px,0.7fr)";
   return (
@@ -305,10 +343,10 @@ function Kontoauszug({ m, gew, onZeile }: { m: FinanzSeiteModell; gew: string | 
         </div>
       ) : null}
       <div className="fin-th" style={{ "--cols": cols } as CSSProperties}>
-        <span>Wann</span>
-        <span>Art</span>
-        <span>Posten</span>
-        <span className="fin-re">Betrag</span>
+        <FinKopf text="Wann" kopf={kopf("wann")} titel="Reihenfolge der Buchungen; Klick sortiert, nochmal klicken dreht die Richtung" />
+        <FinKopf text="Art" kopf={kopf("art")} />
+        <FinKopf text="Posten" kopf={kopf("posten")} />
+        <FinKopf text="Betrag" kopf={kopf("betrag")} re />
       </div>
       {zeilen.length === 0 ? (
         <div className="fin-leer">
@@ -316,8 +354,7 @@ function Kontoauszug({ m, gew, onZeile }: { m: FinanzSeiteModell; gew: string | 
           Apron und Vorstandsziele. Die Kasse ändert sich erst mit der ersten Buchung.
         </div>
       ) : (
-        zeilen.map((z, i) => {
-          const id = `${z.zeit ?? "x"}-${i}`;
+        zeilen.map(({ z, id }) => {
           return (
             <button
               key={id}
@@ -868,7 +905,7 @@ const SALARY_FACTOR_TOOLTIP =
 
 function FaktorChip({ label, value, tone, sub, title }: { label: string; value: string; tone: "good" | "risk" | "neutral"; sub?: string; title: string }) {
   return (
-    <div className="fin-hinweis fin-faktor" title={title} data-testid="fin-gehaltsfaktor" data-ton={tone}>
+    <div className="fin-hinweis fin-faktor" data-bc-tip={title} data-testid="fin-gehaltsfaktor" data-ton={tone}>
       <b>{label}</b>
       <span className={tone === "good" ? "bc-plus" : tone === "risk" ? "bc-minus" : undefined}>
         {value}
@@ -880,16 +917,25 @@ function FaktorChip({ label, value, tone, sub, title }: { label: string; value: 
 
 function GuvAnsicht({ m, salaryFactorOutlook }: { m: FinanzSeiteModell; salaryFactorOutlook: SalaryFactorOutlook }) {
   const f = m.finanzen;
+  const rohPosten = useMemo(() => f?.guvPosten ?? [], [f]);
+  const { sortiert: posten, kopf: guvKopf } = useTabellenSortierung(
+    rohPosten,
+    {
+      posten: { wert: (p) => p.label, standard: "auf" },
+      zusatz: { wert: (p) => p.note ?? null, standard: "auf" },
+      betrag: { wert: (p) => p.amount },
+    },
+    null,
+  );
   if (!f) return <div className="fin-leer"><b>Finanzen werden geladen.</b></div>;
-  const posten = f.guvPosten ?? [];
   const cols = "minmax(0,2fr) minmax(0,3fr) minmax(90px,0.8fr)";
   const apron = f.apron;
   return (
     <div className="fin-tl" data-testid="fin-guv">
       <div className="fin-th" style={{ "--cols": cols } as CSSProperties}>
-        <span>Posten</span>
-        <span>Zusatz</span>
-        <span className="fin-re">Betrag</span>
+        <FinKopf text="Posten" kopf={guvKopf("posten")} />
+        <FinKopf text="Zusatz" kopf={guvKopf("zusatz")} />
+        <FinKopf text="Betrag" kopf={guvKopf("betrag")} re />
       </div>
       {posten.map((p) => (
         <div
@@ -908,7 +954,7 @@ function GuvAnsicht({ m, salaryFactorOutlook }: { m: FinanzSeiteModell; salaryFa
       <div
         className="fin-tz is-su"
         style={{ "--cols": cols } as CSSProperties}
-        title={buildOperatingGuvHoverText({ totalIncome: f.totalIncome, totalExpenses: f.totalExpenses, transferNet: f.transfer?.net ?? null })}
+        data-bc-tip={buildOperatingGuvHoverText({ totalIncome: f.totalIncome, totalExpenses: f.totalExpenses, transferNet: f.transfer?.net ?? null })}
       >
         <span className="fin-nm">GuV der Saison</span>
         <span className="fin-qu">Einnahmen {C(f.totalIncome)} − Ausgaben {C(f.totalExpenses)}</span>
@@ -948,6 +994,18 @@ function GuvAnsicht({ m, salaryFactorOutlook }: { m: FinanzSeiteModell; salaryFa
 
 function ApronAnsicht({ m, eigene, onOpenTeam }: { m: FinanzSeiteModell; eigene: string; onOpenTeam?: (id: string) => void }) {
   const a = m.finanzen?.apron ?? null;
+  const rohLiga = useMemo(() => a?.league ?? [], [a]);
+  // Gehaltsbasis: weniger ist besser (günstig = Rang 1), deshalb zuerst aufsteigend.
+  const { sortiert: ligaZeilen, kopf: apronKopf } = useTabellenSortierung(
+    rohLiga,
+    {
+      team: { wert: (r) => r.teamName, standard: "auf" },
+      basis: { wert: (r) => r.salaryBasis, standard: "auf" },
+      abstand: { wert: (r) => r.distanceLine1, standard: "auf" },
+      netto: { wert: (r) => r.nettoDelta },
+    },
+    null,
+  );
   if (!a) {
     return (
       <div className="fin-leer">
@@ -989,12 +1047,12 @@ function ApronAnsicht({ m, eigene, onOpenTeam }: { m: FinanzSeiteModell; eigene:
         </span>
       </div>
       <div className="fin-th" style={{ "--cols": cols } as CSSProperties}>
-        <span>Team</span>
-        <span className="fin-re">Gehaltsbasis</span>
-        <span className="fin-re">Abstand Linie 1</span>
-        <span className="fin-re">Netto</span>
+        <FinKopf text="Team" kopf={apronKopf("team")} />
+        <FinKopf text="Gehaltsbasis" kopf={apronKopf("basis")} re titel="Weniger Gehalt ist besser: der erste Klick sortiert aufsteigend" />
+        <FinKopf text="Abstand Linie 1" kopf={apronKopf("abstand")} re titel="Kleiner Abstand ist besser: der erste Klick sortiert aufsteigend" />
+        <FinKopf text="Netto" kopf={apronKopf("netto")} re />
       </div>
-      {a.league.map((r) => {
+      {ligaZeilen.map((r) => {
         const inhalt = (
           <>
             <span className="fin-nm">
@@ -1194,14 +1252,22 @@ function KontextQuelle({ m, gew }: { m: FinanzSeiteModell; gew: number }) {
 }
 
 function KontextLiga({ rows, eigene, onOpenTeam }: { rows: FinanceLeagueTableRow[]; eigene: string; onOpenTeam?: (id: string) => void }) {
-  const sortiert = useMemo(() => [...rows].sort((a, b) => b.cash - a.cash), [rows]);
+  const { sortiert, kopf } = useTabellenSortierung(
+    rows,
+    {
+      team: { wert: (r) => r.teamName, standard: "auf" },
+      kasse: { wert: (r) => r.cash },
+      guv: { wert: (r) => r.guv },
+    },
+    { key: "kasse", richtung: "ab" },
+  );
   const cols = "minmax(0,1.6fr) minmax(54px,0.7fr) minmax(54px,0.7fr)";
   return (
     <div className="fin-tl" data-testid="fin-liga">
       <div className="fin-th" style={{ "--cols": cols, padding: "0 10px" } as CSSProperties}>
-        <span>Team</span>
-        <span className="fin-re">Kasse</span>
-        <span className="fin-re">GuV p.a.</span>
+        <FinKopf text="Team" kopf={kopf("team")} />
+        <FinKopf text="Kasse" kopf={kopf("kasse")} re />
+        <FinKopf text="GuV p.a." kopf={kopf("guv")} re />
       </div>
       {sortiert.map((r) => {
         const inhalt = (

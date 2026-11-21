@@ -18,6 +18,7 @@
 // Rein visuell/lesend — keine Engine-Logik. Werte kommen 1:1 aus der Resolve-Preview
 // (teamResults) und der Standings-Preview (items).
 
+import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import { Fragment, useState } from "react";
 
 import { getPoolHeatClass } from "@/lib/foundation/player-league-heat";
@@ -73,8 +74,27 @@ export function beschreibeArenaAusfallGrund(grund: string): string {
  * `null`/fehlend: die Preview liefert für diese Seite weder das eine noch das andere (reine Rangtabelle).
  */
 export type MatchdayPanelSideResult =
-  | { art: "duell"; eigen: number; gegner: number; gegnerTeamId: string | null }
-  | { art: "gruppe"; platz: number; wert: number | null; podId: string; teamIds: string[] };
+  | {
+      art: "duell";
+      eigen: number;
+      gegner: number;
+      gegnerTeamId: string | null;
+      /** E1-Skala `[eigen, gegner]` (0-10), nur wenn die Zeile nach E1 gebucht ist. */
+      skala?: [number, number] | null;
+      /** Gebuchtes Verhaeltnis dieses Teams (±D), `null` ohne. */
+      verhaeltnis?: number | null;
+      /** Zeitsumme bzw. besiegte Gegner (Zeitfahren/Staffel/Breaking), s. `ErgebnisAnzeigeZahl`; fehlt bei aelteren Zeilen. */
+      zahl?: ErgebnisAnzeigeZahl | null;
+    }
+  | {
+      art: "gruppe";
+      platz: number;
+      wert: number | null;
+      podId: string;
+      teamIds: string[];
+      /** E1-Wert (0-10) des Teams in der Gruppe, nur wenn die Zeile nach E1 gebucht ist. */
+      skala?: number | null;
+    };
 
 export type MatchdayPanelTeamResult = {
   teamId: string;

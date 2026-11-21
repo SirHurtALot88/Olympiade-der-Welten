@@ -56,6 +56,7 @@
 .ssm-ligawechsel { border-top: 2px solid var(--bc-linie-2); }
 .ssm-bew { font-size: 13px; font-weight: 600; }
 .ssm-pkt { font-size: 22px; color: var(--bc-creme); }
+.ssm-formpkt small { font-size: 0.8em; opacity: 0.6; }
 .ssm-form { display: inline-flex; gap: 3px; justify-content: flex-end; }
 .ssm-form i { width: 13px; height: 13px; transform: skewX(-14deg); border-radius: 1px; background: var(--bc-stumm); flex: none; }
 .ssm-form i.is-s { background: var(--bc-gut); }
