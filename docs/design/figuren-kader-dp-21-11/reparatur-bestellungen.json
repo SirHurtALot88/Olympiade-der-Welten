@@ -1,0 +1,230 @@
+[
+ {
+  "slug": "conan",
+  "art": "treffer",
+  "richtung": "north",
+  "gid": "5bdf41a5-c865-4895-9c5c-78c00558de2b",
+  "jobs": [
+   "68659074-a6d1-470d-872b-40736fb57ec1"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: he flinches from a heavy hit, shoulders jerking and knees buckling for a moment, still facing away from the camera, then steadies in the starting pose",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "conan",
+  "art": "tod",
+  "richtung": "north",
+  "gid": "2bc2c23e-a3b8-42fb-bf09-b4c849690394",
+  "jobs": [
+   "b79790e4-c5a8-4dec-a21f-9dca48cdae19"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: a tiny dart hits him in the neck, he goes dizzy and wobbles on his feet, then slumps forward away from the camera onto his stomach, knocked out cold, lying still face down with the back of his head and blazer visible",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "conan",
+  "art": "angriff",
+  "richtung": "south",
+  "gid": "bd037f3a-af3e-40e0-8f22-d2783fa34041",
+  "jobs": [
+   "7ceaff49-06e4-484c-babd-c32dc028a423"
+  ],
+  "text": "facing the camera the whole time: he raises his wrist in front of his chest, aims the glowing blue wristwatch gadget straight at the viewer and fires; a short bright round blue muzzle flash and sparks burst right at the watch, no long beam, nothing leaves the picture, then he lowers the arm and returns to the starting pose",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "queen-loriana",
+  "art": "walk",
+  "richtung": "north",
+  "gid": "138e2d54-296a-4903-8957-0c46985d1c86",
+  "jobs": [
+   "e1eef8a6-aad7-4d83-b8cd-1ef984df89b3"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: she walks away from the camera with a steady stride, cloak and long white hair swaying, swords held low at her sides, then returns to the starting pose",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "queen-loriana",
+  "art": "angriff",
+  "richtung": "north",
+  "gid": "ea8e70eb-206f-456e-9710-af35d464aa00",
+  "jobs": [
+   "defe240b-27da-42d4-9e59-c38c6ba1e25f"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: she steps away from the camera and slashes both steel swords in a fast crossing double cut at an enemy beyond her at the top of the picture, white slash arcs above her, then returns to the starting pose",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "queen-loriana",
+  "art": "tod",
+  "richtung": "north",
+  "gid": "d63c6e20-5608-4a7b-956a-1dadb211f225",
+  "jobs": [
+   "435e6dab-12df-4b4d-896c-942e022628d2"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: she is run through, one sword slips from her hand, she drives the other into the ground to hold herself up, sinks to one knee as blood pools beneath her, then falls forward away from the camera, lying still face down with white hair and cloak spread over her back",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "zyra",
+  "art": "angriff",
+  "richtung": "north",
+  "gid": "555c8ecd-2a80-4f9e-a685-a988f6076926",
+  "jobs": [
+   "57ece631-6d9b-43dc-b7d2-ae1eec5a8406"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: she lowers her horns, charges a step away from the camera and swings the big battle axe in a wide heavy arc at an enemy beyond her at the top of the picture, then returns to the starting pose",
+  "generations": 2.0,
+  "status": "completed"
+ },
+ {
+  "slug": "zyra",
+  "art": "tod",
+  "richtung": "north",
+  "gid": "ae02be85-3eac-430a-9c84-93ecd8d5f4f9",
+  "jobs": [
+   "9da1da13-5369-4e6c-9cac-906b8577561a"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: she is cut down, drops the battle axe, falls to her knees as dark red blood spills onto the ground, then crashes forward away from the camera face down into a pool of blood, lying still with her horns and black hair visible from behind",
+  "generations": 2.0,
+  "status": "completed"
+ },
+ {
+  "slug": "amarie",
+  "art": "angriff",
+  "richtung": "north",
+  "gid": "e46b564b-dbc0-430b-8a75-ee062032c8ac",
+  "jobs": [
+   "efafb966-59a7-4f85-b84b-e0099ee3c958"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: she spreads her wings, lunges a step away from the camera and thrusts the long jagged black spear upward at an enemy beyond her at the top of the picture, then returns to the starting pose",
+  "generations": 2.0,
+  "status": "completed"
+ },
+ {
+  "slug": "amarie",
+  "art": "tod",
+  "richtung": "north",
+  "gid": "f4ac5d56-990a-4fb3-a15a-07f21148ef24",
+  "jobs": [
+   "7611d3fd-23e5-4430-8683-d370f919034b"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face never visible: she is pierced through, drops the spear, her wings spasm and fold, blood drips to the ground, she falls to her knees and collapses forward away from the camera, lying still face down with the wings draped over her body",
+  "generations": 2.0,
+  "status": "completed"
+ },
+ {
+  "slug": "zynara",
+  "art": "walk",
+  "richtung": "north",
+  "gid": "71dceca6-b5e7-4721-a01d-27f630ddf295",
+  "jobs": [
+   "5080a29a-d4dd-4447-abda-9ceeaa0196ae"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face and chest never visible: she slithers away from the camera on her coiled snake tail with a smooth swaying motion, staff held upright, then returns to the starting pose",
+  "generations": 2.0,
+  "status": "completed"
+ },
+ {
+  "slug": "zynara",
+  "art": "angriff",
+  "richtung": "north",
+  "gid": "855725c2-a8eb-4f03-83d6-6154ffb76346",
+  "jobs": [
+   "764f3685-8c04-442d-92b8-cd990d2d4903"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face and chest never visible: she raises one clawed hand, conjures a swirling purple arcane orb beside her and hurls it away from the camera toward the top of the picture, then returns to the starting pose",
+  "generations": 2.0,
+  "status": "completed"
+ },
+ {
+  "slug": "zynara",
+  "art": "treffer",
+  "richtung": "north",
+  "gid": "1c0f3956-0116-49e3-8ecf-0958ecb5265a",
+  "jobs": [
+   "a11a59e0-4325-4a0c-abd8-580528010c55"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face and chest never visible: she flinches from a heavy hit, her hood and shoulders jerking and her body swaying for a moment, still facing away from the camera, then steadies in the starting pose",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "zynara",
+  "art": "tod",
+  "richtung": "north",
+  "gid": "e32661b0-78dc-456b-88ec-a00acd3c2ca9",
+  "jobs": [
+   "35eb2c6e-add2-47f5-8042-21b21ee4bbca"
+  ],
+  "text": "seen from behind, back to the camera the whole time, never turns around, face and chest never visible: the purple glow of her staff gem flickers and goes out, her hood folds, she drops the staff, her body goes slack and she sinks down away from the camera into her own snake coils, lying still and dark",
+  "generations": 2.0,
+  "status": "completed"
+ },
+ {
+  "slug": "conan",
+  "art": "angriff",
+  "richtung": "south",
+  "gid": "bd037f3a-af3e-40e0-8f22-d2783fa34041",
+  "jobs": [
+   "bbf9fbf4-58c7-4e21-8e4b-6ea2ebe9d3c4"
+  ],
+  "text": "facing the camera the whole time: he lifts his wrist in front of his chest and points the wristwatch gadget at the viewer; the watch face lights up bright blue and a small round ring of blue light pulses outward around his hand and fades, with a few blue sparks close to the hand; then he lowers the arm and returns to the starting pose",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "amarie",
+  "art": "walk",
+  "richtung": "south",
+  "gid": "59751710-f4ae-410e-ac5e-ad0a2dacfce6",
+  "jobs": [
+   "b7ac88f4-f060-4b40-a177-7f43218377fe"
+  ],
+  "text": "walks forward toward the camera with a steady stride, wings swaying slightly, the single spear held lowered at her side, she never holds a second spear, then returns to the starting pose",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "amarie",
+  "art": "angriff",
+  "richtung": "south",
+  "gid": "e46b564b-dbc0-430b-8a75-ee062032c8ac",
+  "jobs": [
+   "fa13f447-688f-44f1-9986-34b0d5f26606"
+  ],
+  "text": "spreads her wings, lunges forward toward the camera and thrusts her single long jagged black spear at an enemy in front, she never holds a second spear, then returns to the starting pose",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "amarie",
+  "art": "treffer",
+  "richtung": "south",
+  "gid": "601406e4-9201-40ba-9937-ec98ba0ba563",
+  "jobs": [
+   "4d668a90-3412-4e83-a9f8-753f15a30a37"
+  ],
+  "text": "recoils backward sharply as if struck by a heavy hit, flinching, wings jerking, the single spear stays in her hand, then steadies",
+  "generations": 1.0,
+  "status": "completed"
+ },
+ {
+  "slug": "amarie",
+  "art": "tod",
+  "richtung": "south",
+  "gid": "f4ac5d56-990a-4fb3-a15a-07f21148ef24",
+  "jobs": [
+   "632a5afa-c5f4-4099-b36a-4efbde753678"
+  ],
+  "text": "is pierced through the chest: she drops her single spear, her wings spasm and fold, blood runs down her armor, she falls to her knees and collapses forward with the wings draped over her body, lying still",
+  "generations": 1.0,
+  "status": "completed"
+ }
+]

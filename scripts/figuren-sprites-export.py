@@ -187,6 +187,12 @@ def main():
 
     def fetch(url):
         name = url.split("/pixellab-characters/")[-1].split("?")[0].replace("/", "_")
+        # Rotationen behalten ihre URL, wenn PixelLab sie ueberschreibt (save-to-asset, 21.11.: Amaries
+        # Sued-Grundpose); nur der Zeitstempel "?t=" aendert sich. Ohne ihn im Cache-Namen lieferte der
+        # Export weiter das alte Bild aus dem Zwischenspeicher.
+        m = re.search(r"[?&]t=(\d+)", url)
+        if m and "/rotations/" in url:
+            name = name[:-4] + "_t" + m.group(1) + name[-4:]
         p = os.path.join(args.cache, name)
         if os.path.exists(p) and os.path.getsize(p) > 0:
             return p
