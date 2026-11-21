@@ -235,6 +235,18 @@ export function ebayLinks(row: Pick<SortimentRow, "ebayItemId" | "setCode" | "na
  * Konflikt der eindeutige Code zum Namen; Pokemon in der Pokemon-Sektion mit dem Kartennamen. Deutsche Karten
  * mit Sprachfilter Deutsch, englische mit Englisch; sonst gleiche harten Filter (Verkaeufer DE, ab NM).
  */
+/**
+ * Hinweis zum Cardmarket-Link: Seltenheit laut Titel und Anzahl der Cardmarket-Versionen. Cardmarket fuehrt jede Seltenheit einer Karte
+ * als eigenes Produkt mit gleichem Namen; die Suche zeigt dann mehrere Treffer, und wer nicht auf die Seltenheit achtet, kauft die falsche
+ * Version (Chris, 21.11.). Mehrdeutig = der Marktwert-Abgleich fand mehrere Versionen (marketRange.variants).
+ */
+export function cardmarketHint(row: Pick<SortimentRow, "nameRaw" | "market">): { rarity: string | null; variants: number | null; multi: boolean } {
+  const rarity = rarityFromTitle(row.nameRaw);
+  const variants = row.market?.range?.variants ?? null;
+  const multi = variants != null && variants > 1;
+  return { rarity, variants, multi };
+}
+
 export function cardmarketLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "codeName">, packQty = 1): string | null {
   const language = isEnglishCard(row) ? "EN" : "DE";
   if (isPokemonTitle(row.nameRaw)) {

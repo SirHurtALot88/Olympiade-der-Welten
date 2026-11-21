@@ -5,7 +5,7 @@ import { SORTIMENT_LABEL } from "@/lib/dashboard/lifecycle";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
-import { boardVk, cardmarketLink, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
+import { boardVk, cardmarketHint, cardmarketLink, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { conditionOf } from "@/lib/market/condition";
@@ -636,6 +636,7 @@ function Stat({ label, value, sub, info, tone }: { label: string; value: string;
 function EbayActions({ row, hidden, busy, onToggleHidden, onToggleDelist }: { row: SortimentRow; hidden: boolean; busy: boolean; onToggleHidden: () => void; onToggleDelist: () => void }) {
   const l = ebayLinks(row);
   const cm = cardmarketLink(row, cleanTitle(row.nameRaw).pack);
+  const cmHint = cardmarketHint(row);
   return (
     <div className="bd-dt-actions">
       {l.revise && (
@@ -650,8 +651,19 @@ function EbayActions({ row, hidden, busy, onToggleHidden, onToggleDelist }: { ro
         {l.view ? "Angebot ↗" : "eBay-Suche ↗"}
       </a>
       {cm && (
-        <a className="chip" href={cm} target="_blank" rel="noopener noreferrer" title="Sucht die Karte bei Cardmarket (Sprache der Karte, ab NM).">
-          Cardmarket ↗
+        <a
+          className={`chip${cmHint.multi ? " bd-cm-multi" : ""}`}
+          href={cm}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={
+            cmHint.multi
+              ? `Achtung: Die Suche zeigt ${cmHint.variants} Versionen dieser Karte${cmHint.rarity ? `. Nimm nur die Version mit Seltenheit ${cmHint.rarity}` : ", achte auf die Seltenheit"} und vergleiche Bild und Nummer.`
+              : `Sucht die Karte bei Cardmarket (Sprache der Karte, ab NM).${cmHint.rarity ? ` Seltenheit: ${cmHint.rarity}.` : ""}`
+          }
+        >
+          Cardmarket{cmHint.rarity ? ` · ${cmHint.rarity}` : ""}
+          {cmHint.multi ? ` · ${cmHint.variants} Versionen` : ""} ↗
         </a>
       )}
       <button
