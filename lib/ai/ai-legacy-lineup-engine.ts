@@ -20,6 +20,11 @@ import { scoreLegacyLineupDisciplineSide } from "@/lib/lineups/legacy-score-engi
 import type { DisciplineSide, LegacyLineupEntryInput, LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
 import { validateLegacyLineupContext } from "@/lib/lineups/legacy-lineup-validator";
 import { ordneSpielerAufPlaetze } from "@/lib/ai/ai-belastung-platzwahl";
+import {
+  istTauschEignungsverlustKlein,
+  KI_TAUSCH_MIN_FRISCHE_VORTEIL,
+  KI_TAUSCH_STARTER_FATIGUE,
+} from "@/lib/ai/ki-schonung-reha-regeln";
 import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
 import { MATCHDAY_FATIGUE_LOAD } from "@/lib/fatigue/fatigue-injury-service";
 import { getPlayerFatigueLoadMultiplier } from "@/lib/traits/cosmetic-trait-soft-effects";
@@ -739,6 +744,63 @@ export function ordneKiSpielerAufPlaetze(input: {
   });
 }
 
+/**
+ * R3 (docs/design/ki-schonung-reha-analyse-21-11.md): harte Tauschpruefung NACH der globalen Zuteilung.
+ *
+ * Die Zuteilung kennt Erschoepfung nur ueber Leistungsmultiplikator und Auswahlabzuege (3/9/12 ab Fatigue 55/70/85); ein
+ * Starter bei Fatigue 45 bleibt dadurch fast immer stehen, obwohl ein frischer Ersatz kaum schlechter waere. Hier wird
+ * jeder Starter ueber `KI_TAUSCH_STARTER_FATIGUE` gegen den besten BANK-Spieler getauscht, der mindestens
+ * `KI_TAUSCH_MIN_FRISCHE_VORTEIL` Punkte frischer ist, nicht ruhen muss und dessen Eignung auf DIESER Seite hoechstens um
+ * `KI_TAUSCH_MAX_EIGNUNGSVERLUST_ANTEIL` unter der des Starters liegt. Getauscht wird nur gegen Spieler, die an diesem
+ * Spieltag auf keiner Seite stehen (kein Dreieckstausch), der Muedeste zuerst. Aendert die Zuteilung in place.
+ *
+ * Belastungsregel v2 (`ordneKiSpielerAufPlaetze`) laeuft danach unveraendert ueber die gewaehlten Spieler.
+ */
+function tauscheMuedeStarterGegenFrischeren(input: {
+  context: LegacyLineupLoadedContext;
+  allocation: { d1: string[]; d2: string[] };
+  candidateByPlayerId: Map<string, { playerId: string; d1: SideCandidate | null; d2: SideCandidate | null }>;
+  sides: Array<{ side: "d1" | "d2"; plan: SideAllocationPlan }>;
+}): number {
+  const { allocation, candidateByPlayerId } = input;
+  const eingesetzt = new Set([...allocation.d1, ...allocation.d2]);
+  let getauscht = 0;
+  for (const { side, plan } of input.sides) {
+    if (!plan.disciplineId) continue;
+    const gewaehlt = allocation[side];
+    const nachMuedigkeit = gewaehlt
+      .map((playerId, index) => ({ playerId, index, fatigue: candidateByPlayerId.get(playerId)?.[side]?.health.fatigue ?? 0 }))
+      .filter((eintrag) => eintrag.fatigue > KI_TAUSCH_STARTER_FATIGUE)
+      .sort((left, right) => right.fatigue - left.fatigue || left.playerId.localeCompare(right.playerId));
+    for (const starter of nachMuedigkeit) {
+      const starterKandidat = candidateByPlayerId.get(starter.playerId)?.[side];
+      if (!starterKandidat || !starterKandidat.hasScore) continue;
+      let bester: SideCandidate | null = null;
+      for (const [playerId, kandidat] of candidateByPlayerId) {
+        if (eingesetzt.has(playerId)) continue;
+        const seite = kandidat[side];
+        if (!seite || !seite.hasScore) continue;
+        if (seite.health.fatigue > starter.fatigue - KI_TAUSCH_MIN_FRISCHE_VORTEIL) continue;
+        if (playerNeedsLineupRest(input.context, playerId)) continue;
+        if (!istTauschEignungsverlustKlein(starterKandidat.score, seite.score)) continue;
+        if (
+          bester == null ||
+          seite.score > bester.score ||
+          (seite.score === bester.score && seite.playerId.localeCompare(bester.playerId) < 0)
+        ) {
+          bester = seite;
+        }
+      }
+      if (!bester) continue;
+      gewaehlt[starter.index] = bester.playerId;
+      eingesetzt.delete(starter.playerId);
+      eingesetzt.add(bester.playerId);
+      getauscht += 1;
+    }
+  }
+  return getauscht;
+}
+
 // Ordnet die per DP gewählten Spieler einer Seite in Slot-Reihenfolge (bester zuerst) und
 // erzeugt Warnings/Reasoning im selben Format wie zuvor (Konsumenten filtern per "D1"/"D2").
 function buildSideResult(input: {
@@ -866,6 +928,16 @@ export function buildAiLegacyLineupSuggestion(context: LegacyLineupLoadedContext
   });
 
   const candidateByPlayerId = new Map(allocationPlayers.map((player) => [player.playerId, player]));
+  // R3 (KI-Schonung 21.11.): muede Starter gegen frischeren Ersatz tauschen, wenn die Eignung kaum leidet.
+  tauscheMuedeStarterGegenFrischeren({
+    context,
+    allocation,
+    candidateByPlayerId,
+    sides: [
+      { side: "d1", plan: d1Plan },
+      { side: "d2", plan: d2Plan },
+    ],
+  });
   // Belastungsregel v2 (Saison-Stempel): die KI kennt die Resistenz. Alte Regel: null, alles wie bisher.
   const belastungsRegel = context.belastungsRegel ?? (context.gameState ? belastungsRegelFuer(context.gameState) : "alt");
   const belastungsKontext = belastungsRegel === "v2" ? context : null;

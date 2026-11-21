@@ -1,5 +1,6 @@
 import { advancePlayerFormState, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
+import { bauKiRehaBeiSpieltagsabschluss } from "@/lib/ai/ai-reha-bau-service";
 import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { ueberlastungsAbzuegeFuerSpieltag } from "@/lib/training/spieltag-training";
 import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
@@ -411,6 +412,14 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
     } catch {
       // Ein Fehlschlag darf den Spieltagswechsel niemals kippen — der Wechsel ist
       // bereits persistiert. Ohne Neubewertung bleibt der bisherige Modus stehen.
+    }
+    // KI-REHA IM LAUFENDEN SPIEL (21.11., docs/design/ki-schonung-reha-analyse-21-11.md R4): die KI baut Gebaeude
+    // sonst nur in der Preseason, und der Reha-Score haengt an Vorsaison-Verletzungen. Hier prueft jedes KI-Team
+    // (und jedes Menschen-Team mit delegiertem Bereich Gebaeude) hoechstens EINE Recovery-Center-Stufe je Spieltag.
+    try {
+      bauKiRehaBeiSpieltagsabschluss({ saveId: save.saveId, persistence });
+    } catch {
+      // Wie oben: ein Fehlschlag kippt den bereits persistierten Spieltagswechsel nicht.
     }
   }
 

@@ -13,6 +13,11 @@ import { isTeamMatchdayLineupOperationallyReady } from "@/lib/foundation/matchda
 import type { AiLegacyLineupPreview, AiLegacyLineupPreviewStatus } from "@/lib/ai/ai-needs-types";
 import { buildTeamControlSettingsMap, isAiLineupBatchApplyEnabled } from "@/lib/foundation/team-control-settings";
 import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
+import {
+  bestimmeKiSeitenIntensitaet,
+  istKaderDuenn,
+  KI_PUSH_DECKEL_SEITEN_FATIGUE,
+} from "@/lib/ai/ki-schonung-reha-regeln";
 import type { StaleAiLineupFinding } from "@/lib/ai/ai-lineup-freshness";
 import {
   calculateFormModifierForSide,
@@ -1346,10 +1351,6 @@ function getAiIntensityForSide(input: {
     (rank != null && rank >= 22 && strongestScore < 74) ||
     strongestScore < 66;
 
-  if (isWeakDisciplineWindow) {
-    return matchdayIndex <= 2 ? "conserve" as const : "normal" as const;
-  }
-
   const hasHighLeverageRank = rank != null && rank <= 8 && strongestScore >= 76;
   const hasEliteSpecialistWindow = strongestScore >= (isLateSeason ? 84 : 88);
   const hasTopHalfPressure = rank != null && rank <= 16 && strongestScore >= 72 && isMidSeasonOrLater;
@@ -1365,7 +1366,9 @@ function getAiIntensityForSide(input: {
     .filter((count): count is number => typeof count === "number" && Number.isFinite(count));
   const avgSideFatigue =
     sideFatigues.length > 0 ? sideFatigues.reduce((sum, count) => sum + count, 0) / sideFatigues.length : 0;
-  const pushFatigueCeiling = Number(process.env.OLY_AI_PUSH_FATIGUE_CEILING ?? 65) || 65;
+  const envDeckel = Number(process.env.OLY_AI_PUSH_FATIGUE_CEILING);
+  const pushFatigueCeiling =
+    process.env.OLY_AI_PUSH_FATIGUE_CEILING && Number.isFinite(envDeckel) ? envDeckel : KI_PUSH_DECKEL_SEITEN_FATIGUE;
 
   const wantsPush =
     hasCaptain ||
@@ -1375,24 +1378,32 @@ function getAiIntensityForSide(input: {
     hasLargeDisciplineLeverage ||
     hasLateComebackWindow;
 
-  if (wantsPush) {
-    // Push only when the side isn't already heavily fatigued — otherwise the extra load mostly
-    // buys injuries and a deeper recovery hole for a few score points. Above the ceiling, hold at
-    // normal so push stays a deliberate, sparing gamble rather than a constant.
-    if (avgSideFatigue <= pushFatigueCeiling) {
-      return "push" as const;
-    }
-    // Very fatigued AND not a genuine top-leverage window: actively conserve to bank recovery.
-    const isGenuineHighLeverage = hasCaptain || hasHighLeverageRank || hasEliteSpecialistWindow;
-    if (avgSideFatigue >= pushFatigueCeiling + 15 && !isGenuineHighLeverage) {
-      return "conserve" as const;
-    }
-    return "normal" as const;
+  // KI-Schonung (21.11., docs/design/ki-schonung-reha-analyse-21-11.md R1/R2): die Entscheidung steht als reine
+  // Funktion mit allen Schwellen in `ki-schonung-reha-regeln.ts`. Push nur bis Seiten-Durchschnitt 30 (auch der
+  // Kapitaen) und nie mit duennem Kader, geschont wird ab Seiten-Durchschnitt 40 die ganze Saison.
+  return bestimmeKiSeitenIntensitaet({
+    avgSideFatigue,
+    matchdayIndex,
+    duennerKader: istKaderDuenn(input.context.activePlayers.length, resolveKiSpieltagsBedarf(input.context)),
+    isWeakDisciplineWindow,
+    wantsPush,
+    chancenloseSeiteImAnlauf: rank != null && rank >= 24 && strongestScore < 68,
+    pushDeckel: pushFatigueCeiling,
+  });
+}
+
+/** Wie viele verschiedene Spieler verlangt dieser Spieltag (beide Seiten zusammen)? */
+function resolveKiSpieltagsBedarf(context: LegacyLineupLoadedContext): number {
+  let summe = 0;
+  for (const side of ["d1", "d2"] as const) {
+    const disciplineId =
+      side === "d1"
+        ? context.matchdayContract?.discipline1?.disciplineId ?? context.contextMeta?.d1DisciplineId ?? null
+        : context.matchdayContract?.discipline2?.disciplineId ?? context.contextMeta?.d2DisciplineId ?? null;
+    if (!disciplineId) continue;
+    summe += context.disciplineSidePlayerCounts?.[`${disciplineId}::${side}`] ?? context.disciplinePlayerCounts?.[disciplineId] ?? 0;
   }
-  if (matchdayIndex <= 2 && rank != null && rank >= 24 && strongestScore < 68) {
-    return "conserve" as const;
-  }
-  return "normal" as const;
+  return summe;
 }
 
 function applyAiIntensity(context: LegacyLineupLoadedContext, modifiers: LineupDraftModifiers, plannedEntries: LegacyLineupEntryInput[]) {
