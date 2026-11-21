@@ -14,6 +14,8 @@ export type FoundationTaktgeberProps = {
   /** `is-ready` | `is-warning` | `is-blocked` | … aus `deriveGlobalNextUi`. */
   statusClass: string;
   onClick: () => void;
+  /** Sofort-Rückmeldung beim Klick: Knopf gesperrt, Beschriftung „speichert…“, Zustand „läuft“. */
+  busy?: boolean;
   activities: FoundationActivityItem[];
   /** Pflichtschritte mit Haken/Rot/Gelb und kritische Punkte (lib/foundation/foundation-takt-plan.ts). */
   plan?: TaktPlan;
@@ -35,13 +37,13 @@ export function bestimmeTaktgeberZustand(statusClass: string, activities: Founda
   return "bereit";
 }
 
-export default function FoundationTaktgeber({ label, title, statusClass, onClick, activities, plan = LEERER_TAKT_PLAN }: FoundationTaktgeberProps) {
+export default function FoundationTaktgeber({ label, title, statusClass, onClick, busy = false, activities, plan = LEERER_TAKT_PLAN }: FoundationTaktgeberProps) {
   const ablauf = useSyncExternalStore(abonniereTaktAblauf, getTaktAblaufOffen, () => false);
   const setAblauf = (wert: boolean | ((alt: boolean) => boolean)) =>
     setTaktAblaufOffen(typeof wert === "function" ? wert(getTaktAblaufOffen()) : wert);
   const kritisch = plan.kritisch.length;
   const wurzel = useRef<HTMLDivElement | null>(null);
-  const zustand = bestimmeTaktgeberZustand(kritisch > 0 ? "is-blocked" : statusClass, activities);
+  const zustand = busy ? "laeuft" : bestimmeTaktgeberZustand(kritisch > 0 ? "is-blocked" : statusClass, activities);
   const laufend = activities.find((activity) => activity.tone === "running") ?? null;
   const pct =
     laufend?.progressPct != null && Number.isFinite(laufend.progressPct)
@@ -67,7 +69,7 @@ export default function FoundationTaktgeber({ label, title, statusClass, onClick
 
   const statusText =
     zustand === "laeuft"
-      ? `Aktion läuft · ${laufend?.currentLabel ?? laufend?.label ?? ""}`.replace(/ · $/, "")
+      ? `Aktion läuft · ${busy ? label : laufend?.currentLabel ?? laufend?.label ?? ""}`.replace(/ · $/, "")
       : zustand === "zu"
         ? `Hält auf · ${kritisch > 0 ? `${kritisch} kritisch` : "offener Schritt"} · Leertaste zeigt es`
         : zustand === "weiter"
@@ -82,12 +84,14 @@ export default function FoundationTaktgeber({ label, title, statusClass, onClick
         data-testid="foundation-global-next-button"
         onClick={onClick}
         title={title}
+        disabled={busy}
+        aria-busy={busy || undefined}
       >
         {zustand === "laeuft" && pct != null ? (
           <i className="foundation-takt-fuell" style={{ width: `${pct}%` }} aria-hidden="true" />
         ) : null}
         <span>{zustand === "laeuft" ? "Aktion läuft" : "Weiter"}</span>
-        {zustand === "laeuft" ? pct != null ? <strong>{pct} %</strong> : null : <strong>{label}</strong>}
+        {busy ? <strong>{label}</strong> : zustand === "laeuft" ? pct != null ? <strong>{pct} %</strong> : null : <strong>{label}</strong>}
         <small>Leertaste</small>
       </button>
       <button

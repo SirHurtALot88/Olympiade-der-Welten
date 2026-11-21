@@ -1,6 +1,6 @@
 import type { GameState, Player, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
 import { BOARD_V2_CAPTAIN } from "@/lib/board/board-objectives-config";
-import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { getCachedPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import {
   CAPTAIN_TEAM_POWER_EFFECT_FACTOR,
   CAPTAIN_TEAM_POWER_MAX_PCT,
@@ -161,7 +161,7 @@ export type CaptainLeadershipFactor = {
 export function buildCaptainLeadershipBreakdown(
   gameState: GameState,
   player: Player,
-  ratings = buildPlayerRatingContractMap(gameState),
+  ratings = getCachedPlayerRatingContractMap(gameState),
 ): CaptainLeadershipFactor[] {
   const stats = player.attributeSheetStats;
   const traits = getTraits(player);
@@ -186,7 +186,7 @@ export function buildCaptainLeadershipBreakdown(
 }
 
 export function buildCaptainRecordForPlayer(gameState: GameState, teamId: string, player: Player): TeamCaptainRecord {
-  const ratings = buildPlayerRatingContractMap(gameState);
+  const ratings = getCachedPlayerRatingContractMap(gameState);
   const traits = getTraits(player);
   const stats = player.attributeSheetStats;
   const traitBonus = traits.reduce(
@@ -244,7 +244,7 @@ export function buildCaptainCandidateProfiles(gameState: GameState, teamId: stri
   const rosterIds = new Set(gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId));
   const players = gameState.players.filter((player) => rosterIds.has(player.id));
   const demandMap = buildTeamPlayerDemandMap(gameState, teamId);
-  const ratings = buildPlayerRatingContractMap(gameState);
+  const ratings = getCachedPlayerRatingContractMap(gameState);
 
   return players
     .map((player) => {

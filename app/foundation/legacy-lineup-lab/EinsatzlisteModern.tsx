@@ -181,6 +181,7 @@ export default function EinsatzlisteModern(props: Props) {
     undoInfo,
     isReadOnly,
     isBusy,
+    isSavingLineup = false,
     matchdayPreviewCards,
     lineupFlowSummary,
     lineupSaveCta,
@@ -604,7 +605,7 @@ export default function EinsatzlisteModern(props: Props) {
   };
 
   // Hauptaktion im Taktgeber (Regieband): dieselbe Abgabe, nur an EINER Stelle als Knopf.
-  const abgabeLabel = isReadOnly ? "Nur ansehen" : abgegeben ? (arenaReady && onNavigateArena ? "Zur Arena" : "Abgegeben") : gesperrt ? "Abgabe gesperrt" : "Abgeben";
+  const abgabeLabel = isSavingLineup && !isReadOnly ? "Speichert …" : isReadOnly ? "Nur ansehen" : abgegeben ? (arenaReady && onNavigateArena ? "Zur Arena" : "Abgegeben") : gesperrt ? "Abgabe gesperrt" : "Abgeben";
   const abgabeRef = useRef(abgabeKlick);
   abgabeRef.current = abgabeKlick;
   useEffect(() => {
@@ -612,11 +613,12 @@ export default function EinsatzlisteModern(props: Props) {
       label: abgabeLabel,
       title: lineupSaveCta.detail,
       statusClass: abgegeben ? "is-ready" : gesperrt ? "is-blocked" : warnAnzahl > 0 ? "is-warning" : "is-ready",
+      busy: isSavingLineup && !isReadOnly,
       onClick: () => {
         if (!isReadOnly && !isBusy) abgabeRef.current();
       },
     });
-  }, [abgabeLabel, lineupSaveCta.detail, abgegeben, gesperrt, warnAnzahl, isReadOnly, isBusy]);
+  }, [abgabeLabel, lineupSaveCta.detail, abgegeben, gesperrt, warnAnzahl, isReadOnly, isBusy, isSavingLineup]);
   useEffect(() => () => setEinsatzlisteAbgabe(null), []);
 
   /* ---------------- Rendern ---------------- */

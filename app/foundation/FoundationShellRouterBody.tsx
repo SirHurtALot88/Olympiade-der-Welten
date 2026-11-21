@@ -1060,7 +1060,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ligaDraftTor.aktiv && draftTakt
             ? { label: draftTakt.label, title: draftTakt.title, statusClass: draftTakt.statusClass, onClick: draftTakt.onClick }
             : einsatzlisteAbgabe && (activeView === "lineup" || activeView === "lineupV2")
-              ? { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, plan: taktPlan }
+              ? { label: einsatzlisteAbgabe.label, title: einsatzlisteAbgabe.title, statusClass: einsatzlisteAbgabe.statusClass, onClick: einsatzlisteAbgabe.onClick, busy: einsatzlisteAbgabe.busy, plan: taktPlan }
               : { label: globalNextLabel, title: globalNextTitle, statusClass: globalNextStatusClass, onClick: triggerGlobalNext, plan: taktPlan }
         }
         onSearch={() => setShowCommandPalette(true)}
