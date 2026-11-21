@@ -1,0 +1,27 @@
+/* Hover-Vorschau und Spalten-Ziehgriff. Die Karte hängt am <body> (Portal), deshalb feste Maße in px und eigene Farben. */
+.pv-karte { position: fixed; z-index: 3000; width: 288px; pointer-events: none; background: #0c1017; border: 1px solid rgba(244, 230, 196, 0.35); border-radius: 10px; box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6); overflow: hidden; color: #eef2f8; font-family: "Barlow Condensed", "Roboto Condensed", "Arial Narrow", Arial, sans-serif; }
+.pv-bild { display: block; width: 288px; height: 330px; object-fit: cover; object-position: center 18%; background: #1a2231; }
+.pv-text { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
+.pv-name { font: 400 22px/1.1 "RaniraSeason", Georgia, serif; color: #fff; }
+.pv-sub { display: flex; gap: 8px; align-items: center; font-size: 15px; color: #9aa7ba; }
+.pv-sub em { font-style: normal; }
+.pv-ax { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px; }
+.pv-a { text-align: center; background: #121824; border: 1px solid rgba(244, 230, 196, 0.13); border-radius: 6px; padding: 4px 2px 5px; }
+.pv-a small { display: block; font-size: 12px; letter-spacing: 0.12em; color: #66738a; font-weight: 600; }
+.pv-a b { font-size: 20px; font-weight: 700; }
+.pv-a.h b { color: #62d394; }
+.pv-a.m b { color: #f0c35a; }
+.pv-a.nb b { color: #8fb4d9; font-size: 17px; }
+
+/* Ziehgriff an der rechten Kante eines Spaltenkopfs (innerhalb .tmk / .drf). */
+.mz.kopf > span { position: relative; }
+.spg { position: absolute; top: 0; bottom: 0; right: calc(-0.28 * var(--u, 16px)); width: calc(0.56 * var(--u, 16px)); cursor: col-resize; z-index: 3; touch-action: none; font-style: normal; }
+.spg::after { content: ""; position: absolute; top: 22%; bottom: 22%; left: 50%; width: 2px; margin-left: -1px; border-radius: 1px; background: rgba(244, 230, 196, 0.18); }
+.spg:hover::after, .spg.an::after { background: #f0c35a; }
+
+/* Anpassbare Tabelle: Breiten kommen aus --spalten, bei Platzmangel scrollt nur die Tabelle. */
+.mt.sl { overflow: auto; position: relative; grid-template-rows: calc(1.7 * var(--u)) repeat(var(--zeilen, 13), minmax(var(--zmin, 0px), 1fr)); }
+.mt.sl.sl .mz { grid-template-columns: var(--spalten); width: 100%; min-width: var(--minbreite, 0px); box-sizing: border-box; }
+.mt.sl.sl .mz.kopf { position: sticky; top: 0; z-index: 4; background: #0c1017; }
+.mt.sl.pg .mz .por { width: 100%; height: calc(var(--pw, 2.3) * 1.15 * var(--u)); max-height: none; min-height: 0; align-self: center; }
+.mt.sl.sl .mz:not(.kopf) { min-height: var(--zmin, 0px); }

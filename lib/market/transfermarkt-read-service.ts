@@ -7,6 +7,7 @@ import {
   calculateTransfermarktFit,
   getTransfermarktBracket,
   hasMercenaryTrait,
+  istFitSichtbar,
   toStringArray,
 } from "@/lib/market/transfermarkt-fit";
 import {
@@ -740,11 +741,11 @@ export async function listTransfermarktFreeAgents(
     ? filtered.filter((player) => {
         const traitsPositive = toStringArray(player.traitsPositive);
         const traitsNegative = toStringArray(player.traitsNegative);
-        if (hasMercenaryTrait({ traitsPositive, traitsNegative })) {
-          return true;
-        }
         const fitBreakdown = getFitBreakdownForPlayer(player);
-        return (fitBreakdown?.teamFit ?? 0) >= 0;
+        return istFitSichtbar({
+          fit: fitBreakdown?.teamFit ?? 0,
+          mercenary: hasMercenaryTrait({ traitsPositive, traitsNegative }),
+        });
       })
     : filtered;
 

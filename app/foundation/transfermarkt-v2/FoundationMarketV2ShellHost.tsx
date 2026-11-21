@@ -255,6 +255,7 @@ export default function FoundationMarketV2ShellHost({
         wishlistEntries: transferWishlistEntriesForMarketV2,
         wishlistPlayerIds: transferWishlistEntriesForMarketV2.map((entry) => entry.playerId),
         boardObjectiveHighlights: selectedTransfermarktBoardObjectives,
+        profilHost: { gameState, activeSaveId, readMetaSource, foundationManageableTeamIds, effectiveActiveOwnerId },
         onOpenPlayerDetails: (payload) => openPlayerDrawerById(payload.playerId, payload.activePlayerId),
         onOpenHistory: () => setFoundationView("historyV2", setActiveView),
         onToggleWishlist: (item) => {

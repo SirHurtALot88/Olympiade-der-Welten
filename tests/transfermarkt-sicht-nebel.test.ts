@@ -4,6 +4,8 @@ import {
   baueSichtWert,
   baueSpielerSicht,
   bauWege,
+  achsenSchwelle,
+  erfuelltAchsenMinimum,
   erfuelltEignungsMinimum,
   erwartetePp,
   erwartetePpSpanne,
@@ -113,13 +115,38 @@ describe("Scouting-Nebel des Transfermarkts: feste Stufen (18.11.)", () => {
     expect(erfuelltEignungsMinimum(s, "unbekannt", 1)).toBe(false);
   });
 
-  it("Achsen: auch ungescoutet die einzelne Note (Chris 19.11.), nie eine Zahl", () => {
+  it("Achsen-Summen sind offen (Chris 21.11.): auch ungescoutet die ganze Zahl, KEINE Note daneben", () => {
     const grob = baueSpielerSicht(eintrag({ playerId: "p", name: "Emil" }));
-    expect(grob.achsen.pow.anzeige).toBe("B");
-    expect(grob.achsen.pow.exakt).toBe(false);
-    expect(grob.achsen.pow.anzeige).not.toMatch(/\d/);
+    expect(grob.stufe).toBe(0);
+    expect(grob.achsen.pow.anzeige).toBe("71");
+    expect(grob.achsen.pow.summe).toBe(71);
+    expect(grob.achsen.men.anzeige).toBe("79");
+    expect(grob.achsen.pow.anzeige).not.toMatch(/[A-Z]/);
+    // Kommastellen bleiben verdeckt, nur die ganze Summe ist frei.
+    expect(JSON.stringify(grob.achsen)).not.toMatch(/\d+\.\d+/);
     const fein = baueSpielerSicht(eintrag({ playerId: "p", name: "Emil", scoutingLevel: 4 }));
-    expect(fein.achsen.pow.anzeige).toBe("B");
+    expect(fein.achsen.pow.anzeige).toBe("71");
+    // Einzelattribute bleiben im Nebel: nur Noten, nie Zahlen.
+    expect(Object.values(grob.attribute).every((a) => a.anzeige === null || /^[FEDCBAS+]{1,2}$/.test(a.anzeige))).toBe(true);
+  });
+
+  it("Achsen: Sortierung und Mindest-Filter laufen über dieselbe Zahl", () => {
+    const hoch = sicht(eintrag({ playerId: "h", name: "Hoch", pow: 84.4 }));
+    const tief = sicht(eintrag({ playerId: "t", name: "Tief", pow: 60.2 }));
+    const mitte = sicht(eintrag({ playerId: "m", name: "Mitte", pow: 71.37 }));
+    const sortiert = sortiereNachSicht([tief, hoch, mitte], (z) => z.sicht.achsen.pow.summe, -1).map((z) => z.sicht.name);
+    expect(sortiert).toEqual(["Hoch", "Mitte", "Tief"]);
+    // Index 4 (B) = ab 70 Punkten.
+    expect(erfuelltAchsenMinimum(mitte.sicht, "pow", 4)).toBe(true);
+    expect(erfuelltAchsenMinimum(tief.sicht, "pow", 4)).toBe(false);
+    expect(achsenSchwelle(4)).toBe(70);
+    expect(achsenSchwelle(6)).toBe(82);
+  });
+
+  it("Achsen: ohne Summe im Feed bleibt die Note als Rückfall", () => {
+    const s = baueSpielerSicht(eintrag({ playerId: "p", name: "Ohne", pow: null }));
+    expect(s.achsen.pow.summe).toBeNull();
+    expect(s.achsen.pow.anzeige).toBe("B");
     expect(tierBereichSortWert("B–A")).toBe(4.5);
     expect(tierBereichSortWert("S–S+")).toBe(6.5);
     expect(tierBereichSortWert(null)).toBeNull();
