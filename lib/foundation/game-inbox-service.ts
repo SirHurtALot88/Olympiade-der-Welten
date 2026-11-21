@@ -228,6 +228,7 @@ const RECURRING_INBOX_ITEM_PREFIXES = new Set<string>([
   "player_fatigue_risk",
   "player_lineup_rest",
   "player_training_load",
+  "player_training_wish",
   "board_objective_at_risk",
   "board_objective_failed",
   "scout_milestone",
@@ -567,6 +568,34 @@ function buildPlayerHealthInboxTasks(input: {
           targetParams: { team: input.team.teamId, player: plan.playerId },
           ctaLabel: "Training steuern",
           source: "player_health_training_load",
+          createdAt: input.createdAt,
+        }),
+      );
+    }
+
+    // Trainingswunsch (Chris 21.11.): „X wünscht leichtes Training" soll im Postfach stehen, solange der
+    // Wunsch offen ist. Gleiche Quelle wie die Moral (`buildTrainingModeDemand`); erfüllt der Spieler den
+    // Wunsch, entsteht die Meldung nicht mehr.
+    const wunschModus = plan.trainingDemandPreferred;
+    const aktuellerModus = input.playerById.get(plan.playerId)?.trainingMode ?? "mittel";
+    if (wunschModus && wunschModus !== aktuellerModus) {
+      const wunschWort = { leicht: "leichtes", mittel: "mittleres", hart: "hartes" }[wunschModus];
+      items.push(
+        createItem({
+          itemId: `player_training_wish:${input.saveId}:${seasonId}:${input.team.teamId}:${plan.playerId}`,
+          saveId: input.saveId,
+          seasonId,
+          matchday: matchdayId,
+          teamId: input.team.teamId,
+          playerId: plan.playerId,
+          category: "training",
+          severity: "info",
+          title: `Trainingswunsch: ${wunschModus}`,
+          description: `${plan.playerName} wünscht ${wunschWort} Training (aktuell ${aktuellerModus}). Ein erfüllter Wunsch hebt die Moral, ein verfehlter senkt sie.`,
+          targetView: "trainingCompact",
+          targetParams: { team: input.team.teamId, player: plan.playerId },
+          ctaLabel: "Training steuern",
+          source: "player_training_wish",
           createdAt: input.createdAt,
         }),
       );

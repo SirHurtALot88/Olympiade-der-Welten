@@ -98,7 +98,7 @@ export function getTrainingModeMismatchSeverity(
   return gap >= 2 ? 2 : 1;
 }
 
-function resolveTrainingModeDemandStatus(input: {
+export function resolveTrainingModeDemandStatus(input: {
   currentMode: PlayerTrainingMode;
   preferredMode: PlayerTrainingMode;
   mismatchSeverity: 0 | 1 | 2;

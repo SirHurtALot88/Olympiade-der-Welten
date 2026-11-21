@@ -35,6 +35,8 @@ import {
   baueKaderKennzahlen,
   baueTrainingZeilen,
   belastungNachTraining,
+  wunschFolge,
+  wuenscheErfuellen,
   belastungsZone,
   naechsteSortierung,
   risikoProzent,
@@ -126,7 +128,18 @@ function Medaillon({ zeile, klein }: { zeile: Pick<TrainingZeile, "portrait" | "
   );
 }
 
-function ModusSeg({ wert, onWahl, gesperrt }: { wert: PlayerTrainingMode; onWahl: (m: PlayerTrainingMode) => void; gesperrt?: boolean }) {
+function ModusSeg({
+  wert,
+  onWahl,
+  gesperrt,
+  wunsch,
+}: {
+  wert: PlayerTrainingMode;
+  onWahl: (m: PlayerTrainingMode) => void;
+  gesperrt?: boolean;
+  /** Gewünschte Intensität des Spielers: der Knopf bekommt eine Marke. */
+  wunsch?: PlayerTrainingMode | null;
+}) {
   return (
     <BcSeg
       ariaLabel="Intensität"
@@ -137,9 +150,41 @@ function ModusSeg({ wert, onWahl, gesperrt }: { wert: PlayerTrainingMode; onWahl
         id: m.id,
         label: m.kurz,
         heiss: m.id === "hart",
-        titel: m.name,
+        marke: wunsch === m.id,
+        titel: wunsch === m.id ? `${m.name} (Wunsch des Spielers)` : m.name,
       }))}
     />
+  );
+}
+
+/** „wünscht Leicht – erfüllt/nicht erfüllt, Folge: Moral …" für Intensität `modus`; nichts ohne Wunsch. */
+function WunschZeile({ zeile, modus, vorher }: { zeile: TrainingZeile; modus: PlayerTrainingMode; vorher?: PlayerTrainingMode }) {
+  if (!zeile.wunsch) return null;
+  const folge = wunschFolge(zeile, modus);
+  const name = MODI.find((m) => m.id === zeile.wunsch)?.name ?? zeile.wunsch;
+  const erfuellt = zeile.wunsch === modus;
+  const alt = vorher ? wunschFolge(zeile, vorher) : null;
+  return (
+    <p className={`te-wunschzeile ${erfuellt ? "is-ok" : "is-offen"}`} data-testid="training-wunschzeile" title={zeile.row.trainingDemand?.detail}>
+      <BcIcon name={erfuellt ? "check" : "info"} />
+      <span>
+        wünscht <b>{name}</b> · {erfuellt ? "erfüllt" : "nicht erfüllt"}
+        {folge ? (
+          <>
+            {" "}
+            · Folge: Moral{" "}
+            {alt && alt.delta !== folge.delta ? (
+              <>
+                <b className="bc-t">{vz(alt.delta, 1)}</b> → <b className={`bc-t ${ton(folge.delta)}`}>{vz(folge.delta, 1)}</b>
+              </>
+            ) : (
+              <b className={`bc-t ${ton(folge.delta)}`}>{vz(folge.delta, 1)}</b>
+            )}{" "}
+            <small>({folge.text})</small>
+          </>
+        ) : null}
+      </span>
+    </p>
   );
 }
 
@@ -343,7 +388,9 @@ function KaderTabelle({
       key: "modus",
       breite: "7.4em",
       ...kopf("modus", "Intensität", "auf"),
-      render: (z) => <ModusSeg wert={z.modus} onWahl={(m) => onModus(z.playerId, m)} gesperrt={gesperrt || z.verletzt} />,
+      render: (z) => (
+        <ModusSeg wert={z.modus} wunsch={z.wunsch} onWahl={(m) => onModus(z.playerId, m)} gesperrt={gesperrt || z.verletzt} />
+      ),
     },
     {
       key: "netto",
@@ -383,7 +430,7 @@ function KaderTabelle({
       key: "wunsch",
       breite: "5.6em",
       rechts: true,
-      ...kopf("risiko", "Wunsch"),
+      ...kopf("wunsch", "Wunsch"),
       render: (z) =>
         z.wunsch ? (
           <span className={`te-wunsch${z.wunsch === z.modus ? " is-ok" : ""}`} title={z.row.trainingDemand?.detail}>
@@ -528,8 +575,9 @@ function ImBlick({
         <div className="te-blick__plan">
           <div className="te-blick__zeile">
             <span className="te-gk">Plan</span>
-            <ModusSeg wert={zeile.modus} onWahl={(m) => onModus(zeile.playerId, m)} gesperrt={gesperrt || zeile.verletzt} />
+            <ModusSeg wert={zeile.modus} wunsch={zeile.wunsch} onWahl={(m) => onModus(zeile.playerId, m)} gesperrt={gesperrt || zeile.verletzt} />
           </div>
+          <WunschZeile zeile={zeile} modus={zeile.modus} />
           {zeile.verletzt ? (
             <p className="te-hinweis is-warn">Nicht einsetzbar, das Training ruht bis zur Rückkehr.</p>
           ) : zeile.ziel ? (
@@ -938,6 +986,8 @@ function PlanAnsicht({
     [gameState, teamId, zeile, kontext],
   );
   const aenderungen = Object.entries(entwurf).filter(([, e]) => e.ziel || e.modus);
+  // Offen = Wunsch, der auch mit den bereits gesetzten Entwurfs-Änderungen noch nicht erfüllt ist.
+  const offeneWuensche = Object.keys(wuenscheErfuellen(zeilen, entwurf)).length;
   // Vorschau je (Ziel, Intensität): jede Rechnung ist eine volle Spieltags-Progression. Pro Render waren es bis zu acht;
   // jetzt je Spieler und Spielstand einmal pro Kombination (Cache), damit Hover und Auswahl den Browser nicht belasten.
   const vorschauPlayerId = zeile?.playerId ?? null;
@@ -992,6 +1042,31 @@ function PlanAnsicht({
           <h2>Kader-Plan</h2>
           <span>Spieler wählen</span>
         </header>
+        <div className="te-wunschleiste">
+          <button
+            type="button"
+            className="te-btn te-btn--klein"
+            data-testid="training-wuensche-erfuellen"
+            disabled={gesperrt || offeneWuensche === 0}
+            title="Setzt bei allen Spielern mit offenem Wunsch die gewünschte Intensität als offene Änderung"
+            onClick={() =>
+              setEntwurf((alt) => {
+                const neu = { ...alt };
+                for (const [id, modus] of Object.entries(wuenscheErfuellen(zeilen, alt))) {
+                  const z = zeilen.find((x) => x.playerId === id);
+                  const rest = { ...(neu[id] ?? {}) };
+                  if (z && modus === z.modus) delete rest.modus;
+                  else rest.modus = modus;
+                  if (rest.ziel || rest.modus) neu[id] = rest;
+                  else delete neu[id];
+                }
+                return neu;
+              })
+            }
+          >
+            <BcIcon name="check" /> Wünsche erfüllen ({offeneWuensche})
+          </button>
+        </div>
         <div className="te-plan-liste">
           {zeilen.map((z) => {
             const e = entwurf[z.playerId];
@@ -1009,6 +1084,14 @@ function PlanAnsicht({
                     {z.verletzt ? "Reha" : (z.zielLabel ?? "kein Ziel")} · <KlasseTag klasse={z.klasse} />
                   </small>
                 </span>
+                {z.wunsch ? (
+                  <span
+                    className={`te-wunsch te-wunsch--klein${(e?.modus ?? z.modus) === z.wunsch ? " is-ok" : ""}`}
+                    title={`Wunsch: ${MODI.find((m) => m.id === z.wunsch)?.name}`}
+                  >
+                    W {MODI.find((m) => m.id === z.wunsch)?.kurz}
+                  </span>
+                ) : null}
                 {e ? <i className="te-pl__punkt" title="offene Änderung" /> : null}
                 <b className="te-pl__modus">{MODI.find((m) => m.id === (e?.modus ?? z.modus))?.kurz}</b>
               </button>
@@ -1136,9 +1219,10 @@ function PlanAnsicht({
             <b>3</b> Intensität{" "}
             <small>
               mehr Budget kostet Erholung
-              {zeile.wunsch ? ` · sein Wunsch: ${zeile.wunsch}` : ""}
+              {zeile.wunsch ? ` · sein Wunsch: ${MODI.find((m) => m.id === zeile.wunsch)?.name}` : ""}
             </small>
           </h3>
+          <WunschZeile zeile={zeile} modus={aktModus} vorher={aktModus !== zeile.modus ? zeile.modus : undefined} />
           <div className="te-modi">
             {MODI.map((m) => {
               const preset = getTrainingModePresentation(m.id);
@@ -1154,7 +1238,7 @@ function PlanAnsicht({
                 >
                   <span className="te-modus__kopf">
                     <b className="te-haus">{m.name}</b>
-                    {zeile.wunsch === m.id ? <span className="te-art">Sein Wunsch</span> : null}
+                    {zeile.wunsch === m.id ? <span className="te-art te-art--wunsch">Sein Wunsch</span> : null}
                   </span>
                   <small>{preset.note}</small>
                   <span className="te-kv">
@@ -1171,12 +1255,10 @@ function PlanAnsicht({
                     <span>Verletzungsrisiko dann</span>
                     <b className="bc-t">{zahl(risikoProzent(nach), 1)} %</b>
                   </span>
-                  {zeile.row.trainingDemand ? (
+                  {zeile.wunsch ? (
                     <span className="te-kv">
-                      <span>Moral je Block</span>
-                      <b className="bc-t">
-                        {zeile.wunsch === m.id ? `+${zeile.row.trainingDemand.moraleReward}` : `−${zeile.row.trainingDemand.moralePenalty}`}
-                      </b>
+                      <span>Moral durch den Wunsch</span>
+                      <b className={`bc-t ${ton(wunschFolge(zeile, m.id)?.delta)}`}>{vz(wunschFolge(zeile, m.id)?.delta, 1)}</b>
                     </span>
                   ) : null}
                 </button>
@@ -1223,6 +1305,15 @@ function PlanAnsicht({
               {zahl(risikoProzent(belastungNachTraining(zeile.fatigue, aktModus)), 1)} %
             </b>
           </div>
+          {zeile.wunsch ? (
+            <div className="te-kv" data-testid="training-vorschau-wunsch">
+              <span>Moral durch den Wunsch</span>
+              <b className="bc-t">
+                {vz(wunschFolge(zeile, zeile.modus)?.delta, 1)} →{" "}
+                <span className={ton(wunschFolge(zeile, aktModus)?.delta)}>{vz(wunschFolge(zeile, aktModus)?.delta, 1)}</span>
+              </b>
+            </div>
+          ) : null}
         </div>
         <div className="te-offen">
           <span className="te-gk">Offene Änderungen · {aenderungen.length}</span>
@@ -1371,6 +1462,11 @@ export default function TrainingModern(props: TrainingModernProps) {
               <em>Überlastet</em>
               <strong className="bc-t">{kenn.ueberlastet}</strong>
               <small>über 50</small>
+            </div>
+            <div className={kenn.wuenscheOffen > 0 ? "is-wunsch" : ""} data-testid="training-kennzahl-wuensche">
+              <em>Wünsche offen</em>
+              <strong className="bc-t">{kenn.wuenscheOffen}</strong>
+              <small>von {kenn.wuenscheGesamt}</small>
             </div>
             <div>
               <em>Verletzt</em>

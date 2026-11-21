@@ -62,7 +62,7 @@ export function BcSeg<T extends string>({
   gesperrt,
   ariaLabel,
 }: {
-  optionen: ReadonlyArray<{ id: T; label: ReactNode; heiss?: boolean; titel?: string }>;
+  optionen: ReadonlyArray<{ id: T; label: ReactNode; heiss?: boolean; titel?: string; marke?: boolean }>;
   wert: T | null;
   onWahl: (id: T) => void;
   gesperrt?: boolean;
@@ -74,7 +74,7 @@ export function BcSeg<T extends string>({
         <button
           key={option.id}
           type="button"
-          className={option.heiss ? "is-heiss" : undefined}
+          className={[option.heiss ? "is-heiss" : "", option.marke ? "is-marke" : ""].filter(Boolean).join(" ") || undefined}
           aria-pressed={wert === option.id}
           disabled={gesperrt}
           title={option.titel}
