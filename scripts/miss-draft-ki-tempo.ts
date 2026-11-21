@@ -71,6 +71,13 @@ async function main() {
     console.log(`Takt ${takt}x: ${picks} sichtbare Picks in ${sek.toFixed(1)} s = ${(picks / sek).toFixed(2)} Picks/s`);
     return;
   }
+  // --warm: einen Pick vorab nur BEWERTEN (ohne zu buchen), damit die Zwischenspeicher (Spieler-Tags) warm sind — so steht ein
+  // laufender Server beim zweiten Klick da; ohne --warm ist es der kalte Erstklick nach dem Prozessstart.
+  if (process.argv.includes("--warm")) {
+    const gs = persistence.getSaveById(saveId)!.gameState;
+    const draft = gs.seasonState.ligaDraft!;
+    ki.bewerteKiPick({ gameState: gs, saveId, draft, teamId: modell.werIstDran(draft)!.teamId, topN: 3 });
+  }
   let maxLuecke = 0;
   let letzte = performance.now();
   const wach = setInterval(() => {
@@ -79,15 +86,25 @@ async function main() {
     letzte = j;
   }, 5);
   const t0 = performance.now();
+  const cpu0 = process.cpuUsage();
   const vor = process.argv.includes("--vor");
   console.log(vor ? "Modus: Vor (schnell)" : "Modus: Standard-Happen (120 ms)");
-  const r = await dienst.laufeKiImHintergrund({
+  // --ein-happen: alle KI-Picks bis zum Menschen in EINEM Aufruf (ein Laden, ein Schreiben), ohne Zeitbudget.
+  const einHappen = process.argv.includes("--ein-happen");
+  const r = einHappen
+    ? await (async () => {
+        const e = dienst.laufeKiZuege({ persistence, saveId, maxPicks: 1000 });
+        return { halt: e.halt, picks: e.eintraege.length };
+      })()
+    : await dienst.laufeKiImHintergrund({
     persistence,
     saveId,
     logPrefix: "[messung]",
     ...(vor ? { jeHappen: dienst.LIGA_DRAFT_VOR_JE_HAPPEN, happenBudgetMs: dienst.LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS } : {}),
   });
   const dauer = performance.now() - t0;
+  const cpu = process.cpuUsage(cpu0);
+  console.log(`CPU-Zeit (Nutzer+System, unabhaengig von Mitlaeufern): ${((cpu.user + cpu.system) / 1000).toFixed(0)} ms`);
   clearInterval(wach);
   const verlauf = persistence.getSaveById(saveId)!.gameState.seasonState.ligaDraft!.verlauf;
   console.log(`Vor-Lauf: ${r.picks} Picks in ${(dauer / 1000).toFixed(2)} s (${(r.picks / (dauer / 1000)).toFixed(1)} Picks/s), halt ${r.halt}, Verlauf ${verlauf.length}, max. Event-Loop-Luecke ${ms(maxLuecke)}`);

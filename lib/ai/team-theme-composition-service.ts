@@ -987,11 +987,8 @@ export function derivePlayerThemeTags(player: Player): PlayerThemeTagRow {
 }
 
 function getCachedPlayerThemeTags(player: Player) {
-  const cached = PLAYER_THEME_TAG_CACHE.get(player);
-  if (cached) return cached;
-  const computed = derivePlayerThemeTags(player);
-  PLAYER_THEME_TAG_CACHE.set(player, computed);
-  return computed;
+  // Inhalts-Cache (21.11.): der Liga-Draft laedt den Stand je Happen neu, die Spielerobjekte sind jedes Mal andere.
+  return derivePlayerThemeTagsCached(player);
 }
 
 /**
@@ -1001,6 +998,17 @@ function getCachedPlayerThemeTags(player: Player) {
  * ~10 s von ~30 s je Draft-Vorlauf). Die Zeile ist gemeinsam genutzt und darf nicht veraendert werden.
  */
 const PLAYER_THEME_TAG_INHALT_CACHE = new Map<string, PlayerThemeTagRow>();
+/** Tag-Menge je gemeinsam genutzter Tag-Zeile (nicht je Aufruf neu gebaut; Draft-Tempo 21.11.). Die Menge darf nicht veraendert werden. */
+const THEME_TAG_SET_CACHE = new WeakMap<object, Set<string>>();
+export function themeTagSet(row: { playerThemeTags: string[] }): Set<string> {
+  let set = THEME_TAG_SET_CACHE.get(row);
+  if (!set) {
+    set = new Set(row.playerThemeTags);
+    THEME_TAG_SET_CACHE.set(row, set);
+  }
+  return set;
+}
+
 export function derivePlayerThemeTagsCached(player: Player): PlayerThemeTagRow {
   const byObject = PLAYER_THEME_TAG_CACHE.get(player);
   if (byObject) return byObject;
@@ -1154,17 +1162,21 @@ function rosterShare(input: { gameState: GameState; teamId: string; target: Team
   return computed;
 }
 
+const THEMED_POOL_COUNT_BY_PLAYERS = new WeakMap<object, Map<string, number>>();
 function getThemedPoolCount(gameState: GameState, target: TeamThemeCompositionTarget) {
-  let map = THEMED_POOL_COUNT_CACHE.get(gameState);
+  // Der Zaehler haengt nur an den Tags aller Spieler, nicht am Rest des Stands: je Spieler-Liste statt je Spielstand-Objekt
+  // zwischenspeichern (Draft, 21.11.: jeder Kauf macht einen neuen Stand, die Liste bleibt oft dieselbe).
+  let map = THEMED_POOL_COUNT_CACHE.get(gameState) ?? THEMED_POOL_COUNT_BY_PLAYERS.get(gameState.players);
   if (!map) {
     map = new Map<string, number>();
-    THEMED_POOL_COUNT_CACHE.set(gameState, map);
+    THEMED_POOL_COUNT_BY_PLAYERS.set(gameState.players, map);
   }
+  THEMED_POOL_COUNT_CACHE.set(gameState, map);
   const cached = map.get(target.teamId);
   if (cached != null) return cached;
   const targetTags = [...target.primaryThemeTags, ...target.secondaryThemeTags];
   const count = gameState.players.filter((player) => {
-    const playerTags = new Set(getCachedPlayerThemeTags(player).playerThemeTags);
+    const playerTags = themeTagSet(getCachedPlayerThemeTags(player));
     return hasAny(playerTags, targetTags);
   }).length;
   map.set(target.teamId, count);

@@ -906,7 +906,10 @@ export function setzeMenschAutoPick(input: {
 }
 
 /**
- * Gastgeber bricht den Draft ab (Review #1619, A2): Draft `fertig` (alle offenen Teams `abgebrochen`), damit
+ * Gastgeber bricht den Draft ab (Review #1619, A2). STANDUNABHAENGIG (21.11., Chris: „der Draft laesst sich egal auf welchem
+ * Weg nicht abbrechen“): waehrend die KI im Hintergrund pickt, ist der Stand, den die Seite sah, beim Eintreffen des Klicks
+ * schon ueberholt — mit `erwarteteNr` scheiterte der Abbruch still (die Seite verschluckt Stand-Konflikte). Der Abbruch haengt
+ * nicht am Platz im Draft; die Route reicht `erwarteteNr` deshalb nicht mehr durch. Draft `fertig` (alle offenen Teams `abgebrochen`), damit
  * `leagueSetupStatus: "ready"` mit den Warnungen fuer Teams unter 8 und die Marktsperre aufgehoben. Ein laufender
  * Hintergrundlauf haelt beim naechsten Happen von selbst an (kein Zug mehr offen).
  */
@@ -918,6 +921,9 @@ export function brecheLigaDraftAb(input: {
   return mitFrischemStand(input.persistence, input.saveId, (ctx) => {
     const draft = draftAusKontext(ctx);
     pruefeStand(draft, input.erwarteteNr);
+    // Ein laufender Hintergrundlauf haelt nach seinem Happen an (kein Zug mehr offen); dieses Zeichen beendet ihn zusaetzlich,
+    // falls ein Mensch vor dem Abbruch noch im Nachzug war.
+    if (laufendeHintergrundLaeufe.has(input.saveId)) hintergrundAbbruch.add(input.saveId);
     if (draft.status === "fertig") return draft;
     const naechster = bricheLigaDraftAb(draft, jetztIso());
     setzeDraftImKontext(ctx, naechster);
@@ -941,13 +947,16 @@ const hintergrundAbbruch = new Set<string>();
  */
 export const LIGA_DRAFT_HAPPEN_BUDGET_MS = 120;
 /**
- * „Vor zu meinem Pick“ (19.11., Chris: „die KI soll wirklich im Schnelldurchlauf sein“): gemessen kostet ein KI-Pick ~110 ms
- * Rechnen, aber jedes Schreiben des ganzen Spielstands ~360 ms (docs/design/draft-ki-tempo-19-11.md). Mit 120 ms je Happen
- * ging die Haelfte der Zeit in ein Schreiben je Pick. Im Vor-Modus schreibt ein Happen stattdessen einmal fuer ~1 s Picks;
- * die Event-Loop steht dabei hoechstens ~1,3 s (Messung in der Doku). Nur fuer den ausdruecklich angeforderten Vorlauf.
+ * „Vor zu meinem Pick“ und „Selbst kaufen“ (19.11./21.11., Chris: „die KI soll wirklich im Schnelldurchlauf sein … nur rechnen,
+ * nichts anzeigen“): ALLE KI-Picks bis zum naechsten Menschen laufen in EINEM Happen mit EINEM Schreiben des Spielstands.
+ * Gemessen (docs/design/draft-tempo-abbruch-21-11.md) kostet ein KI-Pick ~40 ms Rechnen, das Schreiben des ganzen Spielstands
+ * aber ~0,6 s; je Pick geschrieben waren es 31 Schreibvorgaenge. Die Event-Loop steht dabei einmal ~2 s (31 Picks) — danach
+ * ist der Spielstand fertig, und die Seite zeigt ihn. `LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS` ist nur die Sicherung: eine sehr langsame
+ * Maschine oder eine grosse Liga teilt den Lauf nach dieser Zeit in einen zweiten Happen, statt die Event-Loop minutenlang zu
+ * halten. Nur fuer den ausdruecklich angeforderten Vorlauf; der Standard-Hintergrundlauf bleibt bei 120 ms.
  */
-export const LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS = 1000;
-export const LIGA_DRAFT_VOR_JE_HAPPEN = 40;
+export const LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS = 8000;
+export const LIGA_DRAFT_VOR_JE_HAPPEN = 1000;
 
 export function istHintergrundLaufAktiv(saveId: string): boolean {
   return laufendeHintergrundLaeufe.has(saveId);

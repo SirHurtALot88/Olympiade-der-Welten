@@ -181,7 +181,7 @@ export async function POST(request: Request) {
 
     // A6: jede schreibende Aktion ausser `starten` nennt den Stand, den sie gesehen hat.
     const erwarteteNr = typeof body.erwarteteNr === "number" && Number.isInteger(body.erwarteteNr) ? body.erwarteteNr : null;
-    if (aktion !== "starten" && erwarteteNr == null) return fehler("erwarteteNr_fehlt", 400);
+    if (aktion !== "starten" && aktion !== "abbrechen" && erwarteteNr == null) return fehler("erwarteteNr_fehlt", 400);
     /**
      * STANDUNABHAENGIGE AKTIONEN (Abnahme 19.11., Fehler F2, docs/design/abnahme-saison-19-11.md): Ueberspringen, Auto-Pick und
      * „Ich bin fertig“ haengen nicht am Platz im Draft. Waehrend die KI im Hintergrund pickt (0,1–0,2 s je Pick), war jeder
@@ -228,7 +228,8 @@ export async function POST(request: Request) {
         break;
       }
       case "abbrechen":
-        ergebnis = { draft: brecheLigaDraftAb({ persistence, saveId, erwarteteNr }) };
+        // Standunabhaengig (21.11.): `erwarteteNr` wird nicht geprueft — die KI pickt im Hintergrund, der gesehene Stand ist veraltet.
+        ergebnis = { draft: brecheLigaDraftAb({ persistence, saveId }) };
         break;
       case "ki_schritt": {
         const maxPicks = Math.max(1, Math.min(LIGA_DRAFT_MAX_PICKS_JE_SCHRITT, Math.floor(Number(body.maxPicks) || 1)));
@@ -268,7 +269,14 @@ export async function POST(request: Request) {
         // „Selbst kaufen“: die KI pickt sofort durch (Hintergrundlauf), sobald alle gewaehlt haben und kein Mensch mehr
         // mitspielt. Spielt noch einer, treibt dessen Seite den Takt.
         if (wahl === "selbst" && !wartetAufStartWahl(draft) && !spieltNochEinMensch(draft)) {
-          void laufeKiImHintergrund({ persistence, saveId, logPrefix: "[api/draft]" }).catch(() => undefined);
+          // Alle KI-Picks in einem Happen mit einem Schreiben (Tempo, 21.11.).
+          void laufeKiImHintergrund({
+            persistence,
+            saveId,
+            logPrefix: "[api/draft]",
+            jeHappen: LIGA_DRAFT_VOR_JE_HAPPEN,
+            happenBudgetMs: LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS,
+          }).catch(() => undefined);
         }
         ergebnis = { draft };
         break;

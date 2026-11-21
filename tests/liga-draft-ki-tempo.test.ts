@@ -129,7 +129,7 @@ describe("Draft-KI-Tempo: gleiche Picks, weniger Schreibvorgaenge", () => {
       expect(vor.picks).toBe(picksEng);
       expect(schreibvorgaenge).toBeLessThanOrEqual(2);
       expect(dienst.LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS).toBeGreaterThan(dienst.LIGA_DRAFT_HAPPEN_BUDGET_MS);
-      expect(dienst.LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS).toBeLessThanOrEqual(1500);
+      expect(dienst.LIGA_DRAFT_VOR_HAPPEN_BUDGET_MS).toBeLessThanOrEqual(10_000);
     } finally {
       persistence.saveSingleplayerState = original;
     }
