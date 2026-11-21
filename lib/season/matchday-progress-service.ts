@@ -80,9 +80,9 @@ type PreparedMatchdayProgress = {
  * KI-Merkliste (21.11.): beim Spieltagsabschluss neu rechnen. Eine reine Info-Liste darf den Abschluss nie aufhalten; scheitert die
  * Rechnung, bleibt die alte Liste stehen und die Warnung steht im Log.
  */
-function berechneKiMerklisteBeimAbschluss(gameState: GameState): GameState {
+function berechneKiMerklisteBeimAbschluss(gameState: GameState, saveId: string): GameState {
   try {
-    return aktualisiereKiMerkliste(gameState);
+    return aktualisiereKiMerkliste(gameState, saveId);
   } catch (error) {
     console.warn("[ki-merkliste] Neuberechnung beim Spieltagsabschluss uebersprungen:", error);
     return gameState;
@@ -373,7 +373,7 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
   // season_completed-State berechnet (noch OHNE frozenValuationSnapshot → Gates rechnen live) und
   // sorgt dafür, dass spätere Verkäufe/Roster-Änderungen die Werte der übrigen Spieler nicht mehr
   // verschieben.
-  const gameStateMitMerkliste = berechneKiMerklisteBeimAbschluss(nextGameState);
+  const gameStateMitMerkliste = berechneKiMerklisteBeimAbschluss(nextGameState, prepared.saveId);
   const finalGameState: GameState = prepared.nextMatchdayId
     ? gameStateMitMerkliste
     : {

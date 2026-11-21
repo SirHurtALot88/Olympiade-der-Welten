@@ -3054,11 +3054,12 @@ export function useFoundationShellRouterBodyScope({
     // Die ENTSCHEIDUNG (hinzufuegen oder entfernen) faellt aus der Closure — sie braucht ohnehin
     // Nebenwirkungen (Slot-Pruefung, Hinweis), die nicht in einen State-Updater gehoeren. Die
     // AENDERUNG der Liste laeuft danach funktional, also auf dem wirklich aktuellen Stand.
+    // `ki`-Eintraege gehoeren der KI-Merkliste eines KI-Teams (Runde 2, 21.11.) und sind nie die Wunschliste eines Menschen.
     const existing = (gameState.seasonState.transferWishlist ?? []).some(
-      (entry) => entry.playerId === item.playerId,
+      (entry) => entry.playerId === item.playerId && !entry.ki,
     );
     if (existing) {
-      saveTransferWishlist((entries) => entries.filter((entry) => entry.playerId !== item.playerId));
+      saveTransferWishlist((entries) => entries.filter((entry) => entry.ki || entry.playerId !== item.playerId));
       return;
     }
     if (!teamId) {
@@ -3073,12 +3074,12 @@ export function useFoundationShellRouterBodyScope({
     // Der `some`-Riegel schuetzt gegen den umgekehrten Fall: zwei Klicks auf denselben Spieler vor
     // dem Rerender haetten ihn sonst doppelt in die Liste gelegt.
     saveTransferWishlist((entries) =>
-      entries.some((entry) => entry.playerId === item.playerId) ? entries : [buildWishlistEntry(item), ...entries],
+      entries.some((entry) => entry.playerId === item.playerId && !entry.ki) ? entries : [buildWishlistEntry(item), ...entries],
     );
   }
 
   function removeTransferWishlistEntry(playerId: string) {
-    saveTransferWishlist((entries) => entries.filter((entry) => entry.playerId !== playerId));
+    saveTransferWishlist((entries) => entries.filter((entry) => entry.ki || entry.playerId !== playerId));
   }
 
   function reorderTransferWishlist(playerId: string, targetIndex: number) {

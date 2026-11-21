@@ -1,27 +1,39 @@
 /**
- * KI-MERKLISTE (Chris, 21.11.: „ja, KI soll eine Merkliste fremder Spieler bekommen").
+ * KI-MERKLISTE (Chris, 21.11.: „ja, KI soll eine Merkliste fremder Spieler bekommen"; Runde 2, 21.11.: „KI Teams koennen auch
+ * Spieler vom Transfermarkt UND anderen Spielern auf die Liste setzen und wir hatten das Limit ja aufgehoben, nur das Scouting,
+ * wie viele parallel aufgedeckt werden von ihren Stats, ist limitiert").
  *
- * Jedes KI-Team fuehrt eine kurze Liste fremder Spieler (Spieler, die einem ANDEREN Team gehoeren), die seine Kaderplanung
- * ankaufen wuerde. Es gibt dafuer KEINE eigene Heuristik: bewertet wird mit genau der Funktion, nach der die KI beim Kauf
- * waehlt (`buyUtility`, `lib/ai/organic-squad/utility.ts`), im Zustand des Teams (Kader, Bedarf je Disziplin, Kasse, Forecast,
- * Identitaet und GM-Gewichte aus `buildOrganicDraftFrame`). Ein Spieler kommt nur auf die Liste, wenn
- *   - er einem anderen Team gehoert,
+ * Jedes KI-Team fuehrt eine Liste von Spielern, die seine Kaderplanung ankaufen wuerde: FREIE Spieler des Transfermarkts und
+ * Spieler ANDERER Teams, nie die eigenen. Es gibt dafuer KEINE eigene Heuristik: bewertet wird mit genau der Funktion, nach der
+ * die KI beim Kauf waehlt (`buyUtility`, `lib/ai/organic-squad/utility.ts`), im Zustand des Teams (Kader, Bedarf je Disziplin,
+ * Kasse, Forecast, Identitaet und GM-Gewichte aus `buildOrganicDraftFrame`). Ein Spieler kommt nur auf die Liste, wenn
+ *   - er nicht zum eigenen Kader gehoert,
  *   - der Kaufnutzen den Stop-Nutzen des Teams uebertrifft (`stopUtility`: „lieber nichts tun" verliert), und
  *   - das Team ihn zahlen koennte (Ablöse <= Kasse und <= freier Investitionstopf des Vorstands).
  * Ohne Zufall: gleiche Eingabe, gleiche Liste (kein Jitter-Saatgut, Gleichstand nach `playerId`).
  *
- * WIRKUNG AUF KAEUFE: keine. Die KI kauft heute ausschliesslich aus dem Freien-Spieler-Pool (`fromTeamId: null`), es gibt
- * keinen Kaufweg von Team zu Team; ein Merkliste-Spieler laesst sich deshalb ueber die bestehenden Wege nicht ansprechen.
- * Die Liste aendert kein Kaufverhalten (siehe `docs/design/ki-merkliste-21-11.md`).
+ * KEIN LISTEN-LIMIT, WIE BEIM MENSCHEN. Die Liste wird nicht auf eine Handvoll gekappt (nur `KI_MERKLISTE_TECHNIK_MAX` als
+ * Speicherschutz). Begrenzt ist das SCOUTING: wie viele Spieler parallel gescoutet (ihre Stats aufgedeckt) werden, entscheidet
+ * dieselbe Queue wie beim Menschen (`getScoutingWishlistQueue`, `getScoutingWishlistSlotLimit`: die obersten X nicht fertig
+ * gescouteten Eintraege). Die KI belegt sie nach Stufe, Wunschziel zuerst (`priorityRank`).
  *
- * Gespeichert in `seasonState.kiMerkliste[teamId]`, neu berechnet beim Spieltagsabschluss (`aktualisiereKiMerkliste`).
+ * EINE WAHRHEIT. Die Liste liegt im selben Speicher wie die des Menschen (`seasonState.transferWishlist`, Eintraege mit
+ * `ki`-Zusatz; Scouting-Fortschritt in `scoutIntelByTeamId`), nicht in einer Parallelstruktur. `seasonState.kiMerkliste` ist nur
+ * noch Lese-Huelle fuer Spielstaende aus Runde 1 und wird bei der ersten Neuberechnung uebernommen und entfernt.
+ *
+ * WIRKUNG AUF KAEUFE: keine. Die KI-Kaufentscheidung ist unveraendert; damit der gemeinsame Speicher das nicht verschiebt,
+ * zaehlen Eintraege aus der KI-Merkliste in `ai-market-plan-apply-service.ts` weder als „Watch"-Bonus noch als Scouting-Intel
+ * (siehe `docs/design/ki-merkliste-21-11.md`).
+ *
+ * Neu berechnet beim Spieltagsabschluss (`aktualisiereKiMerkliste`).
  */
 import { buildOrganicDraftFrame } from "@/lib/ai/organic-squad/draft-adapter";
 import { buildStepTeamState, createOrganicPlanStepState } from "@/lib/ai/organic-squad/draft-builder";
 import { SOLIDE_THRESHOLD } from "@/lib/ai/organic-squad/types";
 import { buyUtility, stopUtility } from "@/lib/ai/organic-squad/utility";
-import type { GameState, KiMerklisteEintrag, KiMerklisteStufe, Player } from "@/lib/data/olyDataTypes";
-import { KI_MERKLISTE_MAX, KI_MERKLISTE_STUFEN_AB } from "@/lib/ai/ki-merkliste-lesen";
+import type { GameState, KiMerklisteEintrag, KiMerklisteStufe, Player, TransferWishlistEntry } from "@/lib/data/olyDataTypes";
+import { KI_MERKLISTE_STUFEN_AB, KI_MERKLISTE_TECHNIK_MAX, kiMerklisteFuerTeam } from "@/lib/ai/ki-merkliste-lesen";
+import { refreshScoutPipeline } from "@/lib/scouting/facility-scout-pipeline-service";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 
 export function istKiTeam(gameState: GameState, teamId: string): boolean {
@@ -37,7 +49,7 @@ function stufeFuer(vorsprung: number, bester: number): KiMerklisteStufe {
 }
 
 /**
- * Die Merkliste EINES Teams, frisch gerechnet (rein, schreibt nichts). `vorher` traegt `seit` fort, wenn der Spieler schon
+ * Die Merkliste EINES Teams, frisch gerechnet (rein, schreibt nichts), absteigend nach Vorsprung. `vorher` traegt `seit` fort, wenn der Spieler schon
  * auf der alten Liste stand.
  */
 export function berechneKiMerklisteFuerTeam(
@@ -47,21 +59,18 @@ export function berechneKiMerklisteFuerTeam(
 ): KiMerklisteEintrag[] {
   const team = gameState.teams.find((entry) => entry.teamId === teamId);
   if (!team) return [];
+  // Kandidaten: alle Spieler, die nicht zum eigenen Kader gehoeren — Spieler anderer Teams UND freie Spieler des Marktes.
   const besitzerJeSpieler = new Map<string, string>();
+  const eigene = new Set<string>();
   for (const eintrag of gameState.rosters) {
-    if (eintrag.teamId !== teamId) besitzerJeSpieler.set(eintrag.playerId, eintrag.teamId);
+    if (eintrag.teamId === teamId) eigene.add(eintrag.playerId);
+    else besitzerJeSpieler.set(eintrag.playerId, eintrag.teamId);
   }
-  const eigene = new Set(gameState.rosters.filter((eintrag) => eintrag.teamId === teamId).map((eintrag) => eintrag.playerId));
-  const spielerJeId = new Map<string, Player>(gameState.players.map((spieler) => [spieler.id, spieler]));
   const startkader: Player[] = [];
-  for (const id of eigene) {
-    const spieler = spielerJeId.get(id);
-    if (spieler) startkader.push(spieler);
-  }
   const kandidaten: Player[] = [];
-  for (const id of besitzerJeSpieler.keys()) {
-    const spieler = spielerJeId.get(id);
-    if (spieler) kandidaten.push(spieler);
+  for (const spieler of gameState.players) {
+    if (eigene.has(spieler.id)) startkader.push(spieler);
+    else kandidaten.push(spieler);
   }
   if (kandidaten.length === 0) return [];
 
@@ -79,7 +88,7 @@ export function berechneKiMerklisteFuerTeam(
     .map((kandidat) => ({ kandidat, vorsprung: buyUtility(kandidat, zustand) - stopp }))
     .filter((zeile) => zeile.vorsprung > 0)
     .sort((a, b) => b.vorsprung - a.vorsprung || (a.kandidat.playerId < b.kandidat.playerId ? -1 : 1))
-    .slice(0, KI_MERKLISTE_MAX);
+    .slice(0, KI_MERKLISTE_TECHNIK_MAX);
   if (bewertet.length === 0) return [];
 
   const bester = bewertet[0]!.vorsprung;
@@ -102,7 +111,7 @@ export function berechneKiMerklisteFuerTeam(
     }
     return {
       playerId: kandidat.playerId,
-      besitzerTeamId: besitzerJeSpieler.get(kandidat.playerId) ?? "",
+      besitzerTeamId: besitzerJeSpieler.get(kandidat.playerId) ?? null,
       stufe: stufeFuer(vorsprung, bester),
       vorsprung: Math.round(vorsprung * 1000) / 1000,
       disziplinId: besteDisziplin,
@@ -113,25 +122,79 @@ export function berechneKiMerklisteFuerTeam(
   });
 }
 
-/**
- * Rechnet die Merkliste aller KI-Teams neu und schreibt sie in `seasonState.kiMerkliste`. Aufgerufen beim Spieltagsabschluss;
- * `OLY_KI_MERKLISTE=0` schaltet ab (dann bleibt der Spielstand unveraendert). Menschlich gefuehrte Teams bekommen keine Liste.
- */
-export function aktualisiereKiMerkliste(gameState: GameState): GameState {
-  if (process.env.OLY_KI_MERKLISTE === "0") return gameState;
-  const alt = gameState.seasonState.kiMerkliste ?? {};
-  const neu: Record<string, KiMerklisteEintrag[]> = {};
-  for (const team of gameState.teams) {
-    if (!istKiTeam(gameState, team.teamId)) continue;
-    const liste = berechneKiMerklisteFuerTeam(gameState, team.teamId, alt[team.teamId] ?? []);
-    if (liste.length > 0) neu[team.teamId] = liste;
-  }
+function wunschEintrag(
+  gameState: GameState,
+  spielerJeId: ReadonlyMap<string, Player>,
+  saveId: string,
+  teamId: string,
+  eintrag: KiMerklisteEintrag,
+  rang: number,
+  createdAt: string,
+): TransferWishlistEntry {
+  const { playerId, ...meta } = eintrag;
+  const spieler = spielerJeId.get(playerId);
   return {
+    id: `ki-wunsch-${teamId}-${playerId}`,
+    saveId,
+    seasonId: gameState.season.id,
+    playerId,
+    playerName: spieler?.name ?? playerId,
+    className: spieler?.className ?? "",
+    race: spieler?.race ?? "",
+    marketValue: spieler?.marketValue ?? null,
+    salary: spieler?.salaryDemand ?? null,
+    bracket: null,
+    teamId,
+    createdAt,
+    priorityRank: rang,
+    ki: meta,
+  };
+}
+
+/**
+ * Rechnet die Merkliste aller KI-Teams neu und schreibt sie in die Wunschliste des Teams (`seasonState.transferWishlist`,
+ * Eintraege mit `ki`; Reihenfolge = `priorityRank` = Stufe, dann Vorsprung), danach rechnet `refreshScoutPipeline` die
+ * Scouting-Plaetze des Teams neu — genau der Weg, den auch der Mensch nimmt. Aufgerufen beim Spieltagsabschluss;
+ * `OLY_KI_MERKLISTE=0` schaltet ab (dann bleibt der Spielstand unveraendert). Menschlich gefuehrte Teams bekommen keine Liste,
+ * ihre Eintraege bleiben unberuehrt. Eintraege, die ein KI-Team selbst (ohne `ki`) auf seiner Wunschliste hat, gehen vor.
+ */
+export function aktualisiereKiMerkliste(gameState: GameState, saveId: string = "ki-merkliste"): GameState {
+  if (process.env.OLY_KI_MERKLISTE === "0") return gameState;
+  const vorhanden = gameState.seasonState.transferWishlist ?? [];
+  const eigeneEintraege = vorhanden.filter((zeile) => !zeile.ki);
+  const kiTeams = gameState.teams.filter((team) => istKiTeam(gameState, team.teamId));
+  const createdAtJeSchluessel = new Map<string, string>();
+  for (const zeile of vorhanden) if (zeile.ki && zeile.teamId) createdAtJeSchluessel.set(`${zeile.teamId}|${zeile.playerId}`, zeile.createdAt);
+  const jetzt = new Date().toISOString();
+  const spielerJeId = new Map<string, Player>(gameState.players.map((spieler) => [spieler.id, spieler]));
+
+  const neueZeilen: TransferWishlistEntry[] = [];
+  for (const team of kiTeams) {
+    // Vorher: neue Form, sonst die Lese-Huelle aus Runde 1 — fuer `seit`.
+    const vorher = kiMerklisteFuerTeam(gameState, team.teamId);
+    const liste = berechneKiMerklisteFuerTeam(gameState, team.teamId, vorher);
+    const handPlaetze = eigeneEintraege.filter((zeile) => zeile.teamId === team.teamId);
+    const handSpieler = new Set(handPlaetze.map((zeile) => zeile.playerId));
+    const ersterRang = handPlaetze.reduce((max, zeile) => Math.max(max, (zeile.priorityRank ?? -1) + 1), 0);
+    // Reihenfolge: Stufe (Wunschziel zuerst), dann Vorsprung, dann Kennung — das ist die Reihenfolge der Scouting-Queue.
+    const geordnet = liste
+      .filter((eintrag) => !handSpieler.has(eintrag.playerId))
+      .sort((a, b) => b.stufe - a.stufe || b.vorsprung - a.vorsprung || (a.playerId < b.playerId ? -1 : 1));
+    geordnet.forEach((eintrag, index) => {
+      neueZeilen.push(wunschEintrag(gameState, spielerJeId, saveId, team.teamId, eintrag, ersterRang + index, createdAtJeSchluessel.get(`${team.teamId}|${eintrag.playerId}`) ?? jetzt));
+    });
+  }
+
+  const { kiMerkliste: _alteForm, ...seasonStateOhneHuelle } = gameState.seasonState;
+  void _alteForm;
+  let naechster: GameState = {
     ...gameState,
     seasonState: {
-      ...gameState.seasonState,
-      kiMerkliste: neu,
+      ...seasonStateOhneHuelle,
+      transferWishlist: [...eigeneEintraege, ...neueZeilen],
       kiMerklisteStand: { seasonId: gameState.season.id, matchdayId: gameState.matchdayState?.matchdayId ?? null },
     },
   };
+  for (const team of kiTeams) naechster = refreshScoutPipeline(naechster, team.teamId);
+  return naechster;
 }
