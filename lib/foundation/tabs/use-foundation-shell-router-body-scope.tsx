@@ -9918,8 +9918,13 @@ export function useFoundationShellRouterBodyScope({
         detail: `${getTeamLockedName(payload.teamId)} ist für ${currentMatchdayDisplayLabel} aktualisiert. KI-Einsatzlisten werden bei Bedarf nachgezogen.`,
       });
     }
+    // KEIN zweiter KI-Batch mehr hinter dem Speichern (21.11.): die Route `PUT /api/lineups/legacy` hat die
+    // KI-Aufstellungen beim Speichern schon erzeugt. Der Client-Stand kennt sie in diesem Augenblick nur noch
+    // nicht — `aiLineupMissingTeamIds` war deshalb sofort wieder > 0 und stiess einen zweiten, voellig
+    // ueberfluessigen Batch plus einen vollen `loadSave` an (zusammen mehrere Sekunden vor stehender
+    // Oberflaeche). Nachgeladen wird jetzt nur der Saisonstand; fehlen die KI-Teams danach wirklich noch,
+    // holt sie der Arena-Eintritt (`arena_open`) nach.
     void reloadLiveSeasonState("manual_apply", { compactReload: true });
-    void ensureAiLineupsForCurrentMatchday("human_lineup_saved");
   };
   const seasonBriefingTeamAxes = selectedIdentity
     ? `${formatWholeNumber(selectedIdentity.pow)}/${formatWholeNumber(selectedIdentity.spe)}/${formatWholeNumber(selectedIdentity.men)}/${formatWholeNumber(selectedIdentity.soc)}`

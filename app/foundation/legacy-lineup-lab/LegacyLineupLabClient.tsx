@@ -1084,6 +1084,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   const [captains, setCaptains] = useState<Record<"d1" | "d2", string>>({ d1: "", d2: "" });
   const [modifiers, setModifiers] = useState<LineupDraftModifiers>(() => createEmptyLineupModifiers());
   const [isBusy, setIsBusy] = useState(false);
+  // Abgabe laeuft: Sofort-Rueckmeldung am Knopf + Doppelklick-Schutz (der Ref greift noch vor dem naechsten Render).
+  const [isSavingLineup, setIsSavingLineup] = useState(false);
+  const speichertAbgabeRef = useRef(false);
   // Eigener Riegel statt `isBusy` (F14/#43): die Sammel-Abgabe laeuft ueber MEHRERE Teams und darf
   // die Bedienung des gerade geoeffneten Teams nicht mitsperren.
   const [sammelAbgabeBusy, setSammelAbgabeBusy] = useState(false);
@@ -3904,19 +3907,28 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
   }
 
   async function handleSaveDraft() {
+    if (speichertAbgabeRef.current) return;
     if (lineupMiniAudit.blockingItems.length > 0) {
       setErrors(lineupMiniAudit.blockingItems.map((item) => `${item.label}: ${item.detail}`));
       setWarnings(lineupMiniAudit.warningItems.map((item) => `${item.label}: ${item.detail}`));
       setMessage("");
       return;
     }
-    const saved = await saveEntries(
-      entries,
-      lineupMiniAudit.status === "warning"
-        ? "Mini-Audit mit Hinweisen bestanden. Draft gespeichert."
-        : "Mini-Audit sauber. Draft gespeichert.",
-      { skipContextReload: source === "sqlite" },
-    );
+    speichertAbgabeRef.current = true;
+    setIsSavingLineup(true);
+    let saved = false;
+    try {
+      saved = await saveEntries(
+        entries,
+        lineupMiniAudit.status === "warning"
+          ? "Mini-Audit mit Hinweisen bestanden. Draft gespeichert."
+          : "Mini-Audit sauber. Draft gespeichert.",
+        { skipContextReload: source === "sqlite" },
+      );
+    } finally {
+      speichertAbgabeRef.current = false;
+      setIsSavingLineup(false);
+    }
     if (saved) {
       // Speichern heisst "ich bin bereit" — NICHT "los geht's". Frueher sprang die
       // Einsatzliste direkt (nach dem Handoff-Overlay) in die Arena; damit war der
@@ -6435,6 +6447,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onOpenPlayer={(playerId, activePlayerId) => openPlayerDetails(playerId, activePlayerId)}
         isReadOnly={isReadOnly}
         isBusy={isBusy}
+        isSavingLineup={isSavingLineup}
         matchdayPreviewCards={matchdayPreviewCards}
         lineupFlowSummary={lineupFlowSummary}
         lineupSaveCta={lineupSaveCta}
