@@ -8,7 +8,7 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { buildPlayerSeasonPerformance } from "@/lib/foundation/player-season-performance";
-import { buildPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
+import { getCachedPlayerRatingContractMap } from "@/lib/foundation/player-rating-contract";
 import { buildTrainingModeDemandRecord } from "@/lib/training/training-mode-demand-service";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
@@ -680,7 +680,7 @@ export function selectTeamCaptain(gameState: GameState, teamId: string): TeamCap
   const rosterIds = new Set(gameState.rosters.filter((entry) => entry.teamId === teamId).map((entry) => entry.playerId));
   const players = gameState.players.filter((player) => rosterIds.has(player.id));
   if (players.length === 0) return null;
-  const ratings = buildPlayerRatingContractMap(gameState);
+  const ratings = getCachedPlayerRatingContractMap(gameState);
   const candidates = players
     .map((player) => {
       const stats = player.attributeSheetStats;

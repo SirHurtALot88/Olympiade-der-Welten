@@ -678,3 +678,52 @@ export function buildPlayerRatingContractMap(
     }).map((row) => [row.playerId, row] as const),
   );
 }
+
+
+/**
+ * LESENDE, ZWISCHENGESPEICHERTE Fassung von `buildPlayerRatingContractMap(gameState)` (ohne Optionen).
+ *
+ * Warum: `selectTeamCaptain` baute die Bewertungskarte der GANZEN Liga (rund 3000 Spieler, samt Punkte-Ledger)
+ * fuer jedes Team und jeden Spieler neu, nur um je Spieler einen MVS-Wert zu lesen. Beim KI-Aufstellungslauf
+ * und beim Spieltagsabschluss war das gemessen am Live-Abbild (21.11.) der groesste Einzelposten (16 s von 39 s).
+ *
+ * Gleiches Ergebnis, nur einmal je Stand: Schluessel sind Identitaet und Laenge der
+ * Listen, aus denen die Karte entsteht, PLUS eine Pruefsumme ueber Gesamtwertung und Kernwerte der Spieler —
+ * wer einen Spieler an Ort und Stelle veraendert, bekommt eine frische Karte. Die Rueckgabe darf NUR gelesen
+ * werden (sie wird geteilt); wer schreiben will, nimmt `buildPlayerRatingContractMap`.
+ */
+type RatingMap = ReturnType<typeof buildPlayerRatingContractMap>;
+const RATING_CACHE_MAX = 3;
+const ratingMapCache: Array<{ signatur: string; refs: unknown[]; map: RatingMap }> = [];
+
+export function getCachedPlayerRatingContractMap(gameState: GameState): RatingMap {
+  // Eingefroren: die Karte kommt fertig aus dem Snapshot im Spielstand (billig) und haengt an dessen Inhalt, nicht an den Listen unten.
+  if (isValuationFrozen(gameState)) return buildPlayerRatingContractMap(gameState);
+  const seasonState = gameState.seasonState;
+  const refs: unknown[] = [
+    gameState.players,
+    gameState.rosters,
+    gameState.disciplines,
+    seasonState.matchdayResults,
+    seasonState.disciplineResults,
+    seasonState.playerDisciplinePerformances,
+  ];
+  let summe = 0;
+  for (const player of gameState.players) {
+    const k = player.coreStats;
+    summe += (player.ovr ?? 0) * 3 + (k?.pow ?? 0) + (k?.spe ?? 0) * 5 + (k?.men ?? 0) * 7 + (k?.soc ?? 0) * 11;
+  }
+  const signatur = `${gameState.season.id}|${refs
+    .map((r) => (Array.isArray(r) ? r.length : -1))
+    .join(",")}|${summe}`;
+  const index = ratingMapCache.findIndex((entry) => entry.signatur === signatur && entry.refs.every((r, i) => r === refs[i]));
+  if (index >= 0) {
+    const [treffer] = ratingMapCache.splice(index, 1);
+    ratingMapCache.unshift(treffer!);
+    return treffer!.map;
+  }
+  const map = buildPlayerRatingContractMap(gameState);
+  ratingMapCache.unshift({ signatur, refs, map });
+  if (ratingMapCache.length > RATING_CACHE_MAX) ratingMapCache.length = RATING_CACHE_MAX;
+  return map;
+}

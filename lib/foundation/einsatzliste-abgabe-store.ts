@@ -9,6 +9,8 @@ export type EinsatzlisteAbgabe = {
   /** `is-ready` | `is-warning` | `is-blocked` — gleiche Klassen wie der globale Weiter-Knopf. */
   statusClass: string;
   onClick: () => void;
+  /** Die Abgabe wird gerade gespeichert: der Knopf zeigt „speichert…“ und ist gesperrt (Doppelklick-Schutz). */
+  busy?: boolean;
 };
 
 let aktuell: EinsatzlisteAbgabe | null = null;
