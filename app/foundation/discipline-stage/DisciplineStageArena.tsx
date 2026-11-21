@@ -1350,6 +1350,8 @@ export default function DisciplineStageArena({
             wert: tr.miniDmPod.teamWert ?? tr.miniDmPod.wert ?? null,
             podId: tr.miniDmPod.podId,
             teamIds: [...tr.miniDmPod.teamIds],
+            // ERGEBNISSKALA E1: der gebuchte 0-10-Wert des Teams in der Gruppe (nur bei E1-Zeilen).
+            skala: tr.ergebnisSkala === "e1" && typeof tr.miniDmPod.wert === "number" ? tr.miniDmPod.wert : null,
           });
         } else if (tr.duellSeiten) {
           map.set(tr.teamId, {
@@ -1357,6 +1359,9 @@ export default function DisciplineStageArena({
             eigen: tr.duellSeiten[0],
             gegner: tr.duellSeiten[1],
             gegnerTeamId: tr.opponentTeamId ?? null,
+            skala: tr.ergebnisSkala === "e1" && Array.isArray(tr.ergebnisNormiert) ? [tr.ergebnisNormiert[0], tr.ergebnisNormiert[1]] : null,
+            verhaeltnis: typeof tr.verhaeltnis === "number" ? tr.verhaeltnis : null,
+            zahl: tr.ergebnisAnzeige ?? null,
           });
         }
       }

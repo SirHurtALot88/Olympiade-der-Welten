@@ -20,6 +20,11 @@ import {
   type DisciplineStageMatchdayPanelProps,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
 import {
+  baueBegegnungen,
+  type Begegnung,
+  type BegegnungTeam,
+} from "@/app/foundation/discipline-stage/spieltagswertung-begegnungen";
+import {
   baueWertungsZeilen,
   beschreibeWertungsErgebnis,
   filtereWertungsZeilen,
@@ -58,6 +63,10 @@ export type DisciplineStageSpieltagswertungProps = Pick<
   /** Wird von der Arena weitergereicht; die neue Wertung braucht sie nicht. */
   modifierBaseByTeam?: DisciplineStageMatchdayPanelProps["modifierBaseByTeam"];
   injuryMarksByTeam?: DisciplineStageMatchdayPanelProps["injuryMarksByTeam"];
+  /** Welche Ansicht beim Öffnen steht (Standard: die Tabelle); der Wechsel bleibt Sache des Nutzers. */
+  anfangsAnsicht?: "wertung" | "begegnungen";
+  /** Welcher Filter beim Öffnen steht (Standard: beide Ligen getrennt bzw. alle Teams). */
+  anfangsFilter?: WertungsFilter;
 };
 
 /** Zahl mit Komma, eine Nachkommastelle (Mockup-Schreibweise). */
@@ -117,7 +126,7 @@ function DisziplinZelle({ seite, kurz = false }: { seite: WertungsSeitenWerte; k
     );
   }
   const marke = wertungsMarke(seite.ergebnis);
-  const e = seite.ergebnis;
+  const a = seite.anzeige;
   if (kurz) {
     return (
       <span className="dz">
@@ -129,21 +138,43 @@ function DisziplinZelle({ seite, kurz = false }: { seite: WertungsSeitenWerte; k
   return (
     <span className="dz">
       {marke ? <span className={`pl ${marke.ton}`}>{marke.text}</span> : null}
-      <span className="t">
-        {e?.art === "duell" ? `${de(e.eigen, 0)} : ${de(e.gegner, 0)}` : e?.art === "gruppe" && e.wert != null ? de(e.wert, 0) : ""}
+      <span className="t" title={a ? `${a.einheit}${a.hinweis ? ` — ${a.hinweis}` : ""}` : undefined}>
+        {a?.nativ ?? (seite.gruppe ? seite.gruppe.wertText ?? "" : "")}
       </span>
+      {a?.diff && a.diff !== "±0" ? <small className={`df t ${a.diffTon}`}>{a.diff}</small> : null}
       <em className={`t${seite.punkte ? "" : " o"}`}>{punkteText(seite.punkte)}</em>
+    </span>
+  );
+}
+
+/** Form- bzw. Captain-Wirkung beider Disziplinen einer Zeile nebeneinander: "+3 · −2", nicht Gesetztes als "–". */
+function PaarZelle({ a, b, feld }: { a: WertungsSeitenWerte; b: WertungsSeitenWerte; feld: "form" | "captain" }) {
+  const wert = (x: WertungsSeitenWerte): number | null => {
+    if (!x.aufgedeckt) return null;
+    return feld === "form" ? (x.formLabel != null ? x.form : null) : x.captain;
+  };
+  const teil = (x: WertungsSeitenWerte) => {
+    const w = wert(x);
+    return <i className={w == null ? "null" : ton(w)}>{w == null ? "–" : vz(w)}</i>;
+  };
+  return (
+    <span className="re t pz" data-testid={`spieltagswertung-paar-${feld}`}>
+      {teil(a)}
+      <u>·</u>
+      {teil(b)}
     </span>
   );
 }
 
 function SeitenBlock({
   titel,
+  disziplinId,
   seite,
   zeile,
   nameVon,
 }: {
   titel: string;
+  disziplinId: string | null;
   seite: WertungsSeitenWerte;
   zeile: WertungsZeile;
   nameVon: (teamId: string) => string | null;
@@ -161,7 +192,7 @@ function SeitenBlock({
       </div>
     );
   }
-  const wort = beschreibeWertungsErgebnis(seite.ergebnis, nameVon);
+  const wort = beschreibeWertungsErgebnis(seite.ergebnis, nameVon, disziplinId, seite.anzeige);
   const hatCaptain = seite.captain != null;
   return (
     <div className="bl" data-testid={`spieltagswertung-blatt-${zeile.teamId}-${titel}`}>
@@ -183,12 +214,16 @@ function SeitenBlock({
           <b className={`t ${hatCaptain ? ton(seite.captain ?? 0) : "null"}`}>{hatCaptain ? vz(seite.captain ?? 0) : "nicht gesetzt"}</b>
           {hatCaptain ? <i>Score</i> : null}
         </div>
-        <div>
-          <small>Mutator-Bonus</small>
-          <b className={`t${seite.mutator ? "" : " null"}`} style={seite.mutator ? { color: "var(--drei)" } : undefined}>
-            {seite.mutator ? `◆ +${de(seite.mutator)}` : "keiner"}
-          </b>
-          {seite.mutator ? <i>Pkt</i> : null}
+        <div data-testid="spieltagswertung-differenz">
+          <small>{seite.anzeige ? "Differenz" : seite.gruppe ? "Wertung in der Gruppe" : "Differenz"}</small>
+          {seite.anzeige?.diff ? (
+            <b className={`t ${seite.anzeige.diffTon}`}>{seite.anzeige.diff}</b>
+          ) : seite.gruppe?.skala != null ? (
+            <b className="t">{seite.gruppe.skala}</b>
+          ) : (
+            <b className="t null">–</b>
+          )}
+          {seite.anzeige?.skala ? <i>Skala {seite.anzeige.skala}</i> : seite.gruppe?.skala != null ? <i>von 10</i> : null}
         </div>
       </div>
       <div className="dsp">
@@ -221,6 +256,8 @@ function Blatt({
   zeile,
   d1Name,
   d2Name,
+  d1Id,
+  d2Id,
   d1Revealed,
   d2Revealed,
   nameVon,
@@ -228,6 +265,8 @@ function Blatt({
   zeile: WertungsZeile;
   d1Name: string;
   d2Name: string;
+  d1Id: string | null;
+  d2Id: string | null;
   d1Revealed: boolean;
   d2Revealed: boolean;
   nameVon: (teamId: string) => string | null;
@@ -261,9 +300,9 @@ function Blatt({
           <small>Gesamt heute</small>
         </div>
       </div>
-      <SeitenBlock titel={d1Name} seite={zeile.d1} zeile={zeile} nameVon={nameVon} />
-      <SeitenBlock titel={d2Name} seite={zeile.d2} zeile={zeile} nameVon={nameVon} />
-      <div className="dsum">
+      <SeitenBlock titel={d1Name} disziplinId={d1Id} seite={zeile.d1} zeile={zeile} nameVon={nameVon} />
+      <SeitenBlock titel={d2Name} disziplinId={d2Id} seite={zeile.d2} zeile={zeile} nameVon={nameVon} />
+      <div className={`dsum${zeile.mutator > 0 ? "" : " drei"}`}>
         <div>
           <span>{d1Name}</span>
           <strong className="t">{zeile.d1.aufgedeckt ? punkteText(zeile.d1.punkte) : "–"}</strong>
@@ -272,18 +311,127 @@ function Blatt({
           <span>+ {d2Name}</span>
           <strong className="t">{zeile.d2.aufgedeckt ? punkteText(zeile.d2.punkte) : "–"}</strong>
         </div>
-        <div>
-          <span>+ Mutator ◆</span>
-          <strong className="t" style={{ color: zeile.mutator ? "var(--drei)" : "var(--stumm)" }}>
-            {alles ? de(zeile.mutator) : "–"}
-          </strong>
-        </div>
+        {zeile.mutator > 0 ? (
+          <div>
+            <span>+ Mutator ◆</span>
+            <strong className="t" style={{ color: "var(--drei)" }}>
+              {alles ? de(zeile.mutator) : "–"}
+            </strong>
+          </div>
+        ) : null}
         <div className="g">
           <span>= Gesamt</span>
           <strong className="t">{alles ? de(zeile.gesamt) : "–"}</strong>
         </div>
       </div>
     </section>
+  );
+}
+
+function BegegnungTeamKnopf({
+  team,
+  gewaehlt,
+  rechts,
+  onWaehle,
+}: {
+  team: BegegnungTeam;
+  gewaehlt: boolean;
+  rechts?: boolean;
+  onWaehle: (teamId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`bt${rechts ? " re" : ""}${team.istEigen ? " e" : ""}${gewaehlt ? " sel" : ""}`}
+      aria-pressed={gewaehlt}
+      data-testid={`spieltagswertung-begegnung-team-${team.teamId}`}
+      onClick={() => onWaehle(team.teamId)}
+    >
+      {rechts ? null : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={team.logoUrl ?? undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = "hidden")} />
+      )}
+      <b>{team.name}</b>
+      {team.istEigen ? <span className="du">Du</span> : team.mensch ? <span className="mg">{team.mensch}</span> : null}
+      {rechts ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={team.logoUrl ?? undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = "hidden")} />
+      ) : null}
+    </button>
+  );
+}
+
+/** Wer gegen wen, je Disziplin: Duelle mit Ergebnis, Differenz und Skala, Vierergruppen mit allen vier Plätzen. */
+function BegegnungenAnsicht({
+  spalten,
+  auswahlTeamId,
+  onWaehle,
+}: {
+  spalten: Array<{ titel: string; art: string; aufgedeckt: boolean; begegnungen: Begegnung[] }>;
+  auswahlTeamId: string | null;
+  onWaehle: (teamId: string) => void;
+}) {
+  return (
+    <div
+      className="begs"
+      data-testid="spieltagswertung-begegnungen"
+      // Vierergruppen brauchen vier Teams nebeneinander und damit mehr Breite als ein Duell.
+      style={{ gridTemplateColumns: spalten.map((sp) => (sp.art === "Vierergruppen" ? "minmax(0, 1.35fr)" : "minmax(0, 1fr)")).join(" ") }}
+    >
+      {spalten.map((sp) => (
+        <section key={sp.titel} className="pan beg" aria-label={`Begegnungen ${sp.titel}`}>
+          <div className="lk">
+            <h3>{sp.titel}</h3>
+            <span className="n t">{sp.aufgedeckt ? `${sp.begegnungen.length} ${sp.art}` : "noch nicht gespielt"}</span>
+          </div>
+          <div className="body">
+            {!sp.aufgedeckt ? (
+              <div className="leer">
+                <Icon name="schloss" /> Wird erst mit dem Abpfiff aufgedeckt.
+              </div>
+            ) : sp.begegnungen.length === 0 ? (
+              <div className="leer">Keine Begegnungen in diesem Filter.</div>
+            ) : (
+              sp.begegnungen.map((b) =>
+                b.art === "duell" ? (
+                  <div key={b.schluessel} className={`br${b.istEigen ? " e" : ""}`} data-testid="spieltagswertung-begegnung-duell">
+                    <BegegnungTeamKnopf team={b.a} gewaehlt={b.a.teamId === auswahlTeamId} onWaehle={onWaehle} />
+                    <span className="sc t" title={b.anzeige.hinweis ?? b.anzeige.einheit}>
+                      {b.anzeige.nativ ?? "Sieg"}
+                    </span>
+                    <BegegnungTeamKnopf team={b.b} gewaehlt={b.b.teamId === auswahlTeamId} rechts onWaehle={onWaehle} />
+                    <span className={`df t ${b.anzeige.diffTon}`}>{b.anzeige.diff ?? ""}</span>
+                    <span className="sk t">{b.anzeige.skala ?? ""}</span>
+                  </div>
+                ) : (
+                  <div key={b.schluessel} className={`bg${b.istEigen ? " e" : ""}`} data-testid="spieltagswertung-begegnung-gruppe">
+                    {b.plaetze.map((p) => (
+                      <button
+                        type="button"
+                        key={p.teamId}
+                        className={`gp${p.istEigen ? " e" : ""}${p.teamId === auswahlTeamId ? " sel" : ""}`}
+                        aria-pressed={p.teamId === auswahlTeamId}
+                        onClick={() => onWaehle(p.teamId)}
+                        title={p.name}
+                      >
+                        <span className={`pl ${p.platz === 1 ? "s" : p.platz === 2 ? "z" : "n"}`}>{p.platz}.</span>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.logoUrl ?? undefined} alt="" onError={(e) => (e.currentTarget.style.visibility = "hidden")} />
+                        <b>{p.name}</b>
+                        <span className="t w">
+                          {p.wert ?? ""}
+                          {p.skala != null ? <i> → {p.skala}</i> : null}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ),
+              )
+            )}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -332,9 +480,10 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
     ],
   );
 
-  const [filterWahl, setFilterWahl] = useState<WertungsFilter | null>(null);
+  const [filterWahl, setFilterWahl] = useState<WertungsFilter | null>(props.anfangsFilter ?? null);
   const [sortierung, setSortierung] = useState<WertungsSortierung>("ges");
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  const [ansicht, setAnsicht] = useState<"wertung" | "begegnungen">(props.anfangsAnsicht ?? "wertung");
 
   const mitLiga = hatLigaTrennung(alleZeilen);
   const gruppeDa = findeEigeneGruppe(alleZeilen, ownTeamId) != null;
@@ -350,6 +499,17 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
       : zeilen.find((z) => z.istEigen)?.teamId ?? zeilen[0]?.teamId ?? null;
   const auswahl = zeilen.find((z) => z.teamId === auswahlTeamId) ?? null;
   const nameVon = (teamId: string) => alleZeilen.find((z) => z.teamId === teamId)?.name ?? null;
+
+  const sichtbareIds = useMemo(() => new Set(zeilen.map((z) => z.teamId)), [zeilen]);
+  const begegnungSpalten = useMemo(() => {
+    const filtern = (liste: Begegnung[]) =>
+      liste.filter((b) => (b.art === "duell" ? sichtbareIds.has(b.a.teamId) || sichtbareIds.has(b.b.teamId) : b.plaetze.some((p) => sichtbareIds.has(p.teamId))));
+    const art = (seite: "d1" | "d2") => (baueBegegnungen(alleZeilen, seite, ownTeamId).some((b) => b.art === "gruppe") ? "Vierergruppen" : "Begegnungen");
+    return [
+      { titel: d1?.displayName ?? "Disziplin 1", art: art("d1"), aufgedeckt: d1Revealed, begegnungen: filtern(baueBegegnungen(alleZeilen, "d1", ownTeamId)) },
+      { titel: d2?.displayName ?? "Disziplin 2", art: art("d2"), aufgedeckt: d2Revealed, begegnungen: filtern(baueBegegnungen(alleZeilen, "d2", ownTeamId)) },
+    ];
+  }, [alleZeilen, sichtbareIds, ownTeamId, d1, d2, d1Revealed, d2Revealed]);
 
   if (alleZeilen.length === 0) return null;
 
@@ -386,6 +546,20 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
             {d2Name}
           </span>
           <span className="sp" />
+          <div className="filt ansicht" role="group" aria-label="Ansicht wählen">
+            <button type="button" className={ansicht === "wertung" ? "an" : ""} aria-pressed={ansicht === "wertung"} onClick={() => setAnsicht("wertung")}>
+              Wertung
+            </button>
+            <button
+              type="button"
+              className={ansicht === "begegnungen" ? "an" : ""}
+              aria-pressed={ansicht === "begegnungen"}
+              data-testid="spieltagswertung-ansicht-begegnungen"
+              onClick={() => setAnsicht("begegnungen")}
+            >
+              Begegnungen
+            </button>
+          </div>
           <div className="filt" role="group" aria-label="Teams filtern">
             {FILTER_NAMEN.filter(([wert]) =>
               wert === "beide" || wert === "liga1" || wert === "liga2" ? mitLiga : wert === "alle" ? !mitLiga : wert === "gruppe" ? gruppeDa : wert === "mensch" ? hatMenschen : true,
@@ -403,7 +577,9 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
           </div>
         </div>
 
-        {beide ? (
+        {ansicht === "begegnungen" ? (
+          <BegegnungenAnsicht spalten={begegnungSpalten} auswahlTeamId={auswahlTeamId} onWaehle={setGewaehlt} />
+        ) : beide ? (
           <div className="ligen" data-testid="spieltagswertung-ligen">
             {bloecke.map((b) => (
               <section
@@ -460,8 +636,8 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
         <section className="pan tab" data-testid="spieltagswertung-tabelle">
           <div className="grp">
             <span style={{ gridColumn: "1/3", border: 0 }} />
-            <span style={{ gridColumn: "3/8" }}>Ergebnis · Punkte für die Tabelle</span>
-            <span style={{ gridColumn: "8/10" }}>Wirkung im Score · keine Punkte</span>
+            <span style={{ gridColumn: "3/6" }}>Ergebnis · Differenz · Punkte für die Tabelle</span>
+            <span style={{ gridColumn: "6/8" }}>Wirkung im Score · keine Punkte</span>
             <span>Saison-Rang</span>
           </div>
           <div className="hd">
@@ -469,11 +645,9 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
             {kopf("ges", "Team")}
             {kopf("d1", d1Name)}
             {kopf("d2", d2Name)}
-            {kopf("pkt", "Punkte", "re")}
-            {kopf("mut", "◆ Mutator", "re")}
             {kopf("ges", "Gesamt", "re")}
-            {kopf("form", "Form", "re")}
-            {kopf("cap", "Captain", "re")}
+            {kopf("form", "Form D1 · D2", "re")}
+            {kopf("cap", "Captain D1 · D2", "re")}
             {kopf("sai", "vor → nach", "re")}
           </div>
           <div className="body">
@@ -501,13 +675,9 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
                 </span>
                 <DisziplinZelle seite={z.d1} />
                 <DisziplinZelle seite={z.d2} />
-                <span className="re t">{z.d1.aufgedeckt || z.d2.aufgedeckt ? de(z.punkte) : "–"}</span>
-                <span className="re t" style={{ color: z.mutator ? "var(--drei)" : "var(--stumm)" }}>
-                  {z.mutator ? `+${de(z.mutator)}` : "–"}
-                </span>
                 <span className="ges t">{gesperrt ? <Icon name="schloss" /> : de(z.gesamt)}</span>
-                <span className={`re t ${z.hatForm ? ton(z.form) : "null"}`}>{z.hatForm ? vz(z.form) : "–"}</span>
-                <span className={`re t ${z.hatCaptain ? ton(z.captain) : "null"}`}>{z.hatCaptain ? vz(z.captain) : "–"}</span>
+                <PaarZelle a={z.d1} b={z.d2} feld="form" />
+                <PaarZelle a={z.d1} b={z.d2} feld="captain" />
                 <span className="sr t">
                   {zeigeLiga && z.liga ? <i>{z.liga === "liga1" ? "L1" : "L2"}</i> : null}
                   <i>{z.vorRang != null ? `${z.vorRang}.` : "–"}</i>→
@@ -520,8 +690,8 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
           </div>
           <div className="tfuss">
             <b>#</b> Rang nur dieses Spieltags nach Gesamt · <b>S / N</b> Sieg, Niederlage · <b>1.–4.</b> Platz in der Vierergruppe ·{" "}
-            <b>Gesamt</b> = Punkte + Mutator · <b>Form / Captain</b> haben die Aufstellung stärker oder schwächer gemacht, sie zählen nicht
-            zusätzlich
+            <b>Differenz</b> = eigener Wert minus Gegner (bei Zeiten: Vorsprung) · <b>Form / Captain</b> je Disziplin haben die Aufstellung
+            stärker oder schwächer gemacht, sie zählen nicht zusätzlich
           </div>
         </section>
         )}
@@ -531,6 +701,8 @@ export default function DisciplineStageSpieltagswertung(props: DisciplineStageSp
             zeile={auswahl}
             d1Name={d1Name}
             d2Name={d2Name}
+            d1Id={d1?.disciplineId ?? null}
+            d2Id={d2?.disciplineId ?? null}
             d1Revealed={d1Revealed}
             d2Revealed={d2Revealed}
             nameVon={nameVon}

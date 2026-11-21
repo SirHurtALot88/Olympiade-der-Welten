@@ -1,3 +1,4 @@
+import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import type { LeagueTier } from "@/lib/season/league-split";
 // `import type` -- rein typseitig, erzeugt keine Laufzeit-Zirkularitaet trotz des
@@ -2894,6 +2895,8 @@ export type DisciplineResultRecord = {
    * lib/battle/arena-headless-runner.ts.
    */
   momente?: ArenaMomentEintrag[] | null;
+  /** ANZEIGE-ZAHL (21.11., Spieltagswertung): Zeitsumme bzw. besiegte Gegner, s. `ErgebnisAnzeigeZahl`. */
+  ergebnisAnzeige?: ErgebnisAnzeigeZahl | null;
   /**
    * SICHTBARE ARENA-AUSFÄLLE (Plan docs/design/battle-arena-auto-run-anbindung-plan-16-10.md
    * Abschnitt 3.2 Punkt 3, PR 1): additiv und optional wie `momente` -- aeltere Zeilen (vor dieser

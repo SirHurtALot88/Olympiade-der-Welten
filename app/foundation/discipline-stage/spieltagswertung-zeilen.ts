@@ -27,6 +27,13 @@ import {
   type MatchdayPanelTeamMeta,
   type MatchdayPanelTeamResult,
 } from "@/app/foundation/discipline-stage/DisciplineStageMatchdayPanel";
+import {
+  BESIEGT_DISZIPLINEN,
+  duellErgebnisAnzeige,
+  duellErgebnisText,
+  gruppenWertText,
+  type DuellErgebnisAnzeige,
+} from "@/lib/foundation/ergebnis-anzeige";
 import type { MatchdayTeamModifiers } from "@/lib/foundation/matchday-team-modifiers";
 import { teileNachLiga } from "@/lib/season/liga-raenge";
 
@@ -42,6 +49,12 @@ export type WertungsSeitenWerte = {
   /** Punkte dieser Seite (`d1Points`/`d2Points`), `null` = unbekannt oder verdeckt. */
   punkte: number | null;
   ergebnis: MatchdayPanelSideResult | null;
+  /** Duell-Ergebnis fuer die Anzeige (Punkte, Zeitsumme, besiegte Gegner, Differenz, E1-Skala); `null` bei Gruppen/ohne. */
+  anzeige: DuellErgebnisAnzeige | null;
+  /** Gebuchtes Verhaeltnis (±D) dieses Teams in dieser Begegnung, `null` ohne. */
+  verhaeltnis: number | null;
+  /** Gruppe (Vierer-Pod): Gruppenwert als Text (Zielzeit/Punkte) und E1-Wert; `null` bei Duellen. */
+  gruppe: { platz: number; wertText: string | null; skala: number | null; teamIds: string[] } | null;
   formLabel: string | null;
   form: number | null;
   captain: number | null;
@@ -113,6 +126,9 @@ function seitenWerte(
       aufgedeckt: false,
       punkte: null,
       ergebnis: null,
+      anzeige: null,
+      verhaeltnis: null,
+      gruppe: null,
       formLabel: null,
       form: null,
       captain: null,
@@ -136,10 +152,40 @@ function seitenWerte(
         : res.d2DisciplineId === disziplin?.disciplineId
           ? res.d2Ergebnis ?? null
           : null;
+  const duell = ergebnis?.art === "duell" ? ergebnis : null;
+  const gruppe = ergebnis?.art === "gruppe" ? ergebnis : null;
+  // BREAKING AELTERER SPIELTAGE: gebucht ist nur die Zahl der Ueberlebenden. Besiegte Gegner = Spielerzahl des
+  // Gegners minus dessen Ueberlebende; die Spielerzahlen kommen aus den gebuchten Einsatzlisten. Fehlen sie, bleibt es
+  // beim ehrlichen Hinweis statt einer erfundenen Zahl.
+  let zahl = duell?.zahl ?? null;
+  if (duell && !zahl && disziplin && BESIEGT_DISZIPLINEN.has(disziplin.disciplineId) && duell.gegnerTeamId) {
+    const nEigen = eingabe.playersByTeam?.get(teamId)?.[seite]?.length ?? 0;
+    const nGegner = eingabe.playersByTeam?.get(duell.gegnerTeamId)?.[seite]?.length ?? 0;
+    if (nEigen > 0 && nGegner > 0 && duell.eigen <= nEigen && duell.gegner <= nGegner) {
+      zahl = { art: "besiegt", werte: [nGegner - duell.gegner, nEigen - duell.eigen] };
+    }
+  }
   return {
     aufgedeckt: true,
     punkte,
     ergebnis,
+    anzeige: duell
+      ? duellErgebnisAnzeige({
+          disciplineId: disziplin?.disciplineId ?? null,
+          seiten: [duell.eigen, duell.gegner],
+          anzeige: zahl,
+          skala: duell.skala ?? null,
+        })
+      : null,
+    verhaeltnis: duell?.verhaeltnis ?? null,
+    gruppe: gruppe
+      ? {
+          platz: gruppe.platz,
+          wertText: gruppenWertText(disziplin?.disciplineId ?? null, gruppe.wert),
+          skala: gruppe.skala ?? null,
+          teamIds: gruppe.teamIds,
+        }
+      : null,
     formLabel: mods?.formCardLabel ?? null,
     form: mods?.formModifier ?? 0,
     captain: mods?.captainUsed ? mods.captainBonus ?? 0 : mods?.captainBonus ?? null,
@@ -336,19 +382,37 @@ export function gruppiereNachLiga(
     .filter((b) => b.zeilen.length > 0);
 }
 
-/** Ergebnis einer Seite in einem Satz (Blatt rechts), z. B. „Sieg 78 : 71 gegen Natures Wrath". */
+/**
+ * Ergebnis einer Seite in einem Satz (Blatt rechts), z. B. „Sieg 78 : 71 (+7) gegen Natures Wrath → 7 : 4“.
+ * Zeitfahren und Staffel nennen die Zeiten, Breaking die besiegten Gegner (`duellErgebnisAnzeige`).
+ */
 export function beschreibeWertungsErgebnis(
   ergebnis: MatchdayPanelSideResult | null,
   teamName: (teamId: string) => string | null,
+  disciplineId: string | null = null,
+  /** Bereits berechnete Anzeige der Seite (kennt auch die abgeleiteten besiegten Gegner aelterer Breaking-Spieltage). */
+  vorgabe: DuellErgebnisAnzeige | null = null,
 ): string | null {
   if (!ergebnis) return null;
   if (ergebnis.art === "duell") {
-    const wort = ergebnis.eigen > ergebnis.gegner ? "Sieg" : ergebnis.eigen < ergebnis.gegner ? "Niederlage" : "Unentschieden";
+    const a =
+      vorgabe ??
+      duellErgebnisAnzeige({
+        disciplineId,
+        seiten: [ergebnis.eigen, ergebnis.gegner],
+        anzeige: ergebnis.zahl ?? null,
+        skala: ergebnis.skala ?? null,
+      });
+    const wort = a.ausgang === "sieg" ? "Sieg" : a.ausgang === "niederlage" ? "Niederlage" : "Unentschieden";
     const gegner = ergebnis.gegnerTeamId ? teamName(ergebnis.gegnerTeamId) : null;
-    return `${wort} ${formatZahl(ergebnis.eigen)} : ${formatZahl(ergebnis.gegner)}${gegner ? ` gegen ${gegner}` : ""}`;
+    const stand = duellErgebnisText({ ...a, skala: null });
+    const diff = a.diff && a.diff !== "±0" ? ` (${a.diff})` : "";
+    const skala = a.skala ? ` → ${a.skala}` : "";
+    return `${wort}${stand ? ` ${stand}` : ""}${diff}${gegner ? ` gegen ${gegner}` : ""}${skala}`;
   }
-  const wert = ergebnis.wert != null ? ` · Gruppenwert ${formatZahl(ergebnis.wert)}` : "";
-  return `Platz ${ergebnis.platz} von ${ergebnis.teamIds.length}${wert}`;
+  const wert = ergebnis.wert != null ? ` · Gruppenwert ${gruppenWertText(disciplineId, ergebnis.wert)}` : "";
+  const skala = ergebnis.skala != null ? ` → ${ergebnis.skala}` : "";
+  return `Platz ${ergebnis.platz} von ${ergebnis.teamIds.length}${wert}${skala}`;
 }
 
 /** Marke in der Tabellenzelle: S/N/U für Duelle, „1." bis „4." für Gruppen. */

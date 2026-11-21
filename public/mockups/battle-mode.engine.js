@@ -44877,8 +44877,11 @@
       // (auch die 1/0 von `seiten`) ohne ",0" -- dasselbe Muster wie `f1` im Takeshi-Zweig unten.
       // Reine Anzeige; Punkte/Wertung selbst bleiben unveraendert.
       const fmt=(v)=>typeof v==="number"&&isFinite(v)?v.toFixed(1).replace(/\.0$/,"").replace(".",","):v;
+      // ANZEIGE-ZAHL (21.11., Spieltagswertung): die beiden Zeitsummen in ANGEZEIGTEN Sekunden (wie `zusatz`),
+      // nur am echten Ende; reine Nachlese, `seiten`/Wertung unberuehrt.
+      const zeiten=(alleFertig&&beideVollstaendig)?[bahnRealSek(summe[0]),bahnRealSek(summe[1])]:null;
       return {seiten, suffix:alleFertig?"nach Zeitsumme":"Zeitsumme (Hochrechnung)",
-        punkte:w.punkte, gewertet:alleFertig, zusatz, bannerZusatz, delta, deltaSeite, fmt};
+        punkte:w.punkte, gewertet:alleFertig, zusatz, bannerZusatz, delta, deltaSeite, fmt, zeiten};
     }
     // STAFFEL (Prototyp 06.09.): ZWEI Groessen, bewusst nicht eine. Das RENNEN entscheidet
     // die Mannschaft, die zuerst im Ziel ist (1 : 0) — eine Summe von Rangpunkten je
@@ -44914,6 +44917,8 @@
       }
       return {seiten, suffix:(z[0]!=null||z[1]!=null)?"nach Zieleinlauf":"in Führung",
         punkte:w.punkte, gewertet:z[0]!=null||z[1]!=null,
+        // ANZEIGE-ZAHL (21.11., Spieltagswertung): beide Zielzeiten in angezeigten Sekunden, nur wenn beide im Ziel.
+        zeiten:z[0]!=null&&z[1]!=null?[bahnRealSek(z[0]),bahnRealSek(z[1])]:null,
         zusatz:z[0]!=null&&z[1]!=null?fmtZielzeit(z[0])+" gegen "+fmtZielzeit(z[1]):null,
         // SIEGERZEIT ZUERST (QA 16.11., Fix-Paket A): "AA gewinnt / 3:12,4 gegen 2:40,9" nannte die
         // HEIMzeit zuerst, auch wenn der Gast gewann -- gelesen wie "3:12,4 schlaegt 2:40,9". Dieselben
@@ -72041,8 +72046,12 @@
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
       const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!u.raus).length;
       const seiten=[alive(0),alive(1)];
+      // ANZEIGE-ZAHL (21.11., Spieltagswertung): besiegte Gegner je Seite (Chris: Breaking zaehlt besiegte Gegner, nicht
+      // 1 : 0). Seite A besiegt die ausgeschiedenen Spieler von B und umgekehrt. Nur Nachlese.
+      const gesamt=(s)=>TEILNEHMER.filter(u=>u.side===s).length;
+      const anzeige={art:"besiegt",werte:[gesamt(1)-alive(1),gesamt(0)-alive(0)]};
       M.zurueck(g);
-      return {disziplin:bd, seiten, boxscore};
+      return {disziplin:bd, seiten, boxscore, anzeige};
     },
     // I-SPY-SONDE (PR 2, Bauplan 7.2/PR-0-Vorschlag "schatzsuchProbe()"): rein lesend, wie
     // spieleBuehneAuftritt() direkt darueber, aber zusaetzlich mit den additiven Feldern
@@ -72091,8 +72100,11 @@
         ?({name:n, wert:punkteVonName.get(n)??0, duelle:duelleVonName.get(n)??0})
         :({name:n, wert:punkteVonName.get(n)??0}));
       const seiten=[st.seiten[0], st.seiten[1]];
+      // ANZEIGE-ZAHL (21.11., Spieltagswertung): Zeitfahren/Staffel buchen nur "1 : 0" -- die Zeiten stehen hier, damit
+      // die Wertung die Summe zeigen kann. Nur Nachlese, `seiten` und `boxscore` bleiben unberuehrt.
+      const anzeige=st.zeiten?{art:"zeit",werte:[st.zeiten[0],st.zeiten[1]]}:null;
       M.zurueck(g);
-      return {disziplin:bd, seiten, boxscore};
+      return anzeige?{disziplin:bd, seiten, boxscore, anzeige}:{disziplin:bd, seiten, boxscore};
     },
     // POD-FORMAT (01.11.): N Teams auf einer Bahn, s. spieleBahnPod()/bahnPodSonde() oben.
     // Eigener Einstieg neben spieleBahn() — der Duell-Pfad bleibt unangefasst.
