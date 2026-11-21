@@ -15,8 +15,8 @@ import PlayerPixelSprite from "@/app/foundation/PlayerPixelSprite";
 import type { TrainingCompactClientProps } from "@/app/foundation/training-compact/TrainingCompactClient";
 import { getClassIconSrc } from "@/app/foundation/classVisuals";
 import { klassenKartenfarbe } from "@/app/foundation/KlassenFarbTag";
-import { BcHero, BcIcon, BcSeg, BcTable, type BcTableColumn } from "@/components/foundation/broadcast";
-import { getStaticTeamLogoUrl } from "@/lib/data/mediaAssets";
+import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
+import { BcIcon, BcSeg, BcTable, type BcTableColumn } from "@/components/foundation/broadcast";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { prognostiziereDisziplinTraining } from "@/lib/training/disziplin-trainings-prognose";
 import {
@@ -99,7 +99,11 @@ function KlasseTag({ klasse }: { klasse: string }) {
   const f = klassenKartenfarbe(klasse);
   const src = getClassIconSrc(klasse);
   return (
-    <span className="te-klasse" style={f ? ({ "--kf": f.farbe } as CSSProperties) : undefined} title={f ? `${klasse} · ${f.achse}` : klasse}>
+    <span
+      className="te-klasse"
+      style={f ? ({ "--kf": f.farbe } as CSSProperties) : undefined}
+      title={f ? `${klasse} · ${f.achse}` : klasse}
+    >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={src} alt="" width={16} height={16} loading="lazy" />
@@ -794,7 +798,9 @@ function SpielerAnsicht({
           <PlayerPixelSprite playerId={zeile.playerId} size={200} dir="south" anim="walk" fallback={<Medaillon zeile={zeile} />} />
           <div className="te-sp-name">
             <h3>{zeile.name}</h3>
-            <p><KlasseTag klasse={zeile.klasse} /></p>
+            <p>
+              <KlasseTag klasse={zeile.klasse} />
+            </p>
           </div>
         </div>
         <div className="te-blick__plan">
@@ -927,6 +933,32 @@ function PlanAnsicht({
     [gameState, teamId, zeile, kontext],
   );
   const aenderungen = Object.entries(entwurf).filter(([, e]) => e.ziel || e.modus);
+  // Vorschau je (Ziel, Intensität): jede Rechnung ist eine volle Spieltags-Progression. Pro Render waren es bis zu acht;
+  // jetzt je Spieler und Spielstand einmal pro Kombination (Cache), damit Hover und Auswahl den Browser nicht belasten.
+  const vorschauPlayerId = zeile?.playerId ?? null;
+  const vorschauDisz = Array.from(
+    new Set([zeile?.ziel?.disziplinId, entwurf[zeile?.playerId ?? ""]?.ziel?.disziplinId].filter((x): x is string => Boolean(x))),
+  ).join("|");
+  const vorschauMap = useMemo(() => {
+    const karte = new Map<string, ReturnType<typeof prognostiziereSpieltagsTraining>>();
+    if (!vorschauPlayerId) return karte;
+    for (const disziplinId of vorschauDisz.split("|").filter(Boolean)) {
+      for (const weg of [0, 1, 2] as const) {
+        for (const modus of ["leicht", "mittel", "hart"] as const) {
+          karte.set(
+            `${disziplinId}:${weg}:${modus}`,
+            prognostiziereSpieltagsTraining({ gameState, playerId: vorschauPlayerId, ziel: { disziplinId, weg }, modus, kontext }),
+          );
+        }
+      }
+    }
+    return karte;
+  }, [gameState, kontext, vorschauPlayerId, vorschauDisz]);
+  const vorschau = (ziel: { disziplinId: string; weg: number } | null, modus: PlayerTrainingMode) => {
+    if (!ziel) return null;
+    const erg = vorschauMap.get(`${ziel.disziplinId}:${ziel.weg}:${modus}`);
+    return erg && !erg.verletzt ? erg : null;
+  };
   if (!zeile) return <div className="te-tafel te-leer">Keine Spieler im Kader.</div>;
 
   const wahl = entwurf[zeile.playerId] ?? {};
@@ -944,17 +976,6 @@ function PlanAnsicht({
       return rest;
     });
 
-  const vorschau = (ziel: { disziplinId: string; weg: number } | null, modus: PlayerTrainingMode) => {
-    if (!ziel) return null;
-    const erg = prognostiziereSpieltagsTraining({
-      gameState,
-      playerId: zeile.playerId,
-      ziel: { ...ziel, weg: ziel.weg as 0 | 1 | 2 },
-      modus,
-      kontext,
-    });
-    return erg && !erg.verletzt ? erg : null;
-  };
   const jetzt = vorschau(zeile.ziel ? { disziplinId: zeile.ziel.disziplinId, weg: zeile.ziel.weg } : null, zeile.modus);
   const neu = vorschau(aktZiel, aktModus);
   const wege = aktZiel ? wegeFuerDisziplin(aktZiel.disziplinId) : [];
@@ -1234,7 +1255,6 @@ export default function TrainingModern(props: TrainingModernProps) {
   const {
     gameState,
     selectedTeam,
-    seasonLabel,
     summary,
     playerRows,
     managementLocked = false,
@@ -1281,11 +1301,6 @@ export default function TrainingModern(props: TrainingModernProps) {
     [gameState, selectedTeam.teamId, aktiv, kontext],
   );
 
-  const spieltag = (() => {
-    const ids = gameState.season.matchdayIds ?? [];
-    const i = matchdayId ? ids.indexOf(matchdayId) : -1;
-    return { nr: i >= 0 ? i + 1 : null, von: ids.length };
-  })();
   const gesperrt = managementLocked;
 
   const uebernehmen = () => {
@@ -1312,18 +1327,8 @@ export default function TrainingModern(props: TrainingModernProps) {
   ];
   return (
     <div className="bc te" data-testid="training-modern">
-      <BcHero
-        wappen={getStaticTeamLogoUrl(selectedTeam.teamId)}
-        wappenAlt={selectedTeam.name}
-        dachzeile={<>{selectedTeam.name} · Training und Gebäude</>}
-        titel="Entwicklung"
-        untertitel={
-          <>
-            {seasonLabel} · {spieltag.nr != null ? `Spieltag ${spieltag.nr} / ${spieltag.von}` : "vor Spieltag 1"} · Training wirkt je
-            Spieltag
-          </>
-        }
-        mitte={
+      <FoundationBandSlot>
+        <div className="bc te-slot" data-testid="training-kopf">
           <div className="te-reiter" role="tablist">
             {reiter.map(([id, label]) => (
               <button
@@ -1346,8 +1351,6 @@ export default function TrainingModern(props: TrainingModernProps) {
               Liga <small>kommt</small>
             </button>
           </div>
-        }
-        rechts={
           <div className="te-kennzahlen">
             <div>
               <em>Kader netto</em>
@@ -1375,8 +1378,8 @@ export default function TrainingModern(props: TrainingModernProps) {
               <small>aufs Budget</small>
             </div>
           </div>
-        }
-      />
+        </div>
+      </FoundationBandSlot>
       {managementLockedReason ? <p className="te-sperre">{managementLockedReason}</p> : null}
       <div className="te-work">
         {ansicht === "kader" ? (
