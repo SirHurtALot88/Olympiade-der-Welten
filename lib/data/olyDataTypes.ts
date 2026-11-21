@@ -342,6 +342,12 @@ export type TrainingsSpieltagEintrag = {
   z?: Partial<Record<PlayerGeneratorAttributeName, number>>;
   /** Trainingslast dieses Spieltags (Fatigue-Anteil, nach Reha-Rabatt). */
   l?: number;
+  /**
+   * Zuwachs `z` steht fest, ist aber noch NICHT auf die Attribute gebucht: der Spieltag ist erst halb
+   * gewertet (Arena-Teilbuchung nach D1). Gebucht wird er mit dem Abschluss-Commit (D2), damit sich
+   * Kader und Arena-Eingabe zwischen D1 und D2 nicht aendern (s. `accumulateMatchdayTrainingProgress`).
+   */
+  o?: true;
 };
 
 export type PlayerFormState = {

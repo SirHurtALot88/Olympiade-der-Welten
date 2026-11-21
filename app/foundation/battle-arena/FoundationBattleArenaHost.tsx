@@ -40,6 +40,7 @@ import {
 import { useArenaStandingsPreview } from "@/lib/foundation/battle-arena/use-arena-standings-preview";
 import { findeArenaPodMitVorschau } from "@/lib/foundation/battle-arena/arena-pod-vorschau";
 import { arenaFormatByDisciplineId } from "@/lib/resolve/climbing-format";
+import { entscheideMotorNeuaufbau, spielteilSignatur, type ArenaNutzlastSpielteil } from "@/lib/foundation/battle-arena/arena-motor-neuaufbau";
 
 /**
  * BATTLE ARENA — der Entwurf des Battle Mode, im Spiel sichtbar.
@@ -958,6 +959,11 @@ export default function FoundationBattleArenaHost({
   const istSpieltag = spieltag != null;
   const spieltagDisziplinId = spieltag?.disciplineId ?? null;
   const gemounteteSignaturRef = useRef<string | null>(null);
+  // Spieltag und Spielteil der eingehaengten Instanz (s. `entscheideMotorNeuaufbau`, Review 21.11.).
+  const gemounteterSpieltagRef = useRef<string | null>(null);
+  const gemounteteNutzlastRef = useRef<ArenaNutzlastSpielteil | null>(null);
+  // Aktueller Spieltag fuer Mount-Effekt und Ende-Ereignis; nachgezogen im Spieltagswechsel-Effekt unten.
+  const spieltagsIdRef = useRef<string | null>(matchdayId);
   const mountNrRef = useRef(0);
   const aktuelleDisziplinRef = useRef<string | null>(spieltagDisziplinId);
   aktuelleDisziplinRef.current = spieltagDisziplinId;
@@ -966,12 +972,37 @@ export default function FoundationBattleArenaHost({
   const onEndeRef = useRef(spieltag?.onEnde ?? null);
   onEndeRef.current = spieltag?.onEnde ?? null;
   const [spultVor, setSpultVor] = useState(false);
-  const [endeInfo, setEndeInfo] = useState<{ disziplin: string; sieger: 0 | 1 | null } | null>(null);
+  // Ende und Vorstellung gelten je SPIELTAG und Disziplin: D2 auf Spieltag n und D1 auf n+1 koennen
+  // dieselbe Disziplin sein (Review 21.11.) — ohne Spieltag im Schluessel galt das neue Spiel als
+  // schon angeschaut bzw. beendet.
+  const [endeInfo, setEndeInfo] = useState<{ disziplin: string; sieger: 0 | 1 | null; spieltagsId: string | null } | null>(null);
   // VORSTELLUNG (18.11., Mockup Screen 2): bis "Zur Arena" bzw. Quick-Sim liegt sie ueber der Buehne; mit jedem
   // Disziplinwechsel (D1 -> D2) beginnt sie neu. Kein Spoiler: der Motor steht bis dahin am Anfang.
+  const vorstellungsSchluessel = spieltagDisziplinId != null ? `${matchdayId ?? ""}::${spieltagDisziplinId}` : null;
   const [vorstellungFuerDisziplin, setVorstellungFuerDisziplin] = useState<string | null>(null);
-  const vorstellungErledigt = vorstellungFuerDisziplin != null && vorstellungFuerDisziplin === spieltagDisziplinId;
-  const setVorstellungErledigt = (_erledigt: boolean) => setVorstellungFuerDisziplin(spieltagDisziplinId);
+  const vorstellungErledigt = vorstellungFuerDisziplin != null && vorstellungFuerDisziplin === vorstellungsSchluessel;
+  const setVorstellungErledigt = (_erledigt: boolean) => setVorstellungFuerDisziplin(vorstellungsSchluessel);
+  // Fuer den Mount-Effekt (s. `entscheideMotorNeuaufbau`): was steht gerade auf der Buehne? Refs statt
+  // Abhaengigkeiten, damit ein Spielende allein keinen Effektlauf ausloest. Nachgezogen in Effekten,
+  // die VOR dem Mount-Effekt stehen (Effekte laufen in Deklarationsreihenfolge).
+  const endeDisziplinRef = useRef<string | null>(null);
+  const angeschauteDisziplinRef = useRef<string | null>(null);
+  // SPIELTAGSWECHSEL: Ende und Vorstellung des alten Spieltags zuruecksetzen (der Mount-Effekt baut
+  // ohnehin neu auf, s. `entscheideMotorNeuaufbau` (a)).
+  const letzterSpieltagRef = useRef<string | null>(matchdayId);
+  useEffect(() => {
+    spieltagsIdRef.current = matchdayId;
+    if (letzterSpieltagRef.current === matchdayId) return;
+    letzterSpieltagRef.current = matchdayId;
+    endeDisziplinRef.current = null;
+    angeschauteDisziplinRef.current = null;
+    setEndeInfo(null);
+    setVorstellungFuerDisziplin(null);
+  }, [matchdayId]);
+  useEffect(() => {
+    endeDisziplinRef.current = endeInfo && endeInfo.spieltagsId === matchdayId ? endeInfo.disziplin : null;
+    angeschauteDisziplinRef.current = vorstellungErledigt ? spieltagDisziplinId : null;
+  }, [endeInfo, vorstellungErledigt, spieltagDisziplinId, matchdayId]);
 
   // Haengt den Motor nativ ein, sobald der gerenderte Kader UND die Huelle stehen — und
   // reisst ihn komplett wieder ab, sobald sich der gerenderte Kader aendert (s. Kommentar
@@ -1079,13 +1110,27 @@ export default function FoundationBattleArenaHost({
       // Spieltags-Ansicht: steht schon ein Motor mit genau dieser Nutzlast, bleibt er stehen (s.
       // `gemounteteSignaturRef`). Die Anzeige-Meta (Tabellenplatz, Punkte) zaehlt dafuer nicht.
       const signatur = istSpieltag ? JSON.stringify(umschlag) : null;
-      if (
-        signatur != null &&
-        signatur === gemounteteSignaturRef.current &&
-        container.querySelector(".oly-battle-arena")
-      ) {
-        return;
-      }
+      const nutzlast: ArenaNutzlastSpielteil = { heimTeamId, gastTeamId, umschlag };
+      const spieltagsId = spieltagsIdRef.current;
+      // ENDSTAND BLEIBT STEHEN (21.11.): eine nach dem Zuschauen geaenderte Nutzlast (z. B. ein neuer
+      // Spielstand nach der Buchung) baut die gerade gezeigte Disziplin NICHT neu auf -- erst der
+      // naechste Disziplinwechsel (s. `spieltagDisziplinId` in den Abhaengigkeiten). Vorher verschwand
+      // genau hier der D1-Endstand hinter dem Ladebild, s. `entscheideMotorNeuaufbau`.
+      const entscheidung = entscheideMotorNeuaufbau({
+        signatur,
+        gemounteteSignatur: gemounteteSignaturRef.current,
+        motorSteht: container.querySelector(".oly-battle-arena") != null,
+        spieltagsId,
+        gemounteteSpieltagsId: gemounteterSpieltagRef.current,
+        aktuelleDisziplin: aktuelleDisziplinRef.current,
+        spielteil: spielteilSignatur(nutzlast, aktuelleDisziplinRef.current),
+        gemounteterSpielteil: gemounteteNutzlastRef.current
+          ? spielteilSignatur(gemounteteNutzlastRef.current, aktuelleDisziplinRef.current)
+          : null,
+        endeDisziplin: endeDisziplinRef.current,
+        angeschauteDisziplin: angeschauteDisziplinRef.current,
+      });
+      if (entscheidung !== "neu") return;
 
       huelle.stylesheetHrefs.forEach(sicherstelleStylesheet);
       // Alte Motor-Instanz beenden, BEVOR ihr DOM verschwindet (sonst Zombie-Schleife, s. `stopp`).
@@ -1150,6 +1195,8 @@ export default function FoundationBattleArenaHost({
         mountNrRef.current += 1;
         const meineNr = mountNrRef.current;
         gemounteteSignaturRef.current = signatur;
+        gemounteterSpieltagRef.current = spieltagsId;
+        gemounteteNutzlastRef.current = nutzlast;
         gesetzteDisziplinRef.current = null;
         setMotorBereit(false);
         setEndeInfo(null);
@@ -1189,6 +1236,8 @@ export default function FoundationBattleArenaHost({
     battlefieldPodNutzlast,
     bahnPodNutzlast,
     istSpieltag,
+    // Ein aufgeschobener Neuaufbau (s. `entscheideMotorNeuaufbau`) holt der Disziplinwechsel nach.
+    spieltagDisziplinId,
   ]);
 
   // SPIELTAGS-ANSICHT: Disziplinwechsel (D1 -> D2) stellt den LAUFENDEN Motor um, statt ihn neu
@@ -1209,7 +1258,7 @@ export default function FoundationBattleArenaHost({
       const info = (ereignis as CustomEvent<{ disziplin?: string; sieger?: 0 | 1 | null }>).detail;
       if (!info?.disziplin || info.disziplin !== aktuelleDisziplinRef.current) return;
       const ende = { disziplin: info.disziplin, sieger: info.sieger === 0 || info.sieger === 1 ? info.sieger : null };
-      setEndeInfo(ende);
+      setEndeInfo({ ...ende, spieltagsId: spieltagsIdRef.current });
       onEndeRef.current?.(ende);
     };
     window.addEventListener("oly-arena:ende", beimEnde);

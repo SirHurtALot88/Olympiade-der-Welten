@@ -315,7 +315,15 @@ function computeAccumulatorOverridesFromCounts(
   return { accumulatedBaseTrainingBudget, performanceWeightMultiplier };
 }
 
-/** Spieltage, deren Trainingszuwachs schon JE SPIELTAG gebucht ist (Eintrag `s: "t"` im Verlauf). */
+/**
+ * Spieltage, deren Trainingszuwachs schon JE SPIELTAG gebucht ist (Eintrag `s: "t"` im Verlauf).
+ *
+ * Ein OFFENER Eintrag (`o: true`, Arena-Teilbuchung nach D1, docs/design/arena-fluss-21-11.md) zaehlt
+ * NICHT als gebucht: sein Zuwachs steht noch nicht auf den Attributen. Normal bucht ihn der
+ * Abschluss-Commit des Spieltags (auch fuer Spieler, die inzwischen den Kader verlassen haben). Bleibt
+ * einer trotzdem bis zum Saisonende offen, faellt sein Spieltag damit ins Saisonende-Budget wie ein
+ * Alt-Spieltag — gebucht wird er so genau einmal, weder doppelt noch gar nicht.
+ */
 export function getMatchdayBookedTrainingIds(
   accumulator: Player["seasonTrainingAccumulator"] | undefined,
   seasonId: string,
@@ -323,7 +331,7 @@ export function getMatchdayBookedTrainingIds(
   const ids = new Set<string>();
   if (!accumulator || accumulator.seasonId !== seasonId) return ids;
   for (const eintrag of accumulator.verlauf ?? []) {
-    if (eintrag.s === "t") ids.add(eintrag.m);
+    if (eintrag.s === "t" && !eintrag.o) ids.add(eintrag.m);
   }
   return ids;
 }
