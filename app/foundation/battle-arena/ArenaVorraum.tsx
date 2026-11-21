@@ -20,6 +20,10 @@ const CSS = `
   background:radial-gradient(120% 90% at 50% 30%,#18202c 0%,#0d1219 60%,#07090d 100%)}
 .oly-arena-buehne[data-voll="0"] .oly-vorraum{position:relative;min-height:520px}
 .oly-arena-buehne[data-voll="0"] .oly-vorraum ~ div{display:none}
+.oly-podmarke{display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:8px;border:1px solid #E8C26A;
+  background:rgba(232,194,106,.12);color:#E8C26A;font-weight:900;font-size:13px;letter-spacing:.1em;text-transform:uppercase}
+.oly-podmarke i{display:inline-flex;gap:2px;font-style:normal}
+.oly-podmarke i b{width:9px;height:9px;border-radius:2px;background:#E8C26A}
 .oly-vorraum h2.oly-vorraum-titel{margin:0;font-size:clamp(28px,3.2vw,52px);letter-spacing:.02em;text-transform:uppercase}
 .oly-vorraum .gk{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#9aa7ba}
 .oly-vorraum .duo,.oly-vorraum .vier{display:flex;gap:14px;align-items:stretch;justify-content:center;flex-wrap:wrap;width:min(1500px,100%)}
@@ -34,7 +38,8 @@ const CSS = `
 .oly-vteam h2{margin:0;font-size:20px;line-height:1.1}
 .oly-vteam .du{display:inline-block;margin-bottom:3px;padding:1px 8px;border-radius:6px;background:#E8C26A;color:#17120a;
   font-size:10.5px;font-weight:900;letter-spacing:.07em;text-transform:uppercase}
-.oly-vteam dl{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0}
+.oly-vteam dl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0}
+.oly-vteam dd small{display:block;font-size:11px;font-weight:600;color:#9aa7ba;letter-spacing:0}
 .oly-vteam dl div{display:flex;flex-direction:column}
 .oly-vteam dt{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#9aa7ba}
 .oly-vteam dd{margin:0;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -71,6 +76,20 @@ const CSS = `
 @media (prefers-reduced-motion:reduce){.oly-dreh{animation:none}}
 `;
 
+function PodMarke() {
+  return (
+    <span className="oly-podmarke" data-testid="arena-podmarke" title="Vierergruppe: vier Teams gleichzeitig in einer Arena, Platz 1 bis 4">
+      <i aria-hidden>
+        <b />
+        <b />
+        <b />
+        <b />
+      </i>
+      4 Teams · Pod
+    </span>
+  );
+}
+
 function Wappen({ team }: { team: VorraumTeam }) {
   return (
     <span className="wappen" style={{ ["--tf" as string]: team.farbe }} aria-hidden>
@@ -99,12 +118,24 @@ function Teamkarte({ team, disziplinName }: { team: VorraumTeam; disziplinName: 
           <dt>Saison</dt>
           <dd>{team.rang != null ? `${team.rang}.` : "–"}</dd>
         </div>
+        <div data-testid="arena-vorraum-diszrang">
+          <dt>{disziplinName}-Rang</dt>
+          <dd>
+            {team.diszRang ? `${team.diszRang.liga ?? team.diszRang.gesamt}.` : "–"}
+            {team.diszRang ? (
+              <small title={team.diszRang.quelle === "saison" ? "Rang nach Teampunkten dieser Disziplin" : "Rang nach Kaderstärke (beste 6), noch keine Wertung"}>
+                {team.diszRang.liga != null && team.diszRang.ligaName ? `${team.diszRang.ligaName} · ` : ""}
+                {team.diszRang.gesamt}. von {team.diszRang.gesamtVon}
+              </small>
+            ) : null}
+          </dd>
+        </div>
         <div>
           <dt>Punkte</dt>
           <dd>{team.punkte != null ? String(Math.round(team.punkte * 10) / 10).replace(".", ",") : "–"}</dd>
         </div>
         <div>
-          <dt>{disziplinName}</dt>
+          <dt title={`Kaderstärke in ${disziplinName}: Mittel der besten 6`}>Stärke</dt>
           <dd>{team.kaderStaerke != null ? `≈ ${team.kaderStaerke}` : "–"}</dd>
         </div>
       </dl>
@@ -148,6 +179,7 @@ export function ArenaLadebild({
         Disziplin {disziplinNr} von {disziplinAnzahl} · {disziplinName}
       </div>
       <h2 className="oly-vorraum-titel">Arena wird vorbereitet</h2>
+      {art === "pod" ? <PodMarke /> : null}
       <div className={art === "pod" ? "vier" : "duo"}>
         {teams.map((team, index) => (
           <div key={team.teamId} style={{ display: "contents" }}>
@@ -222,6 +254,7 @@ export function ArenaVorstellung({
         Disziplin {disziplinNr} von {disziplinAnzahl} · {art === "pod" ? "Vierergruppe · jeder gegen jeden" : "Duell"}
       </div>
       <h2 className="oly-vorraum-titel">{disziplinName}</h2>
+      {art === "pod" ? <PodMarke /> : null}
       <div className="oly-schema" data-testid="arena-vorstellung-schema">
         {punkteSchema(art).map((eintrag) => (
           <div key={eintrag.label}>

@@ -45,6 +45,11 @@ export function berechneVerteilung(input: {
   /** activePlayerId -> Seite, auf der er Captain ist. */
   captainSeite?: ReadonlyMap<string, Seite>;
   nameVon?: (activePlayerId: string) => string;
+  /**
+   * Nur „Auffüllen“: füllt ausschließlich offene Plätze dieser Disziplin-Seite (die gerade aktive),
+   * die andere Seite bleibt unberührt (Chris 21.11.). Ohne Angabe beide Seiten wie bisher.
+   */
+  nurSeite?: Seite;
 }): Verteilung {
   // Einmal materialisieren: `Map.entries()` ist ein Einweg-Iterator, und er wird zweimal gelesen.
   const werteListe = [...input.werte];
@@ -61,7 +66,9 @@ export function berechneVerteilung(input: {
   }
 
   const vergeben = new Set(Object.values(input.selections).filter(Boolean));
-  const offene = input.slots.filter((slot) => !input.selections[slot.key]).map((slot) => slot.key);
+  const offene = input.slots
+    .filter((slot) => !input.selections[slot.key] && (input.modus !== "auffuellen" || !input.nurSeite || slot.side === input.nurSeite))
+    .map((slot) => slot.key);
   const slotKeys = input.modus === "optimieren" ? input.slots.map((slot) => slot.key) : offene;
   const ausgeschlossen = new Set(input.ausgeschlossen ?? []);
   if (input.modus === "auffuellen") for (const id of vergeben) ausgeschlossen.add(id);
@@ -105,6 +112,26 @@ export function berechneVerteilung(input: {
     if (vorher !== nachher) wechsel.push({ slotKey: slot.key, vorher, nachher });
   }
   return { neu, wechsel, gewinn: Number(gewinn.toFixed(1)) };
+}
+
+/**
+ * „Leeren“: eine Disziplin-Seite (`d1`/`d2`) oder beide (`alle`). Die vollständige neue Belegung
+ * (Slot -> activePlayerId, "" = leer); Plätze der anderen Seite bleiben unverändert.
+ */
+export function leereSlots(
+  slots: ReadonlyArray<VerteilungsSlot>,
+  selections: Readonly<Record<string, string>>,
+  was: Seite | "alle",
+): { neu: Record<string, string>; geleert: number } {
+  const neu: Record<string, string> = { ...selections };
+  let geleert = 0;
+  for (const slot of slots) {
+    const betroffen = was === "alle" || slot.side === was;
+    if (betroffen && selections[slot.key]) geleert += 1;
+    if (betroffen) neu[slot.key] = "";
+    else if (!(slot.key in neu)) neu[slot.key] = "";
+  }
+  return { neu, geleert };
 }
 
 /** Setzt `spieler` auf `slotKey`; steht er schon irgendwo, wird er dort abgezogen. Wer im Zielplatz stand, rückt in den frei gewordenen Platz (Tausch). */

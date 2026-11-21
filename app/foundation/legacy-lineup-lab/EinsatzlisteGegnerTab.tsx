@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getPlayerPortraitBrowserUrl, getPlayerPortraitInitials, getStaticTeamLogoUrl } from "@/lib/data/mediaAssets";
-import { buildTeamDisciplineRankRowsFromGameState } from "@/lib/foundation/team-discipline-rank-engine";
+import { berechneDisziRang } from "@/lib/lineups/einsatzliste-diszi-rang";
 import { baueGruppenStand, duellStand, spannenMitte, type GruppenEingang } from "@/lib/lineups/einsatzliste-gegner-vergleich";
 import { schaetzeGegnerAufstellung, type GegnerSchaetzung, type GegnerSeite } from "@/lib/lineups/gegner-schaetzung";
 
@@ -82,15 +82,27 @@ const QUELLE_TEXT: Record<string, string> = {
 export function EinsatzlisteGegnerTab(p: GegnerTabProps) {
   const { gameState, gegner, gruppe, seite, disziplinId, plaetze } = p;
 
+  // Rang je Team in dieser Disziplin, wie im Kopf der Einsatzliste: Liga-Rang zuerst (Rang 1 = bester),
+  // dazu der Rang unter allen. Quelle: Saisonwertung, vor der ersten Wertung die Kaderstärke.
   const disziplinRang = useMemo(() => {
-    if (!gameState || !disziplinId) return new Map<string, number>();
-    try {
-      const zeilen = buildTeamDisciplineRankRowsFromGameState(gameState, gameState.disciplines);
-      return new Map(zeilen.flatMap((z) => (z.disciplineRanks[disziplinId] != null ? [[z.teamId, z.disciplineRanks[disziplinId]!] as const] : [])));
-    } catch {
-      return new Map<string, number>();
+    const karte = new Map<string, { liga: number | null; ligaName: string | null; gesamt: number }>();
+    if (!gameState || !disziplinId) return karte;
+    const ids = new Set<string>([...(gruppe?.gegnerTeamIds ?? []), ...(gegner.status === "geschaetzt" ? [gegner.gegnerTeamId] : [])]);
+    for (const id of ids) {
+      try {
+        const r = berechneDisziRang(gameState, id, disziplinId);
+        if (r) karte.set(id, { liga: r.liga, ligaName: r.ligaName, gesamt: r.gesamt });
+      } catch {
+        // ohne Rang bleibt die Zeile ohne Zahl
+      }
     }
-  }, [gameState, disziplinId]);
+    return karte;
+  }, [gameState, disziplinId, gruppe, gegner]);
+  const rangText = (teamId: string): string => {
+    const r = disziplinRang.get(teamId);
+    if (!r) return "ohne Rang";
+    return `Rang ${r.liga ?? r.gesamt}${r.liga != null && r.ligaName ? ` · ${r.ligaName}` : ""}`;
+  };
 
   const spielerVon = useMemo(() => new Map((gameState?.players ?? []).map((pl) => [pl.id, pl] as const)), [gameState]);
   const portraitVon = (id: string | null | undefined) => {
@@ -153,14 +165,19 @@ export function EinsatzlisteGegnerTab(p: GegnerTabProps) {
 
   return (
     <div className="gg" data-testid="elm-gegner">
-      {geschaetzt ? (
+      {istPod ? (
+        <p className="gg-quelle" data-testid="elm-gegner-podkopf">
+          <span className="bc-marke is-gelb">4 TEAMS · POD</span>
+          Vierergruppe: {gruppe?.gegnerNamen.join(" · ") ?? ""}. Gewertet wird die Platzierung unter allen vier Teams.
+        </p>
+      ) : geschaetzt ? (
         <div className="gg-karte">
           <TeamLogo teamId={geschaetzt.gegnerTeamId} name={geschaetzt.gegnerName} />
           <div className="gg-karte__text">
             <span className="bc-gk">{istPod ? "Gegner im Duell-Plan" : "Gegner"} · {geschaetzt.steuerung === "ki" ? "KI" : "Mensch"}</span>
             <b>{geschaetzt.gegnerName}</b>
             <span>
-              {disziplinRang.get(geschaetzt.gegnerTeamId) != null ? `${p.disziplinName}-Rang ${disziplinRang.get(geschaetzt.gegnerTeamId)}` : p.disziplinName}
+              {p.disziplinName} · {rangText(geschaetzt.gegnerTeamId)}
             </span>
           </div>
           <div className="gg-karte__scout" title="Scouting-Stufe der Kader-Spieler, gemittelt">
@@ -173,10 +190,10 @@ export function EinsatzlisteGegnerTab(p: GegnerTabProps) {
             <small>Treffsicherheit ca. {geschaetzt.treffsicherheitPct} %</small>
           </div>
         </div>
-      ) : (
+      ) : istPod ? null : (
         <p className="elm-leer">{gegner.status === "unbekannt" ? `${gegner.grund}.` : "Gegner noch nicht bekannt."}</p>
       )}
-      {geschaetzt ? (
+      {geschaetzt && !istPod ? (
         <p className="gg-quelle">
           <span className={`bc-marke${geschaetzt.quelle === "prognose" ? " is-gelb" : ""}`}>{geschaetzt.quelle === "prognose" ? "PROGNOSE" : geschaetzt.quelle === "ki-muster" ? "MUSTER" : "VERDECKT"}</span>
           {QUELLE_TEXT[geschaetzt.quelle]}
@@ -212,7 +229,10 @@ export function EinsatzlisteGegnerTab(p: GegnerTabProps) {
                   <strong className="bc-t">{g?.spanne ? `${g.spanne.min}–${g.spanne.max}` : "?"}</strong>
                   <span className="gg-duell__nm">
                     <b>{g?.spielerName ?? "unbekannt"}</b>
-                    <small>{g?.spanne ? `Mitte ${ZAHL.format(spannenMitte(g.spanne) ?? 0)}` : "nicht erkennbar"}</small>
+                    <small title="Derselbe Platz wie links: gleiche Rolle auf beiden Seiten">
+                      {pl.kuerzel} · {pl.rolle}
+                      {g?.spanne ? ` · Mitte ${ZAHL.format(spannenMitte(g.spanne) ?? 0)}` : " · nicht erkennbar"}
+                    </small>
                   </span>
                   {g?.spielerName ? <Bild klasse="gg-por" url={portraitVon(g.spielerId)} name={g.spielerName} /> : <span className="gg-por is-leer" />}
                 </span>
@@ -234,7 +254,7 @@ export function EinsatzlisteGegnerTab(p: GegnerTabProps) {
                 <span className="gg-grp__nm">
                   <b>{z.name}</b>
                   <small>
-                    {z.wir ? "Deine Besetzung" : disziplinRang.get(z.teamId) != null ? `${p.disziplinName}-Rang ${disziplinRang.get(z.teamId)}` : ""}
+                    {z.wir ? "Deine Besetzung" : rangText(z.teamId)}
                   </small>
                 </span>
                 {!z.wir && z.prognose ? <span className="bc-marke is-gelb">PROGNOSE</span> : null}

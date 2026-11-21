@@ -31,6 +31,7 @@ import {
 import {
   bauePruefsaetze,
   berechneVerteilung,
+  leereSlots,
   gewichtsZeilen,
   lastTon,
   setzeMitTausch,
@@ -38,7 +39,7 @@ import {
   type Seite,
 } from "@/lib/lineups/einsatzliste-modern-logik";
 import { setzeEinsatzlisteLook } from "@/lib/lineups/einsatzliste-look";
-import { berechneDisziRang, type DisziRang } from "@/lib/lineups/einsatzliste-diszi-rang";
+import { berechneDisziRang, berechneGegnerRaenge, type DisziRang, type GegnerRangZeile } from "@/lib/lineups/einsatzliste-diszi-rang";
 import { setEinsatzlisteAbgabe } from "@/lib/foundation/einsatzliste-abgabe-store";
 import { formationFuerSeite, type GelegteFormation } from "@/lib/lineups/formation";
 import { schaetzeGegnerAufstellung, type GegnerSchaetzung } from "@/lib/lineups/gegner-schaetzung";
@@ -147,10 +148,33 @@ const klassenFarbeVon = (klasse: string | null | undefined): string | undefined 
   return f ? FORM_HEX[f] : undefined;
 };
 
+/** Gegner-Rang im Kopf (21.11.): Duell „gegen Team · 3.“, Vierergruppe alle drei Gegner mit ihrem Liga-Rang (Rang 1 = bester). */
+function GegnerRangKopf({ gegner }: { gegner: GegnerRangZeile[] }) {
+  const pod = gegner.length > 1;
+  const text = (g: GegnerRangZeile) => {
+    const r = g.liga ?? g.gesamt;
+    return `${g.name}: ${r != null ? `${r}.` : "ohne Rang"}${g.liga != null && g.ligaName ? ` in ${g.ligaName}` : ""}${g.gesamt != null && g.gesamtVon != null ? `, ${g.gesamt}. von ${g.gesamtVon}` : ""}`;
+  };
+  return (
+    <span className="elm-rang__geg" data-testid="elm-gegner-rang" title={`${pod ? "Gegner der Vierergruppe" : "Gegner"}, Rang in dieser Disziplin: ${gegner.map(text).join(" · ")}`}>
+      <em>{pod ? "Pod" : "gegen"}</em>
+      {gegner.map((g) => {
+        const r = g.liga ?? g.gesamt;
+        return (
+          <span key={g.teamId}>
+            {pod ? g.kuerzel : g.name} <b className="bc-t">{r != null ? `${r}.` : "–"}</b>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 /** Kopf-Zeile der Disziplin-Karte: „UNSER RANG · KADERSTÄRKE“, groß der Ligarang, klein der Rang unter allen. */
-function RangEyebrow({ seite, rang, fallback }: { seite: string; rang: DisziRang | null; fallback: number | null }) {
+function RangEyebrow({ seite, rang, fallback, gegner = [] }: { seite: string; rang: DisziRang | null; fallback: number | null; gegner?: GegnerRangZeile[] }) {
   const quelle = rang?.quelle === "saison" ? "Saison" : "Kaderstärke";
-  if (!rang) return <span className="elm-rang">{seite.toUpperCase()} · Rang {fallback ?? "–"}</span>;
+  const gegnerZeile = gegner.length > 0 ? <GegnerRangKopf gegner={gegner} /> : null;
+  if (!rang) return <span className="elm-rang">{seite.toUpperCase()} · Rang {fallback ?? "–"}{gegnerZeile}</span>;
   const haupt = rang.liga ?? rang.gesamt;
   const hauptText = rang.liga != null ? `Liga ${rang.ligaName?.slice(-1) ?? ""}` : "alle Teams";
   const titel = `Unser Rang in dieser Disziplin (${quelle === "Saison" ? "Saisonwertung nach Teampunkten" : "nach Kaderstärke: Summe der sechs besten Eignungen, noch keine Wertung"}): ${rang.liga != null ? `${rang.liga}. in ${rang.ligaName}, ` : ""}${rang.gesamt}. von ${rang.gesamtVon} Teams${rang.abstandVordermann != null ? `. ${rang.abstandVordermann} Punkte bis zum Vordermann` : ""}.`;
@@ -162,6 +186,7 @@ function RangEyebrow({ seite, rang, fallback }: { seite: string; rang: DisziRang
         <span>{hauptText}</span>
         {rang.liga != null ? <small className="bc-t">· {rang.gesamt}. von {rang.gesamtVon}</small> : null}
       </span>
+      {gegnerZeile}
     </span>
   );
 }
@@ -463,20 +488,32 @@ export default function EinsatzlisteModern(props: Props) {
       ausgeschlossen: verletzte,
       captainSeite,
       nameVon: spielerName,
+      // Auffüllen gilt nur der gerade aktiven Disziplin (Chris 21.11.), Optimieren bleibt über beide.
+      nurSeite: modus === "auffuellen" ? seite : undefined,
     });
     if (v.wechsel.length === 0) {
-      meldung(modus === "optimieren" ? "Das ist schon die beste Verteilung." : "Es gibt nichts aufzufüllen.");
+      meldung(modus === "optimieren" ? "Das ist schon die beste Verteilung." : `In ${disziplin(seite)?.displayName ?? "dieser Disziplin"} gibt es nichts aufzufüllen.`);
       return;
     }
     onApplyAssignments(
       v.neu,
-      modus === "optimieren" ? `Optimiert (${vz(v.gewinn)} Platzwert)` : `${v.wechsel.length} Plätze aufgefüllt`,
+      modus === "optimieren" ? `Optimiert (${vz(v.gewinn)} Platzwert)` : `${v.wechsel.length} Plätze in ${disziplin(seite)?.displayName ?? seite.toUpperCase()} aufgefüllt`,
       `${v.wechsel.length} Plätze geändert`,
     );
   };
-  const leeren = () => {
+  /** Leeren: nur die aktive Disziplin (`seite`) oder beide (`alle`); die andere Seite bleibt stehen. */
+  const leeren = (was: Seite | "alle") => {
     if (!kannBedienen || !onApplyAssignments) return;
-    onApplyAssignments(Object.fromEntries(slots.map((slot) => [slot.key, ""])), "Einsatzliste geleert", "Alle Plätze");
+    const { neu, geleert } = leereSlots(slots.map((slot) => ({ key: slot.key, side: slot.disciplineSide })), selections, was);
+    if (geleert === 0) {
+      meldung(was === "alle" ? "Die Einsatzliste ist schon leer." : `${disziplin(was)?.displayName ?? "Diese Disziplin"} ist schon leer.`);
+      return;
+    }
+    onApplyAssignments(
+      neu,
+      was === "alle" ? "Einsatzliste geleert" : `${disziplin(was)?.displayName ?? was.toUpperCase()} geleert`,
+      was === "alle" ? "Alle Plätze" : `${geleert} Plätze in ${disziplin(was)?.displayName ?? was.toUpperCase()}`,
+    );
   };
 
   // Tasten D / A / O / Z / Esc (die Zifferntasten und Pfeile gehören dem Client).
@@ -579,6 +616,37 @@ export default function EinsatzlisteModern(props: Props) {
   /** Wessen Werte die Plätze gerade als Vorschau zeigen: der gezogene Spieler, sonst der unter der Maus im Kader. */
   const vorschauId = zieht?.id ?? hoverId ?? null;
 
+  /* ---------------- Vierergruppe: alle drei Gegner (21.11.) ---------------- */
+  const podEintrag = spieltagsGegner?.find((x) => x.disciplineSide === seite && x.art === "pod") ?? null;
+  const podGegnerNamen = podEintrag?.gegnerNamen ?? [];
+  // Jeder der drei Mitspieler einzeln geschätzt; die Waage vergleicht gegen ihren Schnitt, nicht gegen den
+  // Duell-Gegner des Spielplans (der gehört zur anderen Disziplin des Spieltags).
+  const podSchnitt = useMemo(() => {
+    const id = (seite === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2)?.disciplineId ?? null;
+    const ids = podEintrag?.gegnerTeamIds ?? [];
+    if (!context || !id || ids.length < 2) return null;
+    const slotCount = slots.filter((slot) => slot.disciplineSide === seite).length;
+    const spannen = ids.flatMap((gegnerTeamId) => {
+      try {
+        const s = schaetzeGegnerAufstellung({
+          gameState: context.gameState,
+          eigenesTeamId: context.team.id,
+          seasonId: context.season.id,
+          matchdayId: context.matchday.id,
+          seiten: [{ seite, disciplineId: id, slotCount }],
+          gegnerTeamId,
+        });
+        const schnitt = s.status === "geschaetzt" ? s.seiten[seite]?.schnitt ?? null : null;
+        return schnitt ? [schnitt] : [];
+      } catch {
+        return [];
+      }
+    });
+    if (spannen.length === 0) return { min: null, max: null };
+    const mittel = (zahlen: number[]) => zahlen.reduce((a, b) => a + b, 0) / zahlen.length;
+    return { min: mittel(spannen.map((x) => x.min)), max: mittel(spannen.map((x) => x.max)) };
+  }, [context, slots, seite, podEintrag]);
+
   /* ---------------- Waage ---------------- */
   const waage = useMemo(() => {
     const liste = slotsJeSeite[seite];
@@ -600,10 +668,10 @@ export default function EinsatzlisteModern(props: Props) {
     if (eigenSchnitt == null && vorschau == null) eigenSchnitt = null;
     const gegnerSeite = gegner.status === "geschaetzt" ? gegner.seiten[seite] ?? null : null;
     const spannen = gegnerSeite?.slots.flatMap((s) => (s.spanne ? [s.spanne] : [])) ?? [];
-    const gMin = spannen.length ? sum(spannen.map((s) => s.min)) / spannen.length : gegnerSeite?.schnitt?.min ?? null;
-    const gMax = spannen.length ? sum(spannen.map((s) => s.max)) / spannen.length : gegnerSeite?.schnitt?.max ?? null;
+    const gMin = podSchnitt ? podSchnitt.min : spannen.length ? sum(spannen.map((s) => s.min)) / spannen.length : gegnerSeite?.schnitt?.min ?? null;
+    const gMax = podSchnitt ? podSchnitt.max : spannen.length ? sum(spannen.map((s) => s.max)) / spannen.length : gegnerSeite?.schnitt?.max ?? null;
     return { eigenSchnitt, vorschau, gMin, gMax, gMid: gMin != null && gMax != null ? (gMin + gMax) / 2 : null };
-  }, [slotsJeSeite, seite, selections, eignung, hoverZeile, fokusSlot, gegner]);
+  }, [slotsJeSeite, seite, selections, eignung, hoverZeile, fokusSlot, gegner, podSchnitt]);
 
   /* ---------------- Prüfung ---------------- */
   const blockierend = useMemo(() => errors.filter((code) => code !== "lineup_draft_is_locked"), [errors]);
@@ -676,6 +744,22 @@ export default function EinsatzlisteModern(props: Props) {
   const diszRangD1 = useMemo<DisziRang | null>(() => (gs && eigenTeamId && diszIdD1 ? berechneDisziRang(gs, eigenTeamId, diszIdD1) : null), [gs, eigenTeamId, diszIdD1]);
   const diszIdD2 = disziplin("d2")?.disciplineId ?? null;
   const diszRangD2 = useMemo<DisziRang | null>(() => (gs && eigenTeamId && diszIdD2 ? berechneDisziRang(gs, eigenTeamId, diszIdD2) : null), [gs, eigenTeamId, diszIdD2]);
+  // Gegner-Rang je Disziplin (Kopf): Duell ein Gegner, Vierergruppe alle drei (Plan: `spieltagsGegner`).
+  const gegnerRaengeJeSeite = useMemo(() => {
+    const karte: Record<Seite, GegnerRangZeile[]> = { d1: [], d2: [] };
+    if (!gs) return karte;
+    for (const [s, id] of [["d1", diszIdD1], ["d2", diszIdD2]] as const) {
+      const eintrag = spieltagsGegner?.find((e) => e.disciplineSide === s);
+      const ids = eintrag?.gegnerTeamIds ?? [];
+      if (!id || ids.length === 0) continue;
+      try {
+        karte[s] = berechneGegnerRaenge(gs, ids, id);
+      } catch {
+        karte[s] = [];
+      }
+    }
+    return karte;
+  }, [gs, spieltagsGegner, diszIdD1, diszIdD2]);
   const formMoralVon = useMemo(() => {
     const karte = new Map<string, FormMoralAnzeige>();
     const dis = (seite === "d1" ? context?.matchdayContract?.discipline1 : context?.matchdayContract?.discipline2) ?? null;
@@ -1506,7 +1590,7 @@ export default function EinsatzlisteModern(props: Props) {
               key={s}
               aktiv={seite === s}
               onClick={() => waehleSeite(s)}
-              eyebrow={<RangEyebrow seite={s} rang={s === "d1" ? diszRangD1 : diszRangD2} fallback={(s === "d1" ? d1Rank : d2Rank) ?? null} />}
+              eyebrow={<RangEyebrow seite={s} rang={s === "d1" ? diszRangD1 : diszRangD2} fallback={(s === "d1" ? d1Rank : d2Rank) ?? null} gegner={gegnerRaengeJeSeite[s]} />}
               titel={d.displayName}
               symbol={ikon ? <img src={ikon} alt="" /> : d.displayName.slice(0, 2)}
               strich={liste.map((slot) => {
@@ -1716,7 +1800,7 @@ export default function EinsatzlisteModern(props: Props) {
                 })()}
                 <div className="elm-waage__txt">
                   <span>
-                    {gegner.status === "geschaetzt" ? <>gegen <b>{gegner.gegnerName}</b></> : <span title={gegner.grund}>Gegner noch unbekannt</span>}
+                    {gegner.status === "geschaetzt" ? <>gegen <b>{podGegnerNamen.length > 1 ? podGegnerNamen.join(" · ") : gegner.gegnerName}</b></> : <span title={gegner.grund}>Gegner noch unbekannt</span>}
                   </span>
                   <span>
                     {waage.vorschau != null && hoverZeile ? <span className="elm-vor">Vorschau: {hoverZeile.karte.name} auf {kuerzelJeSlot.get(fokusSlot?.key ?? "")}</span> : "Schraffur = Unsicherheit der Schätzung"}
@@ -1729,8 +1813,8 @@ export default function EinsatzlisteModern(props: Props) {
               </div>
             </div>
             <div className="elm-wz" style={{ display: "flex", gap: 6 }}>
-              <button type="button" className="bc-btn bc-btn--klein" disabled={!kannBedienen || !onApplyAssignments} onClick={() => verteile("auffuellen")} data-bc-tip="Offene Plätze mit den besten freien Spielern füllen (A)">
-                <BcIcon name="zauber" /> Auffüllen
+              <button type="button" className="bc-btn bc-btn--klein" disabled={!kannBedienen || !onApplyAssignments} onClick={() => verteile("auffuellen")} data-bc-tip="Offene Plätze der gewählten Disziplin mit den besten freien Spielern füllen (A)">
+                <BcIcon name="zauber" /> Auffüllen <small>{seite.toUpperCase()}</small>
               </button>
               <button type="button" className="bc-btn bc-btn--klein" disabled={!kannBedienen || !onApplyAssignments} onClick={() => verteile("optimieren")} data-bc-tip="Beste Verteilung über beide Disziplinen, jeder Spieler nur einmal (O)">
                 <BcIcon name="krone" /> Optimieren
@@ -1755,9 +1839,10 @@ export default function EinsatzlisteModern(props: Props) {
                     const g = gegnerSeite?.slots.find((s) => s.slotIndex === slot.slotIndex);
                     if (!platz?.gegner || !g || (!g.spielerName && !geteiltFeld)) return null;
                     return (
-                      <div key={`g-${slot.key}`} data-gsk={slot.key} className="elm-geist bc-t" style={{ "--x": geisterPos(slot, platz.gegner).x, "--y": geisterPos(slot, platz.gegner).y } as React.CSSProperties} title="Geschätzte gegnerische Besetzung (Prognose nach Scouting)">
+                      <div key={`g-${slot.key}`} data-gsk={slot.key} className="elm-geist bc-t" style={{ "--x": geisterPos(slot, platz.gegner).x, "--y": geisterPos(slot, platz.gegner).y } as React.CSSProperties} title={`Geschätzte gegnerische Besetzung (Prognose nach Scouting) · gleicher Platz wie dein ${slotName(slot.key)}`}>
                         <FeldFigur spielerId={g.spielerId} blick="west" klasse="elm-geist__fig" />
                         <b>{g.spielerName ?? "Gegner ?"}</b>
+                        <small className="elm-geist__pl">{kuerzelJeSlot.get(slot.key) ?? ""}</small>
                         {g.spanne ? <span>{g.spanne.min}–{g.spanne.max}</span> : null}
                       </div>
                     );
@@ -1916,7 +2001,14 @@ export default function EinsatzlisteModern(props: Props) {
           <strong className="bc-t">{gesamtOffen ? "–" : f0(ges)}</strong>
           <small>Spieltag erwartet</small>
         </div>
-        <button type="button" className="bc-btn bc-nurdesk" disabled={!kannBedienen || !onApplyAssignments} onClick={leeren}>Leeren</button>
+        <span className="elm-leeren bc-nurdesk" role="group" aria-label="Einsatzliste leeren" data-testid="elm-leeren">
+          <button type="button" className="bc-btn" disabled={!kannBedienen || !onApplyAssignments} onClick={() => leeren(seite)} data-testid="elm-leeren-seite" data-bc-tip="Nur die gerade gewählte Disziplin leeren">
+            {disziplin(seite)?.displayName ?? seite.toUpperCase()} leeren
+          </button>
+          <button type="button" className="bc-btn" disabled={!kannBedienen || !onApplyAssignments} onClick={() => leeren("alle")} data-testid="elm-leeren-alle" data-bc-tip="Beide Disziplinen leeren">
+            Beide leeren
+          </button>
+        </span>
         {abgegeben && arenaReady && onNavigateArena ? null : (
           // Der Weg in die Arena bleibt sichtbar, auch solange der Knopf noch "Abgeben" heißt:
           // Wer hier steht, soll wissen, wohin die Abgabe führt (Gameplay-Smoke prüft das).
