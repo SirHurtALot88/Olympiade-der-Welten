@@ -269,3 +269,10 @@ reine Anzeige, keine Änderung an Wertung oder Matrix; Sichtprüfung bei 1920 ×
 | 5 | Welle 0 und 1 jetzt bauen (11 Tage), die anderen Wellen einzeln freigeben? | Ja. |
 | 6 | PR #1358 vorher mergen? | Ja, als Datenbasis; die Mini-Feld-Darstellung daraus wird in Welle 1 ersetzt. |
 | 7 | PixelLab-Schmuck (Rahmen, Banner) für die Seiten? | Nein. CSS und SVG reichen, bleiben scharf in 4K und kosten nichts. |
+
+## Designsystem-Regeln, ergänzt 21.11. (Chris)
+
+- **Alle Tabellen sortierbar**: Klick auf den Spaltenkopf sortiert, zweiter Klick dreht die Richtung.
+- **Keine doppelte Information**: Steht ein Attribut als absolute Zahl da, nicht zusätzlich die Notenstufe (S/A/B/C…) daneben. Noten nur dort, wo keine Zahl sichtbar ist (z. B. Scouting-Nebel).
+- **Klassen immer farblich hervorheben**: Klassenname bzw. -marke in der Klassenfarbe (`app/foundation/classVisuals.ts`: rot Berserker/Warlord/Tank, grün Sprinter/Rogue/Charger, blau Mage/Overseer/Templar, gelb Bard/Hero/Badass/Tactician).
+- **Icons für Klasse und Rasse nutzen**, wo Platz ist: `public/class-icons/*.png` (`app/foundation/ClassIcon.tsx`), `public/race-icons/*.png` (`app/foundation/RaceIcon.tsx`) — statt reinem Text.

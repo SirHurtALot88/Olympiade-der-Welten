@@ -66,3 +66,4 @@ Freigabe 85 %, 20 Spieltage.
 - Kaderstärke in der Mitte zeigt den Rang **in der eigenen Liga** (wie rechts), nicht unter 32.
 - Gehalt und Kasse der anderen Teams in der Liga-Übersicht: offen (kein Nebel).
 - „Meine besten 6“ unter der Kaderstärke: **behalten**.
+- Klassen **immer farblich hervorheben** (Klassenfarbe aus `app/foundation/classVisuals.ts`), wo es passt mit den vorhandenen Icons für Klasse (`public/class-icons/`, `ClassIcon.tsx`) und Rasse (`public/race-icons/`, `RaceIcon.tsx`) statt nur Text „Charger · Dragon“.
