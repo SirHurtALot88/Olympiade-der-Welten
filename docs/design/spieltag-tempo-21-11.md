@@ -95,6 +95,13 @@ erste Charge, (2) der Datensatz bekommt je Disziplin `status: "arena"` sofort na
 liest pro Disziplin, (3) KI-gegen-KI läuft als zweite Charge derselben Signatur. Parallel arbeitet ein anderer Agent in
 `battle-mode.engine.js`; deshalb wurde der Motor nicht berührt.
 
-## 5. Kein Auto-Sprung D1 → D2, Endergebnis bleibt
+## 5. Kein Auto-Sprung D1 -> D2, Endergebnis bleibt: NICHT umgesetzt
 
-Siehe Abschnitt „Ergebnis der Browser-Prüfung" unten bzw. im Bericht.
+Der Weiter-Schritt ist im Code ein ausdruecklicher Knopf (`ArenaWechsel`, `onWeiter` in `DisciplineStageArena.tsx`); ein
+Zeitgeber dafuer wurde nicht gefunden. Der Sprung kommt vermutlich aus dem Ausrichte-Effekt (`alignedMatchdayRef`,
+~Zeile 1450: bevorzugt D2, sobald D1 laut Save gewertet ist) und dem Zuruecksetzen von `arenaEnded`/`endeInfo` bei einem
+Neuaufbau nach dem Neuladen des Spielstands, das auf die Buchung von D1 folgt. Das liess sich in dieser Runde nicht
+bestaetigen: der Chromium der Sandbox stuerzt mit der Dev-App wiederholt ab (`Target crashed` / `closed`, drei Laeufe von
+`scripts/screenshot-spieltag-tempo.ts`), die geplanten Screenshots (Lade-Feedback, Endergebnis bleibt, Weiter zu D2)
+fehlen deshalb. Naechster Schritt: das Skript auf einer Maschine mit stabilem Browser laufen lassen (`arena`-Modus ist
+noch ein Geruest) und den Neuaufbau nach der D1-Buchung beobachten.
