@@ -9,6 +9,7 @@ import {
 } from "@/lib/foundation/team-management-overview";
 import { hydrateTeamOverviewSliceRows, type TeamOverviewSliceRow } from "@/lib/foundation/team-overview-slice";
 import { buildStandingsTransferBalanceByTeamId } from "@/lib/season/transfer-standings-balance";
+import { ligaVonAusSpielstand, rangJeLiga } from "@/lib/season/liga-raenge";
 
 type SeasonStandingsFeedItem = {
   teamId: string;
@@ -169,11 +170,17 @@ export function useSeasonStandRows(input: UseSeasonStandRowsInput): { seasonStan
         return right.cash - left.cash;
       });
 
+    // Rückfall-Rang je Liga (21.11., `lib/season/liga-raenge.ts`) — wie der kanonische Saisonstand.
+    const fallbackRankByTeamId = rangJeLiga(
+      fallbackSorted,
+      ligaVonAusSpielstand(gameState),
+      (gruppe) => new Map(gruppe.map((row, index) => [row.teamId, index + 1] as const)),
+    );
     const fallbackStandingsByTeamId = Object.fromEntries(
       fallbackSorted.map((row, index) => [
         row.teamId,
         {
-          rank: index + 1,
+          rank: fallbackRankByTeamId.get(row.teamId) ?? index + 1,
           points: row.points,
           cash: row.cash,
         },

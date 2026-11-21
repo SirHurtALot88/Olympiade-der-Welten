@@ -22798,7 +22798,15 @@
       // weiterhin als zwei eigene Plaetze mit je eigenem Punkt-fuer-Punkt-Ticker (T-F1a) --
       // eine eigene 2-gegen-2-Hofpraesentation (ein gemeinsamer Platz, Serve-Rotation im
       // Paar) ist eine Ausbaustufe, kein Teil dieses Paketes (s. PR-Beschreibung).
-      if(art.tennis&&duellBretter>=2){
+      //
+      // UNGERADE RUBBER-ZAHL (21.11., Chris: "Tennis 2:2 bei 5 Einzeln"): das Doppel fasst zwei
+      // Bretter zu EINEM Rubber zusammen und senkt die Rubber-Zahl damit um eins. Bei GERADER
+      // Spielerzahl (2/4/6) wird sie dadurch ungerade (1/3/5) -- genau der Sinn des Davis-Cup-
+      // Formats. Bei UNGERADER Spielerzahl (3/5) machte das Doppel sie aber gerade (2/4): im
+      // Live-Save endeten so 4 von 16 Tennis-Duellen an Spieltag 6 (5er-Aufstellung) 2:2, obwohl
+      // Tennis kein Remis kennt. Deshalb gibt es das Doppel nur noch bei gerader Brettzahl; bei
+      // ungerader spielt jeder Slot sein Einzel, die Rubber-Zahl bleibt ungerade.
+      if(art.tennis&&duellBretter>=2&&duellBretter%2===0){
         const dbA=duellBretter-2, dbB=duellBretter-1;
         const a0=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[dbA].n);
         const a1=TEILNEHMER.find(x=>x.side===0&&x.n===mineGeordnet[dbB].n);

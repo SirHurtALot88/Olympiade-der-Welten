@@ -8764,7 +8764,12 @@ export function useFoundationShellRouterBodyScope({
 
   /** Anzahl bereits GEWERTETER Spieltage (nicht die Länge des Spielplans). */
   const fieldRacePlayedMatchdayCount = countPlayedFieldRaceMatchdays(fieldRaceLedger);
-  const fieldRaceTotalTeams = gameState.teams.length;
+  // Feldgröße der Rang-KPI: mit Liga-Split die eigene Liga, nicht alle Teams (21.11.).
+  const fieldRaceTotalTeams = (() => {
+    const ownLeague = selectedTeam ? gameState.seasonState?.leagueByTeamId?.[selectedTeam.teamId] ?? null : null;
+    if (!ownLeague) return gameState.teams.length;
+    return gameState.teams.filter((team) => gameState.seasonState?.leagueByTeamId?.[team.teamId] === ownLeague).length;
+  })();
 
   /**
    * Rang-Movement (Δ vs. letztem gewerteten Spieltag) je Team (D4).
@@ -8799,10 +8804,15 @@ export function useFoundationShellRouterBodyScope({
   const standingsMatchdayRankDeltaByTeamId = useMemo(
     () =>
       buildStandingsMatchdayRankDelta(
-        (gameState.teams ?? []).map((team) => ({ teamId: team.teamId, teamName: team.name })),
+        // Bewegung je Liga (21.11.): ein ▲25 in einer 16er-Liga kam aus einem Ranking über 32 Teams.
+        (gameState.teams ?? []).map((team) => ({
+          teamId: team.teamId,
+          teamName: team.name,
+          league: gameState.seasonState?.leagueByTeamId?.[team.teamId] ?? null,
+        })),
         gameState.seasonState?.standings,
       ),
-    [gameState.teams, gameState.seasonState?.standings],
+    [gameState.teams, gameState.seasonState?.standings, gameState.seasonState?.leagueByTeamId],
   );
 
   /**

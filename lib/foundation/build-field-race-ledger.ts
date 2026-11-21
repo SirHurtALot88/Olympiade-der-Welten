@@ -2,6 +2,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { roundValue } from "@/lib/foundation/foundation-number-utils";
 import { getMatchdaySummaryOptions } from "@/lib/foundation/matchday-summary";
 import { buildSeasonPointsLedger, type SeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
+import { ligaVonAusSpielstand, rangJeLiga } from "@/lib/season/liga-raenge";
 
 /**
  * Feld-Rennen-Ledger — pro Team eine Zeitreihe über alle bereits gespielten
@@ -124,6 +125,7 @@ export function buildFieldRaceLedger(
   const rowsByTeamId = new Map<string, FieldRaceLedgerEntry[]>();
   for (const team of teams) rowsByTeamId.set(team.teamId, []);
 
+  const ligaVon = ligaVonAusSpielstand(gameState);
   const cumulative = new Map<string, number>();
   const prevCumulativeRank = new Map<string, number | null>();
   const matchdays: Array<{ matchdayId: string; matchdayNumber: number; played: boolean }> = [];
@@ -139,11 +141,14 @@ export function buildFieldRaceLedger(
       cumulative.set(team.teamId, roundValue((cumulative.get(team.teamId) ?? 0) + (dayPoints.get(team.teamId) ?? 0), 4));
     }
 
-    const tagesrangByTeam = rankByPoints(new Map(dayPoints), teams);
+    // Ränge je Liga (21.11.): mit Liga-Split zählt Tages- und Gesamtrang nur innerhalb der eigenen
+    // 16er-Liga — sonst stand im Saisonstand „▲25“ (Bewegung über alle 32 Teams). Ohne Split eine Gruppe.
+    const dayPointsByTeam = new Map<string, number | null>(dayPoints);
+    const tagesrangByTeam = rangJeLiga(teams, ligaVon, (gruppe) => rankByPoints(dayPointsByTeam, gruppe));
     const cumulativeByTeam = new Map<string, number | null>(
       teams.map((team) => [team.teamId, cumulative.get(team.teamId) ?? 0] as const),
     );
-    const cumulativeRankByTeam = rankByPoints(cumulativeByTeam, teams);
+    const cumulativeRankByTeam = rangJeLiga(teams, ligaVon, (gruppe) => rankByPoints(cumulativeByTeam, gruppe));
 
     for (const team of teams) {
       const cumulativeRank = cumulativeRankByTeam.get(team.teamId) ?? null;
