@@ -155,12 +155,22 @@ try {
       } catch (e) { standard.push([`spiele climbing/standard ${s}`, "FEHLER " + String(e)]); }
       finally { A.bahnFlags({ climbingFormat: null }); }
     }
-    return { aus, kontakt, standard };
+    // TDM-GEFECHT (21.11.): die Buchung rechnet TDM ueber spieleTdmGefecht() (tdmGefecht), NICHT ueber `spiele tdm`
+    // (altes Echtzeit-Duell) -- ohne diese Zeilen war das produktive TDM vom Fingerabdruck ungeschuetzt. Eigene Summe
+    // AUSSERHALB von GESAMT, damit GESAMT (75 Eintraege) vergleichbar bleibt.
+    const tdmGefecht = [];
+    if (A.spieleTdmGefecht) for (const s of SAATEN) {
+      try { tdmGefecht.push([`spieleTdmGefecht ${s}`, A.spieleTdmGefecht("tdm", s)]); }
+      catch (e) { tdmGefecht.push([`spieleTdmGefecht ${s}`, "FEHLER " + String(e)]); }
+    }
+    return { aus, kontakt, standard, tdmGefecht };
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
   for (const [name, wert] of ergebnis.standard || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.standard?.length) console.log(`CLIMBING-STANDARD ${h(ergebnis.standard)} (${ergebnis.standard.length} Eintraege, nicht in GESAMT)`);
+  for (const [name, wert] of ergebnis.tdmGefecht || []) console.log(`${h(wert)}  ${name}`);
+  if (ergebnis.tdmGefecht?.length) console.log(`TDM-GEFECHT ${h(ergebnis.tdmGefecht)} (${ergebnis.tdmGefecht.length} Eintraege, nicht in GESAMT)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.
   if (ergebnis.kontakt) console.log("KONTAKT " + JSON.stringify(ergebnis.kontakt));
 } finally {
