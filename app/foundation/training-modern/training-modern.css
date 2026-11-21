@@ -1,0 +1,1182 @@
+/*
+ * ENTWICKLUNG / TRAINING (21.11.). Vorlage: public/mockups/training-modern-18-11.html. Tokens und Bausteine:
+ * components/foundation/broadcast/broadcast.css (Wurzelklasse `bc`). Hier nur, was diese Seite ist: Kopf mit Reitern und
+ * Kennzahlen, Trainingshalle, Kader-Tabelle, Radar, „Im Blick", Spieler- und Plan-Ansicht. Schrift und Abstände wachsen mit
+ * der Breite (clamp), 2560x1440 füllt die Fläche, 1710x1112 quetscht nichts.
+ */
+.te {
+  --te-text: clamp(14px, 0.78vw, 22px);
+  --te-klein: clamp(12px, 0.66vw, 18px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: max(660px, calc(100dvh - 152px - max(0px, (100vw - 1700px) * 0.04)));
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r);
+  overflow: hidden;
+  background: var(--bc-grund);
+  font-size: var(--te-text);
+}
+.te .bc-hero {
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  --bc-kul-deckkraft: 0.55;
+}
+.te .bc-hero__titel {
+  font-size: clamp(30px, 1.1vw + 18px, 46px);
+}
+.te .bc-hero__sub {
+  white-space: normal;
+  font-size: var(--te-text);
+}
+.te .bc-hero__crest {
+  width: clamp(62px, 2.4vw + 12px, 84px);
+  height: clamp(62px, 2.4vw + 12px, 84px);
+}
+.te-reiter {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(8px, 1vw, 22px);
+  padding-left: clamp(6px, 0.8vw, 20px);
+  min-width: 0;
+}
+.te-reiter button {
+  height: clamp(36px, 2.3vw, 54px);
+  padding: 0 4px;
+  font: 600 clamp(15px, 0.9vw, 22px) var(--bc-zahl);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bc-leise);
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+  background: none;
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  cursor: pointer;
+}
+.te-reiter button:hover:not(:disabled) {
+  color: var(--bc-tinte);
+}
+.te-reiter button.is-an {
+  color: var(--bc-gold);
+  border-bottom-color: var(--bc-gold);
+}
+.te-reiter button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.te-reiter small {
+  font-size: 0.62em;
+  letter-spacing: 0.06em;
+  color: var(--bc-stumm);
+}
+.te-kennzahlen {
+  display: flex;
+  gap: clamp(8px, 0.7vw, 16px);
+  align-items: stretch;
+}
+.te-kennzahlen > div {
+  min-width: clamp(84px, 6.4vw, 150px);
+  padding: 7px 14px 8px;
+  background: rgba(18, 24, 36, 0.72);
+  border: 1px solid var(--bc-linie);
+  border-top: 2px solid var(--bc-linie-2);
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+}
+.te-kennzahlen > div.is-warn {
+  border-top-color: var(--bc-warn);
+}
+.te-kennzahlen em {
+  display: block;
+  font-style: normal;
+  font-size: var(--te-klein);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--bc-stumm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.te-kennzahlen strong {
+  display: inline-block;
+  font-size: clamp(24px, 1.7vw, 44px);
+  line-height: 1.05;
+  font-weight: 700;
+  color: var(--bc-creme);
+}
+.te-kennzahlen small {
+  margin-left: 6px;
+  font-size: var(--te-klein);
+  color: var(--bc-stumm);
+}
+.te-sperre {
+  margin: 0;
+  padding: 8px 18px;
+  background: rgba(255, 96, 88, 0.12);
+  color: var(--bc-tinte);
+  font-size: var(--te-klein);
+}
+.te-work {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 12px 14px 8px;
+}
+.te-work > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.te-fuss {
+  flex: none;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 5px 16px 7px;
+  font-size: var(--te-klein);
+  color: var(--bc-stumm);
+  border-top: 1px solid var(--bc-linie);
+}
+.te-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 600 var(--te-klein) var(--bc-zahl);
+  color: var(--bc-gold);
+  cursor: pointer;
+  margin-left: auto;
+}
+.te-fuss .te-link {
+  margin-left: 0;
+}
+.te-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  height: clamp(34px, 2vw, 48px);
+  padding: 0 14px;
+  border-radius: 7px;
+  border: 1px solid var(--bc-linie-2);
+  background: transparent;
+  color: var(--bc-tinte);
+  font: 700 var(--te-text) var(--bc-zahl);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.te-btn:hover:not(:disabled) {
+  border-color: var(--bc-creme);
+}
+.te-btn.is-gold {
+  background: var(--bc-gold);
+  border-color: var(--bc-gold);
+  color: #17120a;
+}
+.te-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.te-gk {
+  display: block;
+  font-size: var(--te-klein);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bc-leise);
+  font-weight: 600;
+}
+.te-haus {
+  font: italic 700 1.45em/1.1 var(--bc-haus);
+  color: var(--bc-creme);
+}
+.te-hinweis {
+  margin: 4px 0 0;
+  font-size: var(--te-klein);
+  color: var(--bc-leise);
+  line-height: 1.3;
+}
+.te-hinweis.is-warn {
+  color: var(--bc-warn);
+}
+.te-pad {
+  padding: 6px 14px 0;
+}
+.te-leer {
+  padding: 18px;
+  color: var(--bc-stumm);
+}
+.te-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+  padding: 3px 0;
+  border-top: 1px solid rgba(244, 230, 196, 0.07);
+  font-size: var(--te-text);
+}
+.te-kv > span {
+  color: var(--bc-leise);
+}
+.te-kv > b {
+  font-size: 1.1em;
+}
+
+/* ---------- Tafeln ---------- */
+.te-tafel {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bc-flaeche-1);
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r);
+  overflow: hidden;
+}
+.te-tafel__kopf {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--bc-linie);
+}
+.te-tafel__kopf h2 {
+  margin: 0;
+  font: italic 700 clamp(18px, 1.15vw, 30px) / 1.1 var(--bc-haus);
+  color: var(--bc-creme);
+  white-space: nowrap;
+}
+.te-tafel__kopf span {
+  font-size: var(--te-klein);
+  color: var(--bc-stumm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.te-tbl {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.te-tbl .bc-tbl__koerper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.te-tbl .bc-tbl__zeile {
+  min-height: clamp(40px, 4.1vh, 66px);
+  align-items: center;
+  cursor: pointer;
+}
+
+/* ---------- Kader-Ansicht ---------- */
+.te-kader-raster {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(320px, 19.6vw, 520px);
+  gap: 12px;
+}
+.te-kader-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  min-width: 0;
+}
+.te-halle {
+  flex: 0 0 clamp(180px, 20.5vh, 440px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r);
+  overflow: hidden;
+  background: #3a352c url("/sprites/kulissen/gewichtheben/sandsack.jpg") center top / cover;
+  image-rendering: pixelated;
+}
+.te-halle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 8, 12, 0.55) 0, transparent 26%, transparent 66%, rgba(6, 8, 12, 0.6) 100%);
+  pointer-events: none;
+}
+.te-halle__kopf {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 7px 14px;
+}
+.te-halle__kopf h2 {
+  margin: 0;
+  font: italic 700 clamp(20px, 1.3vw, 34px) / 1 var(--bc-haus);
+  color: #fff;
+  text-shadow: 0 2px 4px #000;
+}
+.te-halle__kopf span {
+  font-size: var(--te-klein);
+  color: var(--bc-tinte);
+  text-shadow: 0 1px 3px #000;
+}
+.te-halle__warn {
+  margin-left: auto;
+  padding: 1px 10px;
+  border-radius: 12px;
+  background: var(--bc-warn);
+  color: #fff;
+  font-size: var(--te-klein);
+}
+.te-halle__stationen {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.te-sta {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  border-right: 1px dashed rgba(244, 230, 196, 0.16);
+}
+.te-sta:last-child {
+  border-right: 0;
+}
+.te-sta__tafel {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  transform: translateX(-50%);
+  padding: 2px 14px 3px;
+  background: rgba(10, 13, 19, 0.9);
+  border: 1px solid var(--bc-linie-2);
+  border-top: 3px solid var(--f);
+  text-align: center;
+  white-space: nowrap;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+.te-sta__tafel b {
+  display: block;
+  font: italic 700 clamp(15px, 1vw, 26px) / 1.1 var(--bc-haus);
+  color: #fff;
+}
+.te-sta__tafel small {
+  font-size: var(--te-klein);
+  color: var(--bc-leise);
+}
+.te-sta__leute {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  padding-bottom: 6px;
+}
+.te-hf {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: clamp(74px, 5.6vw, 132px);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--bc-tinte);
+}
+.te-hf__fig {
+  display: block;
+  margin-bottom: -8px;
+  filter: drop-shadow(0 6px 3px rgba(0, 0, 0, 0.5));
+}
+.te-hf__fig .oly-figur-sprite-frame {
+  width: clamp(60px, 9.4vh, 150px) !important;
+  height: clamp(60px, 9.4vh, 150px) !important;
+}
+.te-hf__last {
+  width: 52%;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  margin-bottom: 3px;
+}
+.te-hf__last i {
+  display: block;
+  height: 100%;
+}
+.te-hf__nm {
+  padding: 1px 9px;
+  border-radius: 4px;
+  background: rgba(8, 11, 17, 0.86);
+  border: 1px solid var(--bc-linie);
+  font: 600 var(--te-klein) var(--bc-zahl);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.te-hf.is-an .te-hf__nm {
+  border-color: var(--bc-gold);
+  background: rgba(60, 44, 10, 0.92);
+  color: #fff;
+}
+.te-hf.is-an::before {
+  content: "";
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  width: 70%;
+  height: 16px;
+  margin-left: -35%;
+  border-radius: 50%;
+  border: 2px solid var(--bc-gold);
+  box-shadow: 0 0 12px rgba(240, 195, 90, 0.7);
+}
+.te-hf.is-rot .te-hf__nm {
+  border-color: var(--bc-warn);
+  color: #ffd9d6;
+}
+.te-hf__ruf {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--bc-warn);
+  color: #fff;
+  font: 700 var(--te-klein) var(--bc-zahl);
+  white-space: nowrap;
+  z-index: 3;
+}
+.te-hf.is-reha .te-hf__fig,
+.te-hf.is-reha .te-med {
+  filter: grayscale(0.85) brightness(0.8);
+}
+
+/* ---------- Medaillon ---------- */
+.te-med {
+  display: inline-grid;
+  place-items: center;
+  width: clamp(52px, 3.6vw, 84px);
+  height: clamp(52px, 3.6vw, 84px);
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--bc-linie-2);
+  background: var(--bc-flaeche-2);
+  flex: none;
+}
+.te-med.is-klein {
+  width: clamp(30px, 1.9vw, 46px);
+  height: clamp(30px, 1.9vw, 46px);
+  border-width: 1px;
+}
+.te-med img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 15%;
+}
+
+/* ---------- Kader-Tabelle ---------- */
+.te-kader {
+  flex: 1;
+  min-height: 0;
+}
+.te-sp {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.te-sp strong {
+  display: block;
+  font: italic 700 1.2em/1.1 var(--bc-haus);
+  color: var(--bc-creme);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.te-sp small {
+  display: block;
+  color: var(--bc-stumm);
+  font-size: var(--te-klein);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.te-ziel,
+.te-reha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.te-reha {
+  color: var(--bc-leise);
+  font-size: var(--te-klein);
+}
+.te-reha b {
+  padding: 1px 7px;
+  border: 1px solid var(--bc-warn);
+  border-radius: 3px;
+  color: var(--bc-warn);
+}
+.te-kurz {
+  display: inline-block;
+  min-width: 2.6em;
+  padding: 1px 6px;
+  text-align: center;
+  border: 1px solid var(--bc-linie-2);
+  border-radius: 3px;
+  background: var(--bc-flaeche-3);
+  font-size: var(--te-klein);
+  letter-spacing: 0.06em;
+}
+.te-art {
+  padding: 1px 7px;
+  border: 1px solid rgba(98, 211, 148, 0.6);
+  border-radius: 3px;
+  background: rgba(98, 211, 148, 0.14);
+  color: var(--bc-gut);
+  font: 700 0.72em var(--bc-zahl);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.te-art.is-neben {
+  border-color: rgba(69, 176, 201, 0.6);
+  background: rgba(69, 176, 201, 0.14);
+  color: var(--bc-gast);
+}
+.te-prof {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-size: var(--te-text);
+}
+.te-prof > span > i,
+.te-attr > i,
+.te-haus > i {
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-right: 5px;
+  background: var(--af, var(--bc-leise));
+  vertical-align: 0;
+}
+.te-prof b {
+  color: var(--bc-leise);
+  font-weight: 600;
+}
+.te-pot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.te-pot__bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  min-width: 24px;
+}
+.te-pot__bar i {
+  display: block;
+  height: 100%;
+  background: var(--bc-creme);
+}
+.te-pot small {
+  color: var(--bc-stumm);
+}
+.te-wunsch {
+  padding: 1px 7px;
+  border: 1px solid var(--bc-acht);
+  border-radius: 3px;
+  color: var(--bc-acht);
+  font: 700 var(--te-klein) var(--bc-zahl);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.te-wunsch.is-ok {
+  border-color: rgba(98, 211, 148, 0.5);
+  color: var(--bc-gut);
+}
+.te-bel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.te-bel__skala {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 40px;
+  height: 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.9;
+}
+.te-bel__skala i {
+  display: block;
+  height: 100%;
+  opacity: 0.45;
+}
+.te-bel__skala i:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.te-bel__skala i:nth-child(4) {
+  border-radius: 0 4px 4px 0;
+}
+.te-bel__skala u {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1px;
+  background: #fff;
+  border-radius: 2px;
+}
+.te-bel__skala s {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 0;
+  border-left: 2px dashed var(--bc-gold);
+}
+.te-bel .bc-t {
+  white-space: nowrap;
+  font-weight: 700;
+}
+.te-bel em {
+  font-style: normal;
+  color: var(--bc-leise);
+  font-weight: 500;
+}
+.te-bel small {
+  color: var(--bc-leise);
+  font-weight: 500;
+}
+
+/* ---------- Radar ---------- */
+.te-radar {
+  flex: none;
+}
+.te-radar__raster {
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  gap: 4px;
+  padding: 6px 10px 8px;
+}
+.te-rk {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "n o" "p b";
+  align-items: center;
+  gap: 0 6px;
+  padding: 2px 5px 3px;
+  background: var(--bc-flaeche-2);
+  border: 1px solid var(--bc-linie);
+  border-bottom: 3px solid rgba(98, 211, 148, 0.55);
+  border-radius: 5px;
+  color: var(--bc-tinte);
+  cursor: pointer;
+  text-align: left;
+}
+.te-rk b {
+  grid-area: n;
+  font-size: var(--te-text);
+  letter-spacing: 0.05em;
+}
+.te-rk > span {
+  grid-area: o;
+  color: var(--bc-gold);
+  font-weight: 700;
+}
+.te-rk small {
+  grid-area: p;
+  color: var(--bc-stumm);
+  font-size: var(--te-klein);
+}
+.te-rk em {
+  grid-area: b;
+  font-style: normal;
+  color: var(--bc-gut);
+  font-weight: 700;
+  justify-self: end;
+}
+.te-rk__bar {
+  display: none;
+}
+.te-rk.is-zu {
+  opacity: 0.5;
+  border-bottom-color: var(--bc-linie);
+}
+.te-rk.is-an {
+  border-color: var(--bc-gold);
+  background: rgba(240, 195, 90, 0.12);
+}
+
+/* ---------- Im Blick ---------- */
+.te-blick {
+  min-height: 0;
+}
+.te-blick__koerper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.te-blick__kopf {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.te-blick__kopf h3,
+.te-sp-name h3 {
+  margin: 0;
+  font: italic 700 clamp(24px, 1.7vw, 42px) / 1 var(--bc-haus);
+  color: #fff;
+}
+.te-blick__kopf p,
+.te-sp-name p {
+  margin: 3px 0 0;
+  color: var(--bc-leise);
+}
+.te-blick__plan,
+.te-blick__saison,
+.te-blick__bel {
+  padding: 8px 10px 9px;
+  background: var(--bc-flaeche-2);
+  border: 1px solid var(--bc-linie);
+  border-radius: 8px;
+}
+.te-blick__zeile,
+.te-blick__ziel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 3px 0;
+}
+.te-blick__zeile .bc-seg {
+  margin-left: auto;
+}
+.te-blick__ziel small {
+  color: var(--bc-stumm);
+}
+.te-vier {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 5px;
+}
+.te-vier small {
+  display: block;
+  color: var(--bc-stumm);
+  font-size: var(--te-klein);
+}
+.te-vier b {
+  font-size: 1.5em;
+}
+.te-blick__fuss {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.te-plan-rechts .te-blick__fuss {
+  padding: 10px 12px;
+}
+
+/* ---------- Spieler-Ansicht ---------- */
+.te-spieler {
+  display: grid;
+  grid-template-columns: clamp(250px, 15vw, 400px) minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 12px;
+}
+.te-sp-links {
+  padding: 10px;
+  gap: 10px;
+}
+.te-sp-fig {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #3a352c url("/sprites/kulissen/gewichtheben/sandsack.jpg") center top / cover;
+  image-rendering: pixelated;
+  overflow: hidden;
+}
+.te-sp-fig .oly-figur-sprite-frame {
+  width: clamp(150px, 11vw, 280px) !important;
+  height: clamp(150px, 11vw, 280px) !important;
+}
+.te-sp-name {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  text-shadow: 0 2px 4px #000;
+}
+.te-attr small {
+  color: var(--bc-gold);
+}
+.te-gross {
+  font-size: 1.4em;
+}
+.te-decke {
+  color: var(--bc-leise);
+  white-space: nowrap;
+}
+.te-decke.is-closing {
+  color: var(--bc-acht);
+}
+.te-decke.is-capped {
+  color: var(--bc-warn);
+}
+.te-verlauf {
+  flex: none;
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--bc-linie);
+}
+.te-verlauf__balken {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: clamp(44px, 3.4vw, 90px);
+  margin-top: 6px;
+}
+.te-verlauf__balken i {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: var(--bc-heim);
+}
+.te-verlauf__balken i.is-leicht {
+  background: var(--bc-gut);
+}
+.te-verlauf__balken i.is-hart {
+  background: var(--bc-warn);
+}
+.te-verlauf__balken i.is-reha {
+  background: var(--bc-stumm);
+}
+
+/* ---------- Plan-Editor ---------- */
+.te-plan {
+  display: grid;
+  grid-template-columns: clamp(220px, 14vw, 380px) minmax(0, 1fr) clamp(300px, 18.5vw, 500px);
+  gap: 12px;
+}
+.te-plan-liste {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.te-pl {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 12px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid rgba(244, 230, 196, 0.07);
+  border-left: 3px solid transparent;
+  color: var(--bc-tinte);
+  text-align: left;
+  cursor: pointer;
+}
+.te-pl.is-an {
+  background: rgba(240, 195, 90, 0.1);
+  border-left-color: var(--bc-gold);
+}
+.te-pl strong {
+  display: block;
+  font: italic 700 1.2em/1.1 var(--bc-haus);
+  color: var(--bc-creme);
+}
+.te-pl small {
+  display: block;
+  color: var(--bc-stumm);
+  font-size: var(--te-klein);
+}
+.te-pl__punkt {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bc-gold);
+}
+.te-pl__modus {
+  padding: 1px 7px;
+  border: 1px solid var(--bc-linie-2);
+  border-radius: 3px;
+  font-size: var(--te-klein);
+}
+.te-plan-mitte {
+  overflow-y: auto;
+}
+.te-plan-schritt {
+  padding: 8px 14px 4px;
+}
+.te-plan-schritt h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 6px;
+  font: italic 700 clamp(18px, 1.15vw, 30px) / 1.1 var(--bc-haus);
+  color: var(--bc-creme);
+}
+.te-plan-schritt h3 b {
+  display: inline-grid;
+  place-items: center;
+  width: 1.3em;
+  height: 1.3em;
+  border-radius: 50%;
+  background: var(--bc-gold);
+  color: #17120a;
+  font: 700 0.8em var(--bc-zahl);
+}
+.te-plan-schritt h3 small {
+  font: 500 var(--te-klein) var(--bc-zahl);
+  color: var(--bc-stumm);
+}
+.te-dk-raster {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+}
+.te-dk {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: clamp(64px, 5vw, 120px);
+  padding: 5px 8px 6px;
+  background: var(--bc-flaeche-2);
+  border: 1px solid var(--bc-linie);
+  border-radius: 6px;
+  color: var(--bc-tinte);
+  text-align: left;
+  cursor: pointer;
+}
+.te-dk b {
+  font: italic 700 1.05em var(--bc-haus);
+  color: var(--bc-creme);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.te-dk__oben {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--te-klein);
+  color: var(--bc-gold);
+}
+.te-dk__oben small {
+  color: var(--bc-stumm);
+  white-space: nowrap;
+}
+.te-dk.is-zu {
+  opacity: 0.55;
+}
+.te-dk.is-an {
+  border-color: var(--bc-gold);
+  background: rgba(240, 195, 90, 0.14);
+}
+.te-wege,
+.te-modi {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.te-weg,
+.te-modus {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 9px 12px 10px;
+  background: var(--bc-flaeche-2);
+  border: 1px solid var(--bc-linie);
+  border-radius: 8px;
+  color: var(--bc-tinte);
+  text-align: left;
+  cursor: pointer;
+}
+.te-weg.is-an,
+.te-modus.is-an {
+  border-color: var(--bc-gold);
+  background: rgba(240, 195, 90, 0.1);
+}
+.te-weg:disabled,
+.te-modus:disabled,
+.te-dk:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.te-weg__kopf,
+.te-modus__kopf {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.te-weg__kopf small,
+.te-modus small {
+  color: var(--bc-stumm);
+  font-size: var(--te-klein);
+}
+.te-weg__fuss {
+  margin-top: auto;
+  color: var(--bc-leise);
+  font-size: var(--te-klein);
+}
+.te-weg__fuss em {
+  font-style: normal;
+  color: var(--bc-acht);
+}
+.te-modus__kopf .te-art {
+  margin-left: auto;
+}
+.te-vorschau,
+.te-offen {
+  padding: 10px 14px;
+}
+.te-offen {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--bc-linie);
+}
+.te-plan-rechts {
+  min-height: 0;
+}
+
+@media (max-width: 1500px) {
+  .te-radar__raster {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+  }
+  .te-dk-raster {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Rückfall-Schalter über der klassischen Seite (wie beim Saisonstand) */
+.saisonstand-look-schalter {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 0 8px;
+}
+.saisonstand-look-schalter__knopf {
+  border: 1px solid var(--line, rgba(244, 230, 196, 0.3));
+  border-radius: 7px;
+  padding: 5px 12px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.te-sp-links .te-btn {
+  flex: none;
+}
+.te-verlauf__legende {
+  margin-left: 10px;
+  font-size: var(--te-klein);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.te-pl > span:not(.te-med) {
+  flex: 1;
+  min-width: 0;
+}
+.te-pl > .te-med {
+  flex: none;
+}
+.te-plan-rechts .te-btn {
+  white-space: nowrap;
+  font-size: var(--te-klein);
+  letter-spacing: 0.05em;
+}
+.te-plan-rechts .te-btn.is-gold {
+  flex: 1.6;
+}
+
+.te-klasse {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  color: var(--kf, var(--bc-leise));
+  font-weight: 600;
+}
+.te-klasse img {
+  width: 1.15em;
+  height: 1.15em;
+  object-fit: contain;
+}
+
+/* ---------- Kopf im Seiten-Slot des Regiebands (ein Kopf statt zwei) ---------- */
+.te-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(8px, 1vw, 24px);
+  width: 100%;
+  min-width: 0;
+  font-size: var(--te-text);
+  background: none;
+}
+.te-slot .te-reiter {
+  align-items: center;
+  padding-left: 0;
+  gap: clamp(8px, 0.9vw, 20px);
+}
+.te-slot .te-reiter button {
+  height: clamp(34px, 2.2vw, 52px);
+  font-size: clamp(14px, 0.85vw, 21px);
+}
+.te-slot .te-kennzahlen > div {
+  min-width: 0;
+  padding: 4px 12px 5px;
+}
+.te-slot .te-kennzahlen strong {
+  font-size: clamp(20px, 1.4vw, 36px);
+}
+.te-slot .te-kennzahlen em {
+  font-size: clamp(10px, 0.56vw, 15px);
+  letter-spacing: 0.08em;
+}
+.te-slot .te-kennzahlen strong {
+  font-size: clamp(18px, 1.05vw, 30px);
+}
+.te-slot .te-reiter button {
+  font-size: clamp(13px, 0.72vw, 19px);
+  letter-spacing: 0.08em;
+}
+@media (max-width: 2300px) {
+  .te-slot .te-kennzahlen small {
+    display: none;
+  }
+}
+@media (max-width: 1500px) {
+  .te-slot .te-kennzahlen > div:nth-child(5) {
+    display: none;
+  }
+}

@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 
 import TrainingCompactClient from "@/app/foundation/training-compact/TrainingCompactClient";
+import TrainingModern from "@/app/foundation/training-modern/TrainingModern";
+import { useTrainingLook } from "@/lib/training/training-look";
 import type { TrainingClassOption } from "@/app/foundation/training-facilities-v2/training-view-types";
 import type { GameState, Team, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
 import type { PlayerRatingContractRow } from "@/lib/foundation/player-rating-contract";
@@ -33,6 +35,13 @@ export type FoundationTrainingCompactShellHostProps = {
   trainingClassOptions: TrainingClassOption[];
   onSetTrainingMode: (playerId: string, mode: PlayerTrainingMode) => void;
   onSetTrainingClass: (playerId: string, trainingClass: string) => void;
+  /** Ziel-Disziplin + Weg gesammelt setzen (Entwicklung, Plan-Editor); `null` = zurück an den KI-Vorschlag. */
+  onSetTrainingsZiele?: (
+    aenderungen: Array<{
+      playerId: string;
+      ziel: { disziplinId: string; weg: number } | null;
+    }>,
+  ) => void;
   onOpenPlayerDetails?: (payload: { playerId: string; activePlayerId?: string | null }) => void;
   onOpenFacilities?: () => void;
   onOpenTeams?: () => void;
@@ -62,6 +71,7 @@ export default function FoundationTrainingCompactShellHost({
   trainingClassOptions,
   onSetTrainingMode,
   onSetTrainingClass,
+  onSetTrainingsZiele,
   onOpenPlayerDetails,
   onOpenFacilities,
   onOpenTeams,
@@ -87,41 +97,88 @@ export default function FoundationTrainingCompactShellHost({
 
   // Saison-Spotlight (`5hcq2p`): rein abgeleitet aus dem Spielstand, deshalb hier im Host und
   // nicht im Client. Ohne Vorsaison liefert der Aufbau `null` und die Karte rendert nichts.
-  const saisonSpotlight = useMemo(
-    () => buildSaisonSpotlight({ gameState, teamId: selectedTeam.teamId }),
-    [gameState, selectedTeam.teamId],
-  );
+  const saisonSpotlight = useMemo(() => buildSaisonSpotlight({ gameState, teamId: selectedTeam.teamId }), [gameState, selectedTeam.teamId]);
+
+  const [look, setzeLook] = useTrainingLook();
+  const gemeinsam = {
+    selectedTeam,
+    selectedTeamControlMode,
+    seasonLabel,
+    managementLocked,
+    managementLockedReason,
+    summary: {
+      recoveryBeforeTraining: trainingForecastSummary.recoveryBeforeTraining,
+      recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
+      performanceXp: trainingForecastSummary.performanceXp,
+      totalXp: trainingForecastSummary.totalXp,
+      lightModeCount: trainingForecastSummary.lightModeCount,
+      hardModeCount: trainingForecastSummary.hardModeCount,
+      trainingXpAfter: trainingFacilityEffectPreview.trainingXp.after,
+      trainingXpModifierPct: trainingFacilityEffectPreview.trainingXp.modifierPct,
+    },
+    developmentFilter: trainingDevelopmentFilter,
+    developmentSummary: trainingDevelopmentSummary,
+    onSetDevelopmentFilter: onSetTrainingDevelopmentFilter,
+    trainingModeOptions: trainingV2ModeOptions,
+    trainingClassOptions,
+    playerRows: trainingPlayerRowViews,
+    allPlayerCount: trainingPlayerForecastRows.length,
+    onSetTrainingMode,
+    onSetTrainingClass,
+    onOpenPlayerDetails,
+    onOpenFacilities,
+    onOpenTeams,
+  };
+
+  if (look === "modern") {
+    return (
+      <TrainingModern
+        {...gemeinsam}
+        saisonSpotlight={saisonSpotlight}
+        gameState={gameState}
+        onSetTrainingsZiele={onSetTrainingsZiele}
+        onZurKlassik={() => setzeLook("klassisch")}
+      />
+    );
+  }
 
   return (
-    <TrainingCompactClient
-      saisonSpotlight={saisonSpotlight}
-      selectedTeam={selectedTeam}
-      selectedTeamControlMode={selectedTeamControlMode}
-      seasonLabel={seasonLabel}
-      managementLocked={managementLocked}
-      managementLockedReason={managementLockedReason}
-      summary={{
-        recoveryBeforeTraining: trainingForecastSummary.recoveryBeforeTraining,
-        recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
-        performanceXp: trainingForecastSummary.performanceXp,
-        totalXp: trainingForecastSummary.totalXp,
-        lightModeCount: trainingForecastSummary.lightModeCount,
-        hardModeCount: trainingForecastSummary.hardModeCount,
-        trainingXpAfter: trainingFacilityEffectPreview.trainingXp.after,
-        trainingXpModifierPct: trainingFacilityEffectPreview.trainingXp.modifierPct,
-      }}
-      developmentFilter={trainingDevelopmentFilter}
-      developmentSummary={trainingDevelopmentSummary}
-      onSetDevelopmentFilter={onSetTrainingDevelopmentFilter}
-      trainingModeOptions={trainingV2ModeOptions}
-      trainingClassOptions={trainingClassOptions}
-      playerRows={trainingPlayerRowViews}
-      allPlayerCount={trainingPlayerForecastRows.length}
-      onSetTrainingMode={onSetTrainingMode}
-      onSetTrainingClass={onSetTrainingClass}
-      onOpenPlayerDetails={onOpenPlayerDetails}
-      onOpenFacilities={onOpenFacilities}
-      onOpenTeams={onOpenTeams}
-    />
+    <>
+      <div className="saisonstand-look-schalter" data-testid="training-look-schalter">
+        <button type="button" className="saisonstand-look-schalter__knopf" onClick={() => setzeLook("modern")}>
+          Zur modernen Ansicht
+        </button>
+      </div>
+      <TrainingCompactClient
+        saisonSpotlight={saisonSpotlight}
+        selectedTeam={selectedTeam}
+        selectedTeamControlMode={selectedTeamControlMode}
+        seasonLabel={seasonLabel}
+        managementLocked={managementLocked}
+        managementLockedReason={managementLockedReason}
+        summary={{
+          recoveryBeforeTraining: trainingForecastSummary.recoveryBeforeTraining,
+          recoveryAfterTraining: trainingForecastSummary.recoveryAfterTraining,
+          performanceXp: trainingForecastSummary.performanceXp,
+          totalXp: trainingForecastSummary.totalXp,
+          lightModeCount: trainingForecastSummary.lightModeCount,
+          hardModeCount: trainingForecastSummary.hardModeCount,
+          trainingXpAfter: trainingFacilityEffectPreview.trainingXp.after,
+          trainingXpModifierPct: trainingFacilityEffectPreview.trainingXp.modifierPct,
+        }}
+        developmentFilter={trainingDevelopmentFilter}
+        developmentSummary={trainingDevelopmentSummary}
+        onSetDevelopmentFilter={onSetTrainingDevelopmentFilter}
+        trainingModeOptions={trainingV2ModeOptions}
+        trainingClassOptions={trainingClassOptions}
+        playerRows={trainingPlayerRowViews}
+        allPlayerCount={trainingPlayerForecastRows.length}
+        onSetTrainingMode={onSetTrainingMode}
+        onSetTrainingClass={onSetTrainingClass}
+        onOpenPlayerDetails={onOpenPlayerDetails}
+        onOpenFacilities={onOpenFacilities}
+        onOpenTeams={onOpenTeams}
+      />
+    </>
   );
 }

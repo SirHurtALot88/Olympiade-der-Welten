@@ -2,6 +2,7 @@
 /* eslint-disable */
 // AUTO-GENERATED render body extracted from the Foundation page component.
 // Contains the real Foundation shell UI (previously the monolith return block).
+import { useTrainingLook } from "@/lib/training/training-look";
 import dynamic from "next/dynamic";
 import { getSeasonEndPayoutStatus } from "@/lib/season/season-end-sponsor-payout-status";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
@@ -744,7 +745,13 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   // bestehenden Nav-Konfiguration; Team-Kontext nur wenn wirklich vorhanden.
   // Abgabe der Einsatzliste als Hauptaktion des Taktgebers (statt zweitem Knopf im Dock der Einsatzliste).
   const einsatzlisteAbgabe = useSyncExternalStore(abonniereEinsatzlisteAbgabe, getEinsatzlisteAbgabe, () => null);
-  const newLookBreadcrumbData = getFoundationBreadcrumb(activeView as FoundationViewId);
+  const [trainingLook] = useTrainingLook();
+  const breadcrumbBasis = getFoundationBreadcrumb(activeView as FoundationViewId);
+  // Entwicklung (21.11.): Training und Gebäude sind im Mockup EIN Bereich; die neue Seite trägt den Titel im Band.
+  const newLookBreadcrumbData =
+    activeView === "trainingCompact" && trainingLook === "modern" && breadcrumbBasis
+      ? { group: "Team · Training und Gebäude", view: "Entwicklung" }
+      : breadcrumbBasis;
   // Regieband (18.11.): goldene Kopfzeile (Gruppe, bei Teamseiten das Team) über dem Seitentitel.
   const newLookBreadcrumb = newLookBreadcrumbData ? (
     <nav className="foundation-shell-breadcrumb nl-breadcrumb" aria-label="Brotkrumen-Navigation" data-testid="foundation-breadcrumb">
