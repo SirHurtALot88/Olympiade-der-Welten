@@ -26,6 +26,9 @@ services:
         # Hockey-Torwart-Regel (22.11., lib/resolve/hockey-torwart.ts): derselbe Weg, ohne eigenen Wert gilt der
         # Server-Schalter OLY_HOCKEY_TORWART. Leer = neue Regel.
         NEXT_PUBLIC_OLY_HOCKEY_TORWART: ${NEXT_PUBLIC_OLY_HOCKEY_TORWART:-${OLY_HOCKEY_TORWART:-}}
+        # Basketball-Puste (22.11., lib/resolve/basketball-puste.ts): derselbe Weg, ohne eigenen Wert gilt der
+        # Server-Schalter OLY_BASKETBALL_PUSTE. Leer = neue Regel.
+        NEXT_PUBLIC_OLY_BASKETBALL_PUSTE: ${NEXT_PUBLIC_OLY_BASKETBALL_PUSTE:-${OLY_BASKETBALL_PUSTE:-}}
     restart: unless-stopped
     # E1 (docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4.1, Fund F11):
     # Chromium braucht beides, nicht nur eins von beiden.
@@ -105,6 +108,10 @@ services:
       # Puste unter Dauerfeuer, Gegentore halb als erwartete), "alt" = Abschalt-Schalter (ab dem naechsten
       # gewerteten Spieltag wieder die alte Regel; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.
       OLY_HOCKEY_TORWART: ${OLY_HOCKEY_TORWART:-}
+      # Basketball-Puste (22.11., docs/design/basketball-puste-22-11.md): leer = neue Regel (Puste-Vorrat aus AUSDAUER,
+      # Beteiligungsboden in der Pass-Lotterie), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten Spieltag wieder die
+      # alte Regel; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.
+      OLY_BASKETBALL_PUSTE: ${OLY_BASKETBALL_PUSTE:-}
       # Liga-Draft (Draft-Seite, #1619/#1623, docs/design/draft-neubau-kern-18-11.md): DIESELBE Falle wie oben -- ohne diese
       # Durchreichung erreicht ein Wert aus deploy/hetzner/.env den Container NIE (gefunden in der Abnahme 19.11.,
       # docs/design/abnahme-saison-19-11.md). Leer = Code-Standard (seit 19.11.: neuer Draft mit Draft-Seite); "block" = Rueckweg

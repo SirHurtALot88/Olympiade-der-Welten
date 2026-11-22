@@ -99,7 +99,8 @@ type TeamZeile = {
 const args = process.argv.slice(2);
 const nurBattlefieldPod = args.includes("--nur-battlefield-pod");
 const nurHockey = args.includes("--nur-hockey");
-const schreibe = args.includes("--schreibe-kalibrierung") || nurBattlefieldPod || nurHockey;
+const nurBasketball = args.includes("--nur-basketball");
+const schreibe = args.includes("--schreibe-kalibrierung") || nurBattlefieldPod || nurHockey || nurBasketball;
 const BF_FORMAT: BattlefieldFormat = args.includes("--format=orte3") ? "orte3" : "domination5";
 const dateien = args.filter((a) => !a.startsWith("--"));
 if (dateien.length === 0) {
@@ -263,6 +264,20 @@ if (schreibe) {
     console.log(`Hockey-Duell-Anker (neue Torwart-Regel) geschrieben: ${ziel.pathname}`);
     process.exit(0);
   }
+  // 22.11.: `--nur-basketball` zieht NUR das Basketball-Duell (Laeufe mit der neuen Puste-Regel); der bisherige Eintrag
+  // wandert beim ersten Mal nach `duellPusteAlt` (Spieltage mit der alten Regel, gezeigt = gebucht).
+  if (nurBasketball) {
+    const neuDuell = kalib["basketball"]?.duell;
+    if (!neuDuell) throw new Error("Keine Basketball-Duelle in den Laeufen.");
+    const bestand = JSON.parse(readFileSync(ziel, "utf8"));
+    const bb = bestand.disziplinen.basketball ?? (bestand.disziplinen.basketball = {});
+    if (bb.duell && !bb.duellPusteAlt) bb.duellPusteAlt = bb.duell;
+    bb.duell = neuDuell;
+    bestand.basketballQuellen = { neu: { gemessenAm: new Date().toISOString().slice(0, 10), quellen: laeufe.map((l) => ({ saveId: l.saveId, modus: l.roh ? "roh" : "gebucht" })) } };
+    writeFileSync(ziel, JSON.stringify(bestand, null, 2) + "\n");
+    console.log(`Basketball-Duell-Anker (neue Puste-Regel) geschrieben: ${ziel.pathname}`);
+    process.exit(0);
+  }
   if (nurBattlefieldPod) {
     const neuPod = kalib["battlefield"]?.pod;
     if (!neuPod) throw new Error("Keine Battlefield-Vierergruppen in den Laeufen.");
@@ -279,6 +294,12 @@ if (schreibe) {
     console.log(`Battlefield-Pod-Anker (${schluessel}) geschrieben: ${ziel.pathname}`);
     process.exit(0);
   }
+  // Regel-/Format-Varianten (`duellTorwartAlt`, `duellPusteAlt`, `podOrte3`) und `*Quellen` aus Sonderlaeufen bleiben erhalten.
+  const vorhanden = JSON.parse(readFileSync(ziel, "utf8"));
+  for (const [d, e] of Object.entries(vorhanden.disziplinen ?? {}) as Array<[string, Record<string, unknown>]>) {
+    for (const k of Object.keys(e)) if (/(TorwartAlt|PusteAlt|Orte3)$/.test(k)) (kalib[d] ??= {} as never)[k as never] = e[k] as never;
+  }
+  const quellenErhalten = Object.fromEntries(Object.entries(vorhanden).filter(([k]) => /Quellen$/.test(k)));
   writeFileSync(
     ziel,
     JSON.stringify(
@@ -288,6 +309,7 @@ if (schreibe) {
         gemessenAm: new Date().toISOString().slice(0, 10),
         quellen: laeufe.map((l) => ({ saveId: l.saveId, modus: l.roh ? "roh" : "gebucht" })),
         disziplinen: kalib,
+        ...quellenErhalten,
       },
       null,
       2,
