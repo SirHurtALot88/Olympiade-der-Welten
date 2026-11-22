@@ -2071,6 +2071,10 @@ Spieltagen.
 
 ## 72. Verbrauchsgegenstände mit bekannten Namen
 
+*Seit Runde 16 (§76) ist der Kiosk kein Pflichteinkauf mehr: Getränke kommen zu zwei je Spieltag gratis vom Getränke-Partner,
+Einzelartikel nur noch als Truhen-Fund oder seltene Gelegenheit beim Händler. Die Artikelwerte unten bleiben der Rahmen für
+Partner-Linien und Funde.*
+
 *Fassung nach Runde 15 (Chris, 22.11.: „bitte getränke und food nicht op machen im vergleich zu gegenständen, das soll nur
 ein nice to have sein!“). Wirkung, Moral-Boni, Nebenwirkungen und Preise sind etwa halbiert, siehe §75.*
 
@@ -2144,6 +2148,9 @@ an etwas Gesundes für den müdesten Stammspieler.
 
 ## 73. Ernährung mit Langzeitwirkung
 
+*Abgelöst durch §76 (Runde 16): statt vier Zählern je Spieler gibt es ein Essens-Abo für das Team und nur noch die zwei
+sichtbaren Zähler „Magen“ und „Alkohol“. Der Rest dieses Abschnitts gilt als Vorstufe und für die beibehaltenen Ereignisse.*
+
 - **Vier Zähler je Spieler:** Fast Food, Zucker, Alkohol, Gesund. Jeder Artikel hebt seinen Zähler um 1 oder 2; ein
   Zähler sinkt um 1 an jedem Spieltag, an dem der Spieler nichts aus dieser Kategorie nimmt (geändert in Runde 14, sonst
   bliebe tägliches Cola-Trinken folgenlos). Sichtbar im Spielerprofil und beim Anlegen, mit markierter Schwelle („noch eine Portion
@@ -2171,8 +2178,7 @@ an etwas Gesundes für den müdesten Stammspieler.
   verstimmte Magen in der Spalte „Belastung“.
 - Im Mockup: `?ansicht=verbrauch` (Katalog in vier Spalten, Zähler für sechs Spieler, Beispiel-Ereignis).
 
-**Offen:** Sollen Getränke-Sponsoren ihre Artikel je Spieltag schenken (kleiner Vorteil, hübsche Verbindung), oder bleibt
-der Kiosk rein käuflich?
+**Entschieden in Runde 16 (§76):** Getränke-Partner liefern gratis, zwei je Spieltag; der Kiosk ist kein Pflichteinkauf mehr.
 
 ## 74. Runde 14: Zähler geprüft
 
@@ -2206,3 +2212,97 @@ Zähler, Schwellen, Ereignisse (§73, §74) und die Leitplanke 3 je Team und Spi
 | Vergleich Ausrüstung | wie ein seltenes Teil (+8) | wie ein Standard-Teil (+3), nur einmalig |
 
 Im Mockup mitgezogen: Ansicht `?ansicht=verbrauch` und der Verbrauchsplatz „Kreideblock“ der Ausrüstung (+8 → +4 Power).
+
+## 76. Runde 16: Getränke-Partner und Essens-Abo
+
+Chris, 22.11., wörtlich: „Getränke-Sponsoren liefern gratis, 2 pro Spieltag immer unterschiedlich? oder soll man nen getränke
+partner wählen können? und je nach marke haben die unterschiedliche boosts? nicht zu viel micromanagement / food könnte man als abo
+machen wo man eins von 5 stufen wählen muss je teurer desto schonender und ggf. performance boost und je günstiger desto eher mal
+magenverstimmung vs kurzfristigen boost und in der mitte wenig vor oder nachteile“. Rahmen aus Runde 15 bleibt: Verbrauch ist nur
+nice to have, nie stärker als ein Standard-Ausrüstungsteil (+3; Selten +8, Episch +15, Legendär +26). Entscheidung der
+Projektleitung, damit gebaut werden kann; die Zahlen sind Startwerte zum Messen.
+
+Mockup: `public/mockups/zwischen-den-spieltagen-22-11.html?ansicht=verbrauch` (umgebaut), Aufnahmen aus der echten Seite:
+![Verbrauch 1920](zwischen-den-spieltagen-22-11/verbrauch-1920.png)
+![Verbrauch 2560](zwischen-den-spieltagen-22-11/verbrauch-2560.png)
+(Dateien `docs/design/zwischen-den-spieltagen-22-11/verbrauch-1920.png` und `verbrauch-2560.png`; selbst angesehen: kein Überlauf, kein
+Seitenscroll, keine Überlappung, keine JS-Fehler.)
+
+### 76.1 Getränke-Partner (ersetzt den Kiosk-Einzelkauf als Hauptweg)
+
+- **Ein Partner je Saison,** gewählt beim Saisonstart, Wechsel nur zum Saisonwechsel. Kostet nichts, zahlt nichts. Delegierbar
+  wie der Sponsor; die KI wählt nach dem Disziplin-Profil des Kaders.
+- **Zwei gratis Getränke je Spieltag** aus der Linie des Partners, rotierend (nie zweimal dasselbe hintereinander).
+- **Automatische Vergabe:** an die zwei knappsten Duelle des Spieltags, je an den aufgestellten Spieler mit dem größten
+  `Bonus × Matrixgewicht`. Der Mensch kann umlegen, muss nicht. Kein Mikromanagement.
+- **Grenze:** die zwei zählen in die Grenze 3 je Team und Spieltag (§72); der dritte Platz bleibt für Funde aus Truhen.
+- **Kiosk:** Einzelartikel nur noch als Truhen-Fund und beim Händler als seltene Gelegenheit.
+
+Werte im Rahmen der Runde 15: ein Attribut +2 bis +4, zwei zusammen höchstens +5, Moral +1 bis +2.
+
+| Partner | Profil | Artikel (Wirkung für einen Einsatz) | Passt zu |
+|---|---|---|---|
+| Red Bull | Tempo: Speed | Original +3 Speed; Sugarfree +2 Speed, +2 Dexterity; Summer +3 Speed, Moral +1 | Bahn, Spurt, Staffel, Climbing |
+| Monster | Ausdauer: Stamina, kleiner Haken | Original +4 Stamina (nächster Einsatz −2 Awareness); Ultra +3 Stamina | lange Läufe, Wettessen, Hockey |
+| Coca-Cola | Stimmung: Moral + Speed klein | Classic Moral +2, +1 Speed; Cherry Moral +1, +2 Speed | Teams mit Moral unter 60, Derbys |
+| Gatorade | Erholung: Stamina + Erholung | Cool Blue +3 Stamina, Erholung +5 %; Lemon +2 Stamina, Erholung +5 %; Orange +4 Stamina | Doppelspieltage, müde Stammspieler |
+| Club-Mate | Köpfchen: Awareness, Intelligence | Original +3 Awareness; Granat +2 Awareness, +2 Intelligence; Winter +3 Intelligence | Schießen, Taktik, Bühne, Rätsel |
+| Carlsberg | Geselligkeit: Spirit, Charisma, Moral | Pilsner +2 Spirit, Moral +2 (Alkohol +1); Elephant +3 Charisma, Moral +1 (Alkohol +2); 0,0 % +2 Charisma, Moral +1 | Showdisziplinen, Teams mit Charisma |
+
+**KI-Wahl des Partners:** Disziplin-Profil des Kaders (welche Attribute in den kommenden Disziplinen am schwersten zählen)
+gegen das Profil der Marke; bei Gleichstand der mit dem geringsten Alkohol-Risiko. Carlsberg nur bei Kaderanteil SOC über 40 %.
+
+### 76.2 Essens-Abo (ersetzt Einzel-Essen und den Großteil der Ernährungs-Zähler)
+
+Team-weit **eine von fünf Stufen,** Wahl zum Saisonstart und in der Winterpause (sonst fest), Standard Stufe 3, delegierbar,
+die KI wählt nach Finanzwert (unter 4 Stufe 1 bis 2, 4 bis 6 Stufe 3, ab 7 Stufe 4, ab 9 Stufe 5). Kosten je Saison für das ganze
+Team, Wirkung je Spieler und Spieltag. Aus dem Gehaltstopf ist es nicht, sondern wie ein Gebäude-Unterhalt aus dem Investitionstopf.
+
+| Stufe | Name | Kosten je Saison | Vorteil | Nachteil |
+|---|---|---:|---|---|
+| 1 | Imbissbude | 0,5 C | Moral +1, +1 Power im Einsatz | 10 % je Spieler und Spieltag verstimmter Magen (−3 % Eignung an diesem Spieltag); zählt für die Fast-Food-Saisonschwelle |
+| 2 | Kantine | 1,0 C | Moral +1 | 4 % Magen-Risiko |
+| 3 | Hausmannskost | 1,5 C | neutral | kein Risiko, keine Boni |
+| 4 | Sportküche | 2,5 C | Erholung +5 % | kein Risiko |
+| 5 | Ernährungsteam | 3,5 C | Erholung +8 %, Verletzungsrisiko −5 %, +1 Stamina im Einsatz | Lazy-Spieler −1 Moral (Gemecker) |
+
+**Traits:** Healthy bekommt Stufe 4 und 5 doppelt und hat das halbe Magen-Risiko; FaintHearted +5 Punkte Magen-Risiko; Lazy
++1 Moral bei Stufe 1 und 2. Nichts liegt über +3 im Einsatz; die Erholungs- und Verletzungswerte sind Dauerwerte und klein.
+
+**Zähler (nur noch zwei sichtbar, je Spieler):**
+- **Magen:** +1 je verstimmtem Magen (aus Abo 1 und 2) und je Fast-Food-Fund, −1 je Spieltag ohne Auslöser. Bei 4 das Ereignis
+  **Verstimmter Magen** (drei Einsätze −3 % Eignung, im Wettessen nicht einsetzbar, Zähler −2).
+- **Alkohol:** +1 oder +2 je Carlsberg oder Cocktail-Fund, −1 je Spieltag ohne. Bei 3 das Ereignis **Kater** (nächster Spieltag
+  −3 % Eignung, Erschöpfung +5; ab Alkohol 5 sinkt das Vertrauen des Vorstands um 0,25).
+- **Saisonschwelle:** ab 12 Magen-Punkten in einer Saison sinkt das Stamina-Potential um 1 (höchstens −1, umkehrbar nach fünf
+  Spieltagen ohne Magen-Auslöser). **Festlegung der Projektleitung:** Abo 1 zählt zusätzlich 0,5 Punkte je Spieltag (20 Spieltage
+  ergeben 10) und kommt mit den ohnehin anfallenden verstimmten Mägen knapp an die 12; Abo 2 zählt nicht mit.
+- **Entfallen:** Zucker, Fast Food und Gesund als eigene Zähler sowie das Ereignis Zuckerabsturz. **„Gut im Saft“** wird durch
+  Abo 4 und 5 ersetzt (Erholung und Verletzungsrisiko dauerhaft, kein Zähler).
+- Kein Spieler wird dauerhaft beschädigt. On top, zählt nicht gegen die Schranke 0,75; Wirkung nur über bestehende Kanäle
+  (Attribut im Einsatz, Eignung des Tages, Erholung, Verletzungsrisiko, Moral). In der Zerlegung (§54) läuft der Partner-Schub in
+  der Spalte „Gegenstand“, ein verstimmter Magen in „Belastung“.
+
+### 76.3 Kosten je Saison
+
+Partner 0 C. Funde: etwa fünf Händler-Artikel je Saison à 0,06 C, rund 0,3 C (Truhen-Funde kosten nichts).
+
+| Abo-Stufe | Abo | Funde | Summe je Saison | Anteil an der Reparatur voll (~19 C) |
+|---|---:|---:|---:|---:|
+| 1 | 0,5 C | 0,3 C | 0,8 C | 4 % |
+| 2 | 1,0 C | 0,3 C | 1,3 C | 7 % |
+| 3 (Standard) | 1,5 C | 0,3 C | 1,8 C | 9 % |
+| 4 | 2,5 C | 0,3 C | 2,8 C | 15 % |
+| 5 | 3,5 C | 0,3 C | 3,8 C | 20 % |
+
+Vergleich: ein Legendäres im Dauereinsatz kostet etwa 2 C Reparatur je Saison (§67), Stufe 5 also knapp zwei Legendäre für das
+ganze Team (0,25 C je Spieler bei 14). Runde 15 lag bei 1,2 bis 1,5 C üblich und bis 3,6 C im Höchstmaß, Runde 16 ist damit im
+selben Bereich, aber ohne Pflichteinkauf und ohne Mikromanagement. Die Wahl ist eine Teamentscheidung zwischen Geld und
+Risiko, nicht ein Wochenspiel.
+
+### 76.4 Offen und Prüfung
+
+- Messen mit `einflussVon`: Partner-Schub darf die Pp-Abweichung (Pflicht ≤ 25) und rho je Spiel nicht berühren (on top).
+- Anzeige im Spiel: Partner und „liefert heute“ in der Einsatzliste, Abo in der Woche und im Verein; Vergabe zeigt = bucht.
+- Mehrspieler: Partner und Abo je Team, delegierbar mit Voll selbst, Halbautomatik und Voll KI.
+- Mockup: Abo-Karten haben bei wenigen Chips viel Leerraum, im Bau kann dort die Wirkung je Spieler als Beispielzeile stehen.
