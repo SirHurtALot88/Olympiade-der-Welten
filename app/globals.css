@@ -52755,6 +52755,21 @@ button.foundation-team-portrait-card {
 }
 
 /* --- Wappen / Monogramm ----------------------------------------- */
+/* PixelLab-Wappen der Dachmarke (22.11.): feste Kante am Element, Pixel bleiben hart. Gilt in jeder Seite, auch
+   ausserhalb von .is-new-look (Finanzseite, Postfach). */
+.sponsor-wappen {
+  display: block;
+  flex: none;
+  object-fit: contain;
+  image-rendering: pixelated;
+  user-select: none;
+}
+
+.is-new-look .nl-sponsor-crest.hat-wappen {
+  width: auto;
+  height: auto;
+}
+
 .is-new-look .nl-sponsor-crest {
   position: relative;
   display: grid;
@@ -61923,6 +61938,15 @@ span.nl-facility-ampel-chip {
   width: 26px;
   height: 30px;
   display: block;
+}
+
+.is-new-look .nl-sponsor-league-crest:has(.hat-wappen) {
+  width: 32px;
+}
+
+.is-new-look .nl-sponsor-league-crest .nl-sponsor-crest.hat-wappen {
+  width: 32px;
+  height: 32px;
 }
 
 .is-new-look .nl-sponsor-league-code {

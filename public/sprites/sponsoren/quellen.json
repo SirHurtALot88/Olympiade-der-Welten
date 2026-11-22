@@ -1,5 +1,57 @@
 {
  "_hinweis": "Icon-Probe Sponsoren (22.11.): eigener Wappen-Stil, Farben an die Vorbild-Marke angelehnt, kein kopiertes Logo. Die Schrift RED STAG im ersten Bild hat PixelLab selbst gesetzt; die anderen zwei tragen ein leeres Banner, der Name kommt in der App als Text. PixelLab /create-image-pixflux, no_background, je ein POST ohne Wiederholung unter flock, je 1,0 Generation. Bisher nur in public/mockups/gm-galerie-22-11.html genutzt.",
+ "_wappen_22_11": "Sponsor-Wappen 22.11. (Chris: „generier nur die Sponsorenwappen, die gerade genutzt werden“): 52 Dachmarken, die in den zwei aktiven Spielständen (active_saves im Live-Abbild) unter Vertrag stehen, bestellt mit scripts/pixellab-sponsor-wappen.py. Stil der Probe-Wappen, Banner leer, keine Schrift: der Spielname steht in der App als Text daneben. Je Wappen ein POST unter flock, keine automatische Wiederholung. 59 Generationen insgesamt (52 eingebaut, 7 Fehlgriffe von Hand mit geändertem Sinnbild neu bestellt), Guthaben 262,54 -> 203,54. Eingebaut über lib/sponsor/sponsor-wappen.ts (sponsorWappenPfad, Rückfall Monogramm).",
+ "_fehlgriffe_22_11": [
+  {
+   "marke": "sennheiser-audio",
+   "saat": 6001,
+   "generationen": 1.0,
+   "prompt": "big black studio headphones with silver ear cups on a dark field with a light blue horizontal stripe, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters",
+   "grund": "Schild fast schwarz, kein Sinnbild erkennbar"
+  },
+  {
+   "marke": "sennheiser-audio",
+   "saat": 6101,
+   "generationen": 1.0,
+   "prompt": "large silver and black studio headphones in the middle of a bright light blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters",
+   "grund": "sehr klein und grau, Feld fehlt"
+  },
+  {
+   "marke": "fiat-automobili",
+   "saat": 6023,
+   "generationen": 1.0,
+   "prompt": "small round red city car seen from the front on a white field with green and red side stripes, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters",
+   "grund": "leerer roter Schild ohne Auto"
+  },
+  {
+   "marke": "trumpf-lasertechnik",
+   "saat": 6018,
+   "generationen": 1.0,
+   "prompt": "red laser beam cutting sparks out of a steel plate on a dark blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters",
+   "grund": "sehr klein und dunkel"
+  },
+  {
+   "marke": "reebok-athletics",
+   "saat": 6040,
+   "generationen": 1.0,
+   "prompt": "white retro sneaker with red and blue stripes and a small dumbbell on a navy blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters",
+   "grund": "Schuh trug ein Zeichen wie eine fremde Marke"
+  },
+  {
+   "marke": "hp-hardware",
+   "saat": 6049,
+   "generationen": 1.0,
+   "prompt": "open laptop next to a small office printer on a blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters",
+   "grund": "kein Sinnbild, Fratze im Schild"
+  },
+  {
+   "marke": "hp-hardware",
+   "saat": 6149,
+   "generationen": 1.0,
+   "prompt": "grey laptop computer with a glowing light blue screen on a bright blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters",
+   "grund": "leerer hellblauer Schild"
+  }
+ ],
  "red-stag-energy.png": {
   "paket": "PixelLab",
   "endpunkt": "/create-image-pixflux",
@@ -32,5 +84,577 @@
   "guthaben_vorher": 263.54,
   "guthaben_nachher": 262.54,
   "prompt": "golden magnifying glass over a globe on a white field divided into blue, red, yellow and green quarters, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text"
+ },
+ "evonik-materials.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor evonik-materials (Evonix Materials), Banner leer",
+  "saat": 6000,
+  "generationen": 1.0,
+  "guthaben_vorher": 262.54,
+  "guthaben_nachher": 261.54,
+  "prompt": "glowing violet hexagonal crystal with a small molecule of three linked spheres on a deep purple field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "kuka-automation.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor kuka-automation (Kuxa Automation), Banner leer",
+  "saat": 6002,
+  "generationen": 1.0,
+  "guthaben_vorher": 259.54,
+  "guthaben_nachher": 258.54,
+  "prompt": "orange industrial robot arm with a gripper claw on a light grey field with an orange band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "porsche-holding.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor porsche-holding (Porschen Holding), Banner leer",
+  "saat": 6003,
+  "generationen": 1.0,
+  "guthaben_vorher": 258.54,
+  "guthaben_nachher": 257.54,
+  "prompt": "black rearing horse on a golden field with red and black stripes at the sides, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "rewe-united.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor rewe-united (Rewo United), Banner leer",
+  "saat": 6004,
+  "generationen": 1.0,
+  "guthaben_vorher": 257.54,
+  "guthaben_nachher": 256.54,
+  "prompt": "red shopping basket filled with a carrot, an apple and a bread loaf on a white field with a red band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "hannover-rueck.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor hannover-rueck (Hannober Rück), Banner leer",
+  "saat": 6005,
+  "generationen": 1.0,
+  "guthaben_vorher": 256.54,
+  "guthaben_nachher": 255.54,
+  "prompt": "open blue umbrella sheltering a small grey stone tower on a navy blue and white field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "hilti-befestigung.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor hilti-befestigung (Hilto Befestigung), Banner leer",
+  "saat": 6006,
+  "generationen": 1.0,
+  "guthaben_vorher": 255.54,
+  "guthaben_nachher": 254.54,
+  "prompt": "red power hammer drill with a steel drill bit on a white field with a red band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "miele-hausgeraete.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor miele-hausgeraete (Miela Hausgeräte), Banner leer",
+  "saat": 6007,
+  "generationen": 1.0,
+  "guthaben_vorher": 254.54,
+  "guthaben_nachher": 253.54,
+  "prompt": "white front loading washing machine with a round glass door and soap bubbles on a dark red field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "wdr-sport.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor wdr-sport (WRD Sportpartner), Banner leer",
+  "saat": 6008,
+  "generationen": 1.0,
+  "guthaben_vorher": 253.54,
+  "guthaben_nachher": 252.54,
+  "prompt": "broadcast television camera on a tripod with a silver referee whistle on a blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "schaeffler-antrieb.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor schaeffler-antrieb (Schäffner Antrieb), Banner leer",
+  "saat": 6009,
+  "generationen": 1.0,
+  "guthaben_vorher": 252.54,
+  "guthaben_nachher": 251.54,
+  "prompt": "steel ball bearing ring inside a green gear wheel on a white and green field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "hella-fahrzeuglicht.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor hella-fahrzeuglicht (Hellix Fahrzeuglicht), Banner leer",
+  "saat": 6010,
+  "generationen": 1.0,
+  "guthaben_vorher": 251.54,
+  "guthaben_nachher": 250.54,
+  "prompt": "round car headlight shining bright yellow light beams on a dark blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "mahle-motoren.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor mahle-motoren (Mahlke Motoren), Banner leer",
+  "saat": 6011,
+  "generationen": 1.0,
+  "guthaben_vorher": 250.54,
+  "guthaben_nachher": 249.54,
+  "prompt": "steel engine piston with connecting rod on a blue field with an orange stripe, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "toom-werkstadt.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor toom-werkstadt (Tumm Werkstatt), Banner leer",
+  "saat": 6012,
+  "generationen": 1.0,
+  "guthaben_vorher": 249.54,
+  "guthaben_nachher": 248.54,
+  "prompt": "crossed hammer and wrench above a small workbench on a green field with a red band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "basf-chemie.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor basf-chemie (BASK Chemie Partner), Banner leer",
+  "saat": 6013,
+  "generationen": 1.0,
+  "guthaben_vorher": 248.54,
+  "guthaben_nachher": 247.54,
+  "prompt": "glass laboratory flask with bubbling bright blue liquid on a white and blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "deichmann-schuhe.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor deichmann-schuhe (Deichmeier Schuhe), Banner leer",
+  "saat": 6014,
+  "generationen": 1.0,
+  "guthaben_vorher": 247.54,
+  "guthaben_nachher": 246.54,
+  "prompt": "brown leather ankle boot with laces on a green and white field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "hermes-paket.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor hermes-paket (Hermos Paket), Banner leer",
+  "saat": 6015,
+  "generationen": 1.0,
+  "guthaben_vorher": 246.54,
+  "guthaben_nachher": 245.54,
+  "prompt": "brown parcel box with two white feathered wings on a light blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "conrad-elektronik.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor conrad-elektronik (Konradin Elektronik), Banner leer",
+  "saat": 6016,
+  "generationen": 1.0,
+  "guthaben_vorher": 245.54,
+  "guthaben_nachher": 244.54,
+  "prompt": "green circuit board chip with a yellow lightning bolt on a blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "webasto-comfort.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor webasto-comfort (Webasco Comfort), Banner leer",
+  "saat": 6017,
+  "generationen": 1.0,
+  "guthaben_vorher": 244.54,
+  "guthaben_nachher": 243.54,
+  "prompt": "orange flame and white snowflake side by side on a field split into dark blue and light blue, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "montblanc-writing.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor montblanc-writing (Montblanko Writing), Banner leer",
+  "saat": 6019,
+  "generationen": 1.0,
+  "guthaben_vorher": 242.54,
+  "guthaben_nachher": 241.54,
+  "prompt": "golden fountain pen nib below a white snowy mountain peak on a midnight blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "leica-kamera.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor leica-kamera (Leiko Kamera), Banner leer",
+  "saat": 6020,
+  "generationen": 1.0,
+  "guthaben_vorher": 241.54,
+  "guthaben_nachher": 240.54,
+  "prompt": "silver vintage rangefinder photo camera with a round lens on a red field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "fressnapf-tierbedarf.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor fressnapf-tierbedarf (Fresstrog Tierbedarf), Banner leer",
+  "saat": 6021,
+  "generationen": 1.0,
+  "guthaben_vorher": 240.54,
+  "guthaben_nachher": 239.54,
+  "prompt": "pet food bowl with a white bone and a paw print above it on a green field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "dr-oetker.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor dr-oetker (Dr. Oedeker Gastronomie), Banner leer",
+  "saat": 6022,
+  "generationen": 1.0,
+  "guthaben_vorher": 239.54,
+  "guthaben_nachher": 238.54,
+  "prompt": "white chef hat above a whisk and a wobbly pudding on a red field with a white band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "fischer-duebelwerke.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor fischer-duebelwerke (Fischler Dübelwerke), Banner leer",
+  "saat": 6024,
+  "generationen": 1.0,
+  "guthaben_vorher": 237.54,
+  "guthaben_nachher": 236.54,
+  "prompt": "grey wall plug dowel with a steel screw and a small red fish above it on a white field with a red band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "general-motors.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor general-motors (Generic Motors), Banner leer",
+  "saat": 6025,
+  "generationen": 1.0,
+  "guthaben_vorher": 236.54,
+  "guthaben_nachher": 235.54,
+  "prompt": "silver V8 engine block on a royal blue field with a white underline stripe, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "penny-markt.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor penny-markt (Pfennig Markt), Banner leer",
+  "saat": 6026,
+  "generationen": 1.0,
+  "guthaben_vorher": 235.54,
+  "guthaben_nachher": 234.54,
+  "prompt": "big shiny copper penny coin on a red field with a yellow band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "toyota-way.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor toyota-way (Toyato Way Mobility), Banner leer",
+  "saat": 6027,
+  "generationen": 1.0,
+  "guthaben_vorher": 234.54,
+  "guthaben_nachher": 233.54,
+  "prompt": "silver compact car silhouette in front of a red rising sun disc on a white field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "hornbach-co.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor hornbach-co (Hornberg & Co), Banner leer",
+  "saat": 6028,
+  "generationen": 1.0,
+  "guthaben_vorher": 233.54,
+  "guthaben_nachher": 232.54,
+  "prompt": "curled ram horn above a grey mountain peak on an orange field with a black band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "deutsche-bank.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor deutsche-bank (Teutonia Bank Partner), Banner leer",
+  "saat": 6029,
+  "generationen": 1.0,
+  "guthaben_vorher": 232.54,
+  "guthaben_nachher": 231.54,
+  "prompt": "stone bank building with columns and a gold coin above it on a deep blue field with a white diagonal stripe, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "chrysler-motors.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor chrysler-motors (Kreisler Motors), Banner leer",
+  "saat": 6030,
+  "generationen": 1.0,
+  "guthaben_vorher": 231.54,
+  "guthaben_nachher": 230.54,
+  "prompt": "muscle car front grille with a pair of silver wings on a dark blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "jaguar-land-rover.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor jaguar-land-rover (Jagwar Land Roamer), Banner leer",
+  "saat": 6031,
+  "generationen": 1.0,
+  "guthaben_vorher": 230.54,
+  "guthaben_nachher": 229.54,
+  "prompt": "leaping spotted jaguar cat above a green hill on a dark green field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "bertelsmann-content.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor bertelsmann-content (Bertelsmeier Content), Banner leer",
+  "saat": 6032,
+  "generationen": 1.0,
+  "guthaben_vorher": 229.54,
+  "guthaben_nachher": 228.54,
+  "prompt": "open book with a film strip rising out of its pages on a blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "douglas-beauty.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor douglas-beauty (Dougall Beauty), Banner leer",
+  "saat": 6033,
+  "generationen": 1.0,
+  "guthaben_vorher": 228.54,
+  "guthaben_nachher": 227.54,
+  "prompt": "elegant glass perfume bottle with a golden cap on a mint turquoise field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "infineon-chips.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor infineon-chips (Infinitron Chips), Banner leer",
+  "saat": 6034,
+  "generationen": 1.0,
+  "guthaben_vorher": 227.54,
+  "guthaben_nachher": 226.54,
+  "prompt": "square microchip with golden pins and a glowing infinity loop on a blue field with a red corner, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "prosieben-media.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor prosieben-media (ProAcht Media), Banner leer",
+  "saat": 6035,
+  "generationen": 1.0,
+  "guthaben_vorher": 226.54,
+  "guthaben_nachher": 225.54,
+  "prompt": "red retro television set with an eight pointed white star on its screen on a dark red field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "ferrari-corse.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor ferrari-corse (Ferrali Corse), Banner leer",
+  "saat": 6036,
+  "generationen": 1.0,
+  "guthaben_vorher": 225.54,
+  "guthaben_nachher": 224.54,
+  "prompt": "red racing car seen from the front on a yellow field with a green white red stripe on top, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "apple-core.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor apple-core (Apfelkern Technology), Banner leer",
+  "saat": 6037,
+  "generationen": 1.0,
+  "guthaben_vorher": 224.54,
+  "guthaben_nachher": 223.54,
+  "prompt": "eaten apple core with a green leaf on a light silver field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "zalando-fashion.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor zalando-fashion (Zalendo Fashion), Banner leer",
+  "saat": 6038,
+  "generationen": 1.0,
+  "guthaben_vorher": 223.54,
+  "guthaben_nachher": 222.54,
+  "prompt": "orange clothes hanger carrying a white dress on a white field with an orange band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "renault-mobility.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor renault-mobility (Renolt Mobility), Banner leer",
+  "saat": 6039,
+  "generationen": 1.0,
+  "guthaben_vorher": 222.54,
+  "guthaben_nachher": 221.54,
+  "prompt": "silver faceted diamond gemstone above a black car wheel on a bright yellow field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "metaworld-social.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor metaworld-social (Metaworld Social), Banner leer",
+  "saat": 6041,
+  "generationen": 1.0,
+  "guthaben_vorher": 220.54,
+  "guthaben_nachher": 219.54,
+  "prompt": "blue globe surrounded by three white speech bubbles on a bright blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "netto-markendiscount.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor netto-markendiscount (Nettio Markendiscount), Banner leer",
+  "saat": 6042,
+  "generationen": 1.0,
+  "guthaben_vorher": 219.54,
+  "guthaben_nachher": 218.54,
+  "prompt": "red shopping cart with a price tag on a yellow field with a red band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "kuehne-nagel-fracht.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor kuehne-nagel-fracht (Kühle & Nagel Fracht), Banner leer",
+  "saat": 6043,
+  "generationen": 1.0,
+  "guthaben_vorher": 218.54,
+  "guthaben_nachher": 217.54,
+  "prompt": "container cargo ship above a silver anchor on a navy blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "loreal-cosmetics.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor loreal-cosmetics (LaRoyal Cosmetics), Banner leer",
+  "saat": 6044,
+  "generationen": 1.0,
+  "guthaben_vorher": 217.54,
+  "guthaben_nachher": 216.54,
+  "prompt": "golden lipstick with a small golden crown above it on a deep magenta field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "adobe-creative.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor adobe-creative (Abode Creative), Banner leer",
+  "saat": 6045,
+  "generationen": 1.0,
+  "guthaben_vorher": 216.54,
+  "guthaben_nachher": 215.54,
+  "prompt": "crossed paintbrush and pencil in front of a small white house on a bright red field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "unilever-brands.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor unilever-brands (Unilover Brands), Banner leer",
+  "saat": 6046,
+  "generationen": 1.0,
+  "guthaben_vorher": 215.54,
+  "guthaben_nachher": 214.54,
+  "prompt": "white heart shape made of leaves and flowers on a blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "nike-just-do-it.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor nike-just-do-it (Nikay Sportswear), Banner leer",
+  "saat": 6047,
+  "generationen": 1.0,
+  "guthaben_vorher": 214.54,
+  "guthaben_nachher": 213.54,
+  "prompt": "white running shoe with a feathered wing at the heel on a bright orange field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "carlsberg-brewery.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor carlsberg-brewery (Karlsbrau Brewery), Banner leer",
+  "saat": 6048,
+  "generationen": 1.0,
+  "guthaben_vorher": 213.54,
+  "guthaben_nachher": 212.54,
+  "prompt": "glass beer mug with white foam and green hop leaves on a dark green field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "enbw-strom.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor enbw-strom (EnWB Strom), Banner leer",
+  "saat": 6050,
+  "generationen": 1.0,
+  "guthaben_vorher": 211.54,
+  "guthaben_nachher": 210.54,
+  "prompt": "white wind turbine with a yellow lightning bolt on a blue field with an orange band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "canon-imaging.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor canon-imaging (Kanon Imaging), Banner leer",
+  "saat": 6051,
+  "generationen": 1.0,
+  "guthaben_vorher": 210.54,
+  "guthaben_nachher": 209.54,
+  "prompt": "big camera lens with a red ring and glass reflections on a white field with a red band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "fiat-automobili.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor fiat-automobili (Fiato Automobili), Banner leer",
+  "saat": 6123,
+  "generationen": 1.0,
+  "guthaben_vorher": 209.54,
+  "guthaben_nachher": 208.54,
+  "prompt": "little red city car with round headlights seen from the front in the middle of a white field with a green stripe on the left and a red stripe on the right, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "sennheiser-audio.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor sennheiser-audio (Sennhauser Audio), Banner leer",
+  "saat": 6201,
+  "generationen": 1.0,
+  "guthaben_vorher": 208.54,
+  "guthaben_nachher": 207.54,
+  "prompt": "silver studio microphone with blue sound wave rings on a bright teal field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "trumpf-lasertechnik.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor trumpf-lasertechnik (Trumpfel Lasertechnik), Banner leer",
+  "saat": 6118,
+  "generationen": 1.0,
+  "guthaben_vorher": 207.54,
+  "guthaben_nachher": 206.54,
+  "prompt": "bright red laser beam hitting a steel gear wheel with yellow sparks on a royal blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "reebok-athletics.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor reebok-athletics (Reebuk Athletics), Banner leer",
+  "saat": 6140,
+  "generationen": 1.0,
+  "guthaben_vorher": 206.54,
+  "guthaben_nachher": 205.54,
+  "prompt": "plain white sports sneaker without any logo next to a red dumbbell on a royal blue field with a red band, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
+ },
+ "hp-hardware.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor hp-hardware (HQ Hardware), Banner leer",
+  "saat": 6249,
+  "generationen": 1.0,
+  "guthaben_vorher": 204.54,
+  "guthaben_nachher": 203.54,
+  "prompt": "beige desktop computer with monitor, keyboard and a small printer, in the middle of a royal blue field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text, no letters"
  }
 }

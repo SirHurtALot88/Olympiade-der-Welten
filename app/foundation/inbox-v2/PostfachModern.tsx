@@ -31,6 +31,8 @@ import { resolveInboxTargetLabel } from "@/lib/foundation/inbox-target-labels";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { VORSTAND_STUFEN, resolveVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { moralStufe } from "@/lib/morale/moral-anzeige";
+import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { sponsorWappenPfadFuer } from "@/lib/sponsor/sponsor-wappen";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
 import "./postfach-modern.css";
@@ -131,6 +133,12 @@ const KATEGORIE_WORT: Record<string, string> = {
   facility: "Gebäude",
   sponsor: "Sponsor",
 };
+
+/** Meldungen des Absenders „Sponsor“ zeigen das Wappen des laufenden Vertrags des Teams, sonst das Absender-Symbol. */
+function sponsorWappenDerMeldung(gameState: GameState, eintrag: PostfachEintrag): string | null {
+  if (eintrag.absender !== "sponsor" || !eintrag.item.teamId) return null;
+  return sponsorWappenPfadFuer(getTeamSponsorContract(gameState, eintrag.item.teamId));
+}
 
 function absenderLabel(id: PostfachAbsenderId) {
   return POSTFACH_ABSENDER.find((a) => a.id === id)?.label ?? id;
@@ -630,6 +638,7 @@ export default function PostfachModern({
     const aktionen = baueAktionen(eintrag);
     const erste = aktionen[0] ?? null;
     const portrait = spieler ? getPlayerPortraitBrowserUrl(spieler.id, spieler.portraitUrl, spieler.portraitPath) : null;
+    const wappen = sponsorWappenDerMeldung(gameState, eintrag);
     const istGewaehlt = item.itemId === gewaehlteId;
     const schwere = item.severity === "critical" ? "ibx-s-k" : item.severity === "warning" ? "ibx-s-w" : "";
     return (
@@ -652,6 +661,9 @@ export default function PostfachModern({
           {portrait ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={portrait} alt="" loading="lazy" />
+          ) : wappen ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="sponsor-wappen ibx-wappen" src={wappen} alt="" loading="lazy" data-testid="postfach-sponsor-wappen" />
           ) : (
             <Sym name={ABSENDER_SYMBOL[eintrag.absender]} />
           )}
@@ -739,6 +751,7 @@ function Brief({
   const aktionen = baueAktionen(eintrag);
   const kacheln = kachelnFuer(eintrag, gameState, spieler);
   const portrait = spieler ? getPlayerPortraitBrowserUrl(spieler.id, spieler.portraitUrl, spieler.portraitPath) : null;
+  const wappen = sponsorWappenDerMeldung(gameState, eintrag);
   const klasse = spieler?.className ? klassenKartenfarbe(spieler.className) : null;
   const klassenIcon = spieler?.className ? getClassIconSrc(spieler.className) : null;
   const ziel = resolveInboxTargetLabel(item);
@@ -749,6 +762,9 @@ function Brief({
           {portrait ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={portrait} alt="" />
+          ) : wappen ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="sponsor-wappen ibx-wappen" src={wappen} alt="" />
           ) : (
             <Sym name={ABSENDER_SYMBOL[eintrag.absender]} />
           )}
