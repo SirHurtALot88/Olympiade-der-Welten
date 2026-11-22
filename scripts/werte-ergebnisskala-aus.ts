@@ -98,7 +98,8 @@ type TeamZeile = {
 
 const args = process.argv.slice(2);
 const nurBattlefieldPod = args.includes("--nur-battlefield-pod");
-const schreibe = args.includes("--schreibe-kalibrierung") || nurBattlefieldPod;
+const nurHockey = args.includes("--nur-hockey");
+const schreibe = args.includes("--schreibe-kalibrierung") || nurBattlefieldPod || nurHockey;
 const BF_FORMAT: BattlefieldFormat = args.includes("--format=orte3") ? "orte3" : "domination5";
 const dateien = args.filter((a) => !a.startsWith("--"));
 if (dateien.length === 0) {
@@ -248,6 +249,20 @@ if (schreibe) {
     kalib[d] = eintrag;
   }
   const ziel = new URL("../data/generated/ergebnis-skala-kalibrierung.json", import.meta.url);
+  // 22.11.: `--nur-hockey` zieht NUR das Hockey-Duell (Laeufe mit der neuen Torwart-Regel); der bisherige Eintrag
+  // wandert beim ersten Mal nach `duellTorwartAlt` (Spieltage mit der alten Regel, gezeigt = gebucht).
+  if (nurHockey) {
+    const neuDuell = kalib["hockey"]?.duell;
+    if (!neuDuell) throw new Error("Keine Hockey-Duelle in den Laeufen.");
+    const bestand = JSON.parse(readFileSync(ziel, "utf8"));
+    const hk = bestand.disziplinen.hockey ?? (bestand.disziplinen.hockey = {});
+    if (hk.duell && !hk.duellTorwartAlt) hk.duellTorwartAlt = hk.duell;
+    hk.duell = neuDuell;
+    bestand.hockeyQuellen = { neu: { gemessenAm: new Date().toISOString().slice(0, 10), quellen: laeufe.map((l) => ({ saveId: l.saveId, modus: l.roh ? "roh" : "gebucht" })) } };
+    writeFileSync(ziel, JSON.stringify(bestand, null, 2) + "\n");
+    console.log(`Hockey-Duell-Anker (neue Torwart-Regel) geschrieben: ${ziel.pathname}`);
+    process.exit(0);
+  }
   if (nurBattlefieldPod) {
     const neuPod = kalib["battlefield"]?.pod;
     if (!neuPod) throw new Error("Keine Battlefield-Vierergruppen in den Laeufen.");

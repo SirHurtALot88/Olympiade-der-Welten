@@ -55,6 +55,7 @@ export function wendeErgebnisSkalaE1An(input: {
       seiten: zeile.duellSeiten ?? null,
       leistungEigen: leistung(zeile.teamId, zeile.disciplineSide),
       leistungGegner: gegner ? leistung(gegner.teamId, gegner.disciplineSide) : null,
+      variante: input.podVariante,
     });
     zeile.verhaeltnis = e1.verhaeltnis;
     zeile.ergebnisNormiert = e1.ergebnis;

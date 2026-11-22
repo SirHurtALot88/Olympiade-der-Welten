@@ -89,14 +89,21 @@ export function ppSkalaAktiv(gameState?: Parameters<typeof ppSkalaVersionFuer>[0
  * Deckel 5). Bewusst KEIN Sprung auf eine benachbarte Feldgroesse: die Spitze haengt an der Zahl der
  * Einsaetze je Zelle, die Disziplin-weiten Anker mitteln ueber alle Feldgroessen.
  */
+/** Anker-Variante eines Spieltags (Format bzw. Regel, nach der er gebucht wurde). */
+export type PpSkalaAnkerVariante = "orte3" | "torwartAlt";
+
 export function ppSkalaAnker(
   disciplineId: string | null | undefined,
   playerCount?: number | null,
-  /** "orte3": Battlefield-Pod im alten Format (Anker unter `battlefieldOrte3`, 22.11.); sonst weglassen. */
-  variante?: "orte3",
+  /**
+   * "orte3": Battlefield-Pod im alten Format (Anker unter `battlefieldOrte3`, 22.11.);
+   * "torwartAlt": Hockey-Spieltag mit der alten Torwart-Regel (Anker unter `hockeyAlt`, 22.11.); sonst weglassen.
+   */
+  variante?: PpSkalaAnkerVariante,
 ): PpSkalaAnker | null {
   if (!disciplineId) return null;
-  const eintrag = (variante === "orte3" ? ANKER_JE_DISZIPLIN.get(`${disciplineId}Orte3`) : undefined) ?? ANKER_JE_DISZIPLIN.get(disciplineId);
+  const suffix = variante === "orte3" ? "Orte3" : variante === "torwartAlt" ? "Alt" : null;
+  const eintrag = (suffix ? ANKER_JE_DISZIPLIN.get(`${disciplineId}${suffix}`) : undefined) ?? ANKER_JE_DISZIPLIN.get(disciplineId);
   if (!eintrag) return null;
   if (typeof playerCount === "number" && Number.isFinite(playerCount)) {
     const exakt = eintrag.jeFeld.find(([n]) => n === Math.round(playerCount));
@@ -119,7 +126,7 @@ export function skaliereUngedeckelt(
   disciplineId: string,
   ungedeckelt: number,
   zuschlag = 0,
-  optionen: { modus?: PpSkalaModus; playerCount?: number | null; variante?: "orte3" } = {},
+  optionen: { modus?: PpSkalaModus; playerCount?: number | null; variante?: PpSkalaAnkerVariante } = {},
 ): number {
   const modus = optionen.modus ?? "an";
   const basis = Math.max(0, ungedeckelt);
@@ -145,8 +152,8 @@ export function ppAusKurveSkaliert(input: {
   modus?: PpSkalaModus;
   /** Feldgroesse dieser Disziplin an diesem Spieltag (Anker je Feldgroesse). */
   playerCount?: number | null;
-  /** Battlefield-Pod im alten Format "orte3": die Anker dieses Formats (gezeigt = gebucht, gebuchte Spieltage bleiben). */
-  variante?: "orte3";
+  /** Alte Variante ("orte3" Battlefield, "torwartAlt" Hockey): die Anker dieses Formats/dieser Regel (gezeigt = gebucht). */
+  variante?: PpSkalaAnkerVariante;
 }): number {
   const { referenz } = input;
   const optionen = { modus: input.modus, playerCount: input.playerCount, variante: input.variante };

@@ -69,7 +69,7 @@
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    19.9,
+    16.2,
     20.3
    ],
    "ppMessung": {
@@ -123,6 +123,22 @@
      "datum": "2026-11-15",
      "commit": "d13f7164a"
     }
+   },
+   "ppVorTorwartRegel": [
+    19.9,
+    20.3
+   ],
+   "ppMessung22_11": {
+    "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs hockey 48 --saat-versatz=0|1e7 --rohdaten=... + node scripts/poole-arena-einfluss.mjs",
+    "staemme": [
+     24.2,
+     39.0
+    ],
+    "gepoolt": 16.2,
+    "stand": "claude/sammel-22-11-c, Fingerabdruck GESAMT 0310ec4a4e3d (Hockey-Torwart-Regel neu)",
+    "ueber": "dexterity +5,2 (2,1 SE), will +2,7 (5,6 SE), determination +0,2",
+    "unter": "stamina -5,1",
+    "hinweis": "Nur EIN Pool aus zwei Straemen (Handbuch sieht drei je Pool vor); Einzelstroeme bei Hockey bekanntlich stark verrauscht. Besser als der alte gepoolte Wert 19,9/20,3, unter der Pflichtschranke 25. ACHTUNG pp[1]=20,3: NICHT neu gemessen, uebernommen als zweiter (alter) Pool der alten Torwart-Regel, damit der Wächter (>= 2 Pp-Werte) greift; nur pp[0]=16,2 ist die Messung 22.11. Zweiten Pool unter der neuen Regel bei Gelegenheit nachziehen."
    }
   },
   "gewichtheben": {

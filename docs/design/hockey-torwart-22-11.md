@@ -43,7 +43,7 @@ Befehle: `OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 hockey -
 
 Rangtreue nach Rolle, Einzelkader (`miss-rangtreue-nach-rolle.mjs hockey 48`, jetzt mit `OLY_FORM_MODUS=echt`; Vorwert ohne echte Formkarten 0,930 / 0,973 / Lücke 0,043): alle 0,965, nur Feldspieler 0,982, Lücke 0,017.
 
-**Pp-Abweichung: NICHT neu gemessen.** Ein Strom n=48 kostet im Node-Motor rund 45 CPU-Minuten (Hockey-Messung `messe-arena-einfluss.mjs`, Pool = 3 Ströme, zwei Pools verlangt); der Rechner war durch andere Sitzungen ausgelastet, der gestartete Pool wurde abgebrochen. Gepoolter Altwert 19,9 / 20,3 (nicht frisch). Erwartung: Torwart-Wert hängt jetzt zu 60 % an der matrixgewichteten Eignung, die Abweichung sollte nicht steigen; das ist eine Erwartung, keine Messung. Beleg-Befehl: `OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs hockey 48 --saat-versatz=0|1e7|2e7 --rohdaten=...` plus `poole-arena-einfluss.mjs`.
+**Pp-Abweichung (gemessen 22.11., nach der Regel):** auf `claude/sammel-22-11-c` (GESAMT `0310ec4a4e3d`), `OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs hockey 48`, zwei Ströme (Saatversatz 0 und 1e7): Einzelstrom 24,2 bzw. 39,0 Pp (einzelne Hockey-Ströme sind bekanntlich stark verrauscht), **gepoolt (`poole-arena-einfluss.mjs`) 16,2 Pp** — besser als der alte gepoolte Wert 19,9/20,3 und unter der Pflichtschranke 25. Über Matrixgewicht: dexterity +5,2 (2,1 SE), will +2,7 (5,6 SE), determination +0,2; unter: stamina −5,1. Einschränkung: nur ein Pool aus zwei Strömen (das Handbuch sieht drei Ströme je Pool vor). Eingetragen in `data/generated/disziplin-abnahme.json` (`pp` = [16,2, 20,3]: der erste Wert ist diese Messung, der zweite der alte Pool 2 der alten Regel, nicht neu gemessen und nur für den Wächter (≥ 2 Werte) stehen gelassen; alter Stand unter `ppVorTorwartRegel`).
 
 ## 4. PP
 
@@ -71,4 +71,34 @@ Hinweis: Der Tagesbeste liegt wie in `pp-analyse-21-11.md` bei 4,7–4,8 (fester
 
 Aufnahmen aus der **Motor-Seite** (`scripts/screenshot-hockey-torwart.mjs`, `docs/design/hockey-torwart-22-11/`): `neu-1920x1080.png`, `neu-2560x1440.png`, `neu-canvas-dauerfeuer.png`, `alt-canvas-dauerfeuer.png`. Angesehen: Torwart-Karte, Puste-Leiste unter den Füßen des Torwarts und Ticker laufen; keine Überlappung, kein Seitenfehler. Nicht aus der eingeloggten App-Hostseite (kein Login im Container). Die Leiste ist klein; ein eigenes Torwart-HUD wurde nicht gebaut.
 
-Offen: (a) Pp-Abweichung nach der Regel nicht neu gemessen (Abschnitt 3); (b) Torwart-Referenz ist dünn (128 Werte je Größe); (c) Hockey-rho bleibt unter 0,75, Hebel liegt bei den Feldspielern.
+Offen: (a) Pp-Pool nur aus zwei Strömen (Abschnitt 3); (b) Torwart-Referenz ist dünn (128 Werte je Größe); (c) Hockey-rho bleibt unter 0,75, Hebel liegt bei den Feldspielern.
+
+## 7. Review-Nachtrag (Opus, 22.11.) und Behebung
+
+| # | Befund | Behebung |
+|---|---|---|
+| 1 | Torwart-PP-Referenz war eine einzige statische Zeile (`feldgroessenTorwart`), neu gezogen. Mit "alt" aufgelöste Spieltage (Schalter `OLY_HOCKEY_TORWART=alt`, `forceReplace` eines vor dem Deploy gebuchten Spieltags) bekamen damit die NEUE Referenz. | Die alten Torwart-Zeilen stehen unverändert (aus `origin/main`) als `feldgroessenTorwartAlt` in `data/generated/hockey-pps-referenz.json`. `resolveArenaPpsReferenz(..., rolle, torwartRegel)` und `computeIndividualBoxscorePpsFromFixtureResults(..., ppSkala, torwartRegel)` wählen nach `hockeyTorwartFuer(gameState, matchdayId)` (Aufrufer: `runBattleModeArenaMatchday`). `ziehe-hockey-pps-referenz.ts` lässt `feldgroessenTorwartAlt` beim Neuziehen stehen. Test: `tests/battle-mode-arena-team-points.test.ts` ("Torwart-Referenz je Regel": alt bit-genau 8,42/16,99 (n=3) und 11,19/18,16 (n=4), neu 11,21/17,13; Feld unberührt). |
+| 2 | E1-/C2-Anker für Hockey unter der alten Regel gemessen (Review-Sonde: Tore je Spiel 10,52 → 9,35, mittlerer Tor-Abstand 2,62 → 2,35, −11 %). | Siehe Abschnitt 8. |
+| 3 | `bestimmeTorwaerter` (Motor) wählt ohne gesetzten Slot nach höchstem PARADE, die Güte ist aber zu 60 % Eignung. | Motor bewusst nicht angefasst (Fingerabdruck). Geprüft: Auf der TS-Seite wählt nichts nach PARADE (`grep` über `lib/`, `app/`, `components/`: PARADE kommt nur im Motor vor). Die Aufstellung (KI wie Mensch) setzt den Torwart über den Slot `goaltender` (Slot-Rollenprofil `matchday-slot-roles.ts`: health/awareness/dexterity plus die Matrix über die Eignung) und der Adapter reicht ihn als `place[name].slot` an den Motor (`arena-aufstellung-adapter.ts`, `slotGesetzt`). Der PARADE-Rückfall greift damit nur, wenn kein Slot gesetzt ist (Messläufe ohne Aufstellung, Mockup-Seite). Die KI-Torwartwahl ist also schon eignungsbasiert und passt zur neuen Güte; eine geteilte Funktion bräuchte hier nur eine Änderung am Motor-Rückfall und wäre eine Wertungsfrage (Fingerabdruck), deshalb nur dokumentiert. |
+| 4 | Doku-Nachträge | Siehe unten. |
+
+**Slot-Aufschlag zählt doppelt in die Güte (klein).** `engP` fließt in `eig` (`eig: basisWert + engP + breitP`, Motor ~12345) und über `mitAufschlag(...)` zugleich in die Attribute und damit in PARADE (~12315). Die Torwart-Güte (0,4 PARADE + 0,6 Eignung) trägt den Slot-Aufschlag deshalb auf beiden Wegen. Der Effekt ist klein (der Aufschlag ist wenige Punkte, der Torwart steht immer im selben Slot, also gilt er für alle Torwarte gleich) und wurde bewusst nicht entfernt, weil das den Fingerabdruck (alt und neu) bewegen würde.
+
+**`rhoJeSpielNurFeldspieler` 0,784 → 0,71 in `data/generated/disziplin-abnahme.json`.** Der alte Wert 0,784 stammt aus der Ersatzkarten-Messung (`OLY_FORM_MODUS` nicht echt, Stand 15.11.); mit gespielten Formkarten (`OLY_FORM_MODUS=echt`, seit 18.11.) lag derselbe Wert schon bei 0,707 ("alt, nur Feld" in Abschnitt 3 dieses Dokuments). Der Sprung auf 0,71 ist also kein Effekt der Torwart-Regel, sondern der Wechsel des Formmodus; die neue Messung (22.11.) bestätigt 0,71 für die Feldspieler.
+
+## 8. C2- und E1-Anker je Regel (Nachmessung 22.11.)
+
+Die Anker (`pp-skala-kalibrierung.json`, `ergebnis-skala-kalibrierung.json`) waren unter der alten Regel gemessen. Nachgemessen auf **sechs frischen Battle-Saves** (`miss-pp-skala.ts 20`, `OLY_PP_SKALA=roh`, `OLY_PP_SKALA_ARENA_MODUS=quick-sim`, Node-Motor, neue Regel, GESAMT `0310ec4a4e3d`), danach `werte-pp-skala-aus.mjs --nur-hockey` und `werte-ergebnisskala-aus.ts --nur-hockey` (neue Schalter, wie `--nur-battlefield`; alle übrigen Disziplinen bleiben byte-gleich).
+
+| | alt (87 Duelle, 20 Zellen) | neu (178 Duelle, 24 Zellen) |
+|---|---:|---:|
+| C2 `rTop` (Median Tagesbester, Disziplin-weit) | 6,84 | **5,51** (−19 %) |
+| C2 `rMed` (Median aller Einsätze) | 1,34 | 1,36 (+1,5 %) |
+| E1 Duell, Median der Siegmarge (Lage 0,5) | 4 | 6 |
+| E1 Duell, Lage 0,975 | 24,7 | 21,6 |
+| E1 Leistungs-Anker lP5 / lP50 / lP95 | 0,472 / 1,416 / 3,187 | 0,405 / 1,439 / 3,367 |
+
+`rTop` weicht um mehr als 5 % ab (die Spitze unter der neuen Regel ist niedriger: der gedämpfte Torwart-Wert erreicht seltener die Obergrenze), ebenso die Margen-Knoten. **Folge: Anker je Regel.** `hockeyAlt` (PP, Schlüssel `torwartAlt`) und `duellTorwartAlt` (E1) tragen die alten Werte unverändert; `hockey` bzw. `duell` die neu gemessenen. Gewählt wird nach `hockeyTorwartFuer(gameState, matchdayId)`: PP in `computeIndividualBoxscorePpsFromFixtureResults` (Variante `torwartAlt`), E1 in der Resolve-Engine (`podVariante: "torwartAlt"` für Hockey-Duelle). Test: `tests/hockey-anker-je-regel.test.ts`.
+
+Einschränkung: Hockey kommt nur zweimal je Saison vor, 24 PP-Zellen sind wenige (die Einzelzellen je Feldgröße schwanken stark, deshalb gilt Disziplin-weit der Median; Feldgrößen mit nur zwei Zellen tragen entsprechendes Rauschen). Bei Gelegenheit mit mehr Saves nachziehen (`--nur-hockey`).
+

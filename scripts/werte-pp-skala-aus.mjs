@@ -382,6 +382,20 @@ if (nurBattlefield) {
   process.exit(0);
 }
 
+// 22.11.: `--nur-hockey` mischt NUR den Hockey-Anker (Laeufe mit der NEUEN Torwart-Regel) in die bestehende Datei; der
+// bisherige Eintrag wandert beim ersten Mal nach `hockeyAlt` (Spieltage mit der alten Regel, gezeigt = gebucht).
+if (args.includes("--nur-hockey")) {
+  const ziel = new URL("../data/generated/pp-skala-kalibrierung.json", import.meta.url);
+  const bestand = JSON.parse(readFileSync(ziel, "utf8"));
+  if (!kalibrierung.hockey) throw new Error("Keine Hockey-Zellen in den Abzuegen.");
+  if (!bestand.disziplinen.hockeyAlt) bestand.disziplinen.hockeyAlt = bestand.disziplinen.hockey;
+  bestand.disziplinen.hockey = kalibrierung.hockey;
+  bestand.hockeyQuellen = { neu: { gemessenAm: new Date().toISOString().slice(0, 10), saves: quellen.map((x) => x.saveId) } };
+  writeFileSync(ziel, JSON.stringify(bestand, null, 2) + "\n");
+  console.log("\nHockey-Anker (neue Torwart-Regel) geschrieben: " + ziel.pathname);
+  process.exit(0);
+}
+
 if (schreibe) {
   const ziel = new URL("../data/generated/pp-skala-kalibrierung.json", import.meta.url);
   writeFileSync(
