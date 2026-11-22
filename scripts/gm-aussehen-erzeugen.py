@@ -4,12 +4,13 @@
     python3 -I scripts/gm-aussehen-erzeugen.py
 
 Die 100 GM-Profile entstehen in lib/foundation/team-general-managers.ts aus 10 Archetypen x 10 Varianten
-(gmId = gm-<archetyp>-<01..10>). Dort gibt es weder Rasse noch Aussehen. Dieses Skript ordnet jedem GM
+(gmId = gm-<archetyp>-<01..10>); die eindeutigen Namen stehen in data/gm-namen.json. Dort gibt es weder Rasse noch Aussehen. Dieses Skript ordnet jedem GM
 deterministisch (ohne Zufall, ohne Teambezug) zu:
   - eine der 18 echten Rassen aus data/generated/oly-player-stats.json, gestreut ueber (5*a + 7*v) mod 18:
     je Archetyp zehn verschiedene Rassen, je Rasse 5 oder 6 GMs, Human damit nur 6 von 100
     (Chris, 22.11.: "dass die wirklich nicht nur wie Menschen aussehen");
-  - Geschlecht aus dem Vornamen der Variante (Ada, Mara, Nia, Tessa, Kira weiblich; Noah, Ivo, Bren, Jaro, Oren maennlich);
+  - Geschlecht je Variante (ungerade Nummer weiblich, gerade maennlich; passend zu den Namen in data/gm-namen.json);
+  - Rassennamen wie im Spiel (Human, Voidborn, Gnom ...), keine deutsche Uebersetzung;
   - Alters-Anmutung und Ausdruck aus dem Varianten-Profil (Prime, Wild, Patient ...);
   - Kleidung und Beiwerk aus dem Archetyp (seine "Vorlieben");
   - den fertigen Prompt-Baustein fuer scripts/pixellab-gm-portraets.py.
@@ -21,16 +22,10 @@ import os
 
 WURZEL = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ZIEL = os.path.join(WURZEL, "data", "gm-aussehen.json")
+NAMEN = json.load(open(os.path.join(WURZEL, "data", "gm-namen.json"), encoding="utf-8"))["namen"]
 
 ARCHETYPEN = ["bargain_hunter", "talent_builder", "star_chaser", "depth_spammer", "elite_curator",
               "facility_architect", "risk_gambler", "culture_keeper", "rivalry_hawk", "systems_tinkerer"]
-NAMEN = ["Ada Vale", "Noah Crest", "Mara Voss", "Ivo Kade", "Nia Solen", "Bren Vale", "Tessa Rune", "Jaro Finch",
-         "Kira Morrow", "Oren Slate"]
-NAMENSWURZEL = {"bargain_hunter": "Bargain Hunter", "talent_builder": "Talent Builder", "star_chaser": "Star Chaser",
-                "depth_spammer": "Depth Spammer", "elite_curator": "Elite Curator",
-                "facility_architect": "Facility Architect", "risk_gambler": "Risk Gambler",
-                "culture_keeper": "Culture Keeper", "rivalry_hawk": "Rivalry Hawk",
-                "systems_tinkerer": "Systems Tinkerer"}
 PROFILE = ["Prime", "Wild", "Patient", "Clinical", "Popular", "Hardline", "Agile", "Builder", "Showcase", "Lean"]
 GESCHLECHT = ["w", "m", "w", "m", "w", "m", "w", "m", "w", "m"]
 
@@ -61,11 +56,6 @@ RASSE_PROMPT = {
     "Goblin": "small {g} goblin with yellow-green skin, enormous long pointed ears, long hooked nose, wide mouth with tiny sharp teeth, big yellow eyes",
     "Gnom": "tiny {g} gnome with an oversized round red nose, huge bushy white eyebrows, big pointed ears, wrinkled leathery face, very large head",
 }
-RASSE_DE = {"Human": "Mensch", "Demon": "Dämon", "Construct": "Konstrukt", "Elf": "Elf", "Animal": "Tierwesen",
-            "Divine": "Göttlich", "Alien": "Alien", "Orc": "Ork", "Aqua": "Wasserwesen", "Dwarf": "Zwerg",
-            "Lizard": "Echse", "Dragon": "Drache", "Tauren": "Taure", "Plant": "Pflanze", "Mutant": "Mutant",
-            "Voidborn": "Leerengeborener", "Goblin": "Goblin", "Gnom": "Gnom"}
-
 # Kleidung und Beiwerk je Archetyp: was der GM mag und wie er arbeitet.
 KLEIDUNG = {
     "bargain_hunter": ("Sparfuchs", "wearing a worn patched tweed jacket with elbow patches, a monocle, a small coin pouch on the lapel, holding a price tag"),
@@ -105,10 +95,9 @@ def baue():
             rp = RASSE_PROMPT[rasse].format(g=g, tier=TIERE[a], bart="hair braids" if w else "beard")
             stil_de, kleid = KLEIDUNG[arch]
             alter_de, anm = ANMUTUNG[v]
-            name = "Chris" if gm_id == "gm-systems-tinkerer-01" else "Franky" if gm_id == "gm-risk-gambler-02" \
-                else f"{NAMEN[v]} {NAMENSWURZEL[arch]}"
+            name = NAMEN[gm_id]
             eintraege[gm_id] = {
-                "name": name, "archetyp": arch, "profil": PROFILE[v], "rasse": rasse, "rasseDe": RASSE_DE[rasse],
+                "name": name, "archetyp": arch, "profil": PROFILE[v], "rasse": rasse,
                 **({"tier": TIERE[a]} if rasse == "Animal" else {}),
                 "geschlecht": GESCHLECHT[v], "anmutung": alter_de, "kleidungsstil": stil_de,
                 "prompt": f"{rp}, sports club general manager, {anm}, {kleid}",
