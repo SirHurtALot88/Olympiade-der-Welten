@@ -11,7 +11,7 @@ Auftrag von Chris, 22.11., wörtlich:
 - „Nicht jeder Spieler nähert sich zwangsweise dem Peak, weil es immer schwerer wird, je stärker ein Spieler wird.“
 - „Das Liga-Mittel soll weiterhin −1 bis +1 sein!“
 
-Stand: Regel **„neu“** gebaut, geeicht und über fünf Saisons gemessen. Gilt per Spielstand-Stempel (`seasonState.entwicklungsRegel`),
+Stand: Regel **„neu“** gebaut, geeicht und über fünf Saisons gemessen (Tabelle 1). Gilt per Spielstand-Stempel (`seasonState.entwicklungsRegel`),
 Rückweg `OLY_ENTWICKLUNG=alt`. Wertungs-Fingerabdruck unverändert (`GESAMT fe1dc086d68d`, Entwicklung ist keine Arena-Wertung).
 
 ## 1. Abnahme und Schwellen
@@ -65,7 +65,7 @@ und nur dort, nie im Tageszuwachs), Bausteine in `lib/training/entwicklung-neu.t
    - **Einsatzanteil** = Einsätze / 10 (höchstens 1): ohne Einsätze kommt gut die Hälfte (0,6) des Trainings an.
    - **Fokusfaktor** = 0,5 bis 1,5 nach dem Anteil des meistgewählten Trainingsziels (≤ 40 % → 0,5, 100 % → 1,5): wer sein Ziel
      hält, behält mehr von seinem Training als jemand, der dauernd wechselt. Das ist die „SP“-Seite des „verdient“.
-2. **Abbau hängt an der Leistung.** Grundabbau je Attribut 0,48 statt 0,3 (alt), mal `1 + 1,0 × (0,5 − Leistungsrang)`: wer unter der
+2. **Abbau hängt an der Leistung.** Grundabbau je Attribut 0,51 statt 0,3 (alt), mal `1 + 1,0 × (0,5 − Leistungsrang)`: wer unter der
    Liga-Mitte spielt, baut bis zu 50 % mehr ab, wer darüber spielt, bis zu 50 % weniger. Dazu 0,25 Verfall (Summe) je
    Verletzungs-Ausfalltag (Verletzte trainieren nicht, Regel vom 18.11. bleibt). Der Marktwertdruck und die Decken-Dämpfung des
    Abbaus bleiben.
@@ -73,7 +73,7 @@ und nur dort, nie im Tageszuwachs), Bausteine in `lib/training/entwicklung-neu.t
 4. **Abnehmende Erträge, stetig.** `ertragsFaktor(h)` mit h = Decke − Wert: ab 10 Punkten Abstand voller Satz, bei 1 Punkt 0,05,
    dazwischen linear (bei 5 Punkten ≈ 0,47, bisher Stufe 0,45). Gilt für das Training je Spieltag (nur Stempel „neu“), den Nachlegen-Anteil
    und den Leistungskanal (nie unter 0,3, wie der alte weiche Auslauf).
-5. **Entwicklungskurve** auf die Gesamtsumme eines Spielers: `G(x) = sign(x) · 3 · (|x| / 4)^2,6`, höchstens ±18. Kleine Summen
+5. **Entwicklungskurve** auf die Gesamtsumme eines Spielers: `G(x) = sign(x) · 2,5 · (|x| / 4)^2,6`, höchstens ±18. Kleine Summen
    werden gedämpft (die Masse bleibt „kaum verändert“), große verstärkt (wenige Schübe und Einbrüche). Alle Attribut-Deltas des
    Spielers werden mit `G(x)/x` multipliziert (Vorzeichen und Verteilung auf die Attribute bleiben); danach Decke und Rundung. Das schon
    gebuchte Training wird dabei nur als Differenz nachgebucht.
@@ -95,11 +95,11 @@ Messung zeigt, dass jeder Spieler spielt; ein Spielzeit-Auslöser hätte heute n
 | `faktorMin` / `faktorMax` | 0,6 / 1,4 | Spanne des Leistungsfaktors auf das gebuchte Training |
 | `einsatzVoll` | 10 | Einsätze, ab denen der Leistungsfaktor voll zählt |
 | `fokusStaerke` | 0,5 | Spanne des Fokusfaktors (1 ± 0,5) |
-| `abbauBasis` | 0,48 | Grundabbau je Attribut und Saison (alt 0,3); **die** Schraube für das Liga-Mittel: ±0,1 verschiebt es um ≈ ∓1 |
+| `abbauBasis` | 0,51 | Grundabbau je Attribut und Saison (alt 0,3); **die** Schraube für das Liga-Mittel: ±0,1 verschiebt es um ≈ ∓1 |
 | `abbauLeistungsKopplung` | 1,0 | Abbau × (1 + k × (0,5 − Rang)) |
 | `verfallJeAusfalltag` | 0,25 | Zusatzabbau je Verletzungstag (Summe) |
 | `leistungsSkala` | 0,6 | Leistungskanal |
-| `kurveA` / `kurveSigma` / `kurveK` / `kurveMax` | 3 / 4 / 2,6 / 18 | Entwicklungskurve: Form der Verteilung (Anteil stark / kaum) |
+| `kurveA` / `kurveSigma` / `kurveK` / `kurveMax` | 2,5 / 4 / 2,6 / 18 | Entwicklungskurve: Form der Verteilung (Anteil stark / kaum) |
 | `schubOhneVerdienstMax` / `schubRangMin` / `schubFokusMin` / `schubZielTageMin` / `schubRampe` | 7,5 / 0,5 / 0,6 / 12 / 0,15 | Schub-Deckel ohne PP und Fokus |
 | Drift: Verschiebung je Ausblick | ±0,12 / ±0,06 / 0 | `ENTWICKLUNG_NEU_DRIFT_VERSCHIEBUNG`, Liga-Schnitt wird abgezogen |
 
@@ -115,13 +115,55 @@ Arena-Spieltage, danach Saisonabschluss + Saisonende-Kette + nächste Saison). J
 `--stop-vor-abschluss`), `--erst-naechste-saison`. Ablauf der Eichung: Rohsummen mit Identitätskurve messen, die Kurve offline an die
 Zielanteile anpassen, einen vollen Lauf zur Kontrolle.
 
-TABELLE_1
+**Tabelle 1: Vorher (Regel alt) und Nachher (Regel neu), je Saison, 32 KI-Teams von Anfang an.**
 
-TABELLE_2
+Vorher (alt):
+| Saison | Spieler | Liga-Mittel | Median | stark besser % | stark schlechter % | kaum % | verdient % (n stark besser) |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 310 | +6.73 | +6.7 | 36.5 | 0.0 | 13.2 | 31 (113) |
+| 2 | 296 | +7.38 | +7.1 | 43.2 | 0.0 | 9.1 | 34 (128) |
+| 3 | 290 | +7.56 | +7.1 | 41.4 | 0.0 | 6.9 | 20 (120) |
+| 4 | 276 | +7.63 | +7.5 | 46.4 | 0.0 | 5.8 | 24 (128) |
+| 5 | 268 | +7.64 | +7.2 | 42.9 | 0.0 | 6.3 | 23 (115) |
+| Mittel | | +7.39 | | 42.1 | 0.0 | 8.3 | |
 
-TABELLE_3
+Nachher (neu, Endstand der Eichung):
+| Saison | Spieler | Liga-Mittel | Median | stark besser % | stark schlechter % | kaum % | verdient % (n stark besser) |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 312 | -0.20 | +0.0 | 6.1 | 6.4 | 61.2 | 95 (19) |
+| 2 | 290 | +0.31 | +0.0 | 6.9 | 4.5 | 58.3 | 100 (20) |
+| 3 | 285 | -0.01 | +0.0 | 5.6 | 4.2 | 61.0 | 100 (16) |
+| 4 | 276 | +0.18 | +0.0 | 6.2 | 6.2 | 56.2 | 100 (17) |
+| 5 | 266 | +0.42 | +0.0 | 6.8 | 4.5 | 59.8 | 100 (18) |
+| Mittel | | +0.14 | | 6.3 | 5.2 | 59.3 | |
 
-TABELLE_4
+
+
+**Tabelle 2: Abnahme gegen Soll** — Liga-Mittel in jeder Saison zwischen −0,2 und +0,4 (Soll −1..+1); stark besser 5,6–6,9 % (Soll 5–8); stark schlechter 4,2–6,4 % (Soll 5–8; drei Saisons knapp darunter: 4,5 / 4,2 / 4,5); kaum verändert 56–61 % (Soll 50–60; zwei Saisons knapp darüber); verdient 95–100 %.
+
+**Tabelle 3: abnehmende Erträge** (Mittel der Änderung je Attribut und Saison, nach Abstand zur Decke zu Saisonbeginn; Mittel über die Saisons)
+
+| Abstand zur Decke | alt | neu |
+|---|---:|---:|
+| ≤ 2 | +0,34 | −0,19 |
+| 2–5 | +0,55 | −0,13 |
+| 5–10 | +0,80 | −0,04 |
+| 10–20 | +0,69 | +0,10 |
+| > 20 | +0,64 | +0,11 |
+
+Neu: je näher an der Decke, desto schlechter die Bilanz; am Rand bleibt nur Abbau. Alt: auch am Rand noch Zuwachs.
+
+**Tabelle 4: Potentialdrift** (Mittel der Änderung der Summe der zwölf Attribut-Decken je Spieler durch die Drift allein)
+
+| Saison | alt (S4, S5) | neu (S1–S5) |
+|---|---:|---|
+| Drift | +12,6 / +12,1 | −0,4 / −0,2 / +0,2 / −0,2 / +0,4 |
+
+**Eichung (Verlauf):** erste Läufe mit Abbau 0,6 / Kurve 2,5·(x/4,5)^2,2 trafen auf der eingefrorenen Saison, am vollen Lauf mit
+stetiger Ertragskurve im Training sank das Training aber auf Mittel 5,4 (alt 6,0) und der Schub-Anteil auf 3,5 %. Zwischenstand
+Abbau 0,48 / A 3,0 über fünf Saisons: Liga-Mittel +0,39 bis +1,48 (Aufwärtstrend durch wachsenden Decken-Spielraum, Anteil stark
+besser 7–10 %). Endstand Abbau 0,51 / A 2,5: Tabelle 1. Verdient (Tabelle 1, letzte Spalte) liegt über 95 % — der Schub-Deckel ist
+die Ursache: ohne PP über dem Median und gehaltenes Ziel kommt niemand über +8.
 
 ## 6. Regelwechsel, Mehrspieler, Rückweg
 

@@ -57,7 +57,7 @@ function liga(laeufe: Lauf[], regel: "neu" | "alt" | null): { gs: GameState; spi
     potential.push({
       playerId: id, potentialBand: "B", hiddenPotentialScore: 70, confidence: 80, source: "generated",
       hiddenAttributeCeiling: Object.fromEntries(PROGRESSION_ATTRIBUTE_ORDER.map((a) => [a, BASIS[a] + lauf.abstand])),
-    } as PlayerPotentialRecord);
+    } as unknown as PlayerPotentialRecord);
     for (let e = 0; e < 14; e += 1) {
       const gut = lauf.ppRang;
       performances!.push({
