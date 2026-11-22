@@ -7,7 +7,12 @@ Dieses Papier ist Konzept und Mockup, kein App-Code. Es nimmt auf, welche Geldfl
 rechnet ihre Wirkung auf die Balance (c) und stellt fünf Fragen (d). Das Mockup ist ein neuer Reiter „Aufschlüsselung“ in
 `public/mockups/finanzen-modern-18-11.html` (`?ansicht=posten`), Abschnitt (e).
 
-**Kurzfassung**
+> **Stand nach Runde 2 (Chris, 22.11.):** Disziplin-Krone gestrichen, dafür Farb-Meister. Dauerkarten mit 25 % Rabatt.
+> Mehr Geld je Besucher, Arena-Ausbau hängt an der Auslastung. Versicherung als Erstattung gegen Pauschale. Trainingslager
+> in der Winterpause. Kredite ab Saison 1. Alles dazu steht in **Abschnitt (f)**; wo (b) und (f) sich widersprechen, gilt (f).
+> Die Balance-Tabelle in (c) ist auf diesen Stand gebracht.
+
+**Kurzfassung** (Runde 1)
 
 - Heute bucht das Spiel 19 Arten von Geldfluss. 96 % der Einnahmen kommen vom Sponsor. Von der FM-Liste gibt es bei uns schon
   Prämien (Siegprämie an den Kader), Loyalitätsboni (Treueprämie), Zinsen (Kredite zwischen Teams), Steuern (Apron),
@@ -97,7 +102,7 @@ Kisten und Ruhm sind kein Geld.
 Bezugsgrößen: Spielergehalt 6 bis 7 C je Saison, Kader rund 14, Gehälter 70 bis 90 C, Reparatur voll 19 C. Beispielzahlen
 für ein Team der Liga 2.
 
-### Empfohlen: umsetzen
+### Empfohlen: umsetzen (Runde 1; N1 bis N3 und N5 sind durch Abschnitt (f) ersetzt)
 
 | # | Posten | Regel | Entscheidung des Managers | je Saison | Mikromanagement | Gegenposten |
 |---|---|---|---|---:|---|---|
@@ -155,27 +160,36 @@ Maßstab ist die Geldmengen-Bilanz des Finanzkonzepts V2 (Abschnitt 3.1): Σ GuV
 Gehälter Σ 1838 C. Grundsatz für alles Neue: **jeder Posten nennt, woraus er bezahlt wird.** Einnahmen werden aus einem
 bestehenden Topf geschnitten, Ausgaben fließen in den Liga-Topf und kommen zur nächsten Kaufphase zurück.
 
-| Posten | brutto je Team | Gegenposten je Team | netto je Team | Σ Liga (32 Teams) |
-|---|---:|---:|---:|---:|
-| N1 Dauerkarten (normal) | +5,2 | −4,6 Tageskarten | +0,6 bis −1,0 | −13 bis +19, im Mittel um 0 |
-| N2 Disziplin-Krone | +1,0 im Mittel | −1,0 Rangprämie | 0 | 0 (32 C umgewidmet) |
-| N3 Versicherung | −2,0 Prämie, +1,7 Leistung | Überschuss in den Liga-Topf | −0,3 | −10 in der GuV, +10 im Liga-Topf |
-| N4 Topspiel | +0,9 | −0,9 Siegprämie der Liga | 0 | 0 |
-| N5 Winterpause | +1,8 oder −2,0 | – | etwa 0 im Liga-Mittel | ±15 |
-| N6 Zielprämie | −1,5 bei Erfolg | – | −0,6 im Mittel | −20 |
-| **Summe, alle sieben** | | | **rund −0,65** | **rund −20 C, 1,1 % der Gehälter** |
-| **Summe, nur N1 bis N3** | | | **rund −0,3** | **rund −10 C, 0,5 % der Gehälter** |
+Stand nach Runde 2. Liga-Mittel je Team und Saison; Regeln und Herleitung in Abschnitt (f).
 
-Die Zahl −0,65 C steht auch im Mockup (Kennzahl „Neue Posten netto“). Zum Vergleich: der Saison-Faktor bewegt die Liga um
-261 C zwischen seinen Grenzen. Die neuen Posten liegen damit weit unter dem Rauschen und kippen keine Kalibrierung.
+| Posten | Stand | brutto je Team | Gegenposten je Team | netto je Team | Σ Liga (32 Teams) |
+|---|---|---:|---:|---:|---:|
+| Dauerkarten, normal, Rabatt 25 % | entschieden | +5,3 | −5,2 Tageskarten (Auslastung 73 %) | +0,1 (von +1,1 bei 60 % bis −1,1 bei 90 %) | um +4 |
+| Mehr Geld je Besucher (+25 %) | Vorschlag | +2,6 | −2,6 Sponsor (Ausschüttung 0,73 → 0,69) | 0 | 0 (83 C umgewidmet) |
+| Arena: Plätze statt fester Einnahme | Vorschlag | wie heute | – | um 0, zu messen | um 0 |
+| Farb-Meister | entschieden | +0,8 im Mittel | −0,8 Rangprämie | 0 | 0 (26 C umgewidmet) |
+| Versicherung (Erstattung) | entschieden | −0,6 Pauschale, +0,3 Erstattung | Überschuss in den Liga-Topf | −0,3 | −9 in der GuV, +9 im Liga-Topf |
+| Trainingslager | entschieden | −1,2 (vier von fünf Teams, Mittel 1,5 C) | in den Liga-Topf | −1,2 | −38 in der GuV, +38 im Liga-Topf |
+| Kredite ab Saison 1 | entschieden | nur der Zins zählt zur GuV | Zins an den Geber oder in den Liga-Topf | −0,15 | um −5 |
+| **Summe, angenommene Posten** | | | | **rund −1,5** | **rund −48 C, 2,6 % der Gehälter** |
+| Topspiel-Geld (N4), Zielprämie (N6) | offen, wie Runde 1 | +0,9 / −1,5 bei Erfolg | −0,9 / – | 0 / −0,6 | 0 / −20 |
+
+Die −48 C sind kein Verlust der Liga: Versicherungs-Überschuss, Lagerkosten und Bankzins fließen in den Liga-Topf und kommen
+zur nächsten Kaufphase als Saisonstart-Budget zurück (Finanzkonzept V2, Stufe 6). Mit Liga-Topf ist die Summe 0. Wird der
+Liga-Topf später gebaut als diese Posten, liegt die Abweichung über der Abnahme von ±30 C; dann entweder die Lagerpreise
+halbieren oder die Sponsor-Ausschüttung um 0,02 heben. Runde 1 kam auf −0,65 C je Team; der Unterschied ist das
+Trainingslager, das jetzt eine reine Ausgabe ist (der Schaukampf als Einnahme entfällt).
+
+Das Mockup zeigt für sein Beispielteam −2,26 C („Neue Posten netto“). Das Team hat eine gute Saison (Auslastung 86 %), darum
+kosten die Dauerkarten 0,6 C, und es hat Lager, Versicherung und Zielprämie gewählt.
 
 Was sich verschiebt, ohne dass die Summe sich ändert:
 
-- **Zeit.** Dauerkarten bringen rund 5 C vor Spieltag 1. Das hebt den Tiefststand der Kasse mitten in der Saison und
+- **Zeit.** Dauerkarten bringen 4 bis 5 C vor Spieltag 1, ein Kredit in Saison 1 bis zum Rahmen. Das hebt den Tiefststand der Kasse mitten in der Saison und
   kann in der Kaufphase einen halben Spieler mehr bezahlen. Der Betrag läuft über die Kasse und unterliegt damit der
   Vorstands-Freigabe wie jedes andere Guthaben.
-- **Verteilung.** Die Krone nimmt den ersten Rängen etwas Rangprämie und gibt sie Spezialisten. Bei 1,6 % des Topfs ist das
-  kein Rubberband, aber messbar; der Lauf muss zeigen, ob die Kronen nicht doch alle beim Tabellenführer landen.
+- **Verteilung.** Der Farb-Meister nimmt allen etwas Rangprämie (1,25 %) und gibt sie den vier Farbbesten je Liga. Der
+  Lauf muss zeigen, wie oft der Tabellenführer mehr als zwei Farben holt.
 - **Risiko.** Die Versicherung glättet. Teams mit langen Ausfällen verlieren weniger, alle anderen zahlen wenig.
 
 Messplan vor dem Bau: zwei Saaten mit `scripts/miss-teamfinanzen-saison.ts`, 32 KI-Teams von Anfang an; Abnahme Σ GuV
@@ -240,3 +254,216 @@ Geprüft: keine JS-Fehler in allen acht Aufnahmen und im Klicktest (sortieren, Z
 kein Seitenscroll bei 2560×1440, 1920×1080 und 1710×1112; alle 19 und 17 Zeilen ohne inneres Scrollen sichtbar; keine
 abgeschnittenen Posten-Namen, Köpfe oder Beträge. Unter 2100 px Breite fällt der Anteilsbalken weg (die Prozentzahl
 bleibt), unter 1500 px die Spalten Anteil und Rang. Auf dem Phone ist ein Name gekürzt („Ausrüstung · Händler, Schmiede“).
+
+---
+
+## (f) Runde 2: Entscheidungen von Chris 22.11.
+
+Chris, 22.11., wörtlich: „diszi krone nicht, aber das beste team in POW SPE MEN SOC am season ende könnte noch einen bonus
+erhalten / dauerkarten klingt gut, 10% sind aber zu wenig rabatt glaube ich / vllt müsste es mehr cash geben für die besucher
+und der arena ausbau den wir als gebäude haben sollte direkt damit verknüpft sein dass man dann ausbaut wenn man das fan max
+erreicht hat um noch mehr fans rein zu bekommen etc / Verletzungsversicherung könnte man dann wirklich einführen wo man
+erstattungen bekommt wenn spieler ausfallen für ne pauschale / Trainingslager möglichkeit für winterpause finde ich gut, wenn
+man ausgeruht genug ist oder ambitioniert dass man seine leute entweder hin schickt für mehr training, besserer fitness,
+moral oder bessere reha wären doch alles möglichkeiten oder temporäre boosts für die nächste(n) diszi(s) / und zur not gibts
+ja auch kredite … geben wir kredite auch ab S1 frei!“
+
+Alle Zahlen sind Startwerte für den Messlauf. Beispielwerte gelten für ein Team der Liga 2 (Gehaltssumme 68 C, 14 Spieler).
+
+### f.1 Farb-Meister statt Disziplin-Krone
+
+Die Disziplin-Krone (N2) ist gestrichen. Neu: Am Saisonende bekommt in jeder Liga das beste Team je Disziplinfarbe einen
+Bonus.
+
+- **Zuordnung im Code:** jede Disziplin trägt ihre Farbe im Feld `category`, `lib/data/dataAdapter.ts:59` bis `:78`
+  (Typ `DisciplineCategory`, `lib/data/olyDataTypes.ts:13`). Es sind genau fünf je Farbe: Power = Mini DM, TDM,
+  Gewichtheben, Hockey, Breaking. Speed = Time Trial, Spurt, Staffel, Climbing, Fechten. Mental = Tennis, Wettessen,
+  Schach, Takeshi, I Spy. Social = Showcase, Basketball, Battlefield, Football, Eiskunst.
+- **Wertung:** Summe der Ergebnispunkte des Teams (E1, 0 bis 10 je Begegnung) aus den fünf Disziplinen der Farbe. Bei 20
+  Spieltagen mit je zwei Disziplinen sind das zehn Begegnungen je Farbe und Team. Gleichstand teilt den Bonus.
+- **Höhe:** 4,0 C in Liga 1, 2,5 C in Liga 2. Das sind rund 5 % der Sponsor-Einnahme eines Teams (Median 78 bzw. 55 C) und
+  gut ein halbes Spielergehalt: spürbar, aber kein Rang lässt sich damit kaufen. Liga-Summe 4 × 4,0 + 4 × 2,5 = 26 C je
+  Saison (die Krone lag bei 32 C).
+- **Gegenposten, Empfehlung: aus dem Rangprämien-Topf.** 26 C sind 1,25 % der Sponsor-Auszahlung der Liga (2089 C heute);
+  jede Rangprämie sinkt um diesen Anteil, im Mittel 0,8 C je Team. Obendrauf wäre einfacher, lässt die Geldmenge aber jede
+  Saison um 26 C wachsen.
+- **Risiko:** Ein überlegenes Team könnte alle vier Farben holen (16 C in Liga 1, ein Fünftel seiner Einnahmen). Der Messlauf
+  zählt, wie oft der Tabellenerste mehr als zwei Farben gewinnt. Liegt das über einem Viertel der Saisons, zahlt der Bonus
+  je Team höchstens zweimal und die übrigen Farben gehen an den Zweiten.
+- **KI:** Liegt ein Team zur Winterpause in einer Farbe unter den ersten drei, gewichtet es Kauf und Training dieser Farbe
+  leicht höher. Für alle 32 Teams dieselbe Regel.
+
+### f.2 Dauerkarten: Rabatt 25 %
+
+Regel wie N1, aber mit **25 % Rabatt** statt 10 %. Wahl weiter einmal je Saison vor Spieltag 1: wenig (20 % der Plätze),
+normal (40 %), viel (60 %).
+
+Begründung der Zahl: Eine Dauerkarte ersetzt einen Platz, der an der Tageskasse nur mit der Wahrscheinlichkeit der
+Auslastung verkauft worden wäre. Netto = Anteil × volles Haus × 10 × (1 − Rabatt − Auslastung). Der Gleichstand liegt also
+bei Auslastung = 1 − Rabatt.
+
+| Rabatt | Gleichstand bei Auslastung | entspricht Stimmung | Folge |
+|---:|---:|---:|---|
+| 10 % (Runde 1) | 90 % | 71 | lohnt sich fast immer, keine echte Wahl und für die Fans kein Angebot |
+| 20 % | 80 % | 59 | lohnt sich für die untere Hälfte der Liga |
+| **25 %** | **75 %** | **53** | Gleichstand nahe am Liga-Mittel (Stimmung 50, Auslastung 73 %): eine echte Wette auf die eigene Saison |
+| 30 % | 70 % | 47 | lohnt sich nur noch für schwache Teams |
+
+Beispiel (volles Haus 1,45 C): wenig 2,18 C, normal 4,35 C, viel 6,53 C sofort. Bei 86 % Auslastung kostet „normal“ netto
+0,6 C, bei 60 % bringt es 0,9 C. Der zweite Wert bleibt: Das Geld ist schon in der Kaufphase da.
+
+KI: erwartete Auslastung unter 70 % → viel, über 80 % → wenig, sonst normal; Kasse unter zwei Gehaltsraten → eine Stufe
+höher.
+
+### f.3 Mehr Geld je Besucher, Arena-Ausbau hängt an der Auslastung
+
+**Befund heute:** Besucher bringen fast nichts. Ohne Arena-Gebäude ist die Einnahme 0. Mit Stufe 1 sind es 2,4 C je Saison
+× Beliebtheit (0,5 bis 1,5) bei 0,8 C Unterhalt (`lib/facilities/facility-catalog.ts:186`, Rechnung
+`lib/facilities/facility-season-end-service.ts:172`), also rund 3 % der Einnahmen. Die Stufen amortisieren sich nach acht
+Saisons. 96 % der Einnahmen kommen vom Sponsor. Das Finanzkonzept V2 (Stufe 5) hebt die Tickets auf 331 C in der Liga, 16 %
+der Einnahmen; die Gebäude-Einnahme bleibt dort ein fester Katalogwert, der mit Plätzen nichts zu tun hat.
+
+**Vorschlag, zwei Teile:**
+
+1. **Preis je Besucher + 25 %.** 0,18 C je 1.000 Besucher in Liga 2, 0,265 C in Liga 1. Volles Haus der Grundarena (8.000
+   Plätze): 1,44 statt 1,15 C bzw. 2,12 statt 1,70 C. Tickets der Liga 414 statt 331 C. Gegenposten: Sponsor-Ausschüttung
+   0,73 → 0,69. Mehr geht nicht, ohne die Abnahme der Stufe 5 zu reißen (Sponsor-Anteil 65 bis 72 %); mit + 25 % liegt er
+   bei rund 65 %.
+2. **Die Arena hat Plätze statt einer festen Einnahme.** Tickets = min(Plätze, Nachfrage) × Preis. Baukosten und Unterhalt
+   bleiben wie im Katalog, die Katalog-Einnahme des Arena-Gebäudes entfällt.
+
+| Stufe | Plätze | Fan-Maximum | Bau | Unterhalt je Saison | volles Haus Liga 2 / Liga 1 | mehr je Saison, netto | Bau bezahlt nach |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 8.000 | 10.000 | – | – | 1,4 / 2,1 C | – | – |
+| 1 | 11.000 | 13.750 | 13 C | 0,8 C | 2,0 / 2,9 C | +4,0 / +6,3 C | 3,2 / 2,1 Saisons |
+| 2 | 14.000 | 17.500 | 24 C | 1,4 C | 2,5 / 3,7 C | +4,2 / +6,5 C | 5,7 / 3,7 Saisons |
+| 3 | 17.500 | 21.875 | 30 C | 2,4 C | 3,2 / 4,6 C | +4,7 / +7,4 C | 6,3 / 4,1 Saisons |
+| 4 | 21.500 | 26.875 | 46 C | 3,6 C | 3,9 / 5,7 C | +5,5 / +8,5 C | 8,4 / 5,4 Saisons |
+| 5 | 26.000 | 32.500 | 72 C | 5,4 C | 4,7 / 6,9 C | +5,8 / +9,2 C | 12,5 / 7,8 Saisons |
+
+„Netto“ zieht den zusätzlichen Unterhalt und den höheren Arena-Betrieb ab (0,6 bzw. 0,9 C je Stufe) und gilt bei vollem
+Haus. Die frühen Stufen lohnen sich schneller als heute, die späten nur für Teams mit großer Fanbasis. In der ersten Saison
+nach dem Ausbau füllen sich die neuen Plätze erst: im Beispiel +0,8 C, danach +4,0 C, bezahlt nach rund vier Saisons.
+
+**Kopplung an die Auslastung:**
+
+- Jedes Team hat eine **Fanbasis**, Start 8.000 × Beliebtheit. Nachfrage = Fanbasis × (0,30 + 0,85 × Stimmung ÷ 100) ×
+  Preisfaktor (die Formel aus V2).
+- Die Fanbasis wächst um 2 % nach jedem Heimspiel mit mindestens 90 % Auslastung und sinkt um 1 % unter 60 %. Sie wächst
+  nur bis zum **Fan-Maximum = 1,25 × Plätze**. Wer das Maximum erreicht hat, bekommt mehr Fans erst mit mehr Plätzen.
+- **Empfehlung des Vorstands** im Postfach, sobald der Schnitt der letzten drei Heimspiele bei 90 % oder mehr liegt, mit
+  der Amortisationsrechnung. Unter 60 % rät er vom Ausbau ab (Warnung im Bau-Dialog, keine Sperre).
+- Der Ausbau bleibt ein Gebäude: sofort aus dem Investitionstopf, hart gegen die Freigabe, wirkt ab dem nächsten Heimspiel.
+  Das Dauerkarten-Kontingent wächst mit, ab der nächsten Saison.
+- KI: baut die Arena nur bei aktiver Empfehlung und wenn die Amortisation unter sechs Saisons liegt.
+
+Die Fanbasis ist die einzige neue Größe im Spielstand. Sie wirkt nur auf Geld, nie auf die Wertung.
+
+### f.4 Verletzungs-Versicherung als Erstattung
+
+Pauschale einmal je Saison aus dem Gehaltstopf, dafür Erstattung je Ausfall-Spieltag.
+
+| Stufe | Pauschale Liga 2 / Liga 1 | versichert | Erstattung |
+|---|---:|---|---|
+| keine | 0 | – | – |
+| beste 6 | 0,7 / 1,0 C | die sechs teuersten Verträge | 80 % des Spieltagsgehalts **ab dem zweiten Ausfall-Spieltag** einer Verletzung |
+| ganzer Kader | 1,2 / 1,7 C | alle | wie oben |
+
+Bezug: Heute fällt ein Verletzter einen Spieltag aus; künftig sollen Verletzungen bis zu drei Spieltage dauern (Idee von
+Chris, noch nicht gebaut). Der erste Ausfall-Spieltag bleibt immer beim Team. Darum zahlt die Versicherung heute nichts und
+gehört erst mit den längeren Verletzungen in den Bau.
+
+Rechnung: Die Liga hat rund 145 Verletzungen je Saison (`lib/fatigue/fatigue-injury-service.ts:177` bis `:182`), 4,5 je
+Team. Annahme für die Dauer: 50 % ein Spieltag, 30 % zwei, 20 % drei. Das sind 0,7 erstattete Tage je Verletzung.
+
+| | Erstattung je Tag | erwartet je Saison | Pauschale | lohnt sich ab |
+|---|---:|---:|---:|---|
+| beste 6 (Mittel 7,5 C Gehalt) | 0,30 C | rund 0,4 C | 0,7 C | 3 erstatteten Tagen, also zwei langen Ausfällen unter den besten 6 |
+| ganzer Kader (Mittel 4,9 C) | 0,19 C | rund 0,6 C | 1,2 C | 7 erstatteten Tagen, also mehr als drei Ausfällen über drei Spieltage |
+
+Im Mittel fließen 50 bis 60 % der Pauschale zurück, der Rest geht in den Liga-Topf. Wer Pech für zwei hat, gewinnt; alle
+anderen zahlen einen kleinen Preis für Ruhe. Ein Recovery Center verkürzt Ausfälle und senkt damit den Wert der
+Versicherung. Beispiel im Mockup: Com. Shepard (9,0 C) fehlt zwei Spieltage, erstattet werden 1 × 0,45 × 0,8 = 0,36 C.
+
+KI: dünner Kader (unter 11) oder ein Star mit über 12 % der Gehaltssumme → beste 6; vorsichtiger Charakter → ganzer Kader;
+sonst keine. Vor dem Bau die Ausfalltage je Team messen (`scripts/miss-teamfinanzen-saison.ts` erweitern).
+
+### f.5 Trainingslager in der Winterpause
+
+Die Pause nach Spieltag 10 gibt es schon (`BELASTUNG_PAUSE_NACH_SPIELTAG`, `lib/fatigue/belastung-regel.ts:50`): ein
+Ruhe-Spieltag für alle, kein Transferfenster. Neu ist eine Teamentscheidung in dieser Pause. Sie ersetzt N5 aus Runde 1
+(Schaukampf und Ruhe entfallen).
+
+| Schwerpunkt | Kosten | bleibende Wirkung | Schub, Spieltag 11 bis 13 | Bedingung |
+|---|---:|---|---|---|
+| kein Lager | 0 | Pause wie bisher | – | – |
+| Training | 2,0 C | Trainingspunkte von zwei Spieltagen zusätzlich für alle Gesunden (+10 % der Saisonmenge) | Form +1 an Spieltag 11 | Erschöpfung im Team-Schnitt höchstens 55, **oder** ambitioniertes Ziel; dann ohne Erholung: Form −1 statt +1 |
+| Fitness | 1,5 C | Erschöpfung −10 zusätzlich zur Pause | Erschöpfung baut sich um 20 % langsamer auf | keine |
+| Moral | 1,5 C | Moral +8 für alle | Form +1 an Spieltag 11 und 12 | keine |
+| Reha | 1,0 C + 0,3 C je Verletztem | Verletzte fehlen einen Spieltag weniger, Spieler im roten Bereich (ab 65) −15 Erschöpfung | Rückkehrer starten ohne Formabzug | mindestens ein Verletzter oder drei im roten Bereich |
+
+- **Ambitioniert** heißt: Vorstandsziel Titel, Aufstieg oder Top 4, oder „Alles auf eine Karte“.
+- **Der Schub läuft über die Form**, nie als Punkte, wie beim Mutator. Eine Form-Stufe ist 1 % Eignung. Das ist ein
+  On-top-Effekt und zählt nicht gegen die Rangtreue-Schranke.
+- **Kosten:** aus dem Investitionstopf, hart gegen die Freigabe, für Mensch und KI gleich. 1,0 bis 2,0 C sind ein Viertel
+  bis ein Drittel eines Spielergehalts. Das Geld geht in den Liga-Topf.
+- **KI:** zwei Verletzte oder vier im roten Bereich → Reha; Moral unter 55 → Moral; Erschöpfung über 60 → Fitness;
+  ambitioniertes Ziel höchstens drei Ränge entfernt und ausgeruht → Training; Kasse unter zwei Gehaltsraten oder Freigabe
+  reicht nicht → kein Lager.
+- **Mehrspieler:** je Team gespeichert, delegierbar im Bereich Training. Ohne Wahl gilt „kein Lager“; kein Spieltag wartet.
+- Training muss gemessen werden: zwei Spieltage Trainingspunkte dürfen das Liga-Mittel der Entwicklung nicht aus dem
+  Korridor −1 bis +1 schieben.
+
+### f.6 Kredite ab Saison 1
+
+Entscheidung: Die Sperre für Saison 1 fällt. Sie sitzt an drei Stellen: `lib/finance/loan-service.ts:399`
+(`buildLoanOffers` gibt in Saison 1 eine leere Liste), `:531` (`originateLoan` lehnt ab) und
+`lib/ai/ai-loan-decision-service.ts:298` (KI). Alles andere bleibt: Kreditrahmen = 15 % der Kasse + 30 % des Kaderwerts −
+Restschuld (`loan-service.ts:95`), Zins 5 bis 12 %, Sparauflage des Vorstands (unter 60 % Freigabe kein freiwilliger
+Kredit), Pflichtkredit erst am Kassensturz.
+
+Folgen, die der Bau beachten muss:
+
+- Vor dem Draft hat ein Team keinen Kader. Der Rahmen ist dann 15 % des Startbudgets, 25 bis 49 C. Nach dem Draft sind es
+  rund 50 bis 60 C.
+- Die KI leiht in Saison 1 nur für den Pflichtkader und im Notfall, **nie für den Draft**. Sonst kaufen alle Teams mit
+  rund 15 % mehr Geld und die Kalibrierung der Startbudgets kippt. Der Mensch darf.
+- Der Kredit landet im Transfertopf und unterliegt der Freigabe (in Saison 1 immer 100 %).
+
+### f.7 Mockup, Runde 2
+
+Neuer Reiter **Saisonwahl**: `public/mockups/finanzen-modern-18-11.html?ansicht=wahl` (Schalter `&dk=0|1|2`, `&vers=0|1|2`,
+`&lager=0..4`, `&st=<Spieltag>`). Sechs Karten: Dauerkarten, Arena und Auslastung mit Ausbau-Rechnung, Versicherung,
+Trainingslager, Farb-Meister, Kredite. Ab 1250 px Höhe steht darunter die Arena-Leiter. Die drei Wahlen sind klickbar und
+rechnen in die Aufschlüsselung durch. Ab Spieltag 15 liegt der Schnitt der letzten drei Heimspiele über 90 % und die Arena-Karte zeigt die
+Empfehlung des Vorstands.
+
+Im Reiter Aufschlüsselung: Farb-Meister ersetzt die Krone, Trainingslager ersetzt den Schaukampf, Versicherung heißt
+Pauschale und Erstattung, Dauerkarten rechnen mit 25 %. Der Reiter Hebel nennt im Fuß die Kredite ab Saison 1. Die
+Ticket-Zeilen nennen die Grundarena mit 8.000 Plätzen (vorher stand dort „Arena Stufe 2“, was nicht zum Betrag passte).
+
+Ehrlich gekennzeichnet: alle Beträge sind erfunden. Dauerkarten und Auslastung rechnen mit dem Modell des Mockups; Lage des
+Kaders (Erschöpfung 58, Moral 64), Farb-Tabellen und Kreditrahmen sind feste Beispielwerte. Das Mockup rechnet mit einem
+vollen Haus von 1,45 C; die Regel ergibt 1,44 C.
+
+| Datei (`docs/design/finanzen-posten-22-11/`) | Zeigt |
+|---|---|
+| `runde2-saisonwahl-1920x1080.png` | Saisonwahl nach Spieltag 12, Auslastung 86 %, noch keine Empfehlung |
+| `runde2-saisonwahl-2560x1440.png` | nach Spieltag 16, Vorstand empfiehlt den Ausbau, Arena-Leiter sichtbar |
+| `runde2-saisonwahl-training-ganzer-kader-1710x1112.png` | andere Wahlen: viel, ganzer Kader, Training trotz Erschöpfung |
+| `runde2-aufschluesselung-neu-farbmeister-1920x1080.png` | Aufschlüsselung, Filter Neu, Farb-Meister mit Quelle |
+| `runde2-aufschluesselung-2560x1440.png` | Aufschlüsselung, alle Posten, Trainingslager gewählt |
+| `runde2-hebel-1920x1080.png` | Reiter Hebel mit neuem Fußtext |
+| `runde2-phone-412x900.png` | Nebenprobe Phone |
+
+Geprüft in Chromium unter `flock /tmp/oly-aufnahme.lock`: keine JS-Fehler in allen sieben Aufnahmen, kein Seitenscroll und
+kein inneres Scrollen bei 2560×1440, 1920×1080 und 1710×1112, kein abgeschnittener Text in Karten, Reitern und Kennzahlen.
+Die Aufnahmen aus Runde 1 zeigen den alten Stand (Krone, Schaukampf, 10 % Rabatt).
+
+### f.8 Offene Fragen an Chris
+
+| # | Frage | Empfehlung |
+|---:|---|---|
+| 1 | Farb-Meister aus dem Rangprämien-Topf oder obendrauf? Und ein Deckel, falls ein Team mehr als zwei Farben holt? | **Aus dem Topf**, Deckel erst nach dem Messlauf. |
+| 2 | Arena-Leiter: Reichen 3 bis 6 Saisons Amortisation für die ersten drei Stufen, oder soll die Arena schneller Geld bringen? | **So lassen.** Schneller heißt höherer Preis je Besucher, und dann fällt der Sponsor-Anteil unter 65 %. |
+| 3 | Kredit in Saison 1 schon im Draft oder erst danach? | **Mensch ja, KI nicht für den Draft**, damit die Startbudgets die Kalibrierung bleiben. |
