@@ -134,3 +134,34 @@ drin / angepasst / fehlt; bei Teil 1 Stichproben über Feldspiel, Bahn, Bühne u
    unter 1 Ergebnispunkt) ein zweites Mal laufen, damit „wäre ein Remis gewesen“ gebucht stimmt?
 3. **Wie viel sieht man vom Mitspieler:** nur Status und Ergebnisse, oder auch den Kartenhaushalt (Zahl der übrigen
    Plus- und Minuskarten)?
+
+## Runde 2 (22.11.): Feedback von Chris
+
+- **Gegner im Vergleich:** der Wasserfall hat rechts eine Spalte „Gegner“ mit denselben Zeilen (Grundwert, Karte,
+  Einsatzstufe, Captain, Form und Moral, Erschöpfung, Vorhersage, Spielverlauf, gespielt). Große Hebel des Gegners sind
+  hell hinterlegt; der Satz darunter sagt, warum es so ausging. Quelle ist die Buchung der Gegenseite, sichtbar erst nach
+  dem Spieltag. Bau-Hinweis: dieselbe Funktion `baueEntscheidungsBilanz` für beide Seiten, kein zweiter Rechenweg.
+- **Rennen neu** (Chris: „wirkt sehr generisch“): je Rennen eine Seite mit vier Tafeln statt der Balkentabelle.
+  1. *Wie es so weit kam:* Abstand zur Linie über die Spieltage für die Teams im Rennen, zwei markierte Wendepunkte, ein
+     Absatz Geschichte aus Regeln (tiefster Stand, Wendepunkt, längste Serie, wer fällt).
+  2. *Wenn, dann:* drei gerechnete Szenarien (eigener Sieg, eigene Niederlage, Direktduell der Verfolger) mit Punkteständen.
+     Bewusst keine Prozent-Chancen: dafür gibt es keine ehrliche Quelle.
+  3. *Die entscheidenden Spieltage:* Restprogramm der Teams im Rennen; Farbe = Kaderstärke (beste 6) in den zwei
+     Disziplinen gegen diesen Gegner; Direktduelle und Derbys hervorgehoben; höchstens erreichbare Punkte.
+  4. *Direktvergleich* mit dem nächsten Rivalen: Punkte, Serie, Hinspiel, Rang der Kaderstärke in den verbleibenden
+     Disziplinen.
+  Die Balkentabelle bleibt als Reiter „Tabelle“. Quellen wie oben (Saisonstand je Spieltag, Spielplan, Kaderstärke).
+  „Im Rennen“ sind die Teams, deren Rückstand höchstens die Hälfte der noch möglichen Punkte beträgt.
+- **Liga:** bleibt vorerst 2 × 16 (entschieden). Das dritte Rennen in Liga 2 bleibt damit das Vorstandsziel.
+- Die Sendung „Nach dem Spiel“, der Zuruf im Spiel und die Winterpause stehen in `zwischen-den-spieltagen-22-11.md`
+  (Abschnitte 8, 17, 15.2).
+
+## Entschieden (Projektleitung, 22.11.)
+
+Die drei offenen Fragen oben sind entschieden:
+
+1. **Drittes Rennen in Liga 2 = Vorstandsziel** (vorhandene Daten).
+2. **Gegenprobe = Differenz der Vorhersagen**, kein zweiter Motorlauf.
+3. **Mitspieler:** vorab nur Status und Ergebnisse. Nach dem Spieltag zeigt „Deine Entscheidungen“ in der Gegnerspalte auch
+   deren gespielte Entscheidungen. Kein Einblick in Kartenhaushalt oder Lager vorab; der Satz „hat noch 2 Pluskarten“ aus
+   dem Mockup (Ansicht Manager) entfällt im Bau.

@@ -498,3 +498,321 @@ die Bewegung der Kiste ist CSS über zwei Standbildern. Reserve 150 bleibt unber
 4. **Personal:** drei Stellen mit Typen gewollt, oder ist das zu viel Verwaltung neben den Gebäuden?
 5. **Stilprobe Kiste:** rund 8 Generationen für eine Kiste und fünf Icons freigeben, damit die Animation mit echten
    Bildern gezeigt werden kann?
+
+---
+
+# Runde 3 (22.11.): zweites Feedback von Chris
+
+Geänderte und neue Ansichten: `woche` (neu geordnet), `ausruestung` (Figur in der Mitte, Attribute, Vorschau), `zuruf` (neu).
+In `spieltag-entscheidungen-rennen-22-11.html`: Gegnerspalte im Wasserfall, Rennen neu. **Liga: bleibt vorerst 2 × 16,
+später möglicherweise 2 × 20. Entschieden, wird hier nicht weiter ausgearbeitet** (Abschnitt 5 bleibt als Begründung stehen).
+
+## 14. Ausrüstung: Attribute statt Punkte
+
+Chris: Gegenstände **erhöhen Attribute** eines Spielers um X, nicht pauschal das Ergebnis; Ausreißer bleiben gewollt, kein
+Deckel aus der Matrix. Das ersetzt die Wirkungsregel aus B6 und Abschnitt 3.
+
+- **Wirkung:** `Attribut mit Ausrüstung = Attribut + Bonus`, auch über das Potential und über 99 hinaus. Die Eignung wird
+  wie immer aus der Matrix gerechnet, nur mit dem erhöhten Attribut. Was ein Gegenstand bringt, hängt damit am
+  Matrixgewicht des Attributs in der Disziplin: +8 Power bringt im Climbing viel, im Speed-Schach nichts.
+- **Drei Arten:** *disziplinspezifisch* (nur in ein bis zwei genannten Disziplinen aktiv, dafür stark), *Disziplinfarbe*
+  (aktiv in allen Disziplinen einer Farbe POW/SPE/MEN/SOC), *allgemein* (immer aktiv, dafür schwächer).
+- **Startwerte je Attribut:** Standard +3 bis +5, Selten +4 bis +8, Episch +8 bis +12, Legendär +12 bis +18 (oder auf zwei
+  Attribute verteilt). Einweg-Teile liegen eine Stufe höher als ihre Seltenheit. Allgemeine Teile etwa halb so stark wie
+  disziplinspezifische derselben Stufe.
+- **Plätze:** fünf je Spieler, um die Figur herum wie in einem Rollenspiel: Kopf, Körper, Hände, Füße, Verbrauch
+  (Mockup `ausruestung`). Bremse ist das Lager (16 je Verein), nicht die Zahl der Plätze.
+- **Vorschau:** je Spieler die Eignung ohne und mit Ausrüstung für die Disziplinen der nächsten vier Spieltage, mit Rang im
+  Team und dem Hinweis, wo es am meisten lohnt. Dazu **Vormerken**: ein Gegenstand wird für eine kommende Disziplin
+  reserviert; die Einsatzliste legt ihn an und warnt, wenn er vorher verbraucht wird oder ausläuft.
+- **Gezeigt = gebucht** wird einfacher als in Runde 1: eine Funktion liefert die wirksamen Attribute je Spieler, Disziplin
+  und Spieltag; alles dahinter (Einsatzliste, Motor, Legacy-Wertung, KI, „Deine Entscheidungen“) rechnet unverändert.
+- **Rangtreue und Pp:** weil der Bonus durch die Matrix läuft, verschiebt er die Attributanteile nicht: die Pp-Abweichung
+  bleibt, gemessen an den wirksamen Attributen. rho gegen die Eignung **mit** Ausrüstung bleibt ebenfalls, rho gegen die
+  nackten Attribute fällt nur, wenn viele schwache Spieler viel tragen. Die Modellrechnung aus Abschnitt 3 gilt der
+  Richtung nach weiter; die Wirkung je Gegenstand ist kleiner (ein +8 auf ein Attribut mit 25 % Gewicht sind +2 Eignung),
+  der Stapel aus fünf Plätzen kann sie aber wieder groß machen. Abnahme wie in Abschnitt 3 vorgeschlagen.
+- **Abnehmer:** Training und Potential rechnen mit den nackten Attributen, Marktwert ebenso. Scouting zeigt bei fremden
+  Spielern die getragene Ausrüstung offen (sie gehört dem Verein, nicht dem Spieler).
+- **KI:** unverändert billig: für die zwei Disziplinen des Tages jeden Gegenstand an den aufgestellten Spieler, bei dem
+  `Bonus × Matrixgewicht` am größten ist; vorgemerkt wird nichts, Einweg-Teile nach der Regel aus B6.
+
+## 15. Die Woche: was sie braucht, damit sie zieht
+
+Chris: „ok, kickt aber noch nicht“. Befund: die erste Fassung war eine Übersicht mit sechs gleich lauten Kästen. Eine
+Woche zieht, wenn sie **einen Aufhänger** hat und höchstens drei echte Entscheidungen. Neu geordnet (Mockup `woche`):
+
+1. **Die Liga-Lage steht vorn, mit ihren drei Antworten** (das, was Chris gut fand). Mitspieler haben verdeckt gewählt.
+2. **Der fahrende Händler** daneben: nur diese Woche da, drei Angebote.
+3. **Dein Zug** (eine Aktionskarte) und der **Spielplan** für den nächsten Spieltag (Haltung und Wenn-dann, Abschnitt 17).
+4. Alles andere (Kader, Kiste, Vorstand) schrumpft auf eine Spalte „nur was Anlass hat“.
+
+Was aus den übrigen Systemen noch in die Woche kann, jeweils nur wenn es anliegt: Schlagzeile der Sendung, Derby-Vorschau,
+Abstimmung zur Regel der Saison (nur in der Winterpause), Potential-Pfeile (nur im Saisonwechsel), Fan-Stimmung,
+Vormerk-Warnungen der Ausrüstung. Regel: nie mehr als ein Aufhänger und drei Entscheidungen; der Rest ist eine Zeile.
+
+### 15.1 Katalog der Liga-Lagen (Skizze)
+
+**Umfang:** rund 36 Lagen in sechs Kategorien, fünf je Saison gezogen. Bei drei bis vier neuen Saisons sieht man keine
+Lage zweimal in derselben Lage der Liga. Jede Lage hat drei Antworten aus sechs Antworttypen.
+
+| Kategorie | Anzahl | Beispiele | Wirkt auf |
+|---|---:|---|---|
+| Geld | 8 | Sponsorenflaute, Boom, Zuschauerschwund, Feiertagsspiele, Ticketpreis-Deckel, Steuerprüfung, Fernsehvertrag, Prämienregen | Sponsor je Spieltag, Stadion, Prämien |
+| Markt | 6 | Transfer-Inflation, Gehaltsdruck, Materialknappheit, Ausverkauf beim Händler, Talentschwemme, Vertragswelle | Ablösen, Gehälter, Ladenpreise, Verlängerungen |
+| Wetter und Körper | 6 | Hitzewelle, Kälteeinbruch, Grippewelle, Dauerregen, Reisestrapazen, goldener Herbst | Belastung, Erholung, Verletzungsrisiko |
+| Regel | 6 | Schonfrist, Kartenruhe, Materialkontrolle, Flutlicht, strenge Schiedsrichter, Kader-Meldeschluss | Formkarten, Ausrüstung, Risiko, Prämien |
+| Stimmung | 5 | Presse-Sommerloch, Fan-Protest ligaweit, Derby-Woche, Jubiläum der Liga, Wettskandal | Moral, Fan-Stimmung, Vertrauen |
+| Disziplin | 5 | Trend-Disziplin (doppelte Prämie), Formatprobe, Rekordjagd, Gastschiedsrichter, Hallenwechsel | Prämien und Ruhm je Disziplin, Kulisse |
+
+| Antworttyp | Muster | Wer wählt ihn (KI-Tabelle) |
+|---|---|---|
+| Aussitzen | nichts tun, volle Wirkung der Lage | Finanzwert hoch, Vorstand zufrieden |
+| Investieren | Geld jetzt, Vorteil später oder Wirkung gemildert | Kasse über Rücklage, Ehrgeiz hoch |
+| Sparen | Geld bekommen, Preis bei Moral oder Stimmung | Kasse unter Rücklage |
+| Mannschaft | Kraft oder Training opfern, Moral gewinnen (oder umgekehrt) | Harmonie hoch, Kader breit |
+| Fans | Stimmung einsetzen oder gewinnen | Beliebtheit hoch |
+| Risiko | fester kleiner Vorteil gegen einen sichtbaren möglichen Nachteil am nächsten Spieltag | Außenseiter, im Rennen hinten |
+
+**Balance:** jede Antwort hat einen Wert in einer gemeinsamen Verrechnungseinheit (1 C ≈ 4 Moral ≈ 3 Stimmung ≈ 0,3
+Vertrauen ≈ 6 Erschöpfung im Kader, Startwerte); die drei Antworten einer Lage liegen innerhalb von ±15 %. Abnahme über
+eine Saison mit 32 KI-Teams: keine Antwort wird von mehr als 60 % oder weniger als 15 % der Teams gewählt, und kein
+Antworttyp bringt über die Saison mehr als 1 Tabellenplatz im Mittel. **KI:** reine Nachschlagetabelle aus Team-Matrix
+(Finanzwert, Ehrgeiz, Beliebtheit, Harmonie) und zwei Lagewerten (Kasse zur Rücklage, Stand im Rennen); deterministisch,
+kein Rechenweg. **Last:** Katalog im Code, je Saison fünf Lagen und 160 Antworten, rund 2 KB.
+
+### 15.2 Winterpause und Händler: drei Varianten
+
+Chris: der Halbzeitbericht gefällt; die Pause könnte ein eigener Status „Winterpause“ sein, in dem sich Transferfenster
+oder Item-Shop öffnen. Alternativ Shop immer offen, oder fahrende Händler.
+
+| Variante | Mehrspieler-Fairness | KI | Wirtschaft | Gefühl |
+|---|---|---|---|---|
+| **A Shop immer offen**, alle sehen dasselbe | perfekt gleich | einfach | Geld wird laufend zu Stärke: reiche Teams kaufen jede Woche das Beste | bequem, kein Anlass hinzusehen |
+| **B Nur Winterpause** (Markt für alle, einmal je Saison) | gleich | einfach | ein großer Kaufmoment, dazwischen nichts; Kisten tragen die Woche allein | ein Höhepunkt, 19 Wochen leer |
+| **C Fahrende Händler** (je Woche ein Händler je Team, drei Angebote, zieht weiter) | gleich **über die Zeit**: Reihum-Plan, jeder Händler kommt in einer Halbserie gleich oft zu jedem Team; in einer einzelnen Woche bewusst ungleich | Nutzwert je C über Schwelle, höchstens ein Kauf je Woche | kleines, stetiges Angebot; Preise folgen der Wirtschaftsstufe | „nur diese Woche“, Gesprächsstoff zu dritt |
+
+**Empfehlung: C und B zusammen.** Unter der Saison fahrende Händler (vier bis fünf Händlertypen: Schmiedin für Kopf und
+Hände, Schneider für Körper, Schuster für Füße, Kräuterfrau für Verbrauch, Trödler mit Gebrauchtem), in der
+**Winterpause der Markt**, auf dem alle Händler für alle stehen. Die Winterpause wird damit ein eigener Status mit
+Halbzeitbericht, Markt, Abstimmung zur Regel der Saison und Erholung. Sicherungen: gleicher Reihum-Plan für Mensch und KI
+aus der Saat des Spielstands, drei Angebote je Besuch, höchstens ein Kauf je Woche, nur Standard bis Episch für Geld
+(Legendäres bleibt Beute), Zahlung aus dem Investitionstopf unter der Vorstands-Freigabe. Variante A empfehle ich nicht:
+sie macht aus Geld direkt Stärke und nimmt der Woche den Anlass.
+
+**Transferfenster in der Winterpause:** wäre der stärkste Hebel für Comebacks, widerspricht aber der Entscheidung vom
+18.11. (kein Handel in der Saison). Wenn überhaupt, dann klein: ein Zugang und ein Abgang je Team. Offene Frage.
+
+## 16. Rückmeldung: Gegnerspalte und Rennen neu
+
+- **Deine Entscheidungen mit Gegner:** jede Zeile des Wasserfalls hat rechts die Zahl des Gegners (Grundwert, Karte,
+  Einsatzstufe, Captain, Form und Moral, Erschöpfung, Vorhersage, Spielverlauf, gespielt). Große Hebel des Gegners sind
+  hell hinterlegt, der Satz darunter nennt den Grund („Lost Kingdom hat im Schach Vollgas und den Captain gesetzt“).
+  Quelle: dieselbe Buchung der Gegenseite; nach dem Spieltag ist das alles öffentlich, vorher nichts davon.
+- **Rennen neu:** statt einer Balkentabelle eine Seite je Rennen mit vier Tafeln: **Wie es so weit kam** (Abstand zur
+  Linie über die Spieltage, zwei markierte Wendepunkte, ein Absatz Geschichte aus Regeln), **Wenn, dann** (drei gerechnete
+  Szenarien: eigener Sieg, eigene Niederlage, Direktduell der Verfolger; Punktestände statt geschätzter Chancen),
+  **Die entscheidenden Spieltage** (Restprogramm der Teams im Rennen, Farbe nach Kaderstärke in den zwei Disziplinen gegen
+  diesen Gegner, Direktduelle hervorgehoben), **Direktvergleich** mit dem nächsten Rivalen (Punkte, Serie, Hinspiel, Rang
+  der Kaderstärke in den verbleibenden Disziplinen). Die Balkentabelle bleibt als Reiter „Tabelle“.
+
+## 17. Baustein B16: Entscheidungen im Spiel (Zuruf)
+
+Chris: im Spieltag kleine Entscheidungen, die das Verhalten der eigenen Spieler ändern; bei zwanzig Disziplinen nicht so
+leicht wie im Football Manager.
+
+**Modell: drei Haltungen, die jede Disziplin anders übersetzt.**
+
+| Haltung | Bedeutung überall | Wirkung (Startwert) |
+|---|---|---|
+| **Druck** | mehr wagen | Streuung des Ergebnisses +15 %, Erschöpfung +10 % |
+| **Kontrolle** | sicher spielen | Streuung −15 % |
+| **Kräfte sparen** | haushalten | Leistung −2 %, Erschöpfung −20 %, Verletzungsrisiko −25 % |
+
+Beispiele der Übersetzung: Hockey (viele Schüsse und Forechecking / Scheibe halten / kurze Wechsel), Climbing
+(Risiko-Route / sichere Route / Pausen an den Griffen), Speed-Schach (scharfe Eröffnung / solide Stellung / schnelle
+Remis-Angebote), Gewichtheben (höheres Gewicht ansagen / sicheres Gewicht / einen Versuch auslassen), Staffel (früh
+attackieren / Wechsel sicher / Tempo halten), Showcase (schwierige Nummer / saubere Kür / kürzeres Programm).
+
+**Wann:** jede Disziplin hat drei Abschnitte und damit **zwei Wechselpunkte**. Die Arena ist ein vorgerechneter Lauf;
+ein Anhalten mitten im Spiel würde alle anderen warten lassen und den Vorlauf sprengen. Deshalb zwei Stufen:
+
+- **Stufe 1 (Empfehlung): Spielplan vor dem Spiel.** In der Einsatzliste je Disziplin eine Start-Haltung und bis zu zwei
+  **Wenn-dann-Regeln** aus einer kurzen Liste von Bedingungen (Rückstand, Führung, Führung ab zwei, Spieler ab 65 müde,
+  Captain fällt aus). Der Motor wertet die Regeln an den Wechselpunkten aus; die Arena zeigt den Moment als **Zuruf von
+  der Bank** mit der Regel, die gegriffen hat (Mockup `zuruf`). Fühlt sich wie eine Entscheidung im Spiel an, hält
+  niemanden auf, und drei Vorlagen („Favorit“, „Außenseiter“, „Kräfte sparen“) machen es zu einem Klick.
+- **Stufe 2 (später): echtes Zuruf-Fenster** von wenigen Sekunden mit dem Spielplan als Standardwahl, nur wenn alle
+  Menschen im Raum dasselbe Spiel sehen (Derby, Solo). Braucht einen Motorlauf in drei Teilen und gehört zum
+  Spielabend-Modus.
+
+**Gezeigt = gebucht:** der Spielplan reist wie Format und Formkarten im Kader-Umschlag zu Host, Runner und Node-Motor und
+steht im Eingabe-Hash des Vorlaufs. „Deine Entscheidungen“ bekommt eine Zeile „Haltung“ je Abschnitt.
+
+**Kein bester Knopf:** Druck und Kontrolle verschieben nur die Streuung, nicht den Erwartungswert; Kräfte sparen kostet
+Leistung und zahlt in Kraft. Damit lohnt Druck für den Außenseiter und Kontrolle für den Favoriten, wie im Sport.
+
+**Rangtreue:** mehr Streuung senkt rho. Schranke: je Haltung höchstens 0,01 unter dem Wert ohne, nie unter 0,75; die
+Pp-Abweichung muss gleich bleiben (die Haltung hängt an keinem Attribut). Messung mit
+`scripts/miss-alle-disziplinen.mjs` je Haltung, eigene Fingerabdruck-Zeilen außerhalb von GESAMT; ohne Spielplan bleibt
+GESAMT unverändert (Standard „Kontrolle ohne Regeln“ = heutiges Verhalten, Streuung ±0).
+
+**KI und Delegation:** Favorit nach Kaderstärke → Kontrolle; Außenseiter → Druck; mittlere Erschöpfung der Aufstellung ab
+55 → Kräfte sparen; Regel „Führung ab zwei → Kräfte sparen“ immer. Deterministisch, eine Tabelle. Für Ramona
+(Halbautomatik) setzt die KI den Spielplan mit.
+
+**Einordnung:** Säule 2 „Spieltag“, ersetzt den schweren Baustein B11 „Spielweisen“ durch eine leichte, gemeinsame
+Schicht; disziplin-eigene Spielweisen können später darauf aufsetzen. **Aufwand:** L insgesamt (zwanzig Übersetzungen im
+Motor), deshalb in Scheiben: zuerst je ein Pilot pro Chassis (Feldspiel, Bahn, Bühne, Arena), dann der Rest.
+**Abhängig von:** „Deine Entscheidungen“ (Rückmeldung), Opus-Review je Chassis. **Last:** ein paar Byte je Aufstellung,
+kein zusätzlicher Motorlauf in Stufe 1.
+
+## 18. Offene Fragen (Runde 3)
+
+1. **Plätze je Spieler:** fünf (Kopf, Körper, Hände, Füße, Verbrauch) wie im Mockup, oder weniger, damit ein einzelner
+   Spieler nicht zu weit über seine Eignung wächst?
+2. **Händler:** fahrende Händler unter der Saison plus Markt in der Winterpause, wie empfohlen?
+3. **Winterpause mit kleinem Transferfenster** (ein Zugang, ein Abgang), oder bleibt es bei „kein Handel in der Saison“?
+4. **Zuruf Stufe 1** (Spielplan mit Wenn-dann vor dem Spiel) als Start, das echte Fenster erst mit dem Spielabend-Modus?
+5. **Lagen mit Antworttyp „Risiko“** (sichtbarer möglicher Nachteil am nächsten Spieltag): gewollt, oder sollen alle
+   Folgen fest sein?
+
+---
+
+# Runde 4 (22.11.): Regel-Abstimmungen, Schranke, Verteilungsziele
+
+## 19. Baustein B17: Regel-Abstimmungen auf Zeit
+
+Chris: „Regeländerungen, wenn es Votes gibt für Verteilung der Punkte, Blockieren von irgendwas usw. … Erlaubt, wenn es
+nicht permanent im Code ist, sondern immer vorübergehend für max. eine Season oder nur wenige Spieltage.“ Das **ersetzt**
+Uhrwerk 2 aus Abschnitt 10: es gibt keine bleibende „Regel der Saison“, nur **befristete Regeln als Stempel**.
+
+**Ablauf.**
+1. **Zwei Abstimmungen je Saison:** vor Spieltag 1 (gilt für die Hinrunde oder die ganze Saison) und in der Winterpause
+   (gilt für die Rückrunde oder wenige Spieltage). Die Liga legt aus dem Katalog **zwei Vorschläge plus „alles bleibt“**
+   vor, gezogen aus der Saat des Spielstands und passend zur Lage (Wirtschaftsstufe, Trend).
+2. **Alle 32 Teams stimmen ab,** jedes mit einer Stimme, verdeckt, einfache Mehrheit; bei Gleichstand bleibt alles.
+3. **KI stimmt nach Eigeninteresse:** je Vorschlag eine feste Nutzenformel aus Größen, die das Team schon hat
+   (Kaderstärke nach Achse, Kaderbreite, Kasse zur Rücklage, Tabellenlage, Bestand an Ausrüstung und Formkarten). Größter
+   Nutzen gewinnt, Gleichstand → „alles bleibt“. Deterministisch, keine Simulation.
+4. **Menschen:** eine Stimme wie jedes Team, in der Woche bzw. im Halbzeitbericht. Vor der Abgabe sieht man, wem der
+   Vorschlag nützt (eigene Formel, in Worten) und die Stimmung der Liga als grobe Tendenz, nicht das Ergebnis. Wer nicht
+   abstimmt oder delegiert hat, bekommt die KI-Stimme. Das Ergebnis kommt als Meldung mit Stimmenzahl; die Stimmen der
+   Mitspieler sind danach sichtbar.
+5. **Ablauf der Frist:** die Regel endet von selbst. Dieselbe Regel kann frühestens in der übernächsten Abstimmung wieder
+   vorgeschlagen werden.
+
+**Katalog befristeter Regeln (Skizze, rund 18).**
+
+| Gruppe | Regel | Dauer | Berührt die Wertung? |
+|---|---|---|---|
+| Punkte | Sieg zählt 3 statt 2 (Remis bleibt 1) | Halbserie | nein, nur die Tabellenbuchung |
+| Punkte | Doppelpunkte-Spieltag (ein vorher benannter Spieltag) | 1 Spieltag | nein |
+| Punkte | Vierergruppe 3-2-1-0 statt 2-1-0-0 | Halbserie | nein |
+| Punkte | Bonuspunkt für einen Kantersieg (10 : 0 bis 9 : 2) | wenige Spieltage | nein |
+| Blockieren | Kartenruhe: keine Formkarten | 2–3 Spieltage | nein, Eingabe |
+| Blockieren | Materialkontrolle: epische und legendäre Ausrüstung gesperrt | 3–5 Spieltage | nein, Eingabe |
+| Blockieren | Vollgas-Verbot oder höchstens eine Disziplin Vollgas je Spieltag | wenige Spieltage | nein, Eingabe |
+| Blockieren | Captain-Pause | 2 Spieltage | nein, Eingabe |
+| Kader | Rotationspflicht: niemand in beiden Disziplinen eines Spieltags | wenige Spieltage | nein, Eingabe |
+| Kader | Einsatzgrenze: höchstens N Einsätze je Spieler in der Halbserie | Halbserie | nein, Eingabe |
+| Belastung | Schonfrist: Verletzungsrisiko halbiert | wenige Spieltage | nein (Belastung) |
+| Belastung | Harte Wochen: Erholung −20 %, dafür Prämien +20 % | wenige Spieltage | nein |
+| Belastung | Zweite Pause (zusätzlicher Ruhe-Spieltag nach Spieltag 15) | einmalig | nein |
+| Geld | Prämientopf: Sieger eines Spieltags bekommt Bonus aus Umlage | Halbserie | nein |
+| Geld | Gehaltsbremse: Verlängerungen höchstens +10 % | Saison | nein |
+| Geld | Solidaritätsfonds: die unteren vier bekommen je Spieltag Zuschuss | Halbserie | nein |
+| Format | Format-Variante einer Disziplin (z. B. Climbing Standard statt Canyon) | Halbserie | **ja**, nur vorhandene, abgenommene Formate |
+| Format | Trend-Disziplin: doppelter Ruhm und Prämie in einer Disziplin | Halbserie | nein |
+
+**Keine dauerhafte Code-Änderung.** Jede Regel ist ein Eintrag im Katalog mit Parametern und ein **Stempel im
+Spielstand**: `seasonState.ligaRegeln = [{ id, parameter, vonSpieltag, bisSpieltag, stimmen }]`, nach dem Muster von
+`wertungsSkalen`, `climbingFormat` und `battlefieldFormat`. Jeder Rechenweg fragt „welche Regel gilt an diesem
+Spieltag“, nie eine Prozess-Variable. Gebuchte Spieltage behalten ihre Regel (Replay rechnet mit dem Stempel), ein
+Notschalter je Regel-ID nimmt eine Regel ab dem nächsten Spieltag aus dem Spiel. Fällt der Katalogeintrag weg, bleibt der
+Standard übrig: das ist der Rückweg.
+
+**Gezeigt = gebucht.** Die geltenden Regeln stehen als Band auf Startseite, Einsatzliste und Arena („Kartenruhe · noch 2
+Spieltage“) und in „Deine Entscheidungen“. Punkteregeln wirken nur in der Tabellenbuchung; die Arena-Wertung und der
+Fingerabdruck bleiben unberührt. Format-Regeln nutzen ausschließlich Formate, die schon abgenommen sind und eigene
+Fingerabdruck-Zeilen haben.
+
+**Balance und Abnahme.** Je Regel ein Messlauf mit 32 KI-Teams: die Regel darf die Endplatzierung im Mittel um höchstens
+einen Platz verschieben und keinem Kaderprofil dauerhaft nützen; über fünf Saisons soll jede Regelgruppe einmal gewinnen.
+**Aufwand:** Abstimmung und Stempel M; je Regel S (Eingabe- und Punkteregeln) bis M (Format). **Last:** wenige Byte je
+Regel, 32 Stimmen je Abstimmung. **Mehrspieler:** die Abstimmung ist ein gemeinsamer Moment zu dritt; drei von 32 Stimmen
+entscheiden selten allein, deshalb lohnt das Werben. Schreibweg hinter `authorizeServerRoomWrite`.
+
+## 20. Rangtreue: die Schranke gilt für die Mechanik
+
+Chris: die Schranke 0,75 gilt **nur gegen die reine Eignung, für die Mechanik ohne On-top-Effekte**. Form, Moral,
+Formkarten, Ausrüstung und Zurufe zählen nicht dagegen: „da sind Spieler einfach gut drauf, haben bessere Ausrüstung etc.
+Das MUSS sich ja sogar auswirken, dass Schwächere besser sein könnten.“
+
+Damit gilt, und ersetzt die Abnahmevorschläge in den Abschnitten 3, 14 und 17:
+
+- **Abnahme = Mechanik ohne On-top gegen 0,75** (Ziel über 0,80), gemessen wie heute mit ausgeschalteter Ausrüstung, ohne
+  Zuruf, ohne Formkarten. Der Fingerabdruck GESAMT bleibt in diesem Zustand unverändert.
+- **On-top-Effekte werden gemessen und gezeigt, aber nicht gegen die Schranke geprüft.** Die „Menge im Umlauf“ ist keine
+  Abnahmebedingung mehr, nur noch eine **Balance-Empfehlung**: Ausrüstung soll Spiele kippen können, aber nicht jede
+  Tabelle bestimmen. Richtwert zum Beobachten, kein Zwang: in einer Saison mit 32 KI-Teams entscheidet Ausrüstung
+  höchstens etwa jedes sechste Duell anders, als es ohne ausgegangen wäre.
+- **Pflicht bleibt, dass on top sichtbar ist** (gezeigt = gebucht): eine Zeile je Effekt in der Einsatzliste und in
+  „Deine Entscheidungen“, bei beiden Seiten.
+- Die Pp-Pflichtprüfung (≤ 25) bleibt für die Mechanik ohne On-top bestehen.
+
+Offene Frage 1 aus Abschnitt 6 und die rho-Schranke je Haltung aus Abschnitt 17 sind damit erledigt.
+
+## 21. Kader: Verteilungsziele für Entwicklung, und Training gegen Leistung
+
+Chris: nur wenige Spieler sollen sich stark verbessern und wenige stark verschlechtern, die Masse kaum. Und zwischen
+Trainingspunkten (SP) und Leistung in PP muss ein gesundes Verhältnis bestehen: wer spielt und leistet, entwickelt sich
+plausibel; Training ersetzt nicht Leistung und umgekehrt. Das schärft Abschnitt 7.
+
+**Verteilungsziel je Saison** (Netto-Summe aller zwölf Attribute je Kaderspieler; Startwerte, an einem Messlauf zu eichen):
+
+| Gruppe | Änderung | Anteil der Spieler |
+|---|---|---:|
+| stark verbessert | +6 und mehr | 5–8 % |
+| leicht verbessert | +2 bis +5 | 15–20 % |
+| kaum verändert | −1 bis +1 | 50–60 % |
+| leicht verschlechtert | −2 bis −5 | 15–20 % |
+| stark verschlechtert | −6 und weniger | 5–8 % |
+
+Dazu: Liga-Mittel zwischen −1 und +1, Median 0, im Schlüsselattribut höchstens +3 je Saison außer bei den „stark
+verbessert“. Heute liegt das Liga-Mittel bei +6,8 und der Median des Schwerpunkt-Attributs bei +2,4: fast alle legen zu.
+
+**Zwei Quellen, die sich brauchen.**
+- **SP (Training)** bestimmen, **wohin** ein Spieler wächst: Ziel-Disziplin und Weg, wie gebaut.
+- **PP (Leistung)** bestimmen, **wie viel davon ankommt**: ein Faktor auf den Trainingsertrag der Saison aus den PP je
+  Einsatz gegen den Liga-Median der Rolle. Startwert: von 0,6 (kaum gespielt oder weit unter Median) bis 1,4 (regelmäßig
+  deutlich darüber). Ohne Training kommt auch mit vielen PP nichts an; ohne Einsätze kommt vom Training nur gut die
+  Hälfte an.
+- PP aus On-top-Effekten zählen dabei nicht doppelt: maßgeblich ist die Leistung gegen die **Erwartung mit Ausrüstung**,
+  sonst kauft Ausrüstung Entwicklung.
+
+**Abnahme „gesundes Verhältnis“** (derselbe Fünf-Saisons-Lauf wie in Abschnitt 7):
+1. Die Verteilung trifft die Tabelle oben in jeder der fünf Saisons.
+2. Unter den „stark verbessert“ haben mindestens 80 % **beides**: Trainingsziel gehalten und PP je Einsatz über dem Median.
+3. Anteil des Zuwachses, der allein durch SP erklärt wird, und Anteil allein durch PP: je höchstens 60 % (keine Quelle
+   dominiert); gemessen als Rangkorrelation Zuwachs gegen SP und Zuwachs gegen PP, beide zwischen 0,3 und 0,7.
+4. Ein Bankspieler mit hartem Training und ohne Einsätze landet in „kaum verändert“ oder „leicht verbessert“, nie in
+   „stark verbessert“. Ein Stammspieler ohne Trainingsziel ebenso.
+5. Die Zahl der „stark verschlechtert“ kommt überwiegend aus den Auslösern (kaum Einsätze, lange verletzt, überlastet),
+   nicht aus dem Zufallsrest: mindestens 70 %.
+
+**Sicht:** im Profil neben der Karrierekurve zwei Balken je Saison, „Training“ und „Leistung“, und ein Satz („viel
+trainiert, wenig gespielt: der Ertrag blieb bei 60 %“). **KI:** unverändert; sie profitiert automatisch, weil sie
+Stammspieler trainiert. **Aufwand:** S zusätzlich zu Abschnitt 7 (ein Faktor in der Saisonend-Progression und die
+Auswertung im Messskript). Die Skala der PP (bester Spieler um 5 je Disziplin) bleibt unberührt.
+
+## 22. Entschieden in dieser Runde
+
+- **Liga:** 2 × 16 bleibt.
+- **Regeln:** nur befristet, als Stempel (Abschnitt 19).
+- **Schranke 0,75:** nur für die Mechanik ohne On-top (Abschnitt 20).
+- Die offenen Fragen zu Teil A (drittes Rennen, Gegenprobe, Sicht auf Mitspieler) sind entschieden, siehe
+  `spieltag-entscheidungen-rennen-22-11.md`.
+
+**Offen bleiben** die fünf Fragen aus Abschnitt 18 und aus Abschnitt 13 die Fragen 1 (Korridor des Liga-Mittels), 3
+(Identität), 4 (Personal) und 5 (Stilprobe Kiste).
