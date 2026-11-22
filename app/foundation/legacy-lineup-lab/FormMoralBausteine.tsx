@@ -223,7 +223,7 @@ export function KartenLeiste({ w }: { w: KartenWirkung }) {
             <b className="t" style={{ color: FORM_HEX[k.farbe] }}>{vz(k.wert, 0)}</b>
             <span>{FARB_NAME[k.farbe] ?? k.farbe}</span>
             <small className="fm-leise">{k.spielerName}</small>
-            <small className={k.passt ? "bc-plus" : "fm-leise"}>{k.passt ? "passt" : "fremd ½"}</small>
+            <small className={k.passt ? "bc-plus" : "fm-leise"}>{k.passt ? "passt" : "andere Farbe ½"}</small>
           </span>
         ))}
       </div>
@@ -302,7 +302,7 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
             <div key={v.id} className={`fm-vergleich__zeile${v.gewaehlt ? " is-gelegt" : ""}`}>
               <b className="t" style={{ color: FORM_HEX[v.farbe] }}>{vz(v.wert, 0)}</b>
               <span>{FARB_NAME[v.farbe] ?? v.farbe} · {v.spielerName}</span>
-              <small className={v.passt ? "bc-plus" : "fm-leise"}>{v.passt ? "passt" : "fremd ½"}</small>
+              <small className={v.passt ? "bc-plus" : "fm-leise"}>{v.passt ? "passt" : "andere Farbe ½"}</small>
               <b className="t">{vz(v.teamSumme)}</b>
             </div>
           ))}

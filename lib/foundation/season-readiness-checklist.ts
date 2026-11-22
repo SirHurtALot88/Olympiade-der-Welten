@@ -180,7 +180,7 @@ function buildPreseasonItems(gameState: GameState, teamId: string): SeasonReadin
     },
     {
       id: "facilities",
-      label: "Facilities prüfen",
+      label: "Gebäude prüfen",
       detail: "Gebäude und Scouting für die neue Saison checken.",
       status: "open",
       targetView: "trainingV2",

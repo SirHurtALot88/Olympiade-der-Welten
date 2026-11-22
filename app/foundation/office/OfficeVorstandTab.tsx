@@ -68,7 +68,7 @@ function Bogen({ wert }: { wert: number | null }) {
 
 function Zielkarte({ z, m }: { z: OfficeZiel; m: OfficeModell }) {
   const farbe =
-    z.status === "completed" ? "var(--bc-gut)" : z.status === "failed" ? "var(--bc-warn)" : z.status === "at_risk" ? "var(--bc-acht)" : "var(--bc-gut)";
+    z.anzeigeStatus === "completed" ? "var(--bc-gut)" : z.anzeigeStatus === "failed" ? "var(--bc-warn)" : z.anzeigeStatus === "at_risk" ? "var(--bc-acht)" : "var(--bc-gut)";
   const liebling = z.id === "board-lieblingsspieler" ? m.liebling : null;
   const laufzeit = z.id === "board-vertragslaufzeiten" ? m.vertraege : null;
   return (
@@ -81,7 +81,7 @@ function Zielkarte({ z, m }: { z: OfficeZiel; m: OfficeModell }) {
         <span className="off-marken">
           {z.neu ? <i className="is-neu">NEU</i> : null}
           <i className={z.mehrjaehrig ? "is-lang" : ""}>{z.laufzeitText}</i>
-          <i className={`is-st-${z.status}`}>{STATUS_TEXT[z.status]}</i>
+          <i className={`is-st-${z.anzeigeStatus}`} title={z.kursGrund}>{STATUS_TEXT[z.anzeigeStatus]}</i>
         </span>
       </div>
       <h3 className="off-ziel__titel">{z.label}</h3>
@@ -176,7 +176,7 @@ export function OfficeVorstandTab({
   ];
   const teileSumme = Math.max(0.01, teile.reduce((a, t) => a + t[0], 0));
   const sichtbar = m.ziele;
-  const aufKurs = sichtbar.filter((z) => z.status === "completed" || z.status === "open").length;
+  const aufKurs = sichtbar.filter((z) => z.anzeigeStatus === "completed" || z.anzeigeStatus === "open").length;
   const naechsteStufe = m.vertrauen != null ? stufeFuerVertrauen(Math.max(1, Math.min(10, m.vertrauen + m.hochrechnung.vertrauen))) : null;
   const paare = new Set<string>();
   for (let i = 0; i < sichtbar.length; i += 1) {
@@ -232,12 +232,12 @@ export function OfficeVorstandTab({
         <ul className="off-liste">
           {sichtbar.length === 0 ? <li className="off-leer">Noch keine Ziele vergeben.</li> : null}
           {sichtbar.slice(0, 7).map((z) => {
-            const delta = z.status === "failed" ? -z.minus : z.status === "completed" ? z.plus : 0;
+            const delta = z.anzeigeStatus === "failed" ? -z.minus : z.anzeigeStatus === "completed" ? z.plus : 0;
             return (
               <li key={z.id}>
-                <span className="off-liste__s">{STATUS_TEXT[z.status]}</span>
+                <span className="off-liste__s" title={z.kursGrund}>{STATUS_TEXT[z.anzeigeStatus]}</span>
                 <span className="off-liste__t">{z.label}</span>
-                <b className={`bc-t ${vzKlasse(delta)}`}>{z.status === "open" || z.status === "at_risk" ? "offen" : vz(delta)}</b>
+                <b className={`bc-t ${vzKlasse(delta)}`}>{z.anzeigeStatus === "open" || z.anzeigeStatus === "at_risk" ? "offen" : vz(delta)}</b>
               </li>
             );
           })}
@@ -298,7 +298,7 @@ export function OfficeVorstandTab({
           <ul className="off-liste">
             {sichtbar.slice(6).map((z) => (
               <li key={z.id}>
-                <span className="off-liste__s">{STATUS_TEXT[z.status]}</span>
+                <span className="off-liste__s" title={z.kursGrund}>{STATUS_TEXT[z.anzeigeStatus]}</span>
                 <span className="off-liste__t">{z.label}</span>
               </li>
             ))}

@@ -1041,7 +1041,7 @@ function NlLineupResolveShow({
                     {card.ready ? (
                       <NlDeltaChip value={card.value ?? 0} format={(n) => `${n > 0 ? "+" : ""}${formatNlNumber(n, 1)}`} />
                     ) : (
-                      <span className="nl-lineup-show-formcard-hint">Reveal folgt in der Arena</span>
+                      <span className="nl-lineup-show-formcard-hint">Die Auflösung folgt in der Arena</span>
                     )}
                   </li>
                 ))}
@@ -1078,7 +1078,7 @@ function NlLineupResolveShow({
                   Zur Arena →
                 </button>
               ) : (
-                <span className="nl-lineup-show-final-hint">Der echte Reveal (Form, Mutatoren, Ränge) läuft in der Arena.</span>
+                <span className="nl-lineup-show-final-hint">Die echte Auflösung (Form, Mutatoren, Ränge) läuft in der Arena.</span>
               )}
             </div>
           ) : null}

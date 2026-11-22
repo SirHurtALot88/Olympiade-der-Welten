@@ -60,7 +60,7 @@ export function formkartenBuchung(gameState: GameState | null | undefined, disci
   if (isBattleModeSave(gameState) && wirdAusMotorGebucht(disciplineId) && !nutztEchteFormkarten(disciplineId)) {
     return {
       gebucht: false,
-      grund: "In dieser Arena-Disziplin zählt die gespielte Karte noch nicht — der Motor nimmt eine Ersatzkarte. Die Punkte hier sind kein Versprechen.",
+      grund: "In dieser Arena-Disziplin zählt die gespielte Karte noch nicht — es wird eine Ersatzkarte gewertet. Die Punkte hier sind kein Versprechen.",
     };
   }
   return { gebucht: true, grund: null };
@@ -258,5 +258,5 @@ export function kartenEffektText(
   const e = kartenEffekt(card, disziplinFarbe, regeln);
   const vz = (x: number) => `${x > 0 ? "+" : ""}${Number(x.toFixed(1))}`;
   if (!e.regelNeu) return e.passt ? " · x2" : "";
-  return ` · ${e.passt ? "passt" : "fremd"}: ${vz(e.alle)} alle, ${vz(e.traegerZusatz)} extra für ${farbKurz(card?.color)}-Spieler`;
+  return ` · ${e.passt ? "passt" : "andere Farbe"}: ${vz(e.alle)} alle, ${vz(e.traegerZusatz)} extra für ${farbKurz(card?.color)}-Spieler`;
 }

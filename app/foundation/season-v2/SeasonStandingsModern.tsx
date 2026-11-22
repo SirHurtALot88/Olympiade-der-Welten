@@ -1078,7 +1078,16 @@ export default function SeasonStandingsModern(props: SeasonStandingsModernProps)
     : [];
 
   const lage = eigene ? lagesatz(eigene, ligaDerZeile(eigene)) : null;
-  const titelKampf = titleRace && titleRace.leaderId && titleRace.contenderIds.size > 1 ? `Meisterschaftskampf: ${titleRace.contenderIds.size} Teams im Rennen` : null;
+  // Je Liga gerechnet (`lib/season/title-race.ts`): Titel (Liga 1), Aufstieg (Liga 2), Abstieg (Liga 1).
+  const aufstiegOffen = titleRace?.leagues.find((r) => r.promotion)?.promotion;
+  const abstiegOffen = titleRace?.leagues.find((r) => r.relegation)?.relegation;
+  const zaehle = (m: Map<string, string> | null | undefined, wert: string) => (m ? [...m.values()].filter((v) => v === wert).length : 0);
+  const rennenTeile = [
+    titleRace && titleRace.leaderId && titleRace.contenderIds.size > 1 ? `Meisterschaftskampf: ${titleRace.contenderIds.size} Teams im Rennen` : null,
+    zaehle(aufstiegOffen, "im-rennen") > 0 ? `Aufstieg: ${zaehle(aufstiegOffen, "im-rennen")} Teams im Rennen` : null,
+    zaehle(abstiegOffen, "gefaehrdet") > 0 ? `Abstieg: ${zaehle(abstiegOffen, "gefaehrdet")} Teams in Gefahr` : null,
+  ].filter((t): t is string => t != null);
+  const titelKampf = rennenTeile.length > 0 ? rennenTeile.join(" · ") : null;
 
   const hero = (
     <BcHero

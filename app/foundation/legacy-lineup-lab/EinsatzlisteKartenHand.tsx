@@ -57,7 +57,7 @@ export function EinsatzlisteKartenHand({ w, colorLabel, primaryId, secondaryId, 
           </span>
         ) : (
           <span className="elm-hand__summe" data-testid="fm-leiste-team" title={w.buchung.grund ?? undefined}>
-            <small className="elm-hand__warn">zählt hier noch nicht · der Motor nimmt in dieser Disziplin eine Ersatzkarte</small>
+            <small className="elm-hand__warn">zählt hier noch nicht · in dieser Disziplin wird eine Ersatzkarte gewertet</small>
           </span>
         )}
       </div>
@@ -81,7 +81,7 @@ export function EinsatzlisteKartenHand({ w, colorLabel, primaryId, secondaryId, 
                 onClick={() => klick(k.id, k.wert)}
               >
                 <span className="elm-hka__fa">{FARB_NAME[k.farbe] ?? k.farbe}</span>
-                <span className="elm-hka__pa">{k.passt ? "passt" : "fremd ½"}</span>
+                <span className="elm-hka__pa">{k.passt ? "passt" : "andere Farbe ½"}</span>
                 <strong className="bc-t">{vz(k.wert)}</strong>
                 <span className="elm-hka__vo">{k.spielerName}</span>
                 {nr ? <i className="elm-hka__nr">{nr}</i> : null}

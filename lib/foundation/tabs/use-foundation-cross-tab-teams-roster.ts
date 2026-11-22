@@ -1,3 +1,4 @@
+import { berechneZielKurs, kursZuStatus } from "@/lib/board/ziel-kurs";
 import { useCallback, useMemo } from "react";
 
 import type { TeamDetailDrawerData, TeamDetailDrawerHistoryRow } from "@/lib/foundation/team-detail-drawer-types";
@@ -1239,7 +1240,8 @@ export function useFoundationCrossTabTeamsRoster(input: {
           category: objective.category,
           targetValue: objective.targetValue,
           currentValue: objective.currentValue,
-          status: objective.status,
+          // Anzeige-Kurs statt Rohstatus (Review 22.11.): "verfehlt" erst, wenn rechnerisch nicht mehr erreichbar.
+          status: kursZuStatus(berechneZielKurs(input.gameState, objective).kurs),
         })),
         teamCaptain: teamCaptain
           ? {

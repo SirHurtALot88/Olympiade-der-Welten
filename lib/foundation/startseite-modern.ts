@@ -195,6 +195,12 @@ export type StartseiteDaten = {
   /** Aus dem echten Zustand abgeleitete Entscheidungen (Einsatzliste, Minuskarte, Moral, Verträge). */
   entscheidungen: AbgeleiteteEntscheidung[];
   spielerDesTages: (SpielerEhrung & { formStufe: number | null }) | null;
+  /**
+   * "Das Beste des Spieltags" (Review 22.11., 3.15): der höchste Duellsieg des eigenen Teams im letzten gewerteten
+   * Spieltag (größter Abstand der Ergebnisskala, bei Gleichstand der erste). `null`, wenn kein Duell gewonnen
+   * wurde — dann steht dort nichts Erfundenes, und der Spieler des Tages bleibt allein.
+   */
+  besterDuellsieg: LetzteMeldung | null;
 };
 
 export type StartseiteEingabe = {
@@ -543,8 +549,26 @@ export function baueStartseiteModern(eingabe: StartseiteEingabe): StartseiteDate
     tabellenfuehrer: fuehrer ? { name: fuehrer.name, punkte: fuehrer.punkte } : null,
     einsatz,
     entscheidungen,
+    besterDuellsieg: besterDuellsiegAus(letzterSpieltag?.meldungen),
     spielerDesTages: tagesEhrung ? { ...tagesEhrung, formStufe: formMoral[tagesEhrung.playerId]?.formVerfuegbar ? formMoral[tagesEhrung.playerId]!.formStufe : null } : null,
   };
+}
+
+/** Abstand "eigen : fremd" aus dem Ergebnistext der Ergebnisskala (z. B. "7 : 4" -> 3); ohne Zahlen 0. */
+export function duellAbstand(ergebnis: string | null | undefined): number {
+  const m = /(-?\d+(?:[.,]\d+)?)\s*:\s*(-?\d+(?:[.,]\d+)?)/.exec(ergebnis ?? "");
+  if (!m) return 0;
+  return Number(m[1].replace(",", ".")) - Number(m[2].replace(",", "."));
+}
+
+/** Höchster Duellsieg (2 Punkte) unter den Meldungen des letzten Spieltags; Vierergruppen-Plätze zählen nicht. */
+export function besterDuellsiegAus(meldungen: readonly LetzteMeldung[] | null | undefined): LetzteMeldung | null {
+  let bester: LetzteMeldung | null = null;
+  for (const m of meldungen ?? []) {
+    if (m.punkte < 2 || m.ergebnis == null) continue;
+    if (!bester || duellAbstand(m.ergebnis) > duellAbstand(bester.ergebnis)) bester = m;
+  }
+  return bester;
 }
 
 export const STARTSEITE_LIGA_GROESSE = LEAGUE_SIZE;
