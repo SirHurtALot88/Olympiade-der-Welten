@@ -148,20 +148,30 @@ main{display:grid;grid-template-rows:auto auto minmax(0,1fr);min-width:0;min-hei
 .zl{min-height:0;height:100%}
 .zl .dn{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:.1rem;border-left:.2rem solid var(--c);padding-left:.5rem;height:100%}
 .zl .dn b{display:flex;align-items:center;gap:.3rem;font:400 1.12rem/1 var(--haus);color:#fff;white-space:nowrap}
-.zl .dn b svg{font-size:.9rem} .zl .dn b svg.lieb{color:var(--lieb)} .zl .dn b svg.unlieb{color:var(--unlieb)}
+.zl .dn b .dnn{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.zl .dn b em{font-style:normal;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.zl .dn b em.vb{width:1.5rem;height:1.5rem;border-radius:50%;font-size:.95rem;color:#14101a}
+.zl .dn b em.vb.l{background:var(--lieb);box-shadow:0 0 .5rem rgba(255,127,163,.6)} .zl .dn b em.vb.u{background:var(--unlieb);box-shadow:0 0 .5rem rgba(157,140,255,.6)}
+.zl .dn b em.vx{font:700 .74rem/1 var(--zahl);letter-spacing:.04em;padding:.14rem .3rem;border-radius:.2rem}
+.zl .dn b em.vx.l{color:var(--lieb);border:1px solid var(--lieb)} .zl .dn b em.vx.u{color:var(--unlieb);border:1px solid var(--unlieb)}
+.zl.lieb .dn{border-left-color:var(--lieb)} .zl.unlieb .dn{border-left-color:var(--unlieb)}
 .zl .dn span{font-size:.8rem;color:var(--leise);white-space:nowrap} .zl .dn span b{display:inline;font:600 .86rem/1 var(--zahl);color:var(--creme)}
-.zl.lieb .dn{background:linear-gradient(90deg,rgba(255,127,163,.14),transparent 80%)}
-.zl.unlieb .dn{background:linear-gradient(90deg,rgba(157,140,255,.14),transparent 80%)}
+.zl.lieb .dn{background:linear-gradient(90deg,rgba(255,127,163,.26),transparent 90%)}
+.zl.unlieb .dn{background:linear-gradient(90deg,rgba(157,140,255,.26),transparent 90%)}
 .hz{position:relative;height:100%;min-height:0;border-radius:.35rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.05rem;
   background:color-mix(in srgb,var(--c) calc(var(--t)*1%),#111723);border:1px solid color-mix(in srgb,var(--c) calc(18% + var(--t)*.6%),transparent);color:#fff;text-align:center}
 .hz b{font-size:1.28rem;font-weight:700;line-height:1}
 .hz span{font-size:.68rem;font-weight:600;letter-spacing:.06em;opacity:.85;line-height:1}
 .hz.hell{color:#10141c}
 .hz.kalt b{color:var(--leise)} .hz.kalt span{color:var(--stumm)}
-.hz:hover{outline:2px solid #fff;outline-offset:-2px}
-.hz.an{outline:.19rem solid var(--gold);outline-offset:-1px;box-shadow:0 0 1rem rgba(240,195,90,.55);z-index:2}
-.hz.an::after{content:"Ziel";position:absolute;top:-.5rem;right:-.3rem;font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--gold);color:#17120a;padding:.05rem .3rem;border-radius:.2rem}
-.hz.best::before{content:"";position:absolute;left:.25rem;top:.25rem;width:.42rem;height:.42rem;border-radius:50%;background:#fff;box-shadow:0 0 .4rem #fff}
+.hz:hover{outline:1px dashed rgba(255,255,255,.8);outline-offset:-1px}
+/* R2b: Gewaehlt = weisser Doppelrahmen (eigene Farbe), Beste Zelle = Gold mit Stern. Beides zugleich: aussen weiss, innen gold. */
+.hz.an{outline:.2rem solid #fff;outline-offset:-.2rem;box-shadow:inset 0 0 0 .36rem #0b0e14,0 0 .9rem rgba(255,255,255,.5);z-index:3}
+.hz.best{box-shadow:inset 0 0 0 .17rem var(--gold),0 0 1.1rem rgba(240,195,90,.75);z-index:2}
+.hz.an.best{box-shadow:inset 0 0 0 .2rem #fff,inset 0 0 0 .38rem var(--gold),0 0 1rem rgba(240,195,90,.7);outline:0}
+.hz em{position:absolute;top:-.48rem;font-style:normal;font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:.06rem .32rem;border-radius:.2rem;line-height:1.15;white-space:nowrap;opacity:1}
+.hz em.bm{left:-.25rem;background:var(--gold);color:#17120a;box-shadow:0 0 .5rem rgba(240,195,90,.8)}
+.hz em.gm{right:-.25rem;background:#fff;color:#0b0e14} .hz.best em.gm{top:auto;bottom:-.48rem}
 .hz .dk{position:absolute;left:.2rem;bottom:.12rem;font-size:.56rem;font-weight:700;letter-spacing:.06em;color:var(--warn);opacity:1}
 .hz.hell .dk{color:#7a1410}
 .hmf{flex:none;display:flex;align-items:center;gap:1rem;padding:.45rem .9rem;border-top:1px solid var(--linie);font-size:.84rem;color:var(--leise);white-space:nowrap;overflow:hidden}
@@ -170,7 +180,15 @@ main{display:grid;grid-template-rows:auto auto minmax(0,1fr);min-width:0;min-hei
 .skala i{display:block;width:7rem;height:.6rem;border-radius:.3rem;background:linear-gradient(90deg,#111723,var(--pow))}
 .skala i.s2{background:linear-gradient(90deg,#111723,var(--spe))} .skala i.s3{background:linear-gradient(90deg,#111723,var(--men))} .skala i.s4{background:linear-gradient(90deg,#111723,var(--soc))}
 .skala .st{display:flex;flex-direction:column;gap:.1rem} .skala .st i{width:5rem;height:.22rem}
-.hmf .p{display:inline-flex;align-items:center;gap:.3rem}
+.hmf .p,.hmf .lg{display:inline-flex;align-items:center;gap:.35rem}
+.hmf .lg i{display:inline-block;width:1.15rem;height:.8rem;border-radius:.18rem;background:#1a2230}
+.hmf .lg.b i{box-shadow:inset 0 0 0 .14rem var(--gold),0 0 .4rem rgba(240,195,90,.7)} .hmf .lg.g i{box-shadow:inset 0 0 0 .14rem #fff}
+/* Fortschritt dieser Saison je Attribut */
+.fs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.18rem .7rem}
+.fa{display:grid;grid-template-columns:2rem minmax(0,1fr) 2.2rem;gap:.35rem;align-items:center;font-size:.8rem;line-height:1.15}
+.fa span{font-weight:700;letter-spacing:.06em;color:var(--c)} .fa i{height:.42rem;border-radius:.2rem;background:#1a2230;overflow:hidden;display:block} .fa u{display:block;height:100%;background:var(--c);text-decoration:none}
+.fa b{text-align:right;font-weight:700;color:var(--gut,#62d394)} .fa.nix{opacity:.42} .fa.nix b{color:var(--stumm)}
+.fa.top{outline:1px solid var(--gold);outline-offset:.12rem;border-radius:.2rem} .fa.top b{color:var(--gold)}
 .hmf .p i{width:.5rem;height:.5rem;border-radius:50%;background:#fff;display:inline-block}
 
 /* VORSCHAU */
@@ -273,7 +291,7 @@ main{display:grid;grid-template-rows:auto auto minmax(0,1fr);min-width:0;min-hei
         <span class="lage">Liga 2 · Saison 1 · <b>Spieltag 12 von 20</b> · noch <b>9 Trainings</b> bis Saisonende</span>
       </div>
       <span class="sp"></span>
-      <div class="kpi"><strong class="t" id="k1">–</strong><span>Zuwachs Kader bis Ende</span></div>
+      <div class="kpi"><strong class="t" id="k1">–</strong><span>SP Kader bis Saisonende</span></div>
       <div class="kpi"><strong class="t" id="k2">–</strong><span>trainieren ihren Liebling</span></div>
       <div class="kpi"><strong class="t" id="k3">–</strong><span>trainieren Ungeliebtes</span></div>
       <div class="kpi"><strong class="t" id="k4">–</strong><span>Training ruht (verletzt)</span></div>
@@ -308,7 +326,7 @@ const KLASSE={Berserker:"pow",Warlord:"pow",Tank:"pow",Badass:"pow",Sprinter:"sp
 const SATZ={leicht:.178,mittel:.226,hart:.32}, LAST={leicht:6,mittel:12,hart:22}, MODN={leicht:"Leicht",mittel:"Mittel",hart:"Hart"};
 const ANTEIL=[.6,.25,.15];
 /* VORSCHLAG Trainingsvorlieben: Wirkung auf das Trainingsbudget und die Moral */
-const V_LIEB=1.10, V_UNLIEB=0.80, MORAL_LIEB=3, MORAL_UNLIEB=-6, TENDENZ=0.15;
+const V_LIEB=1.15, V_UNLIEB=0.80, MORAL_LIEB=3, MORAL_UNLIEB=-6, TENDENZ=0.15;
 const VORLIEBEN_AN=Q.get("vorlieben")!=="aus";
 const D=DATEN.D.map(d=>({...d,f:KAT[d.c]}));
 const DI=Object.fromEntries(D.map(d=>[d.id,d]));
@@ -358,28 +376,37 @@ const P=DATEN.P.map(p=>{
   q.neu={...q.ist};
   return q;
 });
+/* BEISPIELWERTE: Fortschritt dieser Saison je Attribut (Spieltag 1 bis 11). Modell: bisheriger Plan (Ziel, Weg, Intensitaet) ueber die
+   gespielten Spieltage, dazu zwei Attribute aus der Leistungs-Haelfte. Im Spiel kommt das aus dem Trainingsverlauf je Spieltag. */
+const GESPIELT=11;
+for(const p of P){
+  const out=Object.fromEntries(ATTR.map(a=>[a,0])), n=p.verl?GESPIELT-2:GESPIELT, b=SATZ[p.ist.mod]*n*vFaktor(p,p.ist.did);
+  for(const e of profil(p.ist.did,p.ist.weg)){const rest=p.ce?p.ce[e.a]-p.a[e.a]:20;out[e.a]+=b*e.anteil*(rest<=.5?.3:rest<=6?.65:1)}
+  const r=[...ATTR].sort((x,y)=>fnv(p.id+":b:"+y)-fnv(p.id+":b:"+x)).slice(0,2);out[r[0]]+=.35+fnv(p.id+":x")*.4;out[r[1]]+=.15+fnv(p.id+":y")*.25;
+  p.bisher=out;p.bisherS=Object.values(out).reduce((a,c)=>a+c,0);
+}
 const WUNSCH={Maru:"mittel","Queen Loriana":"leicht",Zyra:"mittel"};
-let S={sp:Math.max(0,P.findIndex(p=>p.key===(Q.get("spieler")||"maru"))),mass:Q.get("mass")==="luft"?"luft":"zuwachs",nebel:Q.get("nebel")==="1",sort:"reihe"};
+let S={sp:Math.max(0,P.findIndex(p=>p.key===(Q.get("spieler")||"maru"))),mass:["sp","zuwachs","luft"].includes(Q.get("mass"))?Q.get("mass"):"sp",nebel:Q.get("nebel")==="1",sort:"reihe"};
 if(Q.get("still")==="1")document.body.classList.add("still");
 
 function vpille(p,did,art,kurz){const d=DI[did];const akt=p.neu.did===did;
-  return `<span class="vp ${art>0?"l":"u"} c-${d.f}${akt?" akt":""}" data-tip="${art>0?"<b>Lieblingsdisziplin</b><br>Training mit diesem Ziel: Budget ×1,10 und +3 Moral, solange es Ziel ist.":"<b>Ungeliebte Disziplin</b><br>Training mit diesem Ziel: Budget ×0,80 und −6 Moral, solange es Ziel ist."}">${art>0?HERZ:DAUMEN}${d.n}</span>`}
+  return `<span class="vp ${art>0?"l":"u"} c-${d.f}${akt?" akt":""}" data-tip="${art>0?"<b>Lieblingsdisziplin</b><br>Training mit diesem Ziel: Budget ×1,15 und +3 Moral, solange es Ziel ist.":"<b>Ungeliebte Disziplin</b><br>Training mit diesem Ziel: Budget ×0,80 und −6 Moral, solange es Ziel ist."}">${art>0?HERZ:DAUMEN}${d.n}</span>`}
 
 function zeichneKader(){
   const el=$("p-kader");
-  const zeilen=P.map((p,i)=>{const zu=zuwachs(p,p.neu.did,p.neu.weg,p.neu.mod);return {p,i,dz:p.verl&&restST(p)===0?0:eigDelta(zu,p.neu.did)}});
+  const zeilen=P.map((p,i)=>{const zu=zuwachs(p,p.neu.did,p.neu.weg,p.neu.mod);return {p,i,dz:p.verl&&restST(p)===0?0:zu.summe}});
   if(S.sort==="dz")zeilen.sort((a,b)=>b.dz-a.dz);
   if(S.sort==="vor")zeilen.sort((a,b)=>vArt(b.p,b.p.neu.did)-vArt(a.p,a.p.neu.did)||a.p.n.localeCompare(b.p.n));
   el.innerHTML=`<div class="pk"><h2>Kader</h2><small>${P.length} Spieler · Death Peaches</small></div>
-  <div class="kh"><span></span><a data-sort="reihe" class="${S.sort==="reihe"?"an":""}">Spieler</a><span>Ziel · Weg</span><a data-sort="vor" class="${S.sort==="vor"?"an":""}">Vorlieben</a><a data-sort="dz" class="r ${S.sort==="dz"?"an":""}">Δ Eig. ▾</a></div>
+  <div class="kh"><span></span><a data-sort="reihe" class="${S.sort==="reihe"?"an":""}">Spieler</a><span>Ziel · Weg</span><a data-sort="vor" class="${S.sort==="vor"?"an":""}">Vorlieben</a><a data-sort="dz" class="r ${S.sort==="dz"?"an":""}" data-tip="Skillpunkte bis Saisonende mit dem aktuellen Plan.<br>Klein darunter: was er diese Saison schon gesammelt hat.">SP ▾</a></div>
   <div class="kl">${zeilen.map(({p,i,dz})=>{const d=DI[p.neu.did];const pr=profil(p.neu.did,p.neu.weg);const geaendert=p.neu.did!==p.ist.did||p.neu.weg!==p.ist.weg||p.neu.mod!==p.ist.mod;
     return `<a class="kz c-${p.kf}${i===S.sp&&!S.nebel?" an":""}${p.verl?" verl":""}" data-sp="${i}" data-nebel="0">
       <span class="po"><img src="..${p.port}" alt=""></span>
       <span class="nm"><b>${p.n}</b><span>${p.kl} <i>· ${p.verl?"verletzt":MODN[p.neu.mod]}</i></span></span>
       <span class="zi c-${d.f}"><b>${d.n}${geaendert?" •":""}</b><span>${p.neu.weg===0?"Primärweg":"Nebenweg"} ${AK[pr[0].a]}</span></span>
       <span class="vl">${VORLIEBEN_AN?vpille(p,p.v.lieb[0],1)+vpille(p,p.v.lieb[1],1)+vpille(p,p.v.unlieb,-1):'<span class="vp q">Regel aus</span>'}</span>
-      <span class="dz t ${dz>0?"plus":"null"}">${pm(dz)}<small>${p.verl?"ab ST "+p.zurueck:"bis Ende"}</small></span></a>`}).join("")}</div>
-  <div class="kfuss"><b>Vorlieben:</b> ${HERZ} zwei Lieblingsdisziplinen (Budget ×1,10, +3 Moral), ${DAUMEN} eine ungeliebte (×0,80, −6 Moral) – nur wenn sie das Trainingsziel ist. „•“ = offene Änderung.</div>`;
+      <span class="dz t ${dz>0?"plus":"null"}">${pm(dz)}<small>bisher ${pm(p.bisherS,1)}</small></span></a>`}).join("")}</div>
+  <div class="kfuss"><b>Vorlieben:</b> ${HERZ} zwei Lieblingsdisziplinen (Budget ×1,15, +3 Moral), ${DAUMEN} eine ungeliebte (×0,80, −6 Moral) – nur wenn sie das Trainingsziel ist. „•“ = offene Änderung.</div>`;
 }
 
 function zeichneHeat(){
@@ -387,7 +414,7 @@ function zeichneHeat(){
   if(S.nebel){
     const st=[2,2,1,1,0,0,0], sn=["unbekannt","beobachtet","gescoutet"];
     const ber=(v,s)=>s===2?z(v):s===1?`${Math.floor(v/5)*5}–${Math.floor(v/5)*5+5}`:`${Math.floor(v/10)*10}–${Math.floor(v/10)*10+10}`;
-    const zelle=(id,art,sicht)=>sicht?`<span class="fz c-${DI[id].f}"><b>${art>0?HERZ:DAUMEN}${DI[id].n}</b><span>${BAND.find(b=>b[0]===DI[id].f)[1]} · ${art>0?"trainiert ×1,10":"trainiert ×0,80"}</span></span>`:`<span class="fz q"><b>${FRAGE}unbekannt</b><span>${art>0?"Lieblingsdisziplin":"ungeliebte Disziplin"}</span></span>`;
+    const zelle=(id,art,sicht)=>sicht?`<span class="fz c-${DI[id].f}"><b>${art>0?HERZ:DAUMEN}${DI[id].n}</b><span>${BAND.find(b=>b[0]===DI[id].f)[1]} · ${art>0?"trainiert ×1,15":"trainiert ×0,80"}</span></span>`:`<span class="fz q"><b>${FRAGE}unbekannt</b><span>${art>0?"Lieblingsdisziplin":"ungeliebte Disziplin"}</span></span>`;
     el.innerHTML=`<div class="pk"><h2>Cash Creators</h2><small>fremdes Team · Vorlieben unter Scouting-Nebel</small><span class="sp"></span><div class="seg"><a data-nebel="0">Mein Spieler</a><a class="an">Fremdes Team</a></div></div>
     <div class="fh"><span></span><span>Spieler</span><span>Scouting</span><span>Liebling 1</span><span>Liebling 2</span><span>Ungeliebt</span><span class="r">Beste Disziplin</span></div>
     <div class="fl">${DATEN.F.map((f,i)=>{const v=vorlieben({id:f.id,kl:f.kl,e:f.e});const kf=KLASSE[f.kl]||"bal";const s=st[i];const bd=[...D].sort((a,b)=>f.e[b.id]-f.e[a.id])[0];
@@ -397,25 +424,29 @@ function zeichneHeat(){
   const mod=p.neu.mod;
   const zellen={}; let max=0, min=1e9, best=null;
   for(const d of D)for(let w=0;w<3;w++){
-    const zu=zuwachs(p,d.id,w,mod); const v=S.mass==="luft"?Math.max(0,(p.ce?p.ce[profil(d.id,w)[0].a]:99)-p.a[profil(d.id,w)[0].a]):eigDelta(zu,d.id);
-    zellen[d.id+w]={v,zu}; if(v>max){max=v;best=d.id+w} if(v<min)min=v;
+    const zu=zuwachs(p,d.id,w,mod); const eg=eigDelta(zu,d.id); const v=S.mass==="luft"?Math.max(0,(p.ce?p.ce[profil(d.id,w)[0].a]:99)-p.a[profil(d.id,w)[0].a]):S.mass==="sp"?zu.summe:eg;
+    /* beste Zelle: groesster Wert; bei gleichen Skillpunkten entscheidet der Eignungszuwachs */
+    zellen[d.id+w]={v,zu,eg}; if(v>max+1e-9||(Math.abs(v-max)<1e-9&&best&&eg>zellen[best].eg)){max=v;best=d.id+w} if(v<min)min=v;
   }
+  if(!best)best=D[0].id+"0";
+  const MT={sp:"Skillpunkte bis Saisonende",zuwachs:"Eignungszuwachs bis Saisonende",luft:"Luft bis zur Decke"}[S.mass];
+  const fm=v=>S.mass==="luft"?z(v,0):pm(v), bz=zellen[best], bd=DI[best.slice(0,-1)];
   const kf=p.kf;
-  el.innerHTML=`<div class="pk"><h2><b>1</b>Ziel und Weg</h2><small>${p.n}: ${S.mass==="luft"?"Luft des Weg-Attributs bis zur Decke":"Eignungszuwachs im Ziel bis Saisonende"} · Intensität ${MODN[mod]}</small><span class="sp"></span>
-    <div class="seg"><a data-mass="zuwachs" class="${S.mass==="zuwachs"?"an":""}">Zuwachs</a><a data-mass="luft" class="${S.mass==="luft"?"an":""}">Luft bis Decke</a></div><div class="seg"><a class="an">Mein Spieler</a><a data-nebel="1">Fremdes Team</a></div></div>
+  el.innerHTML=`<div class="pk"><h2><b>1</b>Ziel und Weg</h2><small>${p.n} · ${MT} · ${MODN[mod]}</small><span class="sp"></span>
+    <div class="seg"><a data-mass="sp" class="${S.mass==="sp"?"an":""}" data-tip="<b>Standard.</b> Summe der Skillpunkte über alle drei Attribute des Wegs bis Saisonende. Mit dieser Zahl rechnen Vorschau und Kaderliste.">Skillpunkte</a><a data-mass="zuwachs" class="${S.mass==="zuwachs"?"an":""}">Eignung</a><a data-mass="luft" class="${S.mass==="luft"?"an":""}">Luft bis Decke</a></div><div class="seg"><a class="an">Mein Spieler</a><a data-nebel="1">Fremdes Team</a></div></div>
   <div class="hm">${BAND.map(([f,k,n])=>{
     const ds=D.filter(d=>d.f===f).sort((a,b)=>Math.max(...[0,1,2].map(w=>zellen[b.id+w].v))-Math.max(...[0,1,2].map(w=>zellen[a.id+w].v)));
     let bb=null,bv=-1; for(const d of ds)for(let w=0;w<3;w++)if(zellen[d.id+w].v>bv){bv=zellen[d.id+w].v;bb=d}
-    return `<div class="band c-${f}"><div class="bk"><span class="ic">${ICON[f]}</span><h3>${k}<small>${n}</small></h3>${kf===f?'<span class="kf">Klassenfarbe</span>':kf!=="bal"&&GEGEN[kf]===f?'<span class="kf" style="background:transparent;color:var(--leise);border:1px solid var(--linie-2)">Gegenfarbe</span>':""}<span class="sp"></span><span class="best">am meisten: <b class="t">${S.mass==="luft"?z(bv,0):pm(bv)}</b> ${bb.n}</span></div>
+    return `<div class="band c-${f}"><div class="bk"><span class="ic">${ICON[f]}</span><h3>${k}<small>${n}</small></h3>${kf===f?'<span class="kf">Klassenfarbe</span>':kf!=="bal"&&GEGEN[kf]===f?'<span class="kf" style="background:transparent;color:var(--leise);border:1px solid var(--linie-2)">Gegenfarbe</span>':""}<span class="sp"></span><span class="best">am meisten: <b class="t">${fm(bv)}</b> ${bb.n}</span></div>
       <div class="sph"><span>Disziplin · Eignung · Rang Liga</span><span>Primärweg</span><span>Nebenweg</span><span>Nebenweg</span></div>
       <div class="zln">${ds.map(d=>{const va=vArt(p,d.id);
-        return `<div class="zl${va>0?" lieb":va<0?" unlieb":""}"><span class="dn" ${va?`data-tip="${va>0?"<b>Lieblingsdisziplin</b> von "+p.n+"<br>Budget ×1,10 · +3 Moral":"<b>Ungeliebte Disziplin</b> von "+p.n+"<br>Budget ×0,80 · −6 Moral"}"`:""}><b>${d.n}${va>0?HERZ:va<0?DAUMEN:""}</b><span><b class="t">${z(p.e[d.id])}</b> · Rang <b class="t">${p.rg[d.id]}</b>/${DATEN.ligaN}</span></span>
+        return `<div class="zl${va>0?" lieb":va<0?" unlieb":""}"><span class="dn" ${va?`data-tip="${va>0?"<b>Lieblingsdisziplin</b> von "+p.n+"<br>Budget ×1,15 · +3 Moral":"<b>Ungeliebte Disziplin</b> von "+p.n+"<br>Budget ×0,80 · −6 Moral"}"`:""}><b>${va?`<em class="vb ${va>0?"l":"u"}">${va>0?HERZ:DAUMEN}</em>`:""}<span class="dnn">${d.n}</span>${va?`<em class="vx ${va>0?"l":"u"}">${va>0?"×1,15":"×0,80"}</em>`:""}</b><span><b class="t">${z(p.e[d.id])}</b> · Rang <b class="t">${p.rg[d.id]}</b>/${DATEN.ligaN}</span></span>
         ${[0,1,2].map(w=>{const c=zellen[d.id+w],pr=profil(d.id,w),t=max>min?Math.pow((c.v-min)/(max-min),1.25):0;const an=p.neu.did===d.id&&p.neu.weg===w;
-          const tip=`<b>${d.n} · ${w===0?"Primärweg":"Nebenweg"} ${AN[pr[0].a]}</b><br>${pr.map(e=>`${AK[e.a]} ${Math.round(e.anteil*100)} % (Matrix ${e.g}) <i>${z(p.a[e.a])} → Decke ${p.ce?p.ce[e.a]:"?"}</i> ${pm(c.zu.att[e.a])}`).join("<br>")}<br>Eignung ${d.n}: ${z(p.e[d.id])} → <b>${z(p.e[d.id]+eigDelta(c.zu,d.id),2)}</b>${va?`<br>${va>0?"Lieblingsdisziplin ×1,10":"Ungeliebt ×0,80"}`:""}${c.zu.brems.length?`<br><i>Decke bremst: ${c.zu.brems.map(a=>AK[a]).join(", ")}</i>`:""}`;
-          return `<a class="hz${t>.62&&(f==="soc"||f==="spe")?" hell":""}${t<.2?" kalt":""}${an?" an":""}${d.id+w===best?" best":""}" style="--t:${(4+t*90).toFixed(1)}" data-z="${d.id}|${w}" data-tip='${tip}'><b class="t">${S.mass==="luft"?z(c.v,0):pm(c.v)}</b><span>${AK[pr[0].a]} 60 %</span>${c.zu.brems.includes(pr[0].a)?'<span class="dk">DECKE</span>':""}</a>`}).join("")}</div>`}).join("")}</div></div>`}).join("")}</div>
-  <div class="hmf"><span class="skala"><span>wenig</span><span class="st"><i></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span><span>viel ${S.mass==="luft"?"Luft":"Zuwachs"}</span></span>
-    <span class="p"><i></i>beste Zelle</span><span>${HERZ} Liebling ×1,10</span><span>${DAUMEN} ungeliebt ×0,80</span><span><b style="color:var(--warn);font-size:.7rem;letter-spacing:.06em">DECKE</b> bremst</span>
-    <span class="sp" style="flex:1"></span><span>Zahl: <b>${S.mass==="luft"?"Punkte bis zur Decke":"Eignung bis Saisonende"}</b></span></div>`;
+          const tip=`<b>${d.n} · ${w===0?"Primärweg":"Nebenweg"} ${AN[pr[0].a]}</b><br>${pr.map(e=>`${AK[e.a]} ${Math.round(e.anteil*100)} % (Matrix ${e.g}) <i>${z(p.a[e.a])} → Decke ${p.ce?p.ce[e.a]:"?"}</i> ${pm(c.zu.att[e.a])}`).join("<br>")}<br><b>Summe ${pm(c.zu.summe)} SP bis Saisonende</b><br>Eignung ${d.n}: ${z(p.e[d.id])} → <b>${z(p.e[d.id]+eigDelta(c.zu,d.id),2)}</b>${va?`<br>${va>0?"Lieblingsdisziplin ×1,15":"Ungeliebt ×0,80"}`:""}${c.zu.brems.length?`<br><i>Decke bremst: ${c.zu.brems.map(a=>AK[a]).join(", ")}</i>`:""}`;
+          return `<a class="hz${t>.62&&(f==="soc"||f==="spe")?" hell":""}${t<.2?" kalt":""}${an?" an":""}${d.id+w===best?" best":""}" style="--t:${(4+t*90).toFixed(1)}" data-z="${d.id}|${w}" data-tip='${tip}'><b class="t">${fm(c.v)}</b><span>${AK[pr[0].a]} 60 %</span>${d.id+w===best?'<em class="bm">★ Beste</em>':""}${an?'<em class="gm">Gewählt</em>':""}${c.zu.brems.includes(pr[0].a)?'<span class="dk">DECKE</span>':""}</a>`}).join("")}</div>`}).join("")}</div></div>`}).join("")}</div>
+  <div class="hmf"><span class="skala"><span>wenig</span><span class="st"><i></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span><span>viel ${S.mass==="luft"?"Luft":S.mass==="sp"?"SP":"Zuwachs"}</span></span>
+    <span class="lg b"><i></i>beste Zelle: <b>${bd.n} ${fm(bz.v)}</b></span><span class="lg g"><i></i>gewählt</span><span>${HERZ} Liebling ×1,15</span><span>${DAUMEN} ungeliebt ×0,80</span><span><b style="color:var(--warn);font-size:.7rem;letter-spacing:.06em">DECKE</b> bremst</span>
+    <span class="sp" style="flex:1"></span><span>Zahl: <b>${S.mass==="luft"?"Punkte bis zur Decke":S.mass==="sp"?"Skillpunkte bis Saisonende":"Eignung bis Saisonende"}</b></span></div>`;
 }
 
 function gesicht(m){const c=m>=80?"#62d394":m>=60?"#a6d36a":m>=40?"#e8c34a":m>=20?"#f08a3c":"#ff5a52";const mund=m>=60?"M8 14.500c1.200 1.600 6.800 1.600 8 0":m>=40?"M8.500 15h7":"M8 16c1.200-1.600 6.800-1.600 8 0";
@@ -424,9 +455,9 @@ function gesicht(m){const c=m>=80?"#62d394":m>=60?"#a6d36a":m>=40?"#e8c34a":m>=2
 function zeichneVor(){
   const el=$("p-vor");
   if(S.nebel){el.innerHTML=`<div class="pk"><h2>Die Regel in Zahlen</h2><small>Vorschlag 22.11.</small></div><div class="vs">
-    <div class="kasten vor"><h4>${HERZ} Zwei Lieblingsdisziplinen</h4><p class="vtx" style="margin:0">Ist eine davon das Trainingsziel: <b class="plus">+10 % Trainingsbudget</b> und <b class="plus">+3 Moral</b>, solange sie Ziel bleibt.</p></div>
+    <div class="kasten vor"><h4>${HERZ} Zwei Lieblingsdisziplinen</h4><p class="vtx" style="margin:0">Ist eine davon das Trainingsziel: <b class="plus">+15 % Trainingsbudget</b> und <b class="plus">+3 Moral</b>, solange sie Ziel bleibt.</p></div>
     <div class="kasten" style="border-color:rgba(157,140,255,.45)"><h4>${DAUMEN} Eine ungeliebte Disziplin</h4><p class="vtx" style="margin:0">Ist sie das Trainingsziel: <b class="minus">−20 % Trainingsbudget</b> und <b class="minus">−6 Moral</b>, solange sie Ziel bleibt.</p></div>
-    <div class="kasten"><h4>Warum 10 und 20</h4><p class="vtx" style="margin:0">Zwei von zwanzig Disziplinen geben +10 %, eine gibt −20 %: bei zufälliger Zielwahl hebt sich das <b>genau auf</b> (2 × 10 = 1 × 20). Zum Vergleich: Signatur-Attribut ×1,15, schwaches Attribut ×0,80, Fokusachse +8 %.</p></div>
+    <div class="kasten"><h4>Warum 15 und 20</h4><p class="vtx" style="margin:0">Dieselben Faktoren wie bei der Attribut-Affinität im Code: Signatur ×1,15, schwach ×0,80. Bei zufälliger Zielwahl bleibt ein kleines Plus (2 × 15 − 20 = +10 Punkte über 20 Disziplinen, <b>+0,5 %</b>); bei gezielter Wahl rund +4,7 % Budget. Ausgleich: Satz je Spieltag um rund 4,4 % senken, wenn die Messung das bestätigt.</p></div>
     <div class="kasten"><h4>Wie gewürfelt wird</h4><p class="vtx" style="margin:0">Fest je Spieler aus seiner ID, <b>stark zufällig</b>. Leichte Tendenz: Lieblinge eher in der Klassenfarbe und unter den besten fünf, die ungeliebte eher in der Gegenfarbe und unter den schwächsten fünf.</p></div>
     <div class="kasten"><h4>Was sich nicht ändert</h4><p class="vtx" style="margin:0">Die Matrix, die Leistungs-Hälfte der Entwicklung (40 %), die Wertung im Spiel. Die Vorliebe wirkt <b>nur</b> auf das Trainingsbudget – und nur, wenn die Disziplin das Ziel ist.</p></div>
     <div class="kasten"><h4>Sichtbarkeit</h4><p class="vtx" style="margin:0">Eigenes Team: immer. Fremde: nach Scouting-Stufe. Eine Einstellung schaltet den Nebel ganz ab.</p></div>
@@ -446,12 +477,14 @@ function zeichneVor(){
       <div class="mo"><span>${gesicht(p.mo)} <b class="t">${p.mo}</b>${dMo?` <b class="t ${dMo>0?"plus":"minus"}" style="font-size:.95rem">${dMo>0?"+":"−"}${Math.abs(dMo)}</b>`:""}</span><span>Moral · Form <b class="t" style="font-size:.95rem">${z(p.fo,0)}</b></span></div></div>
     ${p.verl?`<div class="ruht"><b>Nicht einsetzbar bis Spieltag 12.</b> Das Training ruht, Ziel und Intensität gelten ab der Rückkehr (Spieltag ${p.zurueck}). Gerechnet werden <b>${restST(p)} statt 9</b> Trainings; keine Trainingslast, solange er fehlt.</div>`:""}
     ${VORLIEBEN_AN?`<div class="kasten vor"><h4>Trainingsvorlieben<span class="sp"></span><em>fest je Spieler</em></h4>
-      <div class="vch">${p.v.lieb.map(id=>`<div class="vc c-${DI[id].f}${p.neu.did===id?" akt":""}"><b>${HERZ}${DI[id].n}</b><span>Liebling · <i class="plus">×1,10</i></span></div>`).join("")}<div class="vc u c-${DI[p.v.unlieb].f}${p.neu.did===p.v.unlieb?" akt":""}"><b>${DAUMEN}${DI[p.v.unlieb].n}</b><span>ungeliebt · <i class="minus">×0,80</i></span></div></div>
-      <p class="vtx">${va>0?`<b>Trainiert seine Lieblingsdisziplin:</b> +10 % Trainingsbudget und <b class="plus">+3 Moral</b>, solange ${d.n} das Ziel ist.`:va<0?`<b>Trainiert, was er nicht mag:</b> −20 % Trainingsbudget und <b class="minus">−6 Moral</b>, solange ${d.n} das Ziel ist.`:`${d.n} ist ihm gleich: kein Bonus, kein Abzug. Ein Herz in der Heatmap brächte +10 % Budget und +3 Moral.`}</p></div>`:""}
-    <div class="kasten c-${d.f}"><h4>Gewählt${geaendert?' · offene Änderung':""}<span class="sp"></span><em>${restST(p)} Trainings · ${MODN[p.neu.mod]}</em></h4>
+      <div class="vch">${p.v.lieb.map(id=>`<div class="vc c-${DI[id].f}${p.neu.did===id?" akt":""}"><b>${HERZ}${DI[id].n}</b><span>Liebling · <i class="plus">×1,15</i></span></div>`).join("")}<div class="vc u c-${DI[p.v.unlieb].f}${p.neu.did===p.v.unlieb?" akt":""}"><b>${DAUMEN}${DI[p.v.unlieb].n}</b><span>ungeliebt · <i class="minus">×0,80</i></span></div></div>
+      <p class="vtx">${va>0?`<b>Trainiert seine Lieblingsdisziplin:</b> +15 % Trainingsbudget und <b class="plus">+3 Moral</b>, solange ${d.n} das Ziel ist.`:va<0?`<b>Trainiert, was er nicht mag:</b> −20 % Trainingsbudget und <b class="minus">−6 Moral</b>, solange ${d.n} das Ziel ist.`:`${d.n} ist ihm gleich: kein Bonus, kein Abzug. Ein Herz in der Heatmap brächte +15 % Budget und +3 Moral.`}</p></div>`:""}
+    <div class="kasten"><h4>Fortschritt diese Saison<span class="sp"></span><em>bisher <b class="t plus">${pm(p.bisherS,1)} SP</b> · Spieltag 1–${GESPIELT}</em></h4>
+      <div class="fs">${(()=>{const mx=Math.max(...ATTR.map(a=>p.bisher[a])),ord=["pow","spe","men","soc"];return [...ATTR].sort((x,y)=>ord.indexOf(ACHSE[x])-ord.indexOf(ACHSE[y])).map(a=>{const b=p.bisher[a];return `<div class="fa c-${ACHSE[a]}${b>.005?"":" nix"}${b===mx?" top":""}" data-tip="<b>${AN[a]}</b><br>Saisonstart ${z(p.a[a]-b)} → heute <b>${z(p.a[a])}</b>${b>.005?"<br>diese Saison "+pm(b):"<br>diese Saison unverändert"}${b===mx?"<br><i>größter Fortschritt</i>":""}"><span>${AK[a]}</span><i><u style="width:${mx?b/mx*100:0}%"></u></i><b class="t">${b>.005?pm(b,1):"–"}</b></div>`}).join("")})()}</div></div>
+    <div class="kasten c-${d.f}"><h4>Gewählt${geaendert?' · offene Änderung':""}<span class="sp"></span><em>${restST(p)} Trainings · ${MODN[p.neu.mod]} · <b class="t plus">${pm(zu.summe)} SP</b></em></h4>
       <div class="wahl"><span class="bk" style="background:none;border:0;padding:0;height:auto"><span class="ic">${ICON[d.f]}</span></span><div class="zn"><b>${d.n}</b><span>${p.neu.weg===0?"Primärweg":"Nebenweg"} über <i>${AN[pr[0].a]}</i> · Eignung <b class="t" style="color:var(--creme)">${z(p.e[d.id])}</b> → <b class="t plus">${z(p.e[d.id]+eigDelta(zu,d.id),2)}</b></span></div></div>
       <div style="margin-top:.4rem">${pr.map(e=>{const a=p.a[e.a],c=p.ce?p.ce[e.a]:99,g=zu.att[e.a];return `<div class="ar c-${ACHSE[e.a]}" data-tip="<b>${AN[e.a]}</b><br>heute ${z(a)} · Decke ${c} · Matrixgewicht ${e.g}${zu.brems.includes(e.a)?"<br><i>Die Decke bremst diesen Anteil.</i>":""}"><span class="ab">${AK[e.a]}</span><span class="an2 t">${Math.round(e.anteil*100)} %</span><span class="ba"><i style="width:${a}%"></i><u style="left:${a}%;width:${Math.max(.6,g)}%"></u><s style="left:${c}%"></s></span><span class="gw t plus">${pm(g)}</span></div>`}).join("")}</div>
-      <div class="fk"><span>Satz ${z(SATZ[p.neu.mod],3)} je Spieltag</span>${va>0?'<span class="l">Liebling ×1,10</span>':va<0?'<span class="u">ungeliebt ×0,80</span>':""}${zu.brems.length?`<span class="s">Decke bremst ${zu.brems.map(a=>AK[a]).join(", ")}</span>`:'<span class="g">keine Decke im Weg</span>'}</div></div>
+      <div class="fk"><span>Satz ${z(SATZ[p.neu.mod],3)} je Spieltag</span>${va>0?'<span class="l">Liebling ×1,15</span>':va<0?'<span class="u">ungeliebt ×0,80</span>':""}${zu.brems.length?`<span class="s">Decke bremst ${zu.brems.map(a=>AK[a]).join(", ")}</span>`:'<span class="g">keine Decke im Weg</span>'}</div></div>
     <div class="kasten"><h4>Wo das ankommt · Top 6<span class="sp"></span><em>Eignung bis Saisonende</em></h4>
       <div class="an6">${ank.map(x=>`<div class="a6 c-${x.d.f}${x.d.id===d.id?" zielz":""}"><i></i><span>${x.d.n}</span><em class="t">${z(p.e[x.d.id])}</em><b class="t plus">${pm(x.dz)}</b></div>`).join("")}</div></div>
     <div class="kasten"><h4>Belastung · nächste 6 Spieltage<span class="sp"></span><em>heute ${z(p.fat,0)}</em></h4>
@@ -463,13 +496,13 @@ function zeichneVor(){
 
 function kpis(){
   let s=0,l=0,u=0,r=0;
-  for(const p of P){s+=eigDelta(zuwachs(p,p.neu.did,p.neu.weg,p.neu.mod),p.neu.did);const a=vArt(p,p.neu.did);if(a>0)l++;if(a<0)u++;if(p.verl)r++}
+  for(const p of P){s+=zuwachs(p,p.neu.did,p.neu.weg,p.neu.mod).summe;const a=vArt(p,p.neu.did);if(a>0)l++;if(a<0)u++;if(p.verl)r++}
   $("k1").textContent=pm(s,1);$("k2").textContent=l+" / "+P.length;$("k3").textContent=u+" / "+P.length;$("k4").textContent=r;
 }
 function alles(){zeichneKader();zeichneHeat();zeichneVor();kpis();demo()}
 function demo(){
   const p=P[S.sp];
-  $("demo").innerHTML=`<b>Mockup Training R2 · 22.11.</b> <a class="${!S.nebel&&S.mass==="zuwachs"?"an":""}" data-mass="zuwachs" data-nebel="0">Heatmap Zuwachs</a><a class="${!S.nebel&&S.mass==="luft"?"an":""}" data-mass="luft" data-nebel="0">Heatmap Luft</a><a class="${S.nebel?"an":""}" data-nebel="1">Fremdes Team (Nebel)</a>
+  $("demo").innerHTML=`<b>Mockup Training R2 · 22.11.</b> <a class="${!S.nebel&&S.mass==="sp"?"an":""}" data-mass="sp" data-nebel="0">Heatmap SP</a><a class="${!S.nebel&&S.mass==="zuwachs"?"an":""}" data-mass="zuwachs" data-nebel="0">Heatmap Eignung</a><a class="${!S.nebel&&S.mass==="luft"?"an":""}" data-mass="luft" data-nebel="0">Heatmap Luft</a><a class="${S.nebel?"an":""}" data-nebel="1">Fremdes Team (Nebel)</a>
     <span>Spieler:</span>${P.map((q,i)=>`<a data-sp="${i}" data-nebel="0" class="${!S.nebel&&i===S.sp?"an":""}">${q.n}</a>`).join("")}`;
 }
 document.addEventListener("click",e=>{
