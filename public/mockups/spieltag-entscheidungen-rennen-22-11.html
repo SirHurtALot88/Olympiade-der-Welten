@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Deine Entscheidungen · Rennen · Halbzeit · Manager-Leiste (Mockup 22.11.)</title>
+<!--
+DREI VORSCHLAEGE AUS DER GAMEPLAY-REVIEW VOM 22.11. (Fable, 22.11.), von Chris freigegeben ("ja"):
+  1 "Deine Entscheidungen" in Nach dem Spieltag      ?ansicht=entscheidungen
+  2 Rennen je Liga + Halbzeitbericht in der Pause     ?ansicht=rennen | ?ansicht=halbzeit
+  3 Manager-Leiste + Derby-Marke auf der Startseite   ?ansicht=manager
+  ?still=1 blendet die Mockup-Leiste aus.
+ECHT (Groessen, die es im Spiel gibt): Duellpunkte 2/1/0, hoechstens 4 je Spieltag, 20 Spieltage, zwei 16er-Ligen,
+  3 Auf-/Absteiger (lib/season/league-split.ts), Ergebnisskala E1 (87 : 79 -> 7 : 4), Formkarten-Zerlegung "alle + Farbtraeger"
+  (lib/lineups/formkarten-farbregel.ts), Einsatzstufen Schonen/Normal/Vollgas (lib/lineups/legacy-lineup-modifiers.ts),
+  Captain x1,5 (lib/lineups/legacy-score-engine.ts), Erschoepfung und Pause nach Spieltag 10 (lib/fatigue/belastung-regel.ts),
+  Form/Moral, Vorstands-Freigabe, Delegation Voll selbst / Halbautomatik / Voll KI, Teams, Logos, Portraits, Kulissen.
+NEU (lila Marke "neu"): alles, was diese Seite zeigt und es heute nicht gibt.
+ERFUNDEN: alle Staende, Zahlen, Serien, Betraege, die Zuordnung Franky = V-W und Ramona = R-C.
+Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
+Erklaerung: docs/design/spieltag-entscheidungen-rennen-22-11.md
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a; --neu:#b48cff;
+  --pow:#e2574c; --spe:#5fd08a; --men:#5aa2f0; --soc:#f0c35a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)} .acht{color:var(--acht)} .gold{color:var(--gold)}
+.demo{height:2.25rem;display:flex;align-items:center;gap:.7rem;padding:0 .9rem 0 5rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .6rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+body.still .demo{display:none}
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+.rail{display:flex;flex-direction:column;gap:.2rem;padding:.6rem;background:#080b11;border-right:1px solid var(--linie)}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.5rem}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail a{position:relative;height:2.75rem;border-radius:.55rem;display:flex;align-items:center;justify-content:center;font-size:1.25rem;color:var(--stumm)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.55rem;bottom:.55rem;width:.19rem;border-radius:2px;background:var(--gold)}
+.rail .luecke{flex:1}
+main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0}
+.hero{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:1.6rem;align-items:center;padding:1rem 1.5rem;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:0;z-index:-2;display:grid;grid-template-columns:1fr 1fr}
+.hero .kul i{background-position:center 42%;background-size:cover;opacity:.6}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.96) 0%,rgba(6,8,12,.72) 30%,rgba(6,8,12,.5) 55%,rgba(6,8,12,.85) 100%),linear-gradient(180deg,rgba(6,8,12,.2) 30%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:1rem}
+.crest{width:4.9rem;height:4.9rem;border-radius:.75rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 .5rem 1.4rem rgba(0,0,0,.5);flex:none}
+.crest img{width:100%;height:100%;object-fit:cover}
+.hk em{font-style:normal;font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.hk h1{margin:.12rem 0 .25rem;font:400 2.4rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hk .lage{font-size:.97rem;color:var(--leise)} .hk .lage b{color:var(--creme);font-weight:600}
+.kpis{display:flex;gap:.5rem;justify-content:center;min-width:0}
+.kpi{min-width:7.6rem;padding:.55rem 1.15rem .62rem 1.25rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%)}
+.kpi strong{display:flex;align-items:baseline;gap:.35rem;font-size:2rem;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap}
+.kpi strong small{font-size:1rem;color:var(--leise);font-weight:600}
+.kpi>small{font-size:.82rem;color:var(--leise);white-space:nowrap}
+.cta{display:flex;flex-direction:column;align-items:flex-end;gap:.4rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:3.1rem;padding:0 1.5rem;font-size:1.12rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.klein{height:1.9rem;padding:0 .8rem;font-size:.85rem;border:1px solid var(--linie-2);border-radius:.3rem;color:var(--creme)}
+.cta small{font-size:.82rem;color:var(--leise)}
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.7rem;flex:none}
+.pk h2{min-width:0;overflow:hidden;text-overflow:ellipsis;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1} .pk a,.pk .re{font-size:.85rem;font-weight:600;color:var(--gold);white-space:nowrap} .pk .re{color:var(--leise)}
+.neu{font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:.08rem .4rem;border-radius:.2rem;color:var(--neu);border:1px solid rgba(180,140,255,.55);background:rgba(180,140,255,.12);flex:none}
+.pb{padding:.75rem .9rem;flex:1;min-height:0;display:flex;flex-direction:column}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.chip{display:inline-flex;align-items:center;gap:.3rem;height:1.45rem;padding:0 .55rem;border-radius:.2rem;font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--linie-2);color:var(--creme);white-space:nowrap}
+.chip.g{color:var(--gut);border-color:rgba(98,211,148,.5);background:rgba(98,211,148,.1)}
+.chip.w{color:var(--warn);border-color:rgba(255,96,88,.5);background:rgba(255,96,88,.1)}
+.chip.a{color:var(--acht);border-color:rgba(243,181,74,.5);background:rgba(243,181,74,.1)}
+.chip.s{color:var(--stumm);border-color:var(--linie)}
+.chip.d{color:#17120a;background:var(--gold);border-color:var(--gold)}
+.lg{width:1.5rem;height:1.5rem;border-radius:.25rem;object-fit:cover;flex:none}
+.po{width:1.8rem;height:1.8rem;border-radius:50%;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2);flex:none}
+.fm{display:inline-flex;gap:.16rem}
+.fm i{width:.78rem;height:.78rem;transform:skewX(-14deg);background:var(--gut);border-radius:1px;flex:none} .fm i.n{background:var(--warn)} .fm i.u{background:var(--stumm)}
+table{border-collapse:collapse;width:100%}
+th{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:700;text-align:right;padding:0 .4rem .3rem;white-space:nowrap;cursor:pointer}
+th:first-child,td:first-child{text-align:left}
+td{padding:.3rem .4rem;text-align:right;font-size:1rem;border-top:1px solid var(--linie);white-space:nowrap;font-variant-numeric:tabular-nums}
+.sub{display:flex;gap:.4rem;padding:.55rem 1rem 0}
+.sub a{padding:.3rem .9rem;border:1px solid var(--linie);border-radius:.3rem .3rem 0 0;border-bottom:0;font-size:.95rem;color:var(--leise);font-weight:600}
+.sub a.an{background:var(--flaeche-1);color:var(--gold);border-color:var(--linie-2)}
+
+/* ============ 1 ENTSCHEIDUNGEN ============ */
+.e-raster{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 30rem;grid-template-rows:minmax(0,1.5fr) minmax(0,1fr);gap:.72rem;padding:.6rem 1rem .8rem;min-height:0}
+.e-raster .bil{grid-column:3;grid-row:1/3}
+.dkopf{position:relative;height:4.4rem;flex:none;display:flex;align-items:center;gap:.9rem;padding:0 .9rem;isolation:isolate;border-bottom:1px solid var(--linie)}
+.dkopf::before{content:"";position:absolute;inset:0;z-index:-2;background:var(--bild) center 45%/cover;opacity:.55}
+.dkopf::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.95),rgba(6,8,12,.55) 55%,rgba(6,8,12,.9))}
+.dkopf h3{margin:0;font:400 1.55rem/1 var(--haus);color:#fff}
+.dkopf small{display:block;color:var(--leise);font-size:.88rem;margin-top:.15rem}
+.dkopf .erg{margin-left:auto;text-align:right}
+.dkopf .erg b{font-size:2rem;line-height:1;color:var(--creme)} .dkopf .erg span{display:block;font-size:.82rem;color:var(--leise)}
+.dkopf .pkt{width:3.4rem;height:3.4rem;display:grid;place-items:center;font-size:1.9rem;font-weight:700;border-radius:.4rem;border:1px solid}
+.wf{flex:1;min-height:0;display:grid;grid-auto-rows:minmax(0,1fr);padding:.35rem .9rem .2rem}
+.wz{display:grid;grid-template-columns:22rem minmax(0,1fr) 3.6rem;align-items:center;gap:.6rem;border-top:1px solid rgba(244,230,196,.06)}
+.wz:first-child{border-top:0}
+.wz .n{font-size:.98rem;color:var(--tinte);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .wz .n small{color:var(--stumm);font-size:.8rem;margin-left:.3rem}
+.wz .bahn{position:relative;height:1.05rem;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 1px),rgba(244,230,196,.07) calc(10% - 1px),rgba(244,230,196,.07) 10%)}
+.wz .bahn i{position:absolute;top:0;bottom:0;border-radius:2px}
+.wz .bahn i.p{background:var(--gut)} .wz .bahn i.m{background:var(--warn)} .wz .bahn i.s{background:var(--creme)} .wz .bahn i.z{background:var(--stumm)}
+.wz .bahn i.sp{background:rgba(240,195,90,.22);border:1px dashed var(--gold)}
+.wz .bahn u{position:absolute;top:-.25rem;bottom:-.25rem;width:2px;background:var(--gast)}
+.wz .w{text-align:right;font-weight:700;font-size:1.15rem}
+.wz.sum .n{color:var(--creme);font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:.86rem} .wz.sum .w{font-size:1.4rem;color:var(--creme)}
+.wz.zuf .n{color:var(--leise);font-style:italic}
+.gp{flex:none;margin:.1rem .9rem .7rem;padding:.5rem .7rem;border-radius:.4rem;background:var(--flaeche-2);border-left:3px solid var(--gold);font-size:.95rem;color:var(--leise)} .gp b{color:var(--creme)}
+.heb{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.2rem .6rem;align-items:center;padding:.55rem 0;border-top:1px solid var(--linie)}
+.heb:first-of-type{border-top:0}
+.heb .ic{width:2rem;height:2rem;border-radius:.35rem;display:grid;place-items:center;background:var(--flaeche-3);color:var(--gold);font-size:1.05rem}
+.heb b{font-size:1.05rem;color:var(--creme);font-weight:600} .heb .z{font-size:1.45rem;font-weight:700}
+.heb p{grid-column:2/4;margin:0;font-size:.9rem;color:var(--leise);line-height:1.25} .heb p b{font-size:inherit;color:var(--tinte)}
+.netto{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin:.2rem 0 .6rem}
+.netto div{padding:.5rem .6rem;background:var(--flaeche-2);border:1px solid var(--linie);border-radius:.4rem}
+.netto strong{display:block;font-size:1.7rem;line-height:1;color:var(--creme)} .netto small{font-size:.78rem;color:var(--leise)}
+.merk{margin-top:auto;padding:.6rem .7rem;border-radius:.4rem;background:linear-gradient(90deg,rgba(240,195,90,.14),rgba(240,195,90,.03));border:1px solid rgba(240,195,90,.35);font-size:.97rem;color:var(--tinte);line-height:1.3} .merk b{color:var(--gold)}
+.sn{display:inline-flex;align-items:center;gap:.45rem} .sn b{font:400 1.02rem/1 var(--haus);color:#fff} .sn small{color:var(--stumm);font-size:.8rem}
+.cap{display:inline-grid;place-items:center;width:1.15rem;height:1.15rem;border-radius:50%;background:var(--gold);color:#17120a;font-size:.72rem;font-weight:700}
+
+/* ============ 2 RENNEN ============ */
+.r-raster{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(0,1fr);gap:.72rem;padding:.6rem 1rem .8rem;min-height:0}
+.rs{flex:1;min-height:0;display:grid;grid-auto-rows:minmax(0,1fr)}
+.rz{display:grid;grid-template-columns:1.6rem 1.7rem 16.5rem minmax(0,1fr) 2.6rem 8.6rem;align-items:center;gap:.55rem;padding:0 .9rem;border-top:1px solid rgba(244,230,196,.06)}
+.rz.wir{background:linear-gradient(90deg,rgba(242,160,61,.16),transparent 70%)}
+.rz.mensch .nm::after{content:attr(data-m);margin-left:.4rem;font:700 .68rem/1 var(--zahl);letter-spacing:.08em;text-transform:uppercase;color:var(--gast);border:1px solid rgba(69,176,201,.5);border-radius:.2rem;padding:.05rem .3rem}
+.rz.wir .nm::after{color:var(--heim);border-color:rgba(242,160,61,.6)}
+.rz .rg{font-weight:700;color:var(--leise);text-align:right}
+.rz .nm{font:400 1.05rem/1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rz .bahn{position:relative;height:.95rem}
+.rz .bahn i{position:absolute;left:0;top:0;bottom:0;background:var(--creme);border-radius:2px}
+.rz .bahn i.mg{background:rgba(244,230,196,.16);border-radius:0 2px 2px 0}
+.rz .pt{font-weight:700;font-size:1.2rem;text-align:right;color:var(--creme)}
+.rskala{position:relative;height:1.5rem;margin:0 .9rem 0 calc(.9rem + 1.6rem + 1.7rem + 16.5rem + 1.65rem);margin-right:calc(.9rem + 2.6rem + 8.6rem + 1.1rem);flex:none}
+.rskala span{position:absolute;top:.2rem;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.rlinie{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed;opacity:.85;pointer-events:none}
+.rk{display:grid;grid-template-rows:repeat(3,minmax(0,1fr)) auto;gap:.72rem;min-height:0}
+.rkarte .pb{gap:.45rem}
+.rkarte .zeile{display:flex;align-items:center;gap:.5rem;font-size:.97rem;color:var(--leise)} .rkarte .zeile b{color:var(--creme)}
+.rkarte .mz{margin-left:auto;text-align:right} .rkarte .mz strong{display:block;font-size:2rem;line-height:1;color:var(--creme)} .rkarte .mz small{font-size:.76rem;color:var(--leise)}
+.rkarte .satz{margin-top:auto;font-size:.95rem;color:var(--tinte);padding:.4rem .6rem;border-left:3px solid var(--gold);background:var(--flaeche-2);border-radius:.3rem}
+.lgs{display:flex;gap:.25rem} .lgs img{width:1.9rem;height:1.9rem;border-radius:.3rem;object-fit:cover;border:1px solid var(--linie-2)} .lgs img.ich{border:2px solid var(--heim)} .lgs img.aus{opacity:.3;filter:grayscale(1)}
+.l1{display:grid;grid-template-columns:1fr 1fr;gap:.72rem;padding:.6rem .9rem}
+.l1 div{font-size:.92rem;color:var(--leise)} .l1 b{color:var(--creme)}
+
+/* ============ HALBZEIT ============ */
+.h-raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:.72rem;padding:.6rem 1rem .8rem;min-height:0}
+.hz{display:block;overflow:hidden;padding:.3rem 0;line-height:1.9rem;border-top:1px solid var(--linie);font-size:.98rem;color:var(--leise)} .hz:first-child{border-top:0}
+.hz img{display:inline-block;vertical-align:middle;margin-right:.5rem} .hz .chip{vertical-align:middle}
+.hz b{color:var(--creme);font-weight:600} .hz .re{float:right;display:flex;align-items:center;gap:.4rem;white-space:nowrap;height:1.9rem}
+.prog{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:.3rem;margin-top:auto;padding-top:.5rem}
+.prog div{padding:.35rem .3rem;border-radius:.3rem;background:var(--flaeche-2);border:1px solid var(--linie);text-align:center;font-size:.76rem;color:var(--leise);line-height:1.25;white-space:nowrap;overflow:hidden}
+.prog div img{margin:.15rem auto;width:1.7rem;height:1.7rem} .prog div b{display:block;color:var(--creme);font-size:.82rem} .prog div.dd{border-color:var(--gold)} .prog div.dir{border-color:rgba(98,211,148,.6)}
+.balk{position:relative;height:.6rem;border-radius:.3rem;background:var(--flaeche-3);overflow:hidden;flex:1;min-width:4rem} .balk i{position:absolute;left:0;top:0;bottom:0;border-radius:.3rem}
+.achs{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.5rem}
+.achs div{padding:.45rem .6rem;background:var(--flaeche-2);border-radius:.4rem;border-top:3px solid}
+.achs strong{display:block;font-size:1.6rem;line-height:1;color:var(--creme)} .achs small{font-size:.78rem;color:var(--leise)}
+.gross{display:flex;align-items:baseline;gap:.6rem;font-size:2.6rem;font-weight:700;line-height:1;color:var(--creme)} .gross small{font-size:1rem;color:var(--leise);font-weight:600}
+.dchips{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:.3rem;margin:.3rem 0 .5rem}
+.dchips span{padding:.25rem .3rem;border-radius:.3rem;background:var(--flaeche-2);border:1px solid var(--linie);font-size:.78rem;color:var(--leise);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dchips span b{display:block;font-size:1.05rem;color:var(--creme)} .dchips span.st{border-color:rgba(98,211,148,.5)} .dchips span.sw{border-color:rgba(255,96,88,.5)}
+.todo{display:grid;grid-template-columns:1.6rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.4rem 0;border-top:1px solid var(--linie);font-size:.98rem} .todo i{font-style:normal;font-weight:700;color:var(--gold);font-size:1.2rem} .todo a{color:var(--gold);font-weight:600;font-size:.88rem}
+.todo small{display:block;color:var(--leise);font-size:.86rem}
+
+/* ============ 3 MANAGER ============ */
+.m-raster{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:auto minmax(0,1.05fr) minmax(0,1fr);gap:.72rem;padding:.7rem 1rem .8rem;min-height:0}
+.ml{grid-column:1/13;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.72rem}
+.mk .lgg{grid-column:1} .mk h3{grid-column:2;grid-row:1} .mk .tm{grid-column:2;grid-row:2} .mk .zz{grid-column:3} .mk .st{grid-row:3}
+.mk{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.2rem .9rem;align-items:center;padding:.7rem .9rem;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);border-left:.3rem solid var(--farbe)}
+.mk.ich{background:linear-gradient(90deg,rgba(242,160,61,.13),var(--flaeche-1) 60%)}
+.mk .lgg{grid-row:1/3;width:3.6rem;height:3.6rem;border-radius:.5rem;object-fit:cover;border:1px solid var(--linie-2)}
+.mk h3{margin:0;font:400 1.5rem/1 var(--haus);color:#fff;display:flex;align-items:center;gap:.5rem}
+.mk .tm{font-size:.9rem;color:var(--leise)}
+.mk .zz{grid-row:1/3;display:flex;gap:1.1rem;align-items:center}
+.mk .zz div{text-align:right} .mk .zz strong{display:block;font-size:1.75rem;line-height:1;color:var(--creme)} .mk .zz small{font-size:.74rem;color:var(--leise);letter-spacing:.06em;text-transform:uppercase}
+.mk .st{grid-column:1/4;display:flex;align-items:center;gap:.6rem;margin-top:.45rem;padding-top:.45rem;border-top:1px solid var(--linie);font-size:.92rem;color:var(--leise)}
+.mk .st .pkt{width:.7rem;height:.7rem;border-radius:50%;flex:none}
+.derby{position:relative;flex:1;min-height:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:1rem;padding:.8rem 1.1rem;isolation:isolate}
+.derby::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(242,160,61,.2),rgba(6,8,12,.2) 45%,rgba(6,8,12,.2) 55%,rgba(69,176,201,.2))}
+.derby .s{display:flex;align-items:center;gap:.8rem} .derby .s.r{flex-direction:row-reverse;text-align:right}
+.derby .s img{width:5rem;height:5rem;border-radius:.6rem;object-fit:cover;border:2px solid var(--heim)} .derby .s.r img{border-color:var(--gast)}
+.derby .s b{display:block;font:400 1.6rem/1.05 var(--haus);color:#fff} .derby .s small{color:var(--leise);font-size:.92rem}
+.derby .mi{text-align:center}
+.dmarke{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .8rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:.9rem;color:#17120a;background:linear-gradient(90deg,var(--heim),var(--gold),var(--gast));clip-path:polygon(.5rem 0,100% 0,calc(100% - .5rem) 100%,0 100%)}
+.dmarke.k{font-size:.66rem;padding:.08rem .5rem;letter-spacing:.1em}
+.derby .mi strong{display:block;font-size:2.3rem;line-height:1.1;color:var(--creme)} .derby .mi small{color:var(--leise);font-size:.88rem}
+.dz2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;padding:0 .9rem .7rem;flex:none}
+.dz2 div{position:relative;padding:1rem .9rem;border-radius:.4rem;border:1px solid var(--linie);isolation:isolate;overflow:hidden;font-size:.92rem;color:var(--leise)}
+.dz2 div::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.92),rgba(6,8,12,.6)),var(--bild) center/cover}
+.dz2 b{display:block;font:400 1.15rem/1.1 var(--haus);color:#fff}
+.ar{display:grid;grid-template-columns:1.6rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.36rem 0;border-top:1px solid var(--linie);font-size:.98rem} .ar:first-child{border-top:0}
+.ar i{font-style:normal;font-weight:700;color:var(--stumm)} .ar.d i{color:var(--gold)} .ar b{color:var(--creme);font-weight:600} .ar small{color:var(--leise)}
+.verl{flex:1;min-height:0;width:100%}
+.ms{padding:.42rem 0;border-top:1px solid var(--linie);font-size:.98rem;color:var(--leise);display:flex;gap:.55rem;align-items:center} .ms:first-child{border-top:0} .ms b{color:var(--creme);font-weight:600}
+</style>
+</head>
+<body>
+<div class="demo"><b>Mockup 22.11.</b><span id="demoz"></span><span style="margin-left:auto">lila <span class="neu">neu</span> = gibt es heute nicht · Zahlen erfunden</span></div>
+<div class="app">
+  <nav class="rail" id="rail"></nav>
+  <main id="main"></main>
+</div>
+<script>
+var q=new URLSearchParams(location.search),A=q.get("ansicht")||"entscheidungen";
+if(q.get("still"))document.body.className="still";
+function $(i){return document.getElementById(i)}
+function ic(d){return '<svg class="i" viewBox="0 0 24 24">'+d+'</svg>'}
+var I={haus:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',liste:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',pokal:'<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>',leute:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14a6 6 0 0 1 3 6"/>',geld:'<circle cx="12" cy="12" r="9"/><path d="M15 9a3.5 3.5 0 1 0 0 6M8 11h5M8 13.5h5"/>',post:'<path d="M3 6h18v12H3zM3 7l9 6 9-6"/>',zahn:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',karte:'<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6"/>',blitz:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',stern:'<path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1L3.2 9.4l6.1-.8z"/>',herz:'<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',mond:'<path d="M20 14A8 8 0 1 1 10 4a6.5 6.5 0 0 0 10 10z"/>',pfeil:'<path d="M5 12h14M13 6l6 6-6 6"/>',auge:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',glocke:'<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/>',schwert:'<path d="M14 4h6v6L9 21l-3-3zM5 14l5 5M3 21l3-3"/>'};
+function lg(c,k){return '<img class="'+(k||"lg")+'" src="../team-logos/'+c+'.jpg" alt="">'}
+function po(s){return '<img class="po" src="../portraits/'+s+'.jpg" alt="">'}
+function kul(d,b){return "../sprites/kulissen/"+d+"/"+b+".jpg"}
+function fm(f){return '<span class="fm">'+f.split("").map(function(c){return '<i class="'+(c==="s"?"":c)+'"></i>'}).join("")+'</span>'}
+function vz(x,n){var r=x.toFixed(n==null?1:n).replace(".",",").replace("-","−");return (x>0?"+":x===0?"±":"")+r}
+function kl(x){return x>0?"plus":x<0?"minus":"null"}
+function k1(x){return x.toFixed(1).replace(".",",")}
+$("rail").innerHTML='<span class="logo"><img src="../team-logos/D-P.jpg" alt=""></span>'+[["haus",A==="manager"],["liste",A==="entscheidungen"],["pokal",A==="rennen"||A==="halbzeit"],["leute"],["geld"],["post"]].map(function(r){return '<a class="'+(r[1]?"an":"")+'">'+ic(I[r[0]])+'</a>'}).join("")+'<span class="luecke"></span><a>'+ic(I.zahn)+'</a>';
+$("demoz").innerHTML=[["entscheidungen","1 · Deine Entscheidungen"],["rennen","2a · Rennen je Liga"],["halbzeit","2b · Halbzeitbericht"],["manager","3 · Manager-Leiste + Derby"]].map(function(z){return '<a class="'+(z[0]===A?"an":"")+'" href="?ansicht='+z[0]+'">'+z[1]+'</a>'}).join("");
+function hero(o){return '<header class="hero"><div class="kul"><i style="background-image:url('+o.kul[0]+')"></i><i style="background-image:url('+o.kul[1]+')"></i></div><div class="hk"><span class="crest">'+lg("D-P","")+'</span><div><em>'+o.kick+'</em><h1>'+o.titel+'</h1><span class="lage">'+o.lage+'</span></div></div><div class="kpis">'+o.kpi.map(function(k){return '<div class="kpi"><strong class="t">'+k[0]+'</strong><small>'+k[1]+'</small></div>'}).join("")+'</div><div class="cta"><a class="btn haupt" href="'+(o.cta[2]||"#")+'">'+o.cta[0]+' '+ic(I.pfeil)+'</a><small>'+o.cta[1]+'</small></div></header>'}
+
+/* ======================= 1 · DEINE ENTSCHEIDUNGEN ======================= */
+function entscheidungen(){
+ var D=[{n:"Hockey",bild:kul("hockey","eis"),art:"Duell gegen Lost Kingdom · 6 Plätze · Vollgas",roh:"46,6 : 43,1",erg:"7 : 4",pkt:2,geg:43.1,spanne:[43,54],
+   st:[["Grundwert der Aufstellung","Eignung auf den Plätzen",41.2,"s"],["Formkarte POW +8","alle +2,7 · Farbträger Zyra, Amarie +4,1",3.2],["Einsatzstufe Vollgas","je Spieler +2 bis +6",3.6],["Captain Zyra ×1,5","",2.2],["Form und Moral","Form ▼ bei Maru",-0.6],["Erschöpfung","2 Spieler über 55",-1.8]],
+   verlauf:-1.2,gp:"<b>Ohne die Karte:</b> 43,4 gegen 43,1, also ein offenes Spiel statt eines klaren Siegs. Die Karte hat hier die Punkte getragen."},
+  {n:"Speed-Schach",bild:kul("speed-schach","park"),art:"Duell gegen Lost Kingdom · 4 Plätze · Schonen",roh:"40,6 : 40,9",erg:"5 : 5",pkt:1,geg:40.9,spanne:[34,44],
+   st:[["Grundwert der Aufstellung","Eignung auf den Plätzen",44.0,"s"],["Pflicht-Minuskarte MEN −4","alle −2,0 · Farbträger Conan, Zynara −3,1",-2.6],["Einsatzstufe Schonen","je Spieler −3 bis −2",-2.4],["Captain","nicht gesetzt",0],["Form und Moral","Form ▲▲ bei Conan",0.9],["Erschöpfung","alle unter 40",-0.4]],
+   verlauf:1.1,gp:"<b>Mit Normal statt Schonen:</b> 43,0 gegen 40,9, das wäre ein Sieg gewesen. Schonen hat einen Punkt gekostet und 4,5 Erschöpfung je Spieler gespart."}];
+ function wf(d){var lo=30,hi=56,sp=hi-lo,pos=function(x){return (x-lo)/sp*100},cum=0,h="";
+  d.st.forEach(function(s,i){var a=cum,b=cum+s[2],l=Math.min(a,b),w=Math.abs(b-a);if(i===0){l=lo;w=s[2]-lo;b=s[2]}
+   h+='<div class="wz"><span class="n">'+s[0]+(s[1]?'<small>'+s[1]+'</small>':"")+'</span><span class="bahn"><i class="'+(i===0?"s":s[2]>0?"p":s[2]<0?"m":"z")+'" style="left:'+pos(l)+'%;width:'+Math.max(w/sp*100,.4)+'%"></i></span><span class="w t '+(i===0?"":kl(s[2]))+'">'+(i===0?k1(s[2]):vz(s[2]))+'</span></div>';cum=b});
+  var vor=cum,end=cum+d.verlauf;
+  h+='<div class="wz sum"><span class="n">Vorhersage mit deinen Hebeln</span><span class="bahn"><i class="sp" style="left:'+pos(d.spanne[0])+'%;width:'+(d.spanne[1]-d.spanne[0])/sp*100+'%"></i><i class="s" style="left:'+pos(lo)+'%;width:'+(vor-lo)/sp*100+'%;opacity:.55"></i></span><span class="w t">'+k1(vor)+'</span></div>';
+  h+='<div class="wz zuf"><span class="n">Spielverlauf und Tagesform<small>nicht deine Wahl</small></span><span class="bahn"><i class="'+(d.verlauf>0?"p":"m")+'" style="opacity:.55;left:'+pos(Math.min(vor,end))+'%;width:'+Math.abs(d.verlauf)/sp*100+'%"></i></span><span class="w t '+kl(d.verlauf)+'">'+vz(d.verlauf)+'</span></div>';
+  h+='<div class="wz sum"><span class="n">Gespielt</span><span class="bahn"><i class="s" style="left:'+pos(lo)+'%;width:'+(end-lo)/sp*100+'%"></i><u style="left:'+pos(d.geg)+'%" title="Gegner"></u></span><span class="w t">'+k1(end)+'</span></div>';
+  return h}
+ var pan=D.map(function(d){var f=d.pkt===2?"var(--gut)":d.pkt===1?"var(--acht)":"var(--warn)";
+  return '<section class="pan"><div class="dkopf" style="--bild:url('+d.bild+')"><div><h3>'+d.n+'</h3><small>'+d.art+'</small></div><div class="erg"><b class="t">'+d.erg+'</b><span>Teamwert '+d.roh+' · blaue Linie = Gegner</span></div><span class="pkt t" style="color:'+f+';border-color:'+f+'">+'+d.pkt+'</span></div><div class="wf">'+wf(d)+'</div><div class="gp">'+d.gp+'</div></section>'}).join("");
+ var H=[["karte","Formkarte POW +8 in Hockey",3.2,"<b>Gebracht:</b> fast den ganzen Abstand zum Sieg (3,5). <b>Preis:</b> deine beste POW-Karte ist weg, 9 Karten übrig."],
+  ["blitz","Vollgas in Hockey",3.6,"<b>Preis:</b> +5,2 Erschöpfung je Spieler gegenüber Normal, Verletzungsrisiko 6 % → 11 %. <b class='minus'>Brightpaw verletzt</b>, fehlt an Spieltag 13."],
+  ["stern","Captain Zyra in Hockey",2.2,"<b>Preis:</b> ein Captain-Einsatz. Zyra war mit 66,0 beste Spielerin auf dem Eis."],
+  ["karte","Pflicht-Minuskarte in Speed-Schach",-2.6,"<b>Gewinn:</b> Pflicht erledigt (fällig bis Spieltag 15). Im schwächeren Duell gelegt, das war die billigste Stelle."],
+  ["mond","Schonen in Speed-Schach",-2.4,"<b>Gewinn:</b> −4,5 Erschöpfung je Spieler. <b>Preis:</b> der Sieg (Abstand am Ende 0,3)."]];
+ var T=[["Hockey",[["Zyra","zyra","Sturm",1,46.0,4.1,5.2,13.2,-0.2,-2.6,66.0,5.1],["Amarie","amarie","Sturm",0,44.1,4.1,4.4,0,0.4,-3.1,48.9,4.2],["Maru","maru","Verteidigung",0,41.5,2.7,3.0,0,-2.4,-1.2,41.2,3.4],["Brightpaw","brightpaw","Verteidigung",0,40.2,2.7,2.6,0,0.0,-1.9,39.6,3.1],["Emilia","emilia","Flügel",0,38.7,2.7,3.9,0,-0.6,-0.8,42.4,3.6],["Aeon Flux","aeon-flux","Tor",0,36.7,2.7,2.5,0,-0.8,-1.2,41.5,3.9]]],
+  ["Speed-Schach",[["Conan","conan","Brett 1",0,47.9,-3.1,-2.6,0,1.9,-0.3,45.1,3.8],["Zynara","zynara","Brett 2",0,45.2,-3.1,-2.2,0,0.6,-0.5,40.3,3.2],["Lilithara","lilithara","Brett 3",0,42.6,-2.0,-2.5,0,0.8,-0.2,39.4,2.9],["Queen Loriana","queen-loriana","Brett 4",0,40.3,-2.0,-2.3,0,0.3,-0.6,37.6,2.6]]]];
+ function tab(t){return '<section class="pan"><div class="pk"><h2>'+t[0]+' · je Spieler</h2><span class="neu">neu</span><span class="sp"></span><span class="re">sortierbar · PP aus der Buchung</span></div><div class="pb" style="padding-top:.5rem"><table><tr><th>Spieler</th><th>Grund</th><th>Karte</th><th>Stufe</th><th>Captain</th><th>Form/Moral</th><th>Ersch.</th><th>Gespielt</th><th>PP</th></tr>'+t[1].map(function(p){return '<tr><td><span class="sn">'+po(p[1])+'<b>'+p[0]+'</b>'+(p[3]?'<span class="cap">C</span>':"")+'<small>'+p[2]+'</small></span></td><td>'+k1(p[4])+'</td>'+[5,6,7,8,9].map(function(i){return '<td class="'+kl(p[i])+'">'+vz(p[i])+'</td>'}).join("")+'<td><b style="color:var(--creme)">'+k1(p[10])+'</b></td><td class="gold">'+k1(p[11])+'</td></tr>'}).join("")+'</table></div></section>'}
+ return hero({kul:[kul("hockey","eis"),kul("speed-schach","park")],kick:"Saison 1 · nach Spieltag 12 von 20 · Liga 2",titel:"Deine Entscheidungen",lage:"<b>3 von 4 Punkten</b> gegen Lost Kingdom · jetzt <b>2. in Liga 2</b>",
+   kpi:[["3 <small>von 4</small>","Punkte heute"],["<span class='plus'>+4,0</span>","deine Hebel im Teamwert"],["<span class='acht'>1 Verletzung</span>","Preis von Vollgas"],["9 <small>Karten</small>","Haushalt danach"]],cta:["Weiter","Form-Meldungen, Moral, dann Zwischenphase"]})
+  +'<div style="display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0"><div class="sub"><a class="an">Deine Entscheidungen</a><a>Form-Meldungen</a><a>Moral</a><a>Mitspieler</a></div><div class="e-raster">'+pan
+  +'<section class="pan bil"><div class="pk"><h2>Was deine Wahl gebracht und gekostet hat</h2><span class="neu">neu</span></div><div class="pb"><div class="netto"><div><strong class="t plus">+4,0</strong><small>Hebel gesamt (Teamwert)</small></div><div><strong class="t">3 <span style="font-size:1rem;color:var(--leise)">statt 2</span></strong><small>Punkte mit / ohne Hebel</small></div><div><strong class="t acht">2</strong><small>Spieler ab 65 Erschöpfung</small></div></div>'
+  +H.map(function(h){return '<div class="heb"><span class="ic">'+ic(I[h[0]])+'</span><b>'+h[1]+'</b><span class="z t '+kl(h[2])+'">'+vz(h[2])+'</span><p>'+h[3]+'</p></div>'}).join("")
+  +'<div class="merk"><b>Merksatz des Spieltags:</b> Karte und Vollgas auf dasselbe Duell zu legen hat Hockey sicher gemacht. Der Preis liegt am nächsten Spieltag: Zyra (68) und Amarie (66) sind müde, Brightpaw fehlt. <a class="gold" style="font-weight:700">Einsatzliste Spieltag 13 ›</a></div></div></section>'
+  +tab(T[0])+tab(T[1])+'</div></div>'}
+
+/* ======================= 2a · RENNEN ======================= */
+var L2=[["D-P","Death Peaches",41,"ssuss","Chris"],["D-L","Dire Legion",40,"nssns"],["V-W","Vigilante Wranglers",37,"ssuns","Franky"],["M-S","Mortal Sin",36,"nsnus"],["V-V","Vigorous Vikings",35,"snssn"],["L-K","Lost Kingdom",33,"sssns"],["R-C","Royal Court",33,"nsnsn","Ramona"],["T-C","The Chantry",30,"sssus"],["B-B","Blazing Beasts",29,"nnsns"],["T-G","The Giants",27,"snnsn"],["R-R","Riptide Rivers",26,"nsusn"],["S-C","Stronghold Crusaders",25,"nunsn"],["C-C","Cash Creators",23,"snsnn"],["P-C","Pirate Crew",22,"unnun"],["U-A","Undercover Agents",19,"nnsnn"],["A-A","Armageddon Aftermath",14,"nnnsn"]];
+function rennen(){
+ var rest=4,mx=rest*4,hi=60,P=L2.map(function(t,i){return {c:t[0],n:t[1],p:t[2],f:t[3],m:t[4],r:i+1,max:t[2]+mx}});
+ function linie(platz){return P[platz-1].p}
+ var g1=linie(1),g3=linie(3),g6=linie(6);
+ function status(t){
+  if(t.r<=3&&t.p>P[3].max)return ['g','Aufstieg sicher'];
+  if(t.max<g3)return t.max<g6?['s','ohne Rennen']:['s','nur noch Ziel 6'];
+  if(t.r===1)return ['d','Meister-Kurs'];
+  if(t.r<=3)return ['g','auf Aufstiegsplatz'];
+  if(g3-t.p<=mx/2)return ['a','im Rennen · −'+(g3-t.p)];
+  return ['s','nur rechnerisch · −'+(g3-t.p)]}
+ var zeilen=P.map(function(t){var s=status(t);return '<div class="rz'+(t.m==="Chris"?" wir mensch":t.m?" mensch":"")+'"><span class="rg t">'+t.r+'</span>'+lg(t.c)+'<span class="nm" data-m="'+(t.m||"")+'">'+t.n+'</span><span class="bahn"><i class="mg" style="width:'+t.max/hi*100+'%"></i><i style="width:'+t.p/hi*100+'%'+(t.m==="Chris"?";background:var(--heim)":t.m?";background:var(--gast)":"")+'"></i><span class="rlinie" style="left:'+g1/hi*100+'%;border-color:var(--gold)"></span><span class="rlinie" style="left:'+g3/hi*100+'%;border-color:var(--gut)"></span><span class="rlinie" style="left:'+g6/hi*100+'%;border-color:var(--gast)"></span></span><span class="pt t">'+t.p+'</span><span class="chip '+s[0]+'">'+s[1]+'</span></div>'}).join("");
+ function karte(tit,farbe,drin,mz,mzt,z,satz){return '<section class="pan rkarte" style="border-top:3px solid '+farbe+'"><div class="pk"><h2>'+tit+'</h2><span class="neu">neu</span><span class="sp"></span><span class="re">'+drin.filter(function(d){return !d[1]}).length+' Teams im Rennen</span></div><div class="pb"><div class="zeile"><span class="lgs">'+drin.map(function(d){return '<img class="'+(d[0]==="D-P"?"ich":d[1]?"aus":"")+'" src="../team-logos/'+d[0]+'.jpg" alt="">'}).join("")+'</span><span class="mz"><strong class="t">'+mz+'</strong><small>'+mzt+'</small></span></div>'+z.map(function(x){return '<div class="zeile"><span>'+x+'</span></div>'}).join("")+'<div class="satz">'+satz+'</div></div></section>'}
+ return hero({kul:[kul("eiskunstlauf","kuer"),kul("showcase","buehne")],kick:"Saisonstand · nach Spieltag 16 von 20 · Liga 2",titel:"Die Rennen",lage:"noch <b>4 Spieltage</b> · höchstens <b>16 Punkte</b> je Team · <b>1. in Liga 2</b>, 4 Pkt vor Platz 4",
+   kpi:[["41 <small>Pkt</small>","1. · Death Peaches"],["<span class='gold'>16</span>","Punkte bis sicher Meister"],["<span class='plus'>12</span>","Punkte bis sicher Aufstieg"],["2","Direktduelle im Restprogramm"]],cta:["Restprogramm","Spieltag 17: Dire Legion (2.)"]})
+  +'<div style="display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0"><div class="sub"><a>Tabelle</a><a class="an">Rennen</a><a>Spieltage</a><a>Disziplinen</a><a>Liga 1</a></div><div class="r-raster">'
+  +'<section class="pan"><div class="pk"><h2>Liga 2 · wer kann noch was erreichen</h2><span class="neu">neu</span><span class="sp"></span><span class="re">heller Balken = Punkte · matter Balken = noch erreichbar (+16) · <span style="color:var(--gut)">grüne Linie = Aufstieg</span></span></div><div class="rskala"><span style="left:'+g6/hi*100+'%;transform:translateX(-104%);color:var(--gast)">Ziel Platz 6 · '+g6+' ▸</span><span style="left:'+g3/hi*100+'%;transform:translateX(-50%);color:var(--gut)">'+g3+'</span><span style="left:'+g1/hi*100+'%;transform:translateX(.3rem);color:var(--gold)">◂ Platz 1 · '+g1+'</span><span style="left:'+g3/hi*100+'%;transform:translateX(-50%);top:-1.75rem;color:var(--gut)"></span></div><div class="rs">'+zeilen+'</div></section>'
+  +'<div class="rk">'
+  +karte("Meisterschaft Liga 2","var(--gold)",[["D-P"],["D-L"],["V-W"],["M-S"],["V-V"],["L-K"],["R-C"],["T-C",1]],"16","Punkte bis sicher",["<b>Du führst</b> mit 1 Pkt vor Dire Legion.","Rechnerisch noch dabei: 7 Teams, im Rennen (Rückstand höchstens 8): <b>5</b>."],"Spieltag 17 ist das Direktduell <b>gegen Dire Legion</b>: ein Sieg in beiden Disziplinen macht aus 1 Punkt Vorsprung 5.")
+  +karte("Aufstieg · Platz 1 bis 3","var(--gut)",[["D-P"],["D-L"],["V-W"],["M-S"],["V-V"],["L-K"],["R-C"],["T-C"],["B-B"],["T-G",1]],"12","Punkte bis sicher",["Linie bei <b>37 Pkt</b> (Vigilante Wranglers, Franky). Dein Polster: <b>+4</b> auf Platz 4.","<b>Franky</b> hält Platz 3 mit 1 Pkt vor Mortal Sin."],"Franky und Mortal Sin treffen an Spieltag 18 aufeinander. Wer dort gewinnt, steigt wahrscheinlich auf.")
+  +karte("Vorstandsziele der Manager","var(--gast)",[["D-P"],["V-W"],["R-C"]],"6.","Ramonas Ziel",["<b>Chris:</b> Ziel Platz 4, steht auf 1 <span class='chip g'>auf Kurs</span>","<b>Franky:</b> Ziel Platz 5, steht auf 3 <span class='chip g'>auf Kurs</span>","<b>Ramona:</b> Ziel Platz 6, steht auf 7, punktgleich <span class='chip a'>gefährdet</span>"],"Liga 2 hat keinen Abstieg. Das dritte Rennen ist deshalb das Ziel, das der Vorstand jedem Manager gesetzt hat.")
+  +'<section class="pan"><div class="pk"><h2>Liga 1 in Kürze</h2><span class="sp"></span><a>ganze Liga 1 ›</a></div><div class="l1"><div><span class="gk" style="color:var(--gold)">Titel</span><br><b>N-W 44</b> · Z-H 43 · W-W 40<br>3 Teams im Rennen · Linie = Platz 1</div><div><span class="gk" style="color:var(--warn)">Abstieg · Platz 14 bis 16</span><br>Linie bei <b>24 Pkt</b> · L-R 24 · P-S 22 · V-D 19<br>5 Teams im Rennen · die drei tauschen mit deinen Aufsteigern</div></div></section>'
+  +'</div></div></div>'}
+
+/* ======================= 2b · HALBZEITBERICHT ======================= */
+function halbzeit(){
+ function pan(st,tit,inh,re){return '<section class="pan" style="'+st+'"><div class="pk"><h2>'+tit+'</h2><span class="neu">neu</span><span class="sp"></span>'+(re||"")+'</div><div class="pb">'+inh+'</div></section>'}
+ var tab=[[1,"D-L","Dire Legion",26],[2,"M-S","Mortal Sin",25],[3,"D-P","Death Peaches",25],[4,"V-W","Vigilante Wranglers",23],[5,"V-V","Vigorous Vikings",22],[6,"L-K","Lost Kingdom",21],[7,"R-C","Royal Court",21]];
+ var Dz=[["TDM",3,2,"st"],["Mini DM",6,1],["Battlefield",5,2],["Gewichth.",12,0,"sw"],["Climbing",2,2,"st"],["Staffel",9,1],["Time Trial",8,1],["Spurt",4,2],["Tennis",7,1],["Hockey",5,2],["Showcase",1,2,"st"],["Schach",10,1],["Takeshi",11,0],["Breaking",14,0,"sw"],["Wettessen",13,0,"sw"],["Basketball",6,2],["Football",9,1],["Eiskunst",2,2,"st"],["Fechten",7,1],["I-Spy",8,2]];
+ return hero({kul:[kul("climbing","fels"),kul("tennis","court")],kick:"Saison 1 · Saisonpause nach Spieltag 10 von 20 · Liga 2",titel:"Halbzeitbericht",lage:"<b>3. in Liga 2</b> · 25 von 40 möglichen Punkten · alle Spieler erholen sich einen Spieltag",
+   kpi:[["3.","Platz zur Halbzeit"],["25 <small>von 40</small>","Punkte der Hinrunde"],["38 → <span class='plus'>12</span>","Ø Erschöpfung durch die Pause"],["11 <small>Karten</small>","Formkarten für die Rückrunde"]],cta:["Rückrunde starten","Spieltag 11 · Royal Court (Ramona)"]})
+ +'<div class="h-raster">'
+ +pan("grid-column:1/4","Tabelle zur Halbzeit",tab.map(function(t){return '<div class="hz"'+(t[1]==="D-P"?' style="background:linear-gradient(90deg,rgba(242,160,61,.16),transparent)"':"")+'><b class="t" style="display:inline-block;width:1.2rem;margin-right:.5rem;text-align:right">'+t[0]+'</b>'+lg(t[1])+'<b style="font:400 1.02rem var(--haus);color:#fff">'+t[2]+'</b><span class="re"><b class="t">'+t[3]+'</b></span></div>'}).join("")+'<div class="hz" style="margin-top:auto"><span class="chip g">Aufstieg</span> du stehst <b>auf Platz 3</b>, 2 Pkt vor Platz 4</div><div class="hz"><span class="chip d">Titel</span> 1 Pkt hinter Dire Legion</div>','<a>Rennen ›</a>')
+ +pan("grid-column:4/7","Vorstand · Zwischenstand",'<div class="gross t">6,2 <small>Vertrauen · Freigabe 90 %</small></div><div class="hz" style="margin-top:.5rem"><b>Platz 4 oder besser</b><span class="re">steht auf 3 <span class="chip g">auf Kurs</span></span></div><div class="hz"><b>Cash-Reserve 17,5 C halten</b><span class="re">15,9 <span class="chip a">gefährdet</span></span></div><div class="hz"><b>2 Spieler um +3 entwickeln</b><span class="re">1 von 2 <span class="chip g">auf Kurs</span></span></div><div class="hz" style="margin-top:auto">Ab Vertrauen <b>7,5</b> gibt der Vorstand 100 % frei. Dafür reicht Platz 3 am Saisonende.</div>','<a>Office ›</a>')
+ +pan("grid-column:7/10","Sponsor · Zwischenstand",'<div class="gross t">33,0 C <small>von 66,0 C Grundbetrag gebucht</small></div><div class="hz" style="margin-top:.5rem"><b>12 Siege in SOC-Disziplinen</b><span class="re"><span class="balk" style="width:6rem"><i style="width:58%;background:var(--soc)"></i></span> 7</span></div><div class="hz"><b>Platz 5 oder besser</b><span class="re">3. <span class="chip g">auf Kurs</span></span></div><div class="hz"><b>Kein Spieltag ohne Punkt</b><span class="re">1 Nuller <span class="chip w">verfehlt</span></span></div><div class="hz" style="margin-top:auto">Erwartete Prämie am Saisonende: <b class="t">+6,5 C</b> von 9,0 C</div>','<a>Finanzen ›</a>')
+ +pan("grid-column:10/13","Erholung in der Pause",'<div class="gross t">38 → <span class="plus">12</span> <small>Ø Erschöpfung</small></div><div class="hz" style="margin-top:.5rem"><b>Spieler ab 65</b><span class="re t">3 → <b class="plus">0</b></span></div><div class="hz">'+po("zyra")+'<b>Zyra</b><span class="re t">71 → 39</span></div><div class="hz">'+po("amarie")+'<b>Amarie</b><span class="re t">68 → 36</span></div><div class="hz">'+po("maru")+'<b>Maru</b><span class="re t">66 → 35</span></div><div class="hz" style="margin-top:auto">'+po("brightpaw")+'<b>Brightpaw</b> bleibt verletzt, fehlt an Spieltag 11</div>','<span class="re">aus der gebuchten Pause</span>')
+ +pan("grid-column:1/6","Dein Kader in der Hinrunde",'<div class="achs">'+[["POW","pow",5,10],["SPE","spe",7,10],["MEN","men",5,10],["SOC","soc",8,10]].map(function(a){return '<div style="border-color:var(--'+a[1]+')"><strong class="t">'+a[2]+' <span style="font-size:.9rem;color:var(--leise)">von '+a[3]+'</span></strong><small>Punkte in '+a[0]+'</small></div>'}).join("")+'</div><div class="hz">'+po("queen-loriana")+'<b>Spielerin der Hinrunde: Queen Loriana</b><span class="re t gold">38,4 PP · 6-mal beste</span></div><div class="hz">'+po("conan")+'<b>Größter Sprung: Conan</b><span class="re t plus">+2,1 im Schwerpunkt</span></div><div class="hz">'+po("emilia")+'<b>Sorgenkind: Emilia</b><span class="re t">Moral 34 · 5 Spieltage ohne Einsatz</span></div><div class="hz"><b>Beste Disziplin</b> Showcase, 2 von 2 Pkt, Kaderstärke Rang 1<span class="re"><b>Schwächste</b>&nbsp;Breaking, Rang 14</span></div><div class="hz" style="margin-top:auto"><span class="gk">Deine Entscheidungen der Hinrunde</span></div><div class="hz"><b>9 Formkarten gespielt</b><span class="re t">Teamwert <b class="plus">+21,4</b> · 6 davon in Siegen</span></div><div class="hz"><b>7-mal Vollgas</b><span class="re t">4 Siege · <b class="minus">2 Verletzungen</b></span></div><div class="hz"><b>5-mal geschont</b><span class="re t">2 Punkte liegen gelassen · 0 Verletzungen danach</span></div><div class="hz"><b>Captain 8-mal gesetzt</b><span class="re t">Teamwert <b class="plus">+15,8</b> · am häufigsten Zyra</span></div>','<a>Kader ›</a>')
+ +pan("grid-column:6/13","Das brauchst du in der Rückrunde",'<span class="gk">Alle 20 Disziplinen kommen noch einmal · Zahl = deine Kaderstärke-Rang in Liga 2 · darunter Punkte der Hinrunde</span><div class="dchips">'+Dz.map(function(d){return '<span class="'+(d[3]||"")+'"><b class="t">'+d[1]+'.</b>'+d[0]+' · '+d[2]+'</span>'}).join("")+'</div>'
+   +'<div class="todo"><i>1</i><div><b style="color:var(--creme)">POW ist dein Loch: 5 von 10 Punkten, Gewichtheben und Breaking auf Rang 12 und 14</b><small>Training von Zyra und Maru auf Gewichtheben stellen, oder Vollgas dort gar nicht erst versuchen und die Karten sparen.</small></div><a>Training ›</a></div>'
+   +'<div class="todo"><i>2</i><div><b style="color:var(--creme)">Zwei POW-Karten und die Pflicht-Minuskarte liegen noch</b><small>Minuskarte bis Spieltag 15 fällig. Billigste Stelle: Wettessen an Spieltag 13 (Rang 13, wenig zu verlieren).</small></div><a>Formkarten ›</a></div>'
+   +'<div class="todo"><i>3</i><div><b style="color:var(--creme)">Direktduelle gegen die Plätze 1, 2 und 4 kommen an Spieltag 13, 14 und 17</b><small>Davor schonen, dort die guten Karten legen. Spieltag 13 ist das Derby gegen Franky.</small></div><a>Spielplan ›</a></div>'
+   +'<div class="prog">'+[[11,"R-C","Gewichth.","Tennis","dd","Ramona"],[12,"L-K","Hockey","Schach","",""],[13,"V-W","Climbing","Wettessen","dd","Franky"],[14,"M-S","TDM","Staffel","dir","2."],[15,"T-G","Spurt","I-Spy","",""],[16,"B-B","Football","Fechten","",""],[17,"D-L","Showcase","Takeshi","dir","1."],[18,"C-C","Mini DM","Breaking","",""],[19,"P-C","Eiskunst","Basketb.","",""],[20,"T-C","Battlef.","Time Trial","",""]].map(function(s){return '<div class="'+s[4]+'"><b>Spieltag '+s[0]+'</b>'+lg(s[1])+s[2]+'<br>'+s[3]+'<br><b style="color:var(--'+(s[4]==="dd"?"gold":"gut")+')">'+(s[4]==="dd"?"Derby · "+s[5]:s[4]==="dir"?"gegen Platz "+s[5]:"&nbsp;")+'</b></div>'}).join("")+'</div>','<span class="re">3 Sätze, jeder mit Sprung</span>')
+ +'</div>'}
+
+/* ======================= 3 · MANAGER-LEISTE + DERBY ======================= */
+function manager(){
+ var M=[["Chris","D-P","Death Peaches","2.",30,"sunss","var(--heim)","var(--acht)","Stellt auf · 1 Platz offen · Voll selbst","ich"],["Franky","V-W","Vigilante Wranglers","4.",28,"snsns","var(--gast)","var(--gut)","Bereit seit 4 Minuten · Voll selbst",""],["Ramona","R-C","Royal Court","6.",26,"nssss","#c58cff","var(--stumm)","Abwesend · Halbautomatik: KI stellt auf, Käufe warten auf sie",""]];
+ var ml='<div class="ml">'+M.map(function(m){return '<div class="mk '+m[9]+'" style="--farbe:'+m[6]+'">'+lg(m[1],"lgg")+'<h3>'+m[0]+(m[9]?' <span class="chip s">du</span>':"")+'</h3><div class="zz"><div><strong class="t">'+m[3]+'</strong><small>Liga 2</small></div><div><strong class="t">'+m[4]+'</strong><small>Punkte</small></div><div>'+fm(m[5])+'<small style="display:block;margin-top:.3rem">Serie</small></div></div><span class="tm">'+m[2]+'</span><div class="st"><span class="pkt" style="background:'+m[7]+'"></span>'+m[8]+(m[9]?"":'<a class="btn klein" style="margin-left:auto">'+ic(I.glocke)+' anstupsen</a>')+'</div></div>'}).join("")+'</div>';
+ var ar=[["d","<b>Death Peaches – Vigilante Wranglers</b> <span class='dmarke k'>Derby</span>","Chris gegen Franky · ganz gezeigt"],["","<b>Royal Court – Pirate Crew</b>","Ramona · KI stellt auf · ganz gezeigt"],["","<b>Dire Legion – Mortal Sin</b>","Topspiel · 1. gegen 3. · Zusammenfassung"],["","Vigorous Vikings – Lost Kingdom","Zusammenfassung"],["","4 weitere Begegnungen","nur Ergebnis"]];
+ var pts={c:[2,5,8,9,12,15,18,21,23,25,27,30],f:[3,4,7,10,12,13,16,18,21,23,26,28],r:[1,3,4,7,8,11,13,15,18,21,23,26]};
+ function pfad(a,f){return '<polyline fill="none" stroke="'+f+'" stroke-width="2.5" points="'+a.map(function(v,i){return (20+i*52)+","+(150-v*4.3)}).join(" ")+'"/><circle cx="'+(20+11*52)+'" cy="'+(150-a[11]*4.3)+'" r="5" fill="'+f+'"/>'}
+ return hero({kul:[kul("climbing","fels"),kul("wettessen","bierzelt")],kick:"Saison 1 · vor Spieltag 13 von 20 · Liga 2",titel:"Death Peaches",lage:"<b>2. in Liga 2</b> · heute <b>Derby gegen Franky</b> · Sieg heute = sicher vor ihm",
+   kpi:[["2.","Platz in Liga 2"],["bis 4","Punkte heute"],["+2","Punkte vor Franky"],["1 : 1","Derbys diese Saison"]],cta:["Einsatzliste abgeben","1 Platz offen · Franky wartet"]})
+ +'<div class="m-raster">'+ml
+ +'<section class="pan" style="grid-column:1/8;grid-row:2"><div class="pk"><h2>Heute · Spieltag 13</h2><span class="neu">neu</span><span class="sp"></span><span class="dmarke">'+ic(I.schwert)+' Derby</span></div><div class="derby"><div class="s">'+lg("D-P","")+'<div><b>Death Peaches</b><small>Chris · 2. · 30 Pkt · Heim</small></div></div><div class="mi"><small>Direktvergleich Saison 1</small><strong class="t">1 : 1</strong><small>Hinspiel Spieltag 4: <b style="color:var(--creme)">3 : 1 Punkte für Franky</b></small></div><div class="s r">'+lg("V-W","")+'<div><b>Vigilante Wranglers</b><small>Franky · 4. · 28 Pkt · bereit</small></div></div></div><div class="dz2"><div style="--bild:url('+kul("climbing","fels")+')"><b>Climbing</b>Kaderstärke Rang 2 gegen Rang 5 · du bist Favorit</div><div style="--bild:url('+kul("wettessen","bierzelt")+')"><b>Wettessen</b>Kaderstärke Rang 13 gegen Rang 6 · Franky ist Favorit</div></div></section>'
+ +'<section class="pan" style="grid-column:8/13;grid-row:2"><div class="pk"><h2>Reihenfolge in der Arena</h2><span class="neu">neu</span><span class="sp"></span><span class="re">Derbys zuerst, dann Menschen, dann Topspiel</span></div><div class="pb">'+ar.map(function(a,i){return '<div class="ar '+a[0]+'"><i class="t">'+(i+1)+'</i><span>'+a[1]+'</span><small>'+a[2]+'</small></div>'}).join("")+'<div class="ms" style="margin-top:auto;border-top:1px solid var(--linie)">'+ic(I.auge)+'<span>Sind beide im Raum, sehen Chris und Franky das Derby <b>gleichzeitig</b>. Sonst läuft es bei jedem zuerst.</span></div></div></section>'
+ +'<section class="pan" style="grid-column:1/6;grid-row:3"><div class="pk"><h2>Managertabelle</h2><span class="neu">neu</span><span class="sp"></span><span class="re">Punkte je Spieltag</span></div><div class="pb" style="padding-top:.4rem"><svg class="verl" viewBox="0 0 620 160" preserveAspectRatio="none"><g stroke="rgba(244,230,196,.08)">'+[20,60,100,140].map(function(y){return '<line x1="0" x2="620" y1="'+y+'" y2="'+y+'"/>'}).join("")+'</g>'+pfad(pts.r,"#c58cff")+pfad(pts.f,"#45B0C9")+pfad(pts.c,"#F2A03D")+'</svg><table style="flex:none"><tr><th>Manager</th><th>Rang</th><th>Pkt</th><th>Verh.</th><th>Derby-Pkt</th><th>Beste Disziplin</th></tr><tr><td style="color:var(--heim)"><b>Chris</b></td><td>2.</td><td><b>30</b></td><td class="plus">+132,7</td><td>5</td><td>Showcase</td></tr><tr><td style="color:var(--gast)"><b>Franky</b></td><td>4.</td><td><b>28</b></td><td class="plus">+17,1</td><td>7</td><td>Eiskunstlauf</td></tr><tr><td style="color:#c58cff"><b>Ramona</b></td><td>6.</td><td><b>26</b></td><td class="minus">−16,8</td><td>4</td><td>Tennis</td></tr></table></div></section>'
+ +'<section class="pan" style="grid-column:6/10;grid-row:3"><div class="pk"><h2>Deine Mitspieler am Spieltag 12</h2><span class="neu">neu</span></div><div class="pb"><div class="ms">'+lg("V-W")+'<span><b>Franky</b> verliert Hockey 3 : 7 und fällt auf <b>Platz 4</b>.</span></div><div class="ms">'+lg("R-C")+'<span><b>Ramona</b> holt 4 von 4 Punkten, vierter Sieg in Folge, jetzt <b>Platz 6</b>.</span></div><div class="ms">'+lg("V-W")+'<span><b>Franky</b> hat seine beste SPE-Karte gespielt. Für das Derby hat er noch <b>2 Pluskarten</b>.</span></div><div class="ms" style="margin-top:auto">'+ic(I.schwert)+'<span>Nächste Derbys: <b>heute</b> Chris gegen Franky · <b>Spieltag 19</b> Franky gegen Ramona · Bilanz Chris gegen Ramona <b>1 : 0</b></span></div></div></section>'
+ +'<section class="pan" style="grid-column:10/13;grid-row:3"><div class="pk"><h2>Bereit-Status</h2><span class="neu">neu</span></div><div class="pb"><div class="ms"><span class="chip g">bereit</span><span>Einsatzliste abgegeben</span></div><div class="ms"><span class="chip a">stellt auf</span><span>ist da, noch offen</span></div><div class="ms"><span class="chip s">abwesend</span><span>delegierte Bereiche füllt die KI, der Spieltag wartet nicht</span></div><div class="ms"><span class="chip w">blockiert</span><span>nicht delegiert und nicht da: anstupsen</span></div><div class="ms" style="margin-top:auto">Jeder sieht nur seine eigenen Entscheidungen, von den anderen nur den Status.</div></div></section>'
+ +'</div>'}
+$("main").innerHTML=({entscheidungen:entscheidungen,rennen:rennen,halbzeit:halbzeit,manager:manager}[A]||entscheidungen)();
+</script>
+</body>
+</html>
