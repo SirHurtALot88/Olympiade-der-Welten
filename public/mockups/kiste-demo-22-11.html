@@ -61,6 +61,9 @@ main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:.8rem;
 .p1 .hinw,.p2 .hinw,.p3 .hinw{opacity:0}
 .leiste{display:flex;align-items:center;gap:.7rem;padding:.6rem .9rem;border-top:1px solid var(--li);flex-wrap:wrap}
 .ch{display:flex;height:1.3rem;border-radius:.3rem;overflow:hidden;margin:.3rem 0}.ch i{font-style:normal;font-size:.72rem;font-weight:700;color:#06080c;display:grid;place-items:center}
+.mat{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.6rem}.mat span{padding:.2rem .6rem;border-radius:1rem;border:1px solid var(--li2);color:var(--leise);font-size:.86rem}.mat span b{color:var(--creme);margin-left:.3rem}.mat span.null{opacity:.35}.mat span.sig{border-color:var(--gold);color:var(--gold)}
+.rez .zeile{display:flex;align-items:center;gap:.5rem;margin:.25rem 0;font-size:.86rem;color:var(--leise)}.rez .zeile .btn{padding:.2rem .7rem;margin-left:auto;white-space:nowrap}
+.ic.mt{border-radius:50%;border:2px dashed var(--creme);color:var(--creme);font:700 1.3rem var(--zahl)}
 /* Lager und Schmiede */
 .lager{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem}
 .it{position:relative;padding:.4rem .3rem;border-radius:.4rem;background:var(--f2);border:1px solid color-mix(in srgb,var(--sf) 55%,transparent);border-top:3px solid var(--sf);text-align:center;cursor:pointer;font-size:.74rem;color:var(--leise);line-height:1.15;min-height:6.2rem}
@@ -79,72 +82,96 @@ main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:.8rem;
 <section class="pan" id="sKiste"><div class="pk"><h2>Eisenkiste · 20 Ruhm</h2><small>Klick auf die Kiste · Bewegung ist CSS, Bilder aus PixelLab</small></div>
  <div class="buehne p0" id="buehne"><span class="strahl"></span><div class="fund" id="fund"></div>
   <div class="truhe" id="truhe"><img class="kranz" src="../sprites/beute/lichtkranz.png" alt=""><img class="zu" src="../sprites/beute/kiste-eisen-zu.png" alt="" id="bz"><img class="offen" src="../sprites/beute/kiste-eisen-offen.png" alt=""></div><span class="hinw">Klick auf die Kiste</span></div>
- <div class="leiste"><button class="btn g" id="nochmal">nochmal öffnen</button><span class="klein" id="kText">Drei Funde, du wählst einen. Die zwei anderen werden zu Teilen.</span></div></section>
+ <div class="leiste"><button class="btn g" id="nochmal">nochmal öffnen</button><span class="klein" id="kText">Drei Funde, Ausrüstung oder Material. Du wählst einen, die zwei anderen werden zu Teilen.</span></div></section>
 <section class="pan" id="sSchmiede" style="display:none"><div class="pk"><h2>Lager · anklicken zum Auswählen</h2><small id="auswT">nichts gewählt</small></div>
- <div class="pb"><div class="lager" id="lager"></div><div id="log">Probier: <b>Seil + Eisen</b> wählen (Enterhaken), oder drei Standard-Teile (Glück). Was gerade geht, ist golden umrandet.</div></div></section>
+ <div class="pb"><div class="klein" style="margin-bottom:.3rem"><b>Materialbeutel</b> (kein Lagerplatz)</div><div class="mat" id="mat"></div><div class="lager" id="lager"></div><div id="log">Baue den Enterhaken in drei Schritten: Materialien zu zwei Grundgegenständen, die zum Wurfanker, der mit dem Abzeichen zum Enterhaken. Was gerade geht, ist golden umrandet.</div></div></section>
 <aside class="pan"><div class="pk"><h2 id="rT">Chancen der Eisenkiste</h2><small id="rS">je Fund, immer sichtbar</small></div>
  <div class="pb" id="rechts"></div></aside>
 </main>
 <script>
 var SF=["var(--s0)","var(--s1)","var(--s2)","var(--s3)"],SN=["Standard","Selten","Episch","Legendär"],DREH=[200,300,0,130];
 var PREIS=[1,3,6,12],VK=[.25,.30,.35,.40],TEILE=[1,2,4,8];
-/* Katalog: Kuerzel, Stufe, Name, Wirkung, Art, Bild oder Zeichen */
+/* Stufen: Standard und Selten = nur +X · Episch = kleiner Effekt · Legendaer = grosser Effekt */
 var K={riegel:[0,"Energieriegel","+3 Stamina","allgemein · Einweg","icon-energieriegel.png"],brille:[0,"Zielbrille","+3 Awareness","I-Spy, TDM","ZB"],kreide:[0,"Kreideblock","+8 Power","Climbing · Einweg","KB"],
- hand:[1,"Sturmhandschuhe","+4 Dexterity","POW-Disziplinen","icon-sturmhandschuhe.png"],falke:[1,"Falkenbrille","+6 Awareness","I-Spy, TDM","FB"],spikes:[1,"Spikes","+6 Speed","SPE-Disziplinen","SP"],
- faenger:[1,"Fängerhandschuhe","+4 Dexterity, +3 Awareness","POW-Disziplinen","FH"],
- seil:[1,"Seil","+3 Dexterity","Grundteil","SE"],eisen:[1,"Eisen","+3 Power","Grundteil","EI"],
- haken:[3,"Enterhaken","überspringt eine Sektion","Climbing · Effekt, einmal je Lauf","EH"],
- wind:[2,"Windläufer","+10 Speed","Spurt, Staffel","icon-windlaeufer.png"],brett:[2,"Meisterbrett","+10 Intelligence","Speed-Schach","MB"],
- trikot:[3,"Glückstrikot","+9 Charisma, +6 Spirit","SOC-Disziplinen","GT"]};
-var NACH=[["riegel","brille","kreide"],["hand","falke","spikes","seil","eisen"],["wind","brett"],["trikot","haken"]];
-var Z={ruhm:60,teile:8,kasse:3.2,quote:90,zaehler:3,lager:["brille","brille","kreide","hand","seil","eisen","riegel"],ausw:[],funde:[],offen:false};
+ hand:[1,"Sturmhandschuhe","+4 Dexterity","POW-Disziplinen","icon-sturmhandschuhe.png"],falke:[1,"Falkenbrille","+6 Awareness","I-Spy, TDM","FB"],
+ kseil:[1,"Kletterseil","+5 Dexterity","Climbing · Grundgegenstand","KS"],ehaken:[1,"Eisenhaken","+5 Power","Climbing · Grundgegenstand","EH"],
+ wind:[2,"Windläufer","+10 Speed","kleiner Effekt: Start 10 % schneller","icon-windlaeufer.png"],anker:[2,"Wurfanker","+4 Dexterity, +4 Power","kleiner Effekt: erste Sektion 20 % schneller","WA"],
+ trikot:[3,"Glückstrikot","+9 Charisma","großer Effekt: Moral fällt nie unter 60","GT"],haken:[3,"Enterhaken","überspringt eine Sektion","großer Effekt, Climbing, einmal je Lauf","EN"]};
+var NACH=[["riegel","brille","kreide"],["hand","falke","kseil","ehaken"],["wind","anker"],["trikot","haken"]];
+var MN={seil:"Seil",eisen:"Eisen",feder:"Feder",linse:"Linse",rauch:"Rauchkraut",kristall:"Kristall",banner:"Banner",leder:"Leder",abz:"Bergführer-Abzeichen"},MK=["seil","eisen","feder","linse","rauch","kristall","banner","leder"];
+var Z={ruhm:60,teile:10,kasse:3.2,quote:90,zaehler:3,lager:["brille","brille","kreide","hand","riegel"],mat:{seil:1,leder:1,eisen:2,abz:1},hb:[100,100,60,0,100],auto:false,ausw:[],funde:[],offen:false};
 function $(i){return document.getElementById(i)}
-function bild(k){var b=K[k][4],s=K[k][0];return b.length>3?'<span class="ic"><img src="../sprites/beute/'+b+'" alt="" onerror="this.parentNode.className=\'ic sv\';this.parentNode.textContent=\''+K[k][1].slice(0,2)+'\'"></span>':'<span class="ic sv">'+b+'</span>'}
+function istM(k){return k.charAt(0)==="#"}
+function bild(k){if(istM(k))return '<span class="ic mt">'+MN[k.slice(1)].slice(0,2)+'</span>';var b=K[k][4];return b.length>3?'<span class="ic"><img src="../sprites/beute/'+b+'" alt="" onerror="this.parentNode.className=\'ic sv\';this.parentNode.textContent=\''+K[k][1].slice(0,2)+'\'"></span>':'<span class="ic sv">'+b+'</span>'}
 function zahl(x){return x.toFixed(2).replace(".",",").replace(/0$/,"")}
 function wuerfel(ch){var r=Math.random()*100,s=0;for(var i=0;i<ch.length;i++){s+=ch[i];if(r<s)return i}return ch.length-1}
 function aus(st){var a=NACH[st];return a[Math.floor(Math.random()*a.length)]}
+function m(k){return Z.mat[k]||0}
+/* Haltbarkeit laeuft neben dem Lager mit; Reparatur = 25 % vom Haendlerpreis x Verschleiss, kaputt x 1,5 */
+function rein(k){Z.lager.push(k);Z.hb.push(100)}
+function raus(i){Z.lager.splice(i,1);Z.hb.splice(i,1)}
+function rkost(i){var f=100-Z.hb[i];return PREIS[K[Z.lager[i]][0]]*.25*f/100*(f===100?1.5:1)}
+function flick(l){var s=0;l.forEach(function(i){var c=rkost(i);if(c>0&&Z.kasse>=c){Z.kasse-=c;s+=c;Z.hb[i]=100}});return s}
+function alle(){return Z.lager.map(function(k,i){return i})}
 function stand(){$("vr").textContent=Z.ruhm;$("vt").textContent=Z.teile;$("vk").textContent=zahl(Z.kasse)+" C";$("vl").textContent=Z.lager.length+" / 16"}
-/* ---------- Kiste ---------- */
-var CH=[40,40,17,3],T=[];
+/* ---------- Kiste: Material 30, Standard 28, Selten 28, Episch 12, Legendaer 2 ---------- */
+var CH=[30,28,28,12,2],CN=["Material","Standard","Selten","Episch","Legendär"],CF=["#f4e6c4"].concat(SF),T=[];
 function setz(n){$("buehne").className="buehne p"+n}
 function oeffne(){if(Z.offen)return;if(Z.ruhm<20){Z.ruhm+=40;$("kText").innerHTML="<b>Demo:</b> Ruhm war leer, 40 dazugelegt."}Z.ruhm-=20;Z.offen=true;Z.zaehler++;
- var st=[wuerfel(CH),wuerfel(CH),wuerfel(CH)];if(Z.zaehler>=5&&Math.max.apply(0,st)<2){st[2]=2}if(Math.max.apply(0,st)>=2)Z.zaehler=0;
- Z.funde=st.map(aus);var top=Math.max.apply(0,st);$("buehne").style.setProperty("--ziel",SF[top]);$("truhe").style.setProperty("--dreh",DREH[top]+"deg");
- $("fund").innerHTML=Z.funde.map(function(k,i){return '<div class="fk" style="--sf:'+SF[K[k][0]]+'" data-i="'+i+'">'+bild(k)+'<em>'+SN[K[k][0]]+'</em><b>'+K[k][1]+'</b><strong>'+K[k][2]+'</strong><small>'+K[k][3]+'</small></div>'}).join("");
- stand();rechtsKiste();setz(1);T.push(setTimeout(function(){setz(2)},1200));T.push(setTimeout(function(){setz(3);$("kText").innerHTML="Wähle <b>einen</b> Fund. Die Farbe des Lichts hat die beste Stufe verraten: <b style='color:"+SF[top]+"'>"+SN[top]+"</b>."},2000))}
-function nimm(i){if(!Z.offen||Z.funde.length<3)return;var k=Z.funde[i],t=0;Z.funde.forEach(function(f,j){if(j!==i)t+=TEILE[K[f][0]]});
- if(Z.lager.length<16)Z.lager.push(k);else t+=TEILE[K[k][0]];Z.teile+=t;Z.funde=[];
+ var st=[wuerfel(CH)-1,wuerfel(CH)-1,wuerfel(CH)-1];if(Math.max.apply(0,st)<0)st[0]=1;if(Z.zaehler>=5&&Math.max.apply(0,st)<2)st[2]=2;if(Math.max.apply(0,st)>=2)Z.zaehler=0;
+ Z.funde=st.map(function(x){return x<0?"#"+MK[Math.floor(Math.random()*8)]:aus(x)});var top=Math.max(0,Math.max.apply(0,st));$("buehne").style.setProperty("--ziel",SF[top]);$("truhe").style.setProperty("--dreh",DREH[top]+"deg");
+ $("fund").innerHTML=Z.funde.map(function(k,i){var M=istM(k);return '<div class="fk" style="--sf:'+(M?"#f4e6c4":SF[K[k][0]])+'" data-i="'+i+'">'+bild(k)+'<em>'+(M?"Material":SN[K[k][0]])+'</em><b>'+(M?MN[k.slice(1)]:K[k][1])+'</b><strong>'+(M?"zum Schmieden":K[k][2])+'</strong><small>'+(M?"kommt in den Beutel":K[k][3])+'</small></div>'}).join("");
+ stand();rechtsKiste();setz(1);T.push(setTimeout(function(){setz(2)},1200));T.push(setTimeout(function(){setz(3);$("kText").innerHTML="Wähle <b>einen</b> Fund. Das Licht hat die beste Stufe verraten: <b style='color:"+SF[top]+"'>"+SN[top]+"</b>."},2000))}
+function nimm(i){if(!Z.offen||Z.funde.length<3)return;var k=Z.funde[i],t=0;Z.funde.forEach(function(f,j){if(j!==i)t+=istM(f)?1:TEILE[K[f][0]]});
+ if(istM(k))Z.mat[k.slice(1)]=m(k.slice(1))+1;else if(Z.lager.length<16)rein(k);else t+=TEILE[K[k][0]];Z.teile+=t;Z.funde=[];
  document.querySelectorAll(".fk").forEach(function(e,j){e.classList.add(j===i?"gew":"weg")});
- $("kText").innerHTML="<b>"+K[k][1]+"</b> liegt im Lager. Die zwei anderen wurden zu <b>"+t+" Teilen</b>. „nochmal öffnen“ für die nächste Kiste.";stand()}
-function neu(){T.forEach(clearTimeout);T=[];Z.offen=false;Z.funde=[];$("fund").innerHTML="";setz(0);$("kText").textContent="Drei Funde, du wählst einen. Die zwei anderen werden zu Teilen."}
+ $("kText").innerHTML="<b>"+(istM(k)?MN[k.slice(1)]+"</b> liegt im Materialbeutel":K[k][1]+"</b> liegt im Lager")+". Die zwei anderen wurden zu <b>"+t+" Teilen</b>.";stand()}
+function neu(){T.forEach(clearTimeout);T=[];Z.offen=false;Z.funde=[];$("fund").innerHTML="";setz(0);$("kText").textContent="Drei Funde, Ausrüstung oder Material. Du wählst einen, die zwei anderen werden zu Teilen."}
 function rechtsKiste(){$("rT").textContent="Chancen der Eisenkiste";$("rS").textContent="je Fund, immer sichtbar";
- $("rechts").innerHTML='<div class="ch">'+CH.map(function(c,i){return '<i style="width:'+c+'%;background:'+SF[i]+'">'+c+' %</i>'}).join("")+'</div><p class="klein">Standard 40 · Selten 40 · Episch 17 · Legendär 3 %. <b>Mitleidszähler '+Z.zaehler+' von 5:</b> spätestens jede fünfte Eisenkiste zeigt etwas Episches.</p><p class="klein"><b>Eins aus drei:</b> du siehst drei Funde und nimmst einen. Das halbiert das Pech gegenüber einem blinden Zug.</p><p class="klein"><b>Kisten kosten Ruhm</b>, nie Geld. Ruhm gibt es für Punkte am Spieltag.</p><p class="klein"><b>Regie:</b> Klick · rütteln · Lichtkranz in der Farbe der besten Stufe (1,2 s) · Deckel (2,0 s) · drei Funde.</p>'}
+ $("rechts").innerHTML='<div class="ch">'+CH.map(function(c,i){return '<i style="width:'+c+'%;background:'+CF[i]+'">'+c+'</i>'}).join("")+'</div><p class="klein"><b>Material 30 %</b> · Standard 28 · Selten 28 · Episch 12 · Legendär 2 %. <b>Mitleidszähler '+Z.zaehler+' von 5:</b> spätestens jede fünfte Eisenkiste zeigt etwas Episches.</p><p class="klein"><b>Stufen:</b> Standard und Selten heben nur Attribute. <b style="color:var(--s2)">Episch</b> hat zusätzlich einen kleinen Effekt, <b style="color:var(--s3)">Legendär</b> einen großen, den man in der Arena sieht.</p><p class="klein"><b>Materialien</b> (Seil, Eisen, Feder, Linse, Rauchkraut, Kristall, Banner, Leder) sind keine Ausrüstung. Aus ihnen baut die Schmiede Grundgegenstände.</p><p class="klein"><b>Eins aus drei:</b> du siehst drei Funde und nimmst einen, mindestens einer ist Ausrüstung. Kisten kosten Ruhm, nie Geld.</p>'}
 /* ---------- Schmiede ---------- */
 function gew(){return Z.ausw.map(function(i){return Z.lager[i]})}
-function rezepte(){var g=gew(),n=g.length,st=n?K[g[0]][0]:0,gleich=n===3&&K[g[1]][0]===st&&K[g[2]][0]===st,s=g.slice().sort().join("+");
- var fest={"brille+hand":"faenger","eisen+seil":"haken"}[s],kost=fest==="haken"?6:0;
- var r=[];
- r.push(["fest","Bauplan","Zwei bestimmte ergeben ein bestimmtes Teil","<b>Seil + Eisen → Enterhaken</b> (Legendär, mit Effekt: überspringt im Climbing einmal eine Sektion) · 6 Teile, Schmiede Stufe 4. <b>Sturmhandschuhe + Zielbrille → Fängerhandschuhe</b> · 0,5 C, Stufe 2. Kein Würfel.",!!fest&&(kost?Z.teile>=kost:Z.kasse>=.5),"zusammenlegen",function(){weg();if(kost)Z.teile-=kost;else Z.kasse-=.5;Z.lager.push(fest);sag("Bauplan: <b style='color:"+SF[K[fest][0]]+"'>"+K[fest][1]+"</b> ("+SN[K[fest][0]]+") entstanden. "+K[fest][2]+".")}]);
- r.push(["glueck","Glück","Drei derselben Stufe ergeben eines der nächsten",(gleich&&st<3?"<b>3 × "+SN[st]+"</b> → sicher <b style='color:"+SF[st+1]+"'>1 × "+SN[st+1]+"</b>. ":"Standard → Selten, Selten → Episch, Episch → Legendär. Die Stufe ist sicher. ")+"Zufall ist nur, <b>welches</b> Teil der Stufe es wird (jedes gleich wahrscheinlich). Kosten 1 Teil, Schmiede Stufe 3.",gleich&&st<3&&Z.teile>=1,"wagen",function(){var k=aus(st+1);weg();Z.teile-=1;Z.lager.push(k);sag("Glück: <b style='color:"+SF[st+1]+"'>"+SN[st+1]+"</b>, es wurde <b>"+K[k][1]+"</b>.")}]);
- var vk=0;g.forEach(function(k){vk+=PREIS[K[k][0]]*VK[K[k][0]]});
- r.push(["geld","Verkaufen","Beim Händler gegen Geld","Standard 25 %, Selten 30 %, Episch 35 %, Legendär 40 % vom Händlerpreis, mal Zustand. "+(n?"Auswahl bringt <b>"+zahl(vk)+" C</b>, davon bei Vorstands-Quote "+Z.quote+" % ausgebbar <b>"+zahl(vk*Z.quote/100)+" C</b>.":"Der Erlös unterliegt der Vorstands-Quote."),n>0,"verkaufen",function(){weg();Z.kasse+=vk;sag("Verkauft für <b>"+zahl(vk)+" C</b>. Ausgebbar davon "+zahl(vk*Z.quote/100)+" C, der Rest bleibt als Puffer auf dem Konto.")}]);
- var tl=0;g.forEach(function(k){tl+=TEILE[K[k][0]]});
- r.push(["fest","Zerlegen","In Teile für Reparatur und Aufwertung","Standard 1, Selten 2, Episch 4, Legendär 8 Teile. "+(n?"Auswahl bringt <b>"+tl+" Teile</b>.":""),n>0,"zerlegen",function(){weg();Z.teile+=tl;sag("Zerlegt: <b>+"+tl+" Teile</b>.")}]);
- return r}
-function weg(){Z.ausw.sort(function(a,b){return b-a}).forEach(function(i){Z.lager.splice(i,1)});Z.ausw=[]}
+function hat(k){return Z.lager.indexOf(k)>=0}
+function nehm(k){raus(Z.lager.indexOf(k))}
+function bau(ziel,pruef,zahle,text){return {ok:pruef(),tu:function(){zahle();rein(ziel);Z.ausw=[];sag(text+" <b style='color:"+SF[K[ziel][0]]+"'>"+K[ziel][1]+"</b> ("+SN[K[ziel][0]]+", "+K[ziel][2]+").")}}}
+var B=[];
+function rezepte(){var g=gew(),n=g.length,st=n?K[g[0]][0]:0,gleich=n===3&&K[g[1]][0]===st&&K[g[2]][0]===st;
+ B=[bau("kseil",function(){return m("seil")>=1&&m("leder")>=1},function(){Z.mat.seil--;Z.mat.leder--},"Stufe 1:"),
+    bau("ehaken",function(){return m("eisen")>=2},function(){Z.mat.eisen-=2},"Stufe 1:"),
+    bau("anker",function(){return hat("kseil")&&hat("ehaken")&&Z.teile>=3},function(){nehm("kseil");nehm("ehaken");Z.teile-=3},"Stufe 2:"),
+    bau("haken",function(){return hat("anker")&&m("abz")>=1&&Z.teile>=6},function(){nehm("anker");Z.mat.abz--;Z.teile-=6},"Stufe 3:")];
+ function z(i,t){return '<div class="zeile"><span>'+t+'</span><button class="btn'+(B[i].ok?" g":"")+'" data-b="'+i+'"'+(B[i].ok?"":" disabled")+'>bauen</button></div>'}
+ var h='<div class="rez fest'+(B[0].ok||B[1].ok?" geht":"")+'"><h3><span>1 · Material</span>Zwei Materialien → Grundgegenstand</h3>'+z(0,"Seil + Leder → <b>Kletterseil</b> (Selten, +5 Dexterity)")+z(1,"Eisen + Eisen → <b>Eisenhaken</b> (Selten, +5 Power)")+'</div>'
+  +'<div class="rez glueck'+(B[2].ok?" geht":"")+'"><h3><span>2 · Kombinieren</span>Zwei Grundgegenstände → Episch</h3>'+z(2,"Kletterseil + Eisenhaken + 3 Teile → <b>Wurfanker</b> (kleiner Effekt: erste Sektion 20 % schneller)")+'</div>'
+  +'<div class="rez geld'+(B[3].ok?" geht":"")+'"><h3><span>3 · Legendär</span>Episch + Signatur-Material</h3>'+z(3,"Wurfanker + Bergführer-Abzeichen + 6 Teile → <b>Enterhaken</b> (großer Effekt: überspringt im Climbing einmal eine Sektion)")+'</div>';
+ var vk=0,tl=0;g.forEach(function(k){vk+=PREIS[K[k][0]]*VK[K[k][0]];tl+=TEILE[K[k][0]]});
+ var rk=0,ra=0;Z.ausw.forEach(function(i){rk+=rkost(i)});alle().forEach(function(i){ra+=rkost(i)});
+ var ok3=gleich&&st<3&&Z.teile>=1,okr=rk>0&&Z.kasse>=rk;
+ h+='<div class="rez'+(n?" geht":"")+'"><h3><span style="color:var(--leise)">Auswahl im Lager</span>Glück, verkaufen, zerlegen</h3><p><b>Glück:</b> drei derselben Stufe → sicher eines der nächsten, welches ist Zufall (1 Teil). <b>Verkaufen:</b> 25 / 30 / 35 / 40 % vom Händlerpreis'+(n?", Auswahl <b>"+zahl(vk)+" C</b>, bei Quote "+Z.quote+" % ausgebbar "+zahl(vk*Z.quote/100)+" C":"")+'. <b>Zerlegen:</b> 1 / 2 / 4 / 8 Teile'+(n?", Auswahl <b>"+tl+"</b>":"")+'.</p><button class="btn'+(ok3?" g":"")+'" data-a="g"'+(ok3?"":" disabled")+'>wagen</button> <button class="btn'+(n?" g":"")+'" data-a="v"'+(n?"":" disabled")+'>verkaufen</button> <button class="btn'+(n?" g":"")+'" data-a="z"'+(n?"":" disabled")+'>zerlegen</button></div>'
+  +'<div class="rez geld'+(ra>0?" geht":"")+'"><h3><span>Reparatur</span>Kostet Geld, nicht Teile</h3><p>25 % vom Händlerpreis × Verschleiß, kaputt × 1,5. Offen: <b>'+zahl(ra)+' C</b>'+(rk?", Auswahl <b>"+zahl(rk)+" C</b>":"")+'. In der Demo 20 % Verschleiß je Spieltag, im Spiel 5 % je Einsatz.</p><button class="btn'+(okr?" g":"")+'" data-a="r"'+(okr?"":" disabled")+'>Auswahl reparieren</button> <button class="btn'+(Z.auto?" g":"")+'" data-a="auto">Auto-Reparatur: '+(Z.auto?"an":"aus")+'</button> <button class="btn" data-a="tag">Spieltag spielen</button></div>'
+  +'<p class="klein">Angelehnt an: Dota-Shop (fertige Teile werden zu größeren), Teamfight Tactics (zwei Bausteine, ein Gegenstand), Händler-Rezepte aus Path of Exile, Entzaubern in Hearthstone. Im Spiel schaltet die Stufe der Schmiede die Schritte frei.</p>';
+ return {h:h,st:st,vk:vk,tl:tl,rk:rk}}
+function weg(){Z.ausw.sort(function(a,b){return b-a}).forEach(function(i){raus(i)});Z.ausw=[]}
 function sag(t){$("log").innerHTML=t;zeig()}
-var R=[];
-function zeig(){stand();var h="";for(var i=0;i<16;i++){var k=Z.lager[i];h+=k?'<div class="it'+(Z.ausw.indexOf(i)>=0?" gew":"")+'" style="--sf:'+SF[K[k][0]]+'" data-l="'+i+'">'+bild(k)+'<b>'+K[k][1]+'</b>'+K[k][2]+'</div>':'<div class="it frei"></div>'}
+var R={};
+function zeig(){stand();var h="";for(var i=0;i<16;i++){var k=Z.lager[i];h+=k?'<div class="it'+(Z.ausw.indexOf(i)>=0?" gew":"")+'" style="--sf:'+SF[K[k][0]]+'" data-l="'+i+'">'+bild(k)+'<b>'+K[k][1]+'</b>'+K[k][2]+'<br><span style="color:'+(Z.hb[i]>50?"var(--gruen,#62d394)":Z.hb[i]>0?"#f3b54a":"#ff6058")+'">'+(Z.hb[i]?Z.hb[i]+" %":"kaputt")+'</span></div>':'<div class="it frei"></div>'}
  $("lager").innerHTML=h;$("auswT").textContent=Z.ausw.length?Z.ausw.length+" gewählt":"nichts gewählt";
- R=rezepte();$("rT").textContent="Schmiede und Händler";$("rS").textContent="fest, Glück, verkaufen, zerlegen";
- $("rechts").innerHTML=R.map(function(r,i){return '<div class="rez '+r[0]+(r[4]?" geht":"")+'"><h3><span>'+r[1]+'</span>'+r[2]+'</h3><p>'+r[3]+'</p><button class="btn'+(r[4]?" g":"")+'" data-r="'+i+'"'+(r[4]?"":" disabled")+'>'+r[5]+'</button></div>'}).join("")+'<p class="klein">Angelehnt an: Baupläne aus Teamfight Tactics und Dota (zwei Grundteile, ein Gegenstand mit Effekt), Horadrim-Würfel, Händler-Rezepte aus Path of Exile, Entzaubern in Hearthstone. <b>Im Spiel</b> schaltet die Gebäudestufe der Schmiede die Rezepte frei.</p>'}
+ $("mat").innerHTML=MK.map(function(k){return '<span class="'+(m(k)?"":"null")+'">'+MN[k]+'<b>'+m(k)+'</b></span>'}).join("")+'<span class="sig'+(m("abz")?"":" null")+'">'+MN.abz+'<b>'+m("abz")+'</b></span>';
+ R=rezepte();$("rT").textContent="Schmiede";$("rS").textContent="drei Schritte bis Legendär";$("rechts").innerHTML=R.h}
 function tab(n){$("t0").className=n?"":"an";$("t1").className=n?"an":"";$("sKiste").style.display=n?"none":"";$("sSchmiede").style.display=n?"":"none";if(n)zeig();else rechtsKiste()}
 document.addEventListener("click",function(e){var t=e.target;
  if(t.id==="t0")return tab(0);if(t.id==="t1")return tab(1);
  if(t.closest("#truhe"))return oeffne();if(t.id==="nochmal"){neu();return setTimeout(oeffne,250)}
  var f=t.closest(".fk");if(f)return nimm(+f.dataset.i);
  var l=t.closest(".it[data-l]");if(l){var i=+l.dataset.l,p=Z.ausw.indexOf(i);if(p>=0)Z.ausw.splice(p,1);else if(Z.ausw.length<3)Z.ausw.push(i);return zeig()}
- if(t.dataset.r!==undefined&&!t.disabled)R[+t.dataset.r][6]()});
+ if(t.dataset.b!==undefined&&!t.disabled)return B[+t.dataset.b].tu();
+ if(t.dataset.a&&!t.disabled){var a=t.dataset.a,r=R;
+  if(a==="r"){var c=flick(Z.ausw);Z.ausw=[];return sag("Repariert für <b>"+zahl(c)+" C</b>. Posten in den Finanzen: „Ausrüstung: Reparatur“, aus dem Investitionstopf.")}
+  if(a==="auto"){Z.auto=!Z.auto;return sag("Auto-Reparatur <b>"+(Z.auto?"an":"aus")+"</b>. "+(Z.auto?"Nach jedem Spieltag wird alles auf 100 % gebracht, solange das Geld reicht.":"Verschleiß bleibt, bis du selbst reparierst."))}
+  if(a==="tag"){Z.hb=Z.hb.map(function(x){return Math.max(0,x-20)});Z.ausw=[];var d=Z.auto?flick(alle()):0;return sag("Spieltag gespielt: jedes Teil −20 %."+(Z.auto?" Auto-Reparatur: <b>−"+zahl(d)+" C</b>.":" Auto-Reparatur ist aus."))}
+  if(a==="g"){var k=aus(r.st+1);weg();Z.teile-=1;rein(k);return sag("Glück: <b style='color:"+SF[r.st+1]+"'>"+SN[r.st+1]+"</b>, es wurde <b>"+K[k][1]+"</b>.")}
+  if(a==="v"){weg();Z.kasse+=r.vk;return sag("Verkauft für <b>"+zahl(r.vk)+" C</b>. Ausgebbar davon "+zahl(r.vk*Z.quote/100)+" C, der Rest bleibt als Puffer auf dem Konto.")}
+  if(a==="z"){weg();Z.teile+=r.tl;return sag("Zerlegt: <b>+"+r.tl+" Teile</b>.")}}});
 $("bz").addEventListener("error",function(){$("truhe").classList.add("ersatz")});
 if(location.search.indexOf("tab=1")>=0)tab(1);else rechtsKiste();stand();
 </script>

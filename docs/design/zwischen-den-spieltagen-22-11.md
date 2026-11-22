@@ -1378,3 +1378,160 @@ offen. Auch mit Stufe 5 bleibt der Verkauf bei höchstens 60 % des Händlerpreis
 2. **Wie stark dürfen sie sein?** Der Enterhaken macht im Mockup aus der Sechsten die Dritte. Ist das die gewünschte
    Größenordnung, oder eher kleiner oder größer?
 3. **Händler als Figuren** (PixelLab, freigabepflichtig) oder als Symbole?
+
+---
+
+# Runde 9 (22.11.): Stufen, Materialien, Baum wie im Dota-Shop, Reparatur in Geld
+
+Chris' Vorgaben: starke Effekte nur auf hoher Stufe; Materialien als eigene Sache in Kisten; fertige Gegenstände
+miteinander kombinieren; Gegenstände dürfen im Team mehrfach vorkommen; Reparieren kostet Geld; Auto-Reparatur.
+Dieser Teil ersetzt in §37 die Regeln „zwei Grundteile ergeben einen Signatur-Gegenstand“ und „einzigartig je Team“.
+
+## 40. Stufenregel und die Frage „Elite“
+
+| Stufe | Was der Gegenstand kann | Woher |
+|---|---|---|
+| Standard | nur Attribut (+X) | Kiste, Händler |
+| Selten | nur Attribut (+X), dazu alle Grundgegenstände der Schmiede | Kiste, Händler, Schmiede Schritt 1 |
+| Episch | Attribut und **ein kleiner Effekt** | Kiste (selten), Schmiede Schritt 2 |
+| Legendär | Attribut und **ein großer Effekt**, den man in der Arena sieht | Schmiede Schritt 3, Kiste (2 %) |
+
+**Entscheidung: keine fünfte Stufe „Elite“.** Episch übernimmt genau diese Rolle. Eine weitere Stufe bräuchte eine
+eigene Farbe, eine Zeile in den Kisten-Chancen, eine Verkaufszeile und einen vierten Glücks-Schritt, brächte dem Spieler
+aber keine neue Entscheidung. Vier Stufen mit klarer Aussage (nichts / nichts / klein / groß) lassen sich auf einen Blick
+lesen.
+
+**Klein und groß, als Maß:** ein kleiner Effekt verändert einen Abschnitt um 10 bis 30 % (erste Sektion 20 % schneller).
+Ein großer Effekt verändert, *was* passiert (eine Sektion wird übersprungen). Die Attribute der Vorstufe bleiben beim
+Aufstieg erhalten, sonst würde ein Bauschritt einen Verlust bedeuten.
+
+## 41. Materialien
+
+- **Acht Materialien:** Seil, Eisen, Feder, Linse, Rauchkraut, Kristall, Banner, Leder. Sie sind **keine Ausrüstung**:
+  nicht anlegbar, kein Bonus, kein Lagerplatz. Sie liegen gestapelt im **Materialbeutel** des Vereins.
+- **Signatur-Materialien** je Disziplin (Bergführer-Abzeichen, Burgschlüssel, Schatzkarte, Folterknecht-Siegel,
+  Ligasiegel …). Sie sind der seltene Teil: aus dem Wimpel der Disziplin, aus der Goldkiste, beim Händler ab Stufe 4 per
+  Vorbestellung. Über sie steuert man, wie viele Legendäre in Umlauf kommen.
+- **Kisten-Chancen der Eisenkiste, je Fund (Startwert):** Material 30 %, Standard 28 %, Selten 28 %, Episch 12 %,
+  Legendär 2 %. Mindestens einer der drei Funde ist Ausrüstung. Der Mitleidszähler bleibt (jede fünfte zeigt Episches).
+  Die Chancen stehen immer sichtbar neben der Kiste, Materialien als eigener Balken.
+- **Händler** führen Materialien für Geld (Richtwert 0,4 C), mit Handelsposten Stufe 5 regelmäßig.
+- **Zerlegen** gibt weiter Teile (1 / 2 / 4 / 8). Teile zahlen die Bauschritte, nicht mehr die Reparatur.
+
+## 42. Der Baum: drei Schritte
+
+1. **Zwei Materialien → Grundgegenstand** (Selten, nur Attribut). Schmiede Stufe 2, keine Teile.
+2. **Zwei Grundgegenstände → epischer Gegenstand** mit kleinem Effekt. Schmiede Stufe 3, 3 Teile.
+3. **Epischer Gegenstand + Signatur-Material → legendärer Gegenstand** mit großem Effekt. Schmiede Stufe 4, 6 Teile.
+
+Neun Grundgegenstände, jedes Rezept eindeutig:
+
+| Grundgegenstand | Materialien | Bonus |
+|---|---|---|
+| Kletterseil | Seil + Leder | +5 Dexterity |
+| Eisenhaken | Eisen + Eisen | +5 Power |
+| Laufschuhe | Feder + Leder | +5 Speed |
+| Polster | Leder + Leder | +5 Health |
+| Lupe | Linse + Kristall | +5 Awareness |
+| Messingrohr | Eisen + Linse | +5 Intelligence |
+| Schraubstock | Eisen + Kristall | +5 Torment |
+| Kräuterbeutel | Rauchkraut + Leder | +5 Will |
+| Wimpelband | Banner + Banner | +5 Charisma |
+
+Die sechs Pilot-Bäume:
+
+| Legendär (großer Effekt, §37) | Episch (kleiner Effekt) | aus | Signatur-Material |
+|---|---|---|---|
+| **Enterhaken** · Climbing | **Wurfanker** +4 Dexterity, +4 Power · erste Sektion 20 % schneller | Kletterseil + Eisenhaken | Bergführer-Abzeichen |
+| **Gummistiefel** · Takeshi | **Rutschsohlen** +4 Speed, +4 Health · Zeitverlust der ersten Falle halbiert | Laufschuhe + Polster | Burgschlüssel |
+| **Fernglas** · I-Spy | **Feldstecher** +4 Awareness, +4 Intelligence · erste Truhe 30 % schneller geprüft | Lupe + Messingrohr | Schatzkarte |
+| **Daumenschraube** · Breaking | **Zwinge** +4 Power, +4 Torment · erster Peinigungs-Gang 10 % stärker | Eisenhaken + Schraubstock | Folterknecht-Siegel |
+| **Beißholz** · Breaking | **Mundschutz** +4 Health, +4 Will · im ersten Gang 10 % mehr Standzeit | Polster + Kräuterbeutel | Folterknecht-Siegel |
+| **Schiedsrichterpfeife** · alle | **Regelbuch** +4 Charisma, +4 Awareness · Signaturen des Gegners in der Vorschau immer sichtbar | Wimpelband + Lupe | Ligasiegel |
+
+Wie in Dota stecken Eisenhaken, Polster und Lupe in je zwei Bäumen: wer einen Eisenhaken hat, entscheidet zwischen
+Climbing und Breaking. Die übrigen zwanzig Legendären aus §37 bekommen ihren Baum nach demselben Muster, wenn ihre
+Disziplin gebaut wird; im Mockup sind sie ehrlich als „noch nicht ausgearbeitet“ gezeichnet.
+
+**Glücksregel bleibt** (drei derselben Stufe → eines der nächsten). Sie ist der zweite Weg zu Episch und Legendär, ohne
+Wahl, was herauskommt.
+
+**Schmiede-Stufen, angepasst:** 1 Zerlegen und Reparieren · 2 Grundgegenstände · 3 Kombinieren und Glück · 4 Legendäre
+Gegenstände · 5 Meisterschmiede (halbe Teile, Reparatur 20 % günstiger). Kosten wie in §38.
+
+## 43. Leitplanken, neu
+
+- **Mehrfach im Team erlaubt.** „Einzigartig je Team“ entfällt. Es gilt nur: **ein Spieler trägt denselben Gegenstand
+  nicht zweimal.** Zwei verschiedene Legendäre an einem Spieler sind erlaubt.
+- **Einmal je Spiel (oder Abschnitt): bleibt.** Das ist keine Mengenbremse, sondern die Art des Effekts: ein sichtbarer
+  Moment, kein Dauerbonus. Ohne diese Regel würde ein Effekt zur zweiten Eignung.
+- **„Höchstens zwei Effekte je Team und Disziplin“ wird zum Effekt-Budget 4:** kleiner Effekt 1, großer 2. Also zwei
+  große, oder ein großer und zwei kleine, oder vier kleine. Die Bremse bleibt, weil sie jetzt die einzige ist, die sechs
+  Enterhaken in einem Climbing-Team verhindert. Zwei gleiche Gegenstände zählen als zwei. Liegt mehr an als das Budget,
+  wählt der Manager in der Einsatzliste, welche wirken; ohne Wahl die stärksten, bei Gleichstand nach Platz.
+- **Gegenmittel: bleiben.** Sie geben dem Gegner eine Antwort, die nichts mit Geld zu tun hat. Die Pfeife hebt den ersten
+  großen Effekt auf und kostet selbst 2 Budget.
+- **Neue Bremsen statt Einzigartigkeit:** drei Bauschritte, das Signatur-Material und die laufende Reparatur.
+- Weiter on top: zählt nicht gegen die Schranke 0,75 (reine Eignung). Gezeigt = gebucht, für beide Seiten.
+
+## 44. Reparatur kostet Geld
+
+- **Verschleiß:** 5 % je Einsatz, in dem der Gegenstand wirkt (wie bisher). Einweg und Leihgaben werden nicht repariert.
+- **Preis:** `Händlerpreis × 25 % × fehlende Haltbarkeit`, ein **kaputtes** Teil (0 %) kostet das 1,5-Fache.
+
+| Stufe | Händlerpreis | von 0 auf 100 % | kaputt | je Einsatz (5 %) |
+|---|---:|---:|---:|---:|
+| Standard | 1 C | 0,25 C | 0,38 C | 0,013 C |
+| Selten | 3 C | 0,75 C | 1,13 C | 0,038 C |
+| Episch | 6 C | 1,50 C | 2,25 C | 0,075 C |
+| Legendär | 12 C | 3,00 C | 4,50 C | 0,150 C |
+
+- **Größenordnung (gerechnet, nicht gemessen):** der Kader im Mockup (fünf reparierbare Teile) kostet rund **6,0 C je
+  Saison** (0,30 C je Spieltag). Ein voll ausgerüsteter Kader (28 Teile, Mischung 8 / 12 / 6 / 2) rund **15,6 C je
+  Saison** (0,78 C je Spieltag). Das ist mehr als der Unterhalt aller fünf Schmiede-Stufen zusammen. Die Zahl hängt an
+  den Händlerpreisen und muss mit den Gehältern einer Messliga abgeglichen werden (Ziel: voll ausgerüstet etwa 15 bis
+  20 % der Gehaltskosten).
+- **Topf:** Investitionstopf, wie die Gebäude, **hart gegen die Vorstands-Freigabe** (eigene Prüfung nach dem Muster
+  `pruefeGebaeudeGegenVorstandFreigabe`). Der Gehaltstopf bleibt frei davon, damit Reparaturen keine Verträge blockieren.
+- **Finanzen:** je Spieltag ein Posten **„Ausrüstung: Reparatur“**, groß je Saison, klein je Spieltag.
+- **Ort:** Reparieren braucht die Schmiede Stufe 1. Der Schleifstein vom Händler bleibt als Verbrauchsteil für Vereine
+  ohne Schmiede.
+
+## 45. Auto-Reparatur
+
+- **Je Gegenstand an oder aus** (Marke „Auto-Rep.“ am Teil), dazu **„Alles automatisch reparieren“** für den Verein.
+- **Ablauf:** nach der Buchung des Spieltags wird jedes eingeschaltete Teil auf 100 % gebracht und der Posten gebucht.
+- **Anzeige:** neben dem Schalter stehen die erwarteten Kosten je Saison und je Spieltag für das, was eingeschaltet ist.
+  Schaltet man ein Teil ab, sinkt die Zahl sofort.
+- **Wenn das Geld nicht reicht:** zuerst, was am nächsten Spieltag wirkt, dann nach Stufe. Der Rest bleibt, es gibt eine
+  Meldung in der Inbox. Nichts wird über die Freigabe hinaus bezahlt.
+- **KI, dieselbe Funktion:** Finanzwert 8 bis 10 repariert alles; 5 bis 7 alles ab Selten und was am nächsten Spieltag
+  aufgestellt ist; 1 bis 4 nur aufgestellte Teile unter 50 %. Nie unter die Rücklage, nie über die Freigabe.
+- **Mehrspieler:** Schalter je Team, im Bereich „Einsatzliste/Formkarten“ delegierbar; die delegierte KI ändert nichts,
+  was der Mensch von Hand gesetzt hat.
+
+## 46. Im Mockup und in der Demo
+
+- `?ansicht=bauplan`: links die 26 Legendären (sechs mit Baum), Mitte der Baum von unten nach oben mit „hast du / fehlt“,
+  rechts Gegenstand und Leitplanken. Bilder: `bauplan-1920.png`, `bauplan-2560.png`, `bauplan-fernglas-1920.png`.
+- `?ansicht=ausruestung`: Schalter „Alles automatisch reparieren“ mit Kosten, Marke je Teil (anklickbar, die Summe
+  rechnet mit), Schmiede-Leiste mit der Kette und „Reparatur kostet Geld“.
+- `?ansicht=team`: Tafel „Reparatur und Unterhalt“ (Schalter, jetzt offen, voll ausgerüstet, Posten in den Finanzen).
+- `?ansicht=gebaeude`, `?ansicht=kiste`: Stufen und Kreislauf angepasst.
+- `public/mockups/kiste-demo-22-11.html` (24 KB, eigenständig): Kiste liefert Materialien, Chancen mit Material-Balken;
+  Schmiede in drei Schritten bis zum Enterhaken; Reparatur mit Geld, Auto-Reparatur, „Spieltag spielen“.
+  Klicktest ohne Fehler. Bilder `kiste-demo-*.png`.
+
+## 47. Aufwand, Risiko, offen
+
+- **Aufwand:** Materialien und Baum sind Katalogarbeit (S bis M) auf dem Ausrüstungs-Baustein. Reparatur und
+  Auto-Reparatur: M (Finanzposten, Freigabe-Prüfung, KI-Regel). Kleine Effekte brauchen je Disziplin denselben
+  Motor-Haken wie die großen, nur mit kleinerer Zahl.
+- **Risiko:** jeder Effekt bewegt den Wertungs-Fingerabdruck seiner Disziplin und braucht einen Stempel im Spielstand.
+  Das Budget 4 und die Reparaturkosten sind Startwerte ohne Messung.
+- **Offen:**
+  1. Effekt-Budget 4 (klein 1, groß 2) als Ersatz für „höchstens zwei Effekte“: einverstanden?
+  2. Zwei gleiche Legendäre in einer Disziplin: beide wirken (zählt als zwei), oder wirkt derselbe Effekt je Team nur
+     einmal?
+  3. Reparaturkosten: Zielgröße „voll ausgerüstet etwa 15 bis 20 % der Gehaltskosten“ richtig, oder härter?
+  4. Signatur-Material nur über Wimpel, Goldkiste und Händler Stufe 4, oder auch in der Eisenkiste?
