@@ -112,6 +112,10 @@ Motors, Metaworld Social, Flixnet Media, Golden Arches, Cola Classic, Apple Core
 keine. Nach Chris' Klarstellung ist der Weg: eigener Wappen-Stil, Anlehnung in Farbe und Idee, **keine Kopie** des
 Originallogos.
 
+**Nachtrag 22.11. (Namen gelöst):** Chris: „du musst natürlich die Namen der Sponsoren noch anpassen! dass ingame alle so heißen
+wie auch auf den Logos“. Alle 200 Dachmarken heißen jetzt wie eine eigene Parodie (Liste alt → neu in
+`docs/design/sponsor-namen-22-11.md`, `id` unverändert); die drei Probe-Wappen tragen die Namen, die sie schon hatten.
+
 ## 6. Vorschlag für den Rest (nichts davon bestellt)
 
 | Paket | Umfang | Generationen (ein Bild = 1,0) | Anmerkung |
