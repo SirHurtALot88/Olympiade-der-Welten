@@ -63,6 +63,7 @@ import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-servic
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
+import { stempleFinanzenJeSpieltagBeimAnlegen } from "@/lib/finance/finanzen-je-spieltag";
 import { berechneVorstandBudgetStand, SPERRE_ZAEHLER } from "@/lib/finance/vorstand-budgetfreigabe";
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
@@ -367,6 +368,16 @@ async function main() {
     run = { label: LABEL, mode: MODE, saveId, gestartet: new Date().toISOString(), spieltageProSaison: persistence.getSaveById(saveId)!.gameState.season.matchdayIds.length, phasen: {} };
   }
   const get = () => persistence.getSaveById(saveId)!;
+  // FINANZEN JE SPIELTAG (22.11.): fuer den paarweisen A/B-Lauf desselben Draft-Standes wird der Saison-Stempel gesetzt
+  // ("an") oder entfernt ("aus"). Fuer "aus" zusaetzlich OLY_FINANZEN_JE_SPIELTAG=aus setzen, damit auch der Saisonwechsel
+  // alt bleibt. Ohne Schalter bleibt der Stempel, den die Anlage gesetzt hat.
+  const finanzenStempel = arg("finanzen-stempel", "");
+  if (finanzenStempel) {
+    const g = get().gameState;
+    const ohne = { ...g, seasonState: { ...g.seasonState, finanzenJeSpieltag: null } };
+    persistence.saveSingleplayerState(saveId, finanzenStempel === "an" ? stempleFinanzenJeSpieltagBeimAnlegen(ohne) : ohne);
+    log(`Finanzen je Spieltag: Stempel ${finanzenStempel}`);
+  }
   const phasen = run.phasen as Record<string, unknown>;
   const schreibe = () => {
     if (OUT) fs.writeFileSync(OUT, JSON.stringify(run));
@@ -555,7 +566,7 @@ async function main() {
       const s = applyPreSeasonNextSeasonSetupLightweight(get(), tok, persistence);
       log(`${praefix} Saisonwechsel: applied=${s.applied} ${s.blockingReasons?.join("|") ?? ""}`);
       if (!s.applied) break;
-      phasen[`${praefix}_07_nach_saisonwechsel`] = { snap: snap(get().gameState), season: get().gameState.season.id };
+      phasen[`${praefix}_07_nach_saisonwechsel`] = { snap: snap(get().gameState), season: get().gameState.season.id, finanzenJeSpieltag: get().gameState.seasonState.finanzenJeSpieltag ?? null };
       schreibe();
     }
     if (get().gameState.season.id === sid && saison < SEASONS) { log("Saison hat nicht gewechselt, Abbruch"); break; }

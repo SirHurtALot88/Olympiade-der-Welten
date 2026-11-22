@@ -11,6 +11,8 @@
  */
 
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { erwarteteSpieltagBuchung } from "@/lib/finance/finanzen-je-spieltag-erwartung";
+import { istJeSpieltagSaison, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { buildTeamKontoauszug, type KontoauszugZeile, type TeamKontoauszug } from "@/lib/finance/kontoauszug";
 import { berechneVorstandBudgetStand, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 import type { FinancesViewModel, TeamFinancesState } from "@/lib/foundation/finances/finances-types";
@@ -58,6 +60,12 @@ export type FinanzSeiteModell = {
   stand: VorstandBudgetStand;
   /** Die GuV-Posten, soweit das Finanz-Modell sie liefert. */
   finanzen: TeamFinancesState | null;
+  /** Finanzen je Spieltag (22.11.): laeuft diese Saison mit Spieltagsbuchung? */
+  jeSpieltag: boolean;
+  /** Erwartete Nettobuchung je offenem Spieltag (nur im Modus je Spieltag, sonst 0). */
+  erwartetJeSpieltag: number;
+  /** Bereits je Spieltag gebuchtes Netto der Saison (Gehalt, Sponsor-Basis, Gebaeude). */
+  jeSpieltagGebucht: number;
 };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -122,16 +130,32 @@ export function buildFinanzSeiteModell(gameState: GameState, teamId: string, fin
   // Prognose Saisonende: gebucht = Kasse ist schon drin; sonst Kasse + erwartetes GuV ohne die schon verbuchten Transfers.
   const guv = f?.guv ?? null;
   const transferNetto = f?.transfer?.net ?? 0;
-  const erwartung = saisonendeGebucht ? 0 : r2((guv ?? 0) - transferNetto);
+  // FINANZEN JE SPIELTAG (22.11.): die GuV ist die GANZE Saison; was davon je Spieltag schon gebucht ist, steckt in der Kasse
+  // und kommt am Saisonende nicht noch einmal. Die Prognose zeigt nur den Rest.
+  const jeSpieltag = istJeSpieltagSaison(gameState);
+  const jeSpieltagGebucht = jeSpieltag ? summeSpieltagBuchungen(gameState, teamId).cashDelta : 0;
+  const erwartung = saisonendeGebucht ? 0 : r2((guv ?? 0) - transferNetto - jeSpieltagGebucht);
   const prognosePosten = saisonendeGebucht
     ? undefined
-    : (f?.guvPosten ?? [])
-        .filter((p) => p.counted && p.key !== "transfers" && Math.abs(p.amount) > 0.004)
-        .map((p) => ({ key: p.key, label: p.label, betrag: r2(p.amount) }));
+    : [
+        ...(f?.guvPosten ?? [])
+          .filter((p) => p.counted && p.key !== "transfers" && Math.abs(p.amount) > 0.004)
+          .map((p) => ({ key: p.key, label: p.label, betrag: r2(p.amount) })),
+        ...(Math.abs(jeSpieltagGebucht) > 0.004
+          ? [{ key: "spieltag_gebucht", label: "Schon je Spieltag gebucht", betrag: r2(-jeSpieltagGebucht) }]
+          : []),
+      ];
   const prognoseEnde = saisonendeGebucht ? kasse : r2(kasse + erwartung);
   // Gespielte Spieltage nach heute tragen die heutige Kasse fort (flach), damit die Linie bis zum Ende sichtbar bleibt.
+  // Im Modus je Spieltag laeuft die Linie mit der erwarteten Spieltagsbuchung weiter (Gehalt, Sponsor-Basis, Gebaeude).
+  const erwartetJeSpieltag = jeSpieltag && !saisonendeGebucht ? r2(erwarteteSpieltagBuchung(gameState, teamId).netto) : 0;
+  let offenerSpieltag = 0;
   for (const p of verlauf) {
-    if (p.art === "spieltag" && !p.gebucht) p.kasse = r2(kasse + 0);
+    if (p.art === "spieltag" && !p.gebucht) {
+      offenerSpieltag += 1;
+      p.kasse = r2(kasse + erwartetJeSpieltag * offenerSpieltag);
+      p.bewegung = erwartetJeSpieltag;
+    }
   }
   verlauf.push({
     id: "ende",
@@ -191,6 +215,9 @@ export function buildFinanzSeiteModell(gameState: GameState, teamId: string, fin
     kontoauszug,
     stand,
     finanzen: f,
+    jeSpieltag,
+    erwartetJeSpieltag,
+    jeSpieltagGebucht: r2(jeSpieltagGebucht),
   };
 }
 

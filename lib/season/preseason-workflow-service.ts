@@ -4,6 +4,7 @@ import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentsch
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
+import { finanzenJeSpieltagFuerNeueSaison } from "@/lib/finance/finanzen-je-spieltag";
 import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
 import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
@@ -674,6 +675,9 @@ function buildNextSeasonGameState(
     // bestehender Spielstand umschaltet. Nur Battle-Doppelsaisons; die Pause der alten Saison verfaellt.
     belastungsRegel: belastungsRegelFuerNeueSaison(save.gameState, nextSeasonId, matchdayIds.length) ?? null,
     belastungsPause: null,
+    // FINANZEN JE SPIELTAG (22.11., lib/finance/finanzen-je-spieltag.ts): der Saisonwechsel ist der Ort, an dem ein bestehender
+    // Spielstand auf Spieltagsbuchung umschaltet (Rueckweg OLY_FINANZEN_JE_SPIELTAG=aus: dann kein Stempel).
+    finanzenJeSpieltag: finanzenJeSpieltagFuerNeueSaison(nextSeasonId),
     // Battle-Mode-Saves mit aktivem Liga-Split bekommen ab Saison 2 den echten Circle-Spielplan
     // (leagueTier je Fixture, Gegner ueber Runden verteilt) statt der alten Dummy-Paarung --
     // Manager-Mode-/Legacy-Saves ohne `leagueByTeamId` bleiben unveraendert bei `buildSeasonFixtures`.
