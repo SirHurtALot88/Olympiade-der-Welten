@@ -63,7 +63,11 @@ describe("Trainingshistorie · die Posten ergeben den Saldo", () => {
 
   it("die Alterung ist der einzige negative Posten", () => {
     // nurTraining (Zuwachs je Spieltag) rechnet ganz ohne Abbau; sonst bleibt die Alterung der einzige negative Posten.
-    expect(progression).toMatch(/const regression = nurTraining\s*\?\s*0\s*:\s*-\(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE/);
+    // Seit der Entwicklungs-Regel „neu“ (22.11.) waehlt der Abbau je Stempel seine Basis (abbauBasis statt der alten Konstante);
+    // der Leistungsverfall (entVerfall) steckt ebenfalls im Regression-Posten — er bleibt der einzige negative Posten.
+    expect(progression).toMatch(
+      /const regression = nurTraining\s*\?\s*0\s*:\s*-\(\(entNeu \? entP\.abbauBasis : ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE\)/,
+    );
   });
 });
 
