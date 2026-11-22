@@ -302,3 +302,199 @@ und zur Rechenzeit sind aus `season-fixture-schedule.ts` und `spieltag-tempo-21-
 3. **Die Woche:** ein Zug je Woche, oder lieber frei so viel man will?
 4. **Ligaweite Lagen mit Regelwirkung** (Kartenruhe, Materialkontrolle): gewollt, oder nur Wirtschaft und Wetter?
 5. **Ligaformat:** 2 × 20 als Ziel für Welle 5 vormerken, mit vier statt drei Auf- und Absteigern?
+
+---
+
+# Runde 2 (22.11.): Feedback von Chris, fünf Punkte ausführlicher
+
+Neue Ansichten im Mockup: `?ansicht=nachspiel`, `kiste` (`&phase=1|2|3` friert einen Takt ein), `verein`, `welt`, `aera`.
+Weiter grob: Zahlen sind Startwerte, nichts ist gemessen, wo es nicht dabeisteht.
+
+## 7. Kader und Ära: Potential, das wandert
+
+Chris: „Ich würde nicht sagen, dass sich jeder Spieler zwangsweise dem Peak nähert … Wenn Potentiale sich pro Attribut und
+Saison ein bisschen nach oben oder unten anpassen können und Training und Regression so laufen, dass über alle Ligen die
+Spieler im SCHNITT nicht zu viel zulegen, passt es.“ Das korrigiert Abschnitt 1.2: Die Lücke ist nicht „es fehlt ein
+Motor“, sondern „der Motor ist nicht geeicht und nicht sichtbar“.
+
+**Was es schon gibt** (gelesen, nicht gemessen):
+- Decke je Attribut mit Saison-Drift: `applyAttributeCeilingSeasonDrift` (`lib/scouting/player-attribute-ceiling-service.ts`)
+  zieht je Attribut und Saison −2, 0 oder +2 aus einer Saat, verschoben nach Ausblick (`growthOutlook`). Das ist heute
+  **reiner Zufall ohne sichtbaren Grund**.
+- Abnehmender Ertrag und Abbau: `lib/training/organic-season-progression.ts` (Drossel nahe der Decke, Regression,
+  Einstellskript `scripts/long-run-auto-tune-organic.ts`).
+- Messung der Bilanz: `docs/design/training-je-spieltag-18-11.md` weist „Netto Summe aller Attribute, Liga-Mittel **+6,78**
+  je Saison“ aus. Die Liga legt also im Schnitt deutlich zu. Genau das soll nicht sein.
+- Zu- und Abgänge stehen in der Historie (`app/foundation/historie`, `transfer-history-v2`).
+
+**Baustein B15 „Potential, das wandert“ (Startwerte):**
+
+| Teil | Regel |
+|---|---|
+| Drift je Attribut und Saison | −2 bis +2, meist 0. Summe über alle zwölf Attribute eines Spielers höchstens ±4 je Saison |
+| Auslöser nach oben | viel Spielzeit auf einem Platz, der das Attribut braucht; Trainingsziel die Saison gehalten; Wimpel oder mehrfach beste des Spieltags; passendes Gebäude oder Trainerin |
+| Auslöser nach unten | kaum Einsätze; viele Spieltage verletzt; dauernd über 65 Erschöpfung; Attribut die ganze Saison in keiner gespielten Disziplin gebraucht |
+| Rest | kleiner Zufall aus der Saat, höchstens ±1, damit zwei gleiche Laufbahnen nicht identisch enden |
+| Ertrag nahe am Potential | ab 6 Punkten Abstand voller Trainingssatz, darunter linear fallend bis rund 25 % am Potential; darüber nichts |
+| Regression | wer ein Attribut nicht trainiert und nicht spielt, verliert langsam (Startwert −0,5 je Saison), über dem Potential schneller |
+| Kein Alter | bleibt. Laufbahnen enden über sinkendes Potential und über den Abschied (B12), nicht über Jahre |
+
+**Abnahme: Liga-Mittel neutral.** Messlauf wie für das Training (`scripts/miss-training-je-spieltag.ts`, 32 KI-Teams von
+Anfang an), aber über **fünf Saisons** (`lib/season/long-run-*`):
+1. Netto-Summe aller Attribute je Spieler und Saison, **Liga-Mittel zwischen −1 und +1** (heute +6,8).
+2. Streuung gewollt: etwa ein Drittel wird schwächer, ein Drittel stärker, Rest ±1.
+3. Mittlere Kaderstärke (beste 6) je Disziplin driftet über fünf Saisons um höchstens ±1.
+4. Die Rangfolge der Teams bewegt sich: Rangkorrelation der Kaderstärke Saison 1 gegen Saison 5 unter 0,8.
+5. rho und Pp bleiben unberührt (die Mechanik ändert sich nicht, nur die Werte der Spieler).
+
+Stellschrauben sind Trainingsfaktor, Ertragskurve und Regression; nicht die Drift, die soll klein bleiben.
+
+**Sicht für den Spieler** (Mockup `aera`): im Profil je Attribut Wert, Potential als Rahmen, **Pfeil** für die Bewegung zum
+Saisonwechsel und **Ertrag in Prozent**; eine **Karrierekurve** je Attribut und für den Gesamtwert über die Saisons mit
+Marken (Wechsel, Verletzung, Wimpel) und dem Grund je Potential-Schritt. Der Scouting-Nebel gilt weiter: bei fremden
+Spielern Potential nur als Spanne, Pfeile erst mit Scouting Office.
+
+**KI:** nutzt dieselbe Ertragszahl bei der Wahl des Trainingsziels (nicht in ein Attribut am Potential trainieren) und
+beim Kauf (Potential-Spanne nach Scouting-Stufe, wie heute). Sie verkauft Spieler mit zwei fallenden Pfeilen im
+Schlüsselattribut eher. Kein neuer Rechenweg je Spieltag: die Drift läuft einmal im Saisonwechsel.
+
+**Historie erweitern:** je Saison Nachwuchs und Abschiede der Liga, je Spieler die Laufbahn (Vereine, Ablösen,
+Karrierekurve, Wimpel, Bestwerte), je Verein Zu- und Abgänge mit „was aus ihnen wurde“. Speicher: je Spieler und Saison
+ein Datensatz mit zwölf Werten und zwölf Potentialen, rund 0,1 KB, bei 400 Spielern 40 KB je Saison.
+
+**Aufwand:** M für Auslöser, Eichung und Messung; S–M für die Sicht. Die Ära insgesamt bleibt „später, aber sehr
+wichtig“. Vorschlag: Eichung und Sicht schon in Welle 2 (sie berührt keine Wertung und wirkt ab der zweiten Saison),
+Nachwuchs und Abschied in Welle 5.
+
+## 8. Nach dem Spiel: die Sendung
+
+„Deine Entscheidungen“ erklärt die Zahlen. Davor fehlt die **Erzählung**: was ist passiert, wer war es, was folgt. Eine
+Seite, sechs Tafeln (Mockup `nachspiel`), als erster Halt nach der Arena; „Deine Entscheidungen“ ist der zweite Reiter.
+
+| Tafel | Inhalt | Quelle |
+|---|---|---|
+| Schlagzeile | eine Zeile, zwei Sätze, drei Stimmen (Gegner, Fans, Vorstand) | Satzbausteine nach Regeln aus Ergebnis, Abstand, Serie, Rang, Vorstandslage; Saat je Spieltag. Kein Textgenerator |
+| Schlüsselmomente | je Disziplin drei bis vier Momente mit Stand | Ereignisliste des Arena-Laufs (Tore, Führungswechsel, Ausfälle); die mit der größten Wirkung auf den Stand; Sprung zur Stelle in der Wiederholung |
+| Matchwinnerin | großes Bild, gespielt gegen Grundwert, PP, Zählbares, Laufbahn-Satz, Pechvogel | `matchday-mvp-scoring-service.ts`, `baueSpielerPp`, Verletzungsstand |
+| Formpfeile | fünf Spieler mit Pfeil und Grund | Form-Meldungen (`nach-dem-spieltag.ts`) |
+| Folgen für die nächste Woche | fünf Zeilen, jede springt | Erschöpfung, Verletzte, Kartenhaushalt, nächster Gegner, Kasse des Spieltags |
+| Rund um die Liga | Mitspieler zuerst, dann Rekord, Überraschung | Buchung der anderen Begegnungen |
+
+Regeln: jede Zeile stammt aus Gebuchtem; ein Satzbaustein ohne passende Lage erscheint nicht. Die Stimmen bekommen
+Charakter über Typen (KI-Manager aus der Team-Matrix, Vorstand aus Abschnitt 9). Voraussetzung für die Schlüsselmomente:
+der Arena-Lauf muss eine kurze Ereignisliste mit Zeitpunkt und Stand speichern (**prüfen**, was der Motor heute ausgibt);
+das ist reine Anzeige, der Fingerabdruck bleibt. Für legacy-gewertete Disziplinen gibt es Momente nur als „bester Wert,
+größter Ausreißer, knappste Platzierung“. Aufwand M, Welle 1 oder 2.
+
+## 9. Verein: was hinein könnte
+
+Leitgedanke: der Verein wird eine **Figur mit Haltung, Leuten, Publikum und Gedächtnis**. Acht Elemente (Mockup `verein`).
+
+| Element | Zweck | Wechselwirkung | KI | Aufwand |
+|---|---|---|---|---|
+| **Identität (drei Leitsätze)** | gibt eine Richtung mit Vorteil und Preis, z. B. „Bühne vor Kraft“, „Eigene Leute“, „Volles Haus“ | färbt Vorstandsziele, Sponsor-Passung, Fan-Vorlieben, Training | wählt aus der Team-Matrix (Achsen, Ehrgeiz, Beliebtheit), fest je Saison | M |
+| **Fans und Stadion** | Stimmung 0–100 aus Ergebnissen, Derbys, eigenen Leuten; bestimmt Auslastung und Einnahme je Heimspiel | Spieltag → Kasse; Schonen im Heimspiel und Star-Verkäufe kosten Stimmung; Arena-Ausbau hebt die Obergrenze | keine Entscheidung, nur Folge | M |
+| **Gebäude mit Zweck** | jedes Gebäude liefert etwas zum Anfassen: eine Aktionskarte, ein Ladenangebot, ein aufgedeckter Potential-Pfeil | Woche, Training, Scouting, Beute | baut nach Identität und Kassenlage (wie heute) | M |
+| **Personal (Trainerin, Scout, Physio)** | drei Stellen, je ein Typ mit Vorteil und Preis; zweite Verwendung für den Gehaltstopf | Training, Scouting-Nebel, Erholung; unter der Vorstands-Freigabe | nimmt den Typ, der zur Identität passt | M |
+| **Jugend und Nachwuchs** | ein bis drei Plätze, lange Sicht, eigener Nachwuchs-Draft (Schwächere zuerst) | Academy, Leitsatz „Eigene Leute“, Fans, Ära | bestehende Draft-Logik | L, Welle 5 |
+| **Sponsor-Beziehung** | Treue wächst mit erfüllten Zielen und Jahren; ab einer Schwelle mehr Grundbetrag und eine Leihgabe | Finanzen, Ausrüstung, Wirtschaftslage | bleibt, solange Treue über der Schwelle und kein besseres Angebot | S–M |
+| **Vorstand mit Gesichtern** | drei Stimmen (Kasse, Ehrgeiz, Tradition) mit Gewicht; das Vertrauen ist ihr Mittel | Gespräch, Ziele; Freigabe-Quote bleibt wie entschieden | nicht betroffen (KI-Teams haben denselben Vorstand) | M |
+| **Vereinsgeschichte** | Wimpel, Rekorde, Legenden, Erzfeind, ewige Tabelle | Fans, Traditionalist, Saisonfinale, Historie | nichts | S |
+
+Serverlast überall klein: wenige Zahlen je Team und Saison. Personal braucht **keine neuen Figuren** (Symbole und
+Typnamen). Die festen Finanz-Vorgaben bleiben: keine Geldstrafen, Freigabe als Quote, zwei Töpfe, Rücklage nach
+Finanzwert. Reihenfolge: Fans und Gebäude-Zweck zuerst (sie machen Vorhandenes spürbar), dann Identität und Vorstand,
+dann Personal.
+
+## 10. Welt: die Zeit geht weiter
+
+Das Gefühl von Zeit entsteht nicht durch mehr Zufall, sondern durch **Zustände mit Gedächtnis**: Sie ändern sich langsam,
+sind angekündigt, bleiben und haben einen Grund. Vier Uhrwerke (Mockup `welt`):
+
+1. **Wirtschaftslage (träge Stufe).** Fünf Stufen von Krise bis Boom, höchstens eine Stufe je Saison, die Richtung steht
+   eine Saison vorher fest. Wirkt auf Sponsor-Grundbetrag, Stadion, Ablösen, Gehaltsforderungen. Die kurzen Liga-Lagen
+   (B5) werden aus der Stufe gezogen: im Boom Feiertagsspiele, in der Krise Sponsorenflaute. Rückkopplung: viel Geld im
+   Umlauf treibt Ablösen, das kühlt ab.
+2. **Regel der Saison (bleibend).** Jede Saison bringt genau **eine** dauerhafte Änderung. Die Liga stimmt in der
+   Saisonpause über drei Vorschläge ab, jedes Team eine Stimme, die KI nach Vorteil für den eigenen Kader. Beispiele:
+   vier statt drei Auf- und Absteiger, Kader 14, eine dritte Formkarte, Format einer Disziplin. Beschlossenes steht in
+   der Chronik und gilt weiter.
+3. **Trends und Formate (aus dem Spiel selbst).** Welche Achse gewinnt, wird gemessen und gezeigt. KI-Teams ziehen im
+   Fenster eine Saison verzögert nach, danach lohnt das Gegenmittel: ein Kreislauf ohne Würfel. Dazu wechseln je Saison
+   zwei Disziplinen ihr **Format** (Canyon, Fünf Punkte und Tag-Team gibt es schon als Stempel im Spielstand); das
+   verschiebt, welche Plätze zählen, ohne die Matrix anzufassen.
+4. **Chronik und Rekorde.** Die Liga erinnert sich: Rekorde je Disziplin, Serien, Aufstieg und Niedergang von Teams,
+   ewige Tabelle, Legenden. Sichtbar auf Startseite, in Profilen und im Saisonfinale.
+
+Dazu eine **Dynastie-Bremse** mit Grund statt Gummiband: Stars des Meisters fordern mehr Gehalt, die Letzten wählen im
+Nachwuchs zuerst, abgestiegene Teams verlieren Sponsor-Treue. KI-Teams bekommen damit eigene Bögen (Aufstieg, Blüte,
+Niedergang), weil ihre Kasse, ihr Kader und ihr Potential über die Saisons wandern.
+
+**KI:** stimmt nach Tabelle ab, folgt dem Trend verzögert, reagiert auf die Wirtschaftsstufe über Rücklage und
+Kaufschwelle. **Last:** ein Zustand und ein Chronik-Eintrag je Saison, Rekorde 20 × wenige Werte. **Aufwand:** Chronik
+und Rekorde S, Wirtschaftsstufe M, Regel der Saison M–L (jede Regel einzeln abzunehmen; Formate brauchen rho, Pp und
+Fingerabdruck), Trends S als Anzeige, M mit KI-Nachzug. **Abnahme:** fünf Saisons mit 32 KI-Teams; der Kassen-Median
+bleibt im Korridor, kein Team ist fünfmal in Folge Meister, mindestens ein Team wechselt in fünf Saisons zweimal die Liga.
+
+## 11. Ausrüstung: der Kreislauf und die Kiste
+
+**Kreislauf in sechs Schritten** (Mockup `kiste`, links):
+
+1. **Woher:** Ruhm aus Punkten kauft Kisten; Laden für Geld (nur Standard und Selten, ein Kauf je Woche);
+   Sponsor-Leihgabe ab Treue 70; Belohnung für Wimpel, Vorstandsziel, Derby-Sieg.
+2. **Lager:** 16 Plätze je Verein, Duplikate werden Teile.
+3. **Anlegen:** in der Einsatzliste direkt am Platz, je Spieler ein Feld Ausrüstung und ein Feld Verbrauch. Ein Knopf
+   „Vorschlag“ rüstet wie die KI. Auch vom Spielerprofil und vom Lager aus.
+4. **Wirkung:** Punkte on top in den Disziplinen des Gegenstands. Sichtbar an drei Stellen: Vorschau der Einsatzliste,
+   kurze Einblendung in der Arena beim ersten Auftritt des Trägers (Symbol am Namensschild), Zeile „Ausrüstung“ in
+   „Deine Entscheidungen“.
+5. **Abnutzung:** Einweg weg, Leihgabe läuft ab, Verschleiß je Einsatz, Vollgas doppelt. Vor dem letzten Einsatz warnt
+   die Einsatzliste.
+6. **Zurück:** Reparatur mit Teilen (danach höchstens 80 %) oder zerlegen. Teile entstehen nur aus Beute, nie aus Geld.
+
+**Kiste öffnen, drei Sekunden, überspringbar** (Mockup `kiste`, läuft beim Laden, „nochmal öffnen“ wiederholt):
+
+| Zeit | Takt | Was man sieht |
+|---|---|---|
+| 0,0 s | Aufbau | Kiste im Lichtkegel, rüttelt, dumpfer Ton |
+| 1,2 s | Spannung | Rütteln schneller, Deckel einen Spalt offen, Licht pulsiert **in der Farbe des seltensten Fundes**, Strahlen drehen an |
+| 2,0 s | Deckel | springt federnd auf, Lichtsäule, Funken, Fanfare je Stufe |
+| 2,3 s | Auftritt | drei Karten steigen nacheinander auf und drehen sich um |
+| danach | Wahl | eine nehmen, zwei zerfallen sichtbar zu Teilen |
+
+Die Farbe im Spalt ist der eigentliche Moment: eine halbe Sekunde Vorahnung. Zu dritt stehen epische und legendäre Funde
+im Liga-Ticker. KI-Teams öffnen ohne Animation. Das Mockup ist eine CSS/SVG-Skizze; im Bau kommen Kiste und Effekte als
+Bilder.
+
+**PixelLab-Bedarf (Schätzung, nichts bestellt, nur Requisiten und Effekte):**
+
+| Was | Generationen |
+|---|---:|
+| 3 Kisten (Holz, Eisen, Gold), je zu und offen | 6–9 |
+| VFX: Lichtstrahl, Funken, Zerfall zu Teilen | 6–10 |
+| rund 60 Gegenstands-Icons | 60–80 |
+| Kartenrahmen je Seltenheit (4) | 4–6 |
+| **Summe** | **rund 75–105** |
+
+Erst Stilprobe (eine Kiste und fünf Icons, rund 8 Generationen), dann der Rest. Keine Figuren, keine Figuren-Animation;
+die Bewegung der Kiste ist CSS über zwei Standbildern. Reserve 150 bleibt unberührt.
+
+## 12. Was sich am Rahmen ändert
+
+- Säule 1 „Kader“: die Lücke heißt jetzt **Eichung und Sicht** (B15); Nachwuchs und Abschied bleiben Welle 5.
+- Säule 2 „Spieltag“: die Rückmeldung hat zwei Teile, **die Sendung** (Abschnitt 8) und „Deine Entscheidungen“.
+- Säule 3 „Verein“: acht Elemente statt drei Bausteinen, Reihenfolge in Abschnitt 9.
+- Säule 4 „Welt“: neben den kurzen Liga-Lagen vier Uhrwerke über die Saisons (Abschnitt 10). Das ist der größte Block.
+- Wellen: Welle 2 bekommt zusätzlich B15 (Eichung, Profil), Chronik und Rekorde, Fans und Gebäude-Zweck. Wirtschaftsstufe
+  und Regel der Saison folgen als eigene Welle zwischen 2 und 3, weil sie erst ab der zweiten Saison wirken und früh
+  angelegt sein müssen. Die Übersicht `?ansicht=rahmen` zeigt noch den Stand der ersten Runde.
+
+## 13. Neue offene Fragen (Runde 2)
+
+1. **Liga-Mittel:** Zielkorridor −1 bis +1 für die Netto-Summe aller Attribute je Spieler und Saison, oder darf die Liga
+   leicht wachsen (z. B. +1 bis +2)?
+2. **Regel der Saison:** per Abstimmung der 32 Teams, oder legt die Liga sie fest und kündigt nur an?
+3. **Identität:** drei Leitsätze frei wählbar je Saison, oder einmal gewählt und nur selten änderbar (stärkere Bindung)?
+4. **Personal:** drei Stellen mit Typen gewollt, oder ist das zu viel Verwaltung neben den Gebäuden?
+5. **Stilprobe Kiste:** rund 8 Generationen für eine Kiste und fünf Icons freigeben, damit die Animation mit echten
+   Bildern gezeigt werden kann?
