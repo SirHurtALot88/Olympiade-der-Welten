@@ -387,7 +387,7 @@ function getCurrentSeasonMatchdayResultIds(gameState: GameState) {
   return new Set(getCurrentSeasonMatchdayResults(gameState).map((entry) => entry.id));
 }
 
-function getRemainingMatchdays(gameState: GameState) {
+export function getRemainingMatchdays(gameState: GameState) {
   const playedMatchdayIds = new Set(getCurrentSeasonMatchdayResults(gameState).map((entry) => entry.matchdayId).filter(Boolean));
   const scheduledMatchdays = gameState.season.matchdayIds?.length ?? 0;
   return Math.max(0, scheduledMatchdays - playedMatchdayIds.size);

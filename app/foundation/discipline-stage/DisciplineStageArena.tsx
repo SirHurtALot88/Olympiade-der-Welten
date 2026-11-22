@@ -1239,6 +1239,7 @@ export default function DisciplineStageArena({
             mutatorPp,
             // MUTATOR = FORM (Battle-Modus, 18.11.): wo der Mutator getroffen hat, steht der Formschub am Spieler.
             mutatorForm: mutatorAlsFormHier && (e.mutatorHits ?? 0) > 0 ? (e.mutatorHits ?? 0) * MUTATOR_FORM_JE_TREFFER : null,
+            mutatorHits: mutatorAlsFormHier && (e.mutatorHits ?? 0) > 0 ? e.mutatorHits ?? null : null,
             // Ligaweiter OVR-Rang fuer den Star-Tier-Rahmen des Chips. Quelle ist die
             // bereits vorhandene `ratingByPlayerId` — `buildPlayerRatingContractMap`
             // OHNE `playerIds`, sonst schrumpfte der Normalisierungs-/Rang-Pool auf die
@@ -2408,6 +2409,8 @@ export default function DisciplineStageArena({
             // die VOLLE gutgeschriebene PP-Summe zeigen kann (resolveAwardedPlayerPoints),
             // nicht nur den Team-Anteil.
             mutatorPpsBonus: p.mutatorPpsBonus,
+            // MUTATOR = FORM (22.11.): Treffer nur im Battle-Modus zeigen; im Manager-Modus bleibt der Punkte-Aufschlag.
+            mutatorHits: mode === "real" && isBattleModeSave(gameState) && isMutatorAlsFormAktiv() ? p.mutatorHits ?? null : null,
             ovrRank: p.playerId ? ratingByPlayerId.get(p.playerId)?.ovrRank ?? null : null,
             // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): Körpergröße für die
             // "2 größten Spieler/Centers"-Auswahl in DisciplineStageNativeArena.tsx.
@@ -2442,6 +2445,7 @@ export default function DisciplineStageArena({
             // Modell-/Random-Modus kennt keine gebuchte PP-Zuteilung (kein Engine-Preview) —
             // bleibt konsequent null, wie pointsAwarded direkt darüber.
             mutatorPpsBonus: null as number | null,
+            mutatorHits: null as number | null,
             ovrRank: s.playerId ? ratingByPlayerId.get(s.playerId)?.ovrRank ?? null : null,
             // Tasks #21/#24a (Basketball-Sprungball/Eishockey-Bully): s. Engine-Zweig oben.
             height: s.playerId ? playerHeightById.get(s.playerId) ?? null : null,

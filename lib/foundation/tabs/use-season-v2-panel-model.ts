@@ -19,7 +19,9 @@ import {
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
 import { hasFinalMatchdayBeenPlayed } from "@/lib/season/season-completion-state";
-import { buildTitleRace, type TitleRaceResult } from "@/lib/season/title-race";
+import { buildTitleRace, maxPointsPerMatchdayFor, type TitleRaceResult } from "@/lib/season/title-race";
+import { isBattleModeSave } from "@/lib/season/game-mode";
+import { ligaVonAusSpielstand } from "@/lib/season/liga-raenge";
 
 /** Gebäude-Unterhalt p.a. für ein Team — Summe der Season-Upkeeps aller gebauten
  * Anlagen (gleiche Rechnung wie die Liga-Finanzübersicht, client-safe, kein Leak).
@@ -277,7 +279,13 @@ export function useSeasonV2PanelModel({
     if (!isLastMatchdayActive || hasFinalMatchdayBeenPlayed(gameState)) {
       return null;
     }
-    return buildTitleRace(standingsRows.map((row) => ({ teamId: row.teamId, points: row.points })));
+    // Battle-Spielstand: Duellpunkte, höchstens 2 x 2 = 4 je Spieltag (nicht die alte Faustzahl 39,6);
+    // je Liga gerechnet, weil jede Liga ihre eigene Tabelle hat (`lib/season/title-race.ts`).
+    const ligaVon = ligaVonAusSpielstand(gameState);
+    return buildTitleRace(
+      standingsRows.map((row) => ({ teamId: row.teamId, points: row.points, liga: ligaVon ? ligaVon(row.teamId) : null })),
+      { maxPointsPerMatchday: maxPointsPerMatchdayFor(isBattleModeSave(gameState)), remainingMatchdays: 1 },
+    );
   }, [gameState, isViewingArchivedSeason, standingsRows]);
 
   const topPlayers = useMemo(() => {

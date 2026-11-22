@@ -220,6 +220,7 @@ button.tz:hover{background:var(--flaeche-2)}
 .spo span .marke{color:#0b0d12;margin:0}
 .spo strong{font-size:26px;line-height:1;font-weight:700;color:var(--creme);text-align:right;white-space:nowrap}
 .spo strong small{display:block;font-size:11.5px;font-weight:500;color:var(--stumm);letter-spacing:.04em}
+.zl strong small.sj{display:block;text-align:right;font:600 12px/1.1 var(--zahl);color:var(--stumm);letter-spacing:.02em;margin-top:2px}
 .zl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14.5px;color:var(--leise);line-height:1.25}
 .zl b{color:var(--tinte);font-weight:600} .zl strong{font-size:17px;font-weight:700;color:var(--creme);white-space:nowrap}
 .txt{font-size:14.5px;line-height:1.3;color:var(--leise)} .txt b{color:var(--tinte);font-weight:600}
@@ -415,7 +416,7 @@ body.phone .kontext .ktabs button:last-child{flex:none;width:44px}
 /* ================= Daten (alles erfunden, Groessenordnung aus dem Konzept) ================= */
 var q=new URLSearchParams(location.search);
 var KAT={spo:["Sponsoren","--gold"],tic:["Ticketing","--p5"],mer:["Merchandising","--p6"],tv:["Ligageld / TV","--p4"],pra:["Siegprämien","--p3"],erg:["Ereignis","--creme"],
-         geh:["Gehälter","--p1"],bet:["Arena-Betrieb & Reise","--p2"],kre:["Kredit & Zins","--leise"],bon:["Kaderprämie","--acht"],bil:["Bilanz (nicht GuV)",""]};
+         geh:["Gehälter","--p1"],verp:["Verpflegung (Essens-Abo)","--p1"],bet:["Arena-Betrieb & Reise","--p2"],kre:["Kredit & Zins","--leise"],bon:["Kaderprämie","--acht"],bil:["Bilanz (nicht GuV)",""]};
 var FARBE={pow:["Power","--p1","POW"],spe:["Speed","--p4","SPE"],men:["Mental","--p5","MEN"],soc:["Social","--p6","SOC"]};
 /* Disziplin-Plan der Saison: 20 Spieltage x 2 Disziplin-Duelle, je mit Farbe (Rueckrunde = Hinrunde) */
 var PLAN=[null,[["TDM","pow"],["SPU","spe"]],[["SCH","men"],["BAS","soc"]],[["GEW","pow"],["CLI","spe"]],[["TEN","men"],["EIS","soc"]],[["HOC","pow"],["STA","spe"]],
@@ -436,7 +437,7 @@ var ANG={pow:{n:"Hammerwerk Stahl",mo:"H",bonus:.45,chance:.46,ziel:"Vier Power-
 var STARS=[{n:"Com. Shepard",p:"com-shepard",kl:"Warlord",sp:92,ff:1,m:.15},{n:"The Dark Lady",p:"the-dark-lady",kl:"Badass",sp:81,ff:0,m:.1},{n:"Sterling",p:"sterling",kl:"Bard",sp:74,ff:1,m:.05}];
 var LEITER=[[1,3,18,1.3],[4,6,14,1.0],[7,9,11,.8],[10,12,8,.6],[13,16,5,.4]];
 var SZEN={normal:{n:"Normal",start:25.4},eng:{n:"Engpass",start:15.6},dispo:{n:"Im Minus",start:4.5}};
-var GEHALT=3.4, RAHMEN=14, ZINS=.01, KAP=1.45, MARKE=1.04, STARTRANG=9, SIEGPR=.12, BETRIEB=.3, REISE=.1, FAKTOR=1.0;
+var VERPJE=.25, GEHALT=3.4, RAHMEN=14, ZINS=.01, KAP=1.45, MARKE=1.04, STARTRANG=9, SIEGPR=.12, BETRIEB=.3, REISE=.1, FAKTOR=1.0;
 var KADN=["keine","normal","hoch"], KADF=[0,.4,.8];
 var LIGA=[["D-L","Dire Legion",1,8.1,77,71],["M-S","Mortal Sin",3,26.4,82,58],["V-V","Vigorous Vikings",5,31.9,61,66],["R-C","Royal Court",6,22.7,68,63],["L-K","Lost Kingdom",7,35.2,55,69],["T-G","The Giants",9,40.6,49,74],["P-C","Pirate Crew",13,44.8,41,78],["A-A","Armageddon Aftermath",16,38.3,33,81]];
 var ANSICHTEN={kasse:["kasse","Übersicht","Stufe 0 Kontoauszug · Stufe 4 Taktung auf 20 Spieltage"],auszug:["kasse","Spieltags-Abrechnung","Stufe 0 Kontoauszug · neue Posten mit Stufe 4/5"],hebel:["kasse","Hebel","Stufe 7 Kassensturz · Stufe 8 Hebel"],budget:["kasse","Budgets","Stufe 2a bis 2d Budgets des Vorstands · Stufe 9 Quote nach Vertrauen"],
@@ -507,6 +508,8 @@ function modell(){
     /* Ausgaben */
     var geh=GEHALT-(Z.notv&&!geb?.25:0);
     P(l,"geh","geh","Gehälter","Kader · "+(Z.notv&&!geb?13:14)+" Verträge","Rate "+t+" von 20 · Jahresgehalt "+zahl(geh*20)+" C",-geh,"Summe der Jahr-1-Gehälter "+zahl(geh*20)+" C ÷ 20 Spieltage\n= "+zahl(geh)+" C je Spieltag"+(Z.notv&&!geb?"\n(nach Notverkauf: 0,25 C weniger)":""));
+    var vn=(Z.notv&&!geb?13:14),vp=VERPJE*vn/20;
+    P(l,"verp","verp","Verpflegung (Essens-Abo)","Abo Stufe 3 · "+vn+" Spieler","Rate "+t+" von 20 · "+zahl(VERPJE*vn)+" C je Saison",-vp,"Essens-Abo, Stufe 3: "+zahl(VERPJE)+" C je Spieler und Saison ÷ 20 Spieltage = 0,0125 C je Spieler\n"+vn+" Spieler × 0,0125 C = "+String(Math.round(vp*10000)/10000).replace(".",",")+" C je Spieltag (Anzeige auf 0,01 gerundet)\nläuft mit jedem Vertrag mit, auch bei Verletzten; Posten des Gehaltsbudgets");
     P(l,"kre","kre","Kreditrate + Zins","Kredit · Royal Court","Annuität 3,0 C je Saison · 20 Raten",-.15,"Bestehender Kredit aus der Kaufphase: Rate 3,0 C je Saison\n÷ 20 Spieltage = 0,15 C (davon 0,05 C Zins, der Zins geht in den Liga-Topf)");
     if(heim)P(l,"bet","bet","Arena-Betrieb","Heimspiel · Arena Stufe 2","fester Posten je Heimspiel",-BETRIEB,"Betrieb je Heimspiel in Liga 2: 0,30 C × (1 + 0,2 × Arena-Stufe)\nim Mockup vereinfacht: 0,30 C");
     else P(l,"bet","bet","Reise","Auswärtsspiel","fester Posten je Auswärtsspiel",-REISE,"Reise je Auswärtsspiel in Liga 2: 0,10 C");
@@ -839,7 +842,7 @@ function vHebel(){
     '<div class="zl"><span>Pflichtkredit, wenn du nichts tust</span><strong class="t '+(kred?"minus":"plus")+'">'+(kred?C(kred)+" · Rate "+zahl(kred*.5917/20)+" C je Spieltag":"keiner")+'</strong></div>'+
     '<div class="txt">Geprüft wird einmal: am Schluss des Kauffensters. Wer dann unter 0 steht, bekommt den Pflichtkredit (Fehlbetrag + 10 % des Jahresgehalts, 2 Saisons, 12 %).</div></div></div>';
   var nv='<div class="sd'+(Z.notv?" wir":"")+'"><div class="kopf">Notverkauf<small>schnelles Geld, unter Marktwert</small></div><div class="in">'+
-    '<div class="spo" style="--pc:var(--stumm)"><img src="../portraits/sterling.jpg" alt="" style="width:52px;height:52px;border-radius:9px;object-fit:cover"><div><b>Sterling</b><span>Bard · Marktwert 8,0 C · Gehalt 0,25 C je Spieltag</span></div><strong class="t plus">+6,4 C<small>−20 % Abschlag</small></strong></div>'+
+    '<div class="spo" style="--pc:var(--stumm)"><img src="../portraits/sterling.jpg" alt="" style="width:52px;height:52px;border-radius:9px;object-fit:cover"><div><b>Sterling</b><span>Bard · Marktwert 8,0 C · Gehalt 0,25 C + Verpflegung 0,0125 C je Spieltag</span></div><strong class="t plus">+6,4 C<small>−20 % Abschlag</small></strong></div>'+
     '<div class="txt">Folgen: Kader 13 statt 14, Merch −0,05 C je Spieltag, Stimmung −5 (Fan-Liebling), Abschlag 1,6 C in den Liga-Topf. Vorschlag kommt vom Verkaufs-Berater (am wenigsten gebraucht, bestes Verhältnis Wert zu Gehalt).</div>'+
     '</div><div class="fuss"><small>'+(Z.notv?"Verkauft · Gehalt sinkt ab Spieltag "+Math.min(N,Z.now+1):"Fenster nach jedem Spieltag")+'</small><span class="sp"></span><button class="btn klein'+(Z.notv?"":" ja")+'" data-notv="1">'+(Z.notv?"Rückgängig":"Verkaufen")+'</button></div></div>';
   var tk='<div class="sd"><div class="kopf">Ticketpreis<small>Fans &amp; Arena</small></div><div class="in"><div class="zl"><span class="riesig t" style="font-size:34px">'+(p>0?"+":p<0?"−":"±")+Math.abs(p)+'<small>% · '+preisName(p)+(Z.auto?" · Auto":"")+'</small></span></div><div class="txt">Vier Stufen, gilt an Heimspielen. Höher: mehr je Karte, weniger Zuschauer, Stimmung fällt. Günstig: volles Haus, Stimmung steigt.</div></div><div class="fuss"><span class="sp"></span><button class="btn klein" data-ans="fans">Regler öffnen '+ic("r")+'</button></div></div>';
@@ -852,8 +855,8 @@ function vHebel(){
 
 /* ---------- Budgets: zwei Toepfe des Vorstands (docs/design/finanzkonzept-v2-budgets-18-11.md) ---------- */
 /* Zahlen erfunden (Groessenordnung Liga 2), Formeln und Startwerte wie im Konzept. Jahreswerte, je Spieltag = / 20. */
-var BUD={kasse0:78,kader:162,fw:3.1,sockel:21.6,rangbonus:52.6,tickets:9.6,merch:3.6,praemien:2.4,betrieb:3,reise:1,kaderpr:1,unterhalt:.8,kredit:0,
-         laufend:68,abloesen:31,bau:0,vertrauen:{1:6.4,.85:4.8,.7:3.4,.5:2.1},grenze:{1:.25,.85:.2,.7:.15,.5:.1},puffer:{.85:.1,.7:.2,.5:.3}};
+var BUD={kasse0:78,kader:162,fw:3.1,sockel:21.6,rangbonus:56.6,tickets:9.6,merch:3.6,praemien:2.4,betrieb:3,reise:1,kaderpr:1,unterhalt:.8,kredit:0,
+         laufend:71.5,verp:3.5,abloesen:31,bau:0,vertrauen:{1:6.4,.85:4.8,.7:3.4,.5:2.1},grenze:{1:.25,.85:.2,.7:.15,.5:.1},puffer:{.85:.1,.7:.2,.5:.3}};
 function budget(){
   var b=BUD,q=Z.bq,trag=b.sockel+b.rangbonus*FAKTOR+b.tickets+b.merch+b.praemien-b.betrieb-b.reise-b.kaderpr-b.unterhalt-b.kredit;
   var rq=.05+.2*(b.fw-1)/9,rl=rq*(b.kasse0+b.kader),g0=q*trag,pu=Math.max(0,.35*g0-rl),basis=Math.max(0,b.kasse0-rl-pu),t0=q*basis;
@@ -875,6 +878,7 @@ function vBudget(){
     '<div><small>Kasse nach Käufen und Verkäufen</small><strong class="t">'+C(B.kasse)+'</strong></div></div>';
   function z(l,w,k,s){return '<div class="zl'+(s?" sum":"")+'"><span>'+l+'</span><strong class="t '+(k||"")+'">'+w+'</strong></div>'}
   function topf(teile,ges,marke){ges=Math.max(ges,.01);return '<div class="topf">'+teile.map(function(x){return x[0]>0?'<i class="'+x[1]+'" style="width:'+kl(x[0]/ges*100,0,100)+'%"></i>':""}).join("")+(marke!=null?'<u style="left:'+kl(marke/ges*100,0,100)+'%"></u>':"")+'</div>'}
+  function zv(l,w,sm){return '<div class="zl'+(sm?" sum":"")+'"><span>'+l+'</span><strong class="t">'+zahl(w)+' C<small class="sj">'+(Math.round(w/20*1000)/1000+"").replace(".",",")+' C je Spieltag</small></strong></div>'}
   var tGes=Math.max(B.basis+B.vk,b.abloesen+b.bau);
   var tr='<div class="sd farbe" style="--pc:var(--gut)"><div class="kopf">Transfer- und Investitionsbudget<small>Ablösen · Gebäude</small></div><div class="in">'+
     '<div class="zl"><span class="riesig t" style="font-size:34px">'+zahl(Math.max(0,B.tFrei))+'<small>C frei von '+zahl(B.t)+'</small></span></div>'+
@@ -890,6 +894,7 @@ function vBudget(){
     '<div class="zl"><span class="riesig t '+(ueber?"minus":"")+'" style="font-size:34px">'+(ueber?"−":"")+zahl(Math.abs(B.gFrei/20))+'<small>C je Spieltag '+(ueber?"über dem Budget":"frei")+' · Budget '+zahl(B.g/20)+'</small></span></div>'+
     topf([[Math.min(b.laufend,B.g),"geh"],[Math.max(0,B.gFrei),"frei"],[Math.max(0,b.laufend-B.g),"rot"],[Math.max(0,B.trag-Math.max(B.g,b.laufend)),"gesp"]],gGes,ueber?B.g:null)+
     '<div class="legz"><span><i class="geh"></i>laufend '+zahl(b.laufend)+' je Saison</span><span><i class="frei"></i>frei</span><span><i class="gesp"></i>nicht freigegeben</span></div>'+
+    '<div class="herl lauf">'+zv("Gehälter <small>14 Verträge</small>",b.laufend-b.verp)+zv("Verpflegung (Essens-Abo, Stufe 3, 14 Spieler) <small>0,25 C je Spieler und Saison · läuft mit jedem Vertrag mit</small>",b.verp)+zv("= laufende Kosten im Gehaltsbudget",b.laufend,1)+'</div>'+
     '<div class="herl">'+z("Sponsor-Sockel <small>20 Raten</small>",C(b.sockel))+z("+ erwarteter Rangbonus × Saison-Faktor "+FAKTOR.toFixed(2).replace(".",","),"+"+zahl(b.rangbonus*FAKTOR)+" C")+
       z("+ Tickets, Merch, Siegprämien <small>Plan bei Stimmung 50</small>","+"+zahl(b.tickets+b.merch+b.praemien)+" C")+z("− Fixkosten <small>Betrieb, Reise, Kaderprämie, Unterhalt"+(b.kredit?", Kreditrate":"")+"</small>","−"+zahl(b.betrieb+b.reise+b.kaderpr+b.unterhalt+b.kredit)+" C")+
       z("= tragbares Gehalt",C(B.trag),"",1)+z("× Freigabe "+pzt+" %",C(B.g0))+(B.um?z(B.um>0?"+ umgeschichtet aus dem Transfer":"− umgeschichtet in den Transfer",Cv(B.um),vz(B.um)):"")+
@@ -922,7 +927,7 @@ function vBudget(){
     '<div class="mreg"><span class="gk">Mockup: Verkäufe im Fenster</span><input type="range" class="ein" id="vk" min="0" max="80" step="2" value="'+B.vk+'" aria-label="Verkaufserlöse im Fenster (Mockup)"></div>'+
     '</div></div>';
   var ha='<div class="sd"><div class="kopf">Was gegen welchen Topf zählt<small>hart für Mensch und KI</small></div><div class="in">'+
-    '<div class="rek"><span><b>Spieler kaufen</b><small>Ablöse aus dem Transferbudget, Gehalt aus dem Gehaltsbudget. Beides muss passen.</small></span><span class="marke gut">BEIDE</span></div>'+
+    '<div class="rek"><span><b>Spieler kaufen</b><small>Ablöse aus dem Transferbudget, Gehalt + Verpflegung (0,25 C je Spieler und Saison) aus dem Gehaltsbudget. Beides muss passen.</small></span><span class="marke gut">BEIDE</span></div>'+
     '<div class="rek"><span><b>Vertrag verlängern, Gehalt erhöhen</b><small>nur Gehaltsbudget</small></span><span class="marke" style="--pc:var(--p1)">GEHALT</span></div>'+
     '<div class="rek"><span><b>Gebäude bauen</b><small>nur Transferbudget; der Unterhalt senkt das nächste Gehaltsbudget</small></span><span class="marke gut">TRANSFER</span></div>'+
     '<div class="rek"><span><b>Spieler verkaufen</b><small>Erlös × '+pzt+' % ins Transferbudget, sein Gehalt voll zurück ins Gehaltsbudget</small></span><span class="marke gold">ZURÜCK</span></div>'+

@@ -6,6 +6,7 @@
  * sie nur fuer die Oberflaeche und rechnet Raenge (Rang 1 ist immer der beste; bei Kosten das guenstigste Team).
  */
 
+import { berechneZielKurs, kursZuStatus } from "@/lib/board/ziel-kurs";
 import { buildTeamObjectiveOverview, istZielTauschbar, zielTauschZeitfenster } from "@/lib/board/team-season-objectives-service";
 import {
   bereichDesZiels,
@@ -35,6 +36,12 @@ export type OfficeZiel = {
   detail: string | null;
   hinweis: string | null;
   status: TeamSeasonObjectiveRecord["status"];
+  /**
+   * Anzeige-Status (Review 22.11.): mitten in der Saison hochgerechnet, "failed" erst wenn rechnerisch nicht mehr
+   * erreichbar (`lib/board/ziel-kurs.ts`). `status` bleibt der gespeicherte, abrechnungsrelevante Wert.
+   */
+  anzeigeStatus: TeamSeasonObjectiveRecord["status"];
+  kursGrund: string;
   ist: string;
   soll: string;
   plus: number;
@@ -161,6 +168,7 @@ export function buildOfficeModell(gameState: GameState, teamId: string): OfficeM
     const laufzeit = o.laufzeit;
     const mehrjaehrig = Boolean(laufzeit && laufzeit.bisSaisonNr > laufzeit.vonSaisonNr);
     const delta = o.boardConfidenceDelta ?? 0;
+    const kurs = berechneZielKurs(gameState, o);
     // Plus/Minus: was bei Erfuellung bzw. Verfehlen gebucht wuerde. Ist der Status entschieden, steht dort der Beleg.
     const plusRoh = o.status === "completed" ? delta : o.status === "failed" ? 0 : Math.max(0, delta);
     return {
@@ -170,6 +178,8 @@ export function buildOfficeModell(gameState: GameState, teamId: string): OfficeM
       detail: o.detail ?? null,
       hinweis: o.actionHint ?? null,
       status: o.status,
+      anzeigeStatus: kursZuStatus(kurs.kurs),
+      kursGrund: kurs.begruendung,
       ist: wert(o.currentValue),
       soll: wert(o.targetValue),
       plus: r2(o.status === "failed" || o.objectiveId === "vorstand-gespraech-vertrauen" ? 0 : plusRoh > 0 ? plusRoh : 0.3),

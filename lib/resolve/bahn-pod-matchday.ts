@@ -14,6 +14,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { ppTagesankerFuer, ppVorTagesanker, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import {
   runBahnPodFixtures,
   type BahnPodFixtureInput,
@@ -49,6 +50,8 @@ export type RunBahnPodMatchdayErgebnis = {
   rohdatenByPodId: Map<string, BahnPodRohdaten>;
   /** `playerId -> PP` ueber alle Pods (ein Spieler laeuft an einem Spieltag in genau einem Pod). */
   playerPpsByPlayerId: Map<string, number>;
+  /** Nur mit Tagesanker: C2-PP VOR dem Anker (gedeckelt wie kalibriert), ausschliesslich fuer E1. */
+  playerPpsVorAnkerByPlayerId?: Map<string, number>;
   warnings: string[];
   /** k, mit dem gerechnet wurde (Spielplan-Slot), fuer Hash/Diagnose. */
   playerCount: number | null;
@@ -130,6 +133,8 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
 
   const referenz = resolveBahnPodSpielerPpReferenz(input.disciplineId, k);
   const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
+  // PP-TAGESANKER (scharf 22.11., Saison-Stempel): ueber alle Pods des Spieltags, s. pp-tagesanker.ts.
+  const tagesanker = ppTagesankerFuer(input.gameState, input.matchdayId);
   const rohdatenByPodId = new Map<string, BahnPodRohdaten>();
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];
@@ -153,11 +158,17 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
         eintrag.playerId,
         // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
         ppSkala !== "aus"
-          ? ppAusKurveSkaliert({ disciplineId: input.disciplineId, wert: eintrag.wert, referenz, modus: ppSkala, playerCount: k })
+          ? ppAusKurveSkaliert({ disciplineId: input.disciplineId, wert: eintrag.wert, referenz, modus: ppSkala, playerCount: k, ...(tagesanker ? { deckel: false } : {}) })
           : ppAusBahnPodWert(eintrag.wert, referenz),
       );
     }
   });
 
-  return { rohdatenByPodId, playerPpsByPlayerId, warnings, playerCount: k };
+  return {
+    rohdatenByPodId,
+    playerPpsByPlayerId: tagesanker ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    ...(tagesanker ? { playerPpsVorAnkerByPlayerId: ppVorTagesanker(playerPpsByPlayerId) } : {}),
+    warnings,
+    playerCount: k,
+  };
 }

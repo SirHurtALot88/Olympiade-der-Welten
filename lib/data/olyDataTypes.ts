@@ -3675,7 +3675,7 @@ export type SeasonSnapshotRecord = {
    * Ergebnisskala diese Saison gerechnet wurde. Fehlt = vor dem 18.11. archiviert (alte Skalen).
    * Saisonuebergreifende Summen (ewige Tabelle, Laufbahn) koennen daran ablesen, ab wann die neue Skala gilt.
    */
-  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string } | null;
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string; ppTagesanker?: boolean } | null;
   /** Top-6 discipline strength ranks per team at season end (for Ranks archive). */
   teamDisciplineRankSnapshots?: TeamDisciplineRankSnapshotRecord[];
   /** Woher `teamDisciplineRankSnapshots` stammt — fehlt bei Altständen (dann: Live-Kader beim Abschluss). */
@@ -4207,7 +4207,7 @@ export type SeasonState = {
    * Saison rechnet. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der
    * Stempel (bestehender Spielstand) oder gehoert er zu einer anderen Saison, gilt "alt".
    */
-  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string };
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string; ppTagesanker?: boolean };
   /**
    * WIRTSCHAFTS-REGELN DIESER SAISON (22.11., lib/resolve/wirtschafts-regeln.ts): Kaderpflicht-Quote, Erwartungsanker, Kernschutz und
    * Rueckkauf-Sperre. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der Stempel oder gehoert er zu einer

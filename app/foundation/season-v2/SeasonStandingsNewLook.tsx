@@ -71,6 +71,8 @@ import {
   type SeasonDisciplineKey,
 } from "@/lib/season/season-discipline-area-groups";
 import {
+  DUELL_DISCIPLINES_PER_MATCHDAY,
+  DUELL_MAX_POINTS_PER_MATCHDAY,
   MAX_PLAYERS_PER_MATCHDAY,
   MAX_POINTS_PER_MATCHDAY,
   POINTS_PER_PARTICIPATING_PLAYER,
@@ -2639,8 +2641,11 @@ export default function SeasonStandingsNewLook({
     // eigenen Zahlen im sichtbaren Text — nur die fertige Obergrenze selbst steht in der
     // Kopfzeile. Die Herleitung ("12 Spieler × 3,3") steht NUR im Tooltip der Chips als
     // Begründung, sonst würde die Zeile mit Zwischenwerten überladen.
-    const maxPointsLabel = formatNlNumber(MAX_POINTS_PER_MATCHDAY, 1);
-    const maxPointsTooltip = `maximal ${maxPointsLabel} Punkte sind am letzten Spieltag noch zu holen (${formatNlNumber(MAX_PLAYERS_PER_MATCHDAY, 0)} Spieler × ${formatNlNumber(POINTS_PER_PARTICIPATING_PLAYER, 1)})`;
+    const maxPointsLabel = formatNlNumber(titleRace.maxPointsPerMatchday, titleRace.maxPointsPerMatchday % 1 === 0 ? 0 : 1);
+    const maxPointsTooltip =
+      titleRace.maxPointsPerMatchday === MAX_POINTS_PER_MATCHDAY
+        ? `maximal ${maxPointsLabel} Punkte sind am letzten Spieltag noch zu holen (${formatNlNumber(MAX_PLAYERS_PER_MATCHDAY, 0)} Spieler × ${formatNlNumber(POINTS_PER_PARTICIPATING_PLAYER, 1)})`
+        : `maximal ${maxPointsLabel} Punkte sind am letzten Spieltag noch zu holen (${formatNlNumber(DUELL_DISCIPLINES_PER_MATCHDAY, 0)} Duelle × je ${formatNlNumber(DUELL_MAX_POINTS_PER_MATCHDAY / DUELL_DISCIPLINES_PER_MATCHDAY, 0)} Punkte)`;
 
     return (
       <>

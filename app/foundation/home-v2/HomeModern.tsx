@@ -597,10 +597,21 @@ function Band({ sd }: { sd: StartseiteDaten }) {
       );
     }
   }
-  if (sd.spielerDesTages) {
-    teile.push(
-      <span key="tag">
-        Spieler des Tages: <b>{sd.spielerDesTages.name}</b> {sd.spielerDesTages.formStufe != null ? <BcFormPfeil stufe={sd.spielerDesTages.formStufe} /> : null}
+  if (sd.besterDuellsieg || sd.spielerDesTages) {
+    // "Das Beste des Spieltags": nur aus echten Daten (höchster Duellsieg, bester Spieler des Teams), sonst fehlt der Teil.
+    teile.unshift(
+      <span key="beste" data-testid="hm-beste">
+        <b className="hm-plus">Das Beste des Spieltags</b>
+        {sd.besterDuellsieg ? (
+          <>
+            {" "}· Höchster Sieg: <b>{sd.besterDuellsieg.disziplin}</b> {sd.besterDuellsieg.ergebnis}
+          </>
+        ) : null}
+        {sd.spielerDesTages ? (
+          <>
+            {" "}· Spieler des Tages: <b>{sd.spielerDesTages.name}</b> {sd.spielerDesTages.formStufe != null ? <BcFormPfeil stufe={sd.spielerDesTages.formStufe} /> : null}
+          </>
+        ) : null}
       </span>,
     );
   }

@@ -318,7 +318,7 @@ function reihenGruppen(beleg: string): Record<string, FormationsGruppe> {
       label: REIHEN_NAMEN[reihe],
       x: reihenX(reihe),
       y: 0.5,
-      text: `Reihe ${reihe + 1} (${REIHEN_NAMEN[reihe]}). Der Motor setzt die Reihe beim Kampfstart und hält sie über die Formationsleine; innerhalb der Reihe ordnet er nach Kader, nicht nach Slot.`,
+      text: `Reihe ${reihe + 1} (${REIHEN_NAMEN[reihe]}). Die Reihe wird beim Kampfstart gesetzt und gehalten; innerhalb der Reihe ordnet sich das Team nach Kader, nicht nach Platz.`,
       verbindlichkeit: "motor",
       beleg,
     };
@@ -366,7 +366,7 @@ function hockeyGruppen(): Record<string, FormationsGruppe> {
       label: namen[index]!,
       x: platz.x,
       y: platz.y,
-      text: `Grundformation ${namen[index]}. Darstellung: der Motor verteilt die Feldspieler nach Nahschuss-Stärke, nicht nach Rolle.`,
+      text: `Grundformation ${namen[index]}. Nur Darstellung: die Feldspieler stehen nach Nahschuss-Stärke verteilt, nicht nach Rolle.`,
       verbindlichkeit: "darstellung",
       beleg: `SLOTS_HOCKEY[${index}] (Zuteilung nach SCHUSS_NAH)`,
     };
@@ -375,7 +375,7 @@ function hockeyGruppen(): Record<string, FormationsGruppe> {
     label: "Tor",
     x: TOR.x + 0.03,
     y: 0.5,
-    text: "Steht im Tor. Der Motor liest diesen Slot (TORWART_SLOTS) und stellt ihn fest ins Tor.",
+    text: "Steht im Tor. Dieser Platz bleibt fest im Tor.",
     verbindlichkeit: "motor",
     beleg: "TORWART_SLOTS",
   };
@@ -529,7 +529,7 @@ const FORMATIONEN: readonly FormationsDefinition[] = [
     disziplin: "basketball",
     feld: "halbfeld",
     seitenverhaeltnis: 2.2,
-    kopfzeile: "Halbfeld: jede Rolle hat ihren Platz — der Motor nimmt ihn nur bei voller, eindeutiger Besetzung.",
+    kopfzeile: "Halbfeld: jede Rolle hat ihren Platz — die Aufstellung greift nur bei voller, eindeutiger Besetzung.",
     gegner: "schatten",
     anordnung: "gruppen",
     gruppen: basketballGruppen(),

@@ -99,6 +99,7 @@
 .swm .det .bh strong { font-size:calc(1.3 * var(--u));color:var(--gut);white-space:nowrap }
 .swm .det .bh strong.o { color:var(--stumm) }
 .swm .kette { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:calc(0.3 * var(--u));margin:calc(0.45 * var(--u)) 0 calc(0.4 * var(--u)) }
+.swm .kette.vier { grid-template-columns:repeat(4,minmax(0,1fr)) }
 .swm .kette div { padding:calc(0.3 * var(--u)) calc(0.5 * var(--u));background:var(--flaeche-2);border:1px solid var(--linie);border-radius:calc(0.35 * var(--u)) }
 .swm .kette small { display:block;font-size:calc(0.7 * var(--u));letter-spacing:.06em;text-transform:uppercase;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
 .swm .kette b { font-size:calc(1.15 * var(--u));line-height:1.15 }

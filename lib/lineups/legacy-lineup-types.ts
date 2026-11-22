@@ -702,6 +702,13 @@ export type LegacyResolvePreviewOptions = {
    */
   arenaIndividualBoxscorePpsByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, number>> | null;
   /**
+   * PP-TAGESANKER: dieselbe Form, aber die C2-PP VOR dem Tagesanker (gedeckelt wie kalibriert). NUR die
+   * Ergebnisskala E1 liest sie (Niveau, Zeitfahren-Abstand); gebucht und gezeigt werden die PP aus
+   * `arenaIndividualBoxscorePpsByDisciplineId`. Fehlt der Eintrag (kein Tagesanker, Ausfall-Rueckfall),
+   * liest E1 wie bisher `pointsAwarded`.
+   */
+  arenaIndividualBoxscorePpsVorAnkerByDisciplineId?: ReadonlyMap<string, ReadonlyMap<string, number>> | null;
+  /**
    * SICHTBARE ARENA-AUSFÄLLE (Plan `docs/design/battle-arena-auto-run-anbindung-plan-16-10.md`
    * Abschnitt 3.2 Punkt 4, PR 1): ein explizit ÜBERGEBENER Ausfallgrund je Disziplin — so kann ein
    * Aufrufer (z.B. der künftige Arena-Vorlauf-Service, PR 3) "Chromium ist abgestürzt" melden,

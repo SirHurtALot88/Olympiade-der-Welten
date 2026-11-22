@@ -166,8 +166,8 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
   return [
     step({
       stepId: "season_intro",
-      label: "Season-Briefing lesen",
-      cta: "Weiter: Season-Briefing",
+      label: "Saisonbriefing lesen",
+      cta: "Weiter: Saisonbriefing",
       status: !isSeasonReviewPhase && (seasonIntroOpen || (!hasStoredNewGameFlow && isFirstSeason)) ? "ready" : "completed",
       targetView: "home",
       targetPanel: "season-briefing",
@@ -201,8 +201,8 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
     }),
     step({
       stepId: "facilities",
-      label: "Facilities prüfen",
-      cta: "Weiter: Facilities prüfen",
+      label: "Gebäude prüfen",
+      cta: "Weiter: Gebäude prüfen",
       status: !hasActiveTeam
         ? "blocked"
         : teamHasAffordableFacilityUpgrade(gameState, activeTeamId)
@@ -277,8 +277,8 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
     }),
     step({
       stepId: "prepare_season",
-      label: "Season vorbereiten",
-      cta: "Weiter: Season Setup",
+      label: "Saison vorbereiten",
+      cta: "Weiter: Saison vorbereiten",
       status: gamePhase === "next_season_ready" || gamePhase === "season_active" ? "completed" : preseasonManagementReady ? "warning" : "ready",
       // Ziel ist die Saisonabschluss-Ansicht, nicht das Cockpit: dort steht der Schritt
       // "Neue Saison starten" mit demselben Handler, aber in Spielersprache.
@@ -308,7 +308,7 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
     }),
     step({
       stepId: "start_matchday_1",
-      label: "Matchday 1 starten",
+      label: "Ersten Spieltag starten",
       cta: "Weiter: Einsatzliste vorbereiten",
       status: gamePhase === "season_active" ? "completed" : "ready",
       targetView: "lineup",
@@ -648,8 +648,8 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
   return [
     step({
       stepId: "season_intro",
-      label: "Season-Briefing lesen",
-      cta: "Weiter: Season-Briefing",
+      label: "Saisonbriefing lesen",
+      cta: "Weiter: Saisonbriefing",
       status: seasonIntroOpen ? "ready" : "completed",
       targetView: "home",
       targetPanel: "season-briefing",
@@ -842,8 +842,8 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
     }),
     step({
       stepId: "run_reveal",
-      label: "Reveal laufen lassen",
-      cta: "Weiter: Reveal prüfen",
+      label: "Spieltag auswerten lassen",
+      cta: "Weiter: Auswertung ansehen",
       status: hasResults ? "completed" : matchdayArenaReady ? "ready" : "blocked",
       targetView: "matchdayArena",
       teamId: activeTeamId,
@@ -895,7 +895,7 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
     step({
       stepId: "advance_to_next_matchday",
       label: isFinalMatchday ? "Saison abschließen" : "Zum nächsten Spieltag",
-      cta: isFinalMatchday ? "Weiter: Zur Saison-Auswertung" : "Weiter: Matchday fortsetzen",
+      cta: isFinalMatchday ? "Weiter: Zur Saison-Auswertung" : "Weiter: Nächster Spieltag",
       status: hasFullMatchdayResult ? (boardSignals.blockers.length > 0 ? "warning" : "ready") : "blocked",
       targetView: advanceBlockedByMissingD2 ? "matchdayArena" : "cockpit",
       targetPanel: advanceBlockedByMissingD2 ? "foundation-matchday-arena" : null,

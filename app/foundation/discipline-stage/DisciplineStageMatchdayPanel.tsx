@@ -154,6 +154,8 @@ export type MatchdayPanelPlayerRow = {
   mutatorPp: number | null;
   /** Battle-Modus (18.11.): Formschub aus Mutator-Treffern statt PP — der Mutator gibt dort keine Punkte mehr. */
   mutatorForm?: number | null;
+  /** Mutator-Treffer des Spielers (nur Battle-Modus, 22.11.) — die neue Aufloesung zeigt Treffer + Form. */
+  mutatorHits?: number | null;
   /**
    * Ligaweiter OVR-Rang — Grundlage des Star-Tier-Rahmens am Chip (Diamant/Gold/
    * Silber/Bronze fuer die Top 3/10/25/50, `lib/foundation/player-star-tier.ts`).

@@ -855,13 +855,31 @@ function resolveWeightedAttributeScore(
 function resolveProfileRoleModifier(
   role: MatchdaySlotRoleDefinition,
   attributeStats: PlayerAttributeSheetStats | null | undefined,
+  skala = 1,
 ) {
   const baseScore = resolveWeightedAttributeScore(attributeStats, role.baseWeightProfile);
   const slotScore = resolveWeightedAttributeScore(attributeStats, role.slotWeightProfile);
   if (baseScore == null || slotScore == null) {
     return null;
   }
-  return Number(clampNumber((slotScore - baseScore) * SLOT_PROFILE_MODIFIER_SCALE, -8.5, 8.5).toFixed(1));
+  return Number(clampNumber((slotScore - baseScore) * SLOT_PROFILE_MODIFIER_SCALE * skala, -8.5, 8.5).toFixed(1));
+}
+
+/**
+ * Der Slot-Bonus EINES Spielers in EINER Rolle, ohne Form, Moral, Karte, Intensitaet und Muedigkeit:
+ * (gewichteter Attributschnitt im Slotprofil minus im Grundprofil der Disziplin) x 2,2, geklemmt auf
+ * +-8,5. Dieselbe Formel wie `slotAufschlag()` im Arena-Motor (beide lesen `slotWeightProfile` bzw.
+ * `baseWeightProfile` derselben Rolle; der Motor bekommt sein `SLOTVON` aus `generiere-arena-daten.ts`
+ * genau daraus). `skala` bildet den einzigen Sonderfall des Motors ab (Football 0,35, vor der Klemmung).
+ * `null`, wenn der Attributbogen fehlt. Genutzt von der Arena-Vorstellung (roh + Slot-Bonus).
+ */
+export function berechneSlotAufschlag(
+  role: MatchdaySlotRoleDefinition | null | undefined,
+  attributeStats: PlayerAttributeSheetStats | null | undefined,
+  skala = 1,
+): number | null {
+  if (!role) return null;
+  return resolveProfileRoleModifier(role, attributeStats, skala);
 }
 
 function resolveSlotStrainLoad(fatigueProfile: MatchdaySlotRoleDefinition["fatigueProfile"], roleId: string) {

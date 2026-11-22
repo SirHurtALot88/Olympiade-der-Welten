@@ -767,6 +767,7 @@ button.fb-chip:hover {
 .foundation-takt-schritt-text { display: grid; min-width: 0; }
 .foundation-takt-schritt-text b { font-size: 0.95em; font-weight: 600; color: var(--fb-tinte); }
 .foundation-takt-schritt-text small { font-size: 0.8em; color: var(--fb-leise); }
+.foundation-takt-schritt-text small.foundation-takt-warum { opacity: 0.85; font-style: italic; }
 .foundation-takt-schritt.is-erledigt .foundation-takt-schritt-text b { color: var(--fb-leise); }
 .foundation-takt-sprung {
   font-family: var(--fb-zahl);
