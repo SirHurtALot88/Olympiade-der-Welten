@@ -73,6 +73,12 @@ Jede Phase ist einzeln mergebar und abschaltbar. Ein Regel-Stempel gilt für all
 - Zwei gleiche Legendäre bringen höchstens das 1,8-Fache von einem.
 - Standard und Selten werden als „typischer Kader“ gemessen, nicht je Teil, weil das Rauschen sonst zu groß ist.
 
+**Preis-Anker (Chris, 22.11., korrigiert):** Ein Legendäres im Dauereinsatz (26 wirksame Einsätze je Saison) kostet rund 2 C je Saison an Reparatur.
+- Daraus folgt: Reparatur je Einsatz = Mehrertrag × 0,125 C, volle Reparatur 0,20 / 0,38 / 0,75 / 1,50 C.
+- Händlerpreis = zwei volle Reparaturen: 0,40 / 0,75 / 1,50 / 3,00 C.
+- Ein voll ausgerüsteter Kader (28 Teile) kostet etwa 19 C je Saison, rund 21 % des Gehalts. Ein typischer Kader (14 Teile) kostet etwa 6,7 C.
+- Konzept §67.
+
 ## C. Entscheidungen (PM, 22.11.)
 
 | # | Frage | Entscheidung |
