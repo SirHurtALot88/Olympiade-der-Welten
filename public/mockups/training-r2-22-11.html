@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Training Runde 2: Ziel-Heatmap und Trainingsvorlieben (Mockup 22.11.)</title>
+<!--
+  TRAINING RUNDE 2 (Fable, 22.11.). Erklaerung: docs/design/training-r2-22-11.md. Stil und Tokens aus training-modern-18-11.html.
+  Zwei Wuensche von Chris (22.11.): (1) „Plan aendern“ als HEATMAP (wo ist am meisten Steigerung moeglich), die vier Bereiche
+  POW / SPE / MEN / SOC klar getrennt; (2) TRAININGSVORLIEBEN je Spieler: zwei Lieblingsdisziplinen, eine ungeliebte.
+  ECHT (Live-Abbild 22.11., Spielstand „Oly New Game Custom 19.11.“, Saison 1, Spieltag 12, Team Death Peaches, Liga 2):
+        Kader, Portraits, Klassen, Traits, 12 Attribute, individuelle Attribut-Decken, Eignung je Disziplin, Rang in der Liga (195 Spieler),
+        Belastung, Trainingsmodus, gesetzte Ziele und Wege, Moral, Form, Verletzungen; Matrixgewichte (official-discipline-weights.ts,
+        nur gelesen); Disziplinfarbe (dataAdapter.ts, category); Saetze je Spieltag und Trainingslast (training-mode-presentation.ts).
+  MODELL (vereinfacht, die App zeigt die Engine): Zuwachs = Satz je Spieltag x Rest-Spieltage, verteilt 60 / 25 / 15 auf den Weg,
+        Decke bremst (offen x1, eng x0,45, zu x0,05), Eignung = Summe Zuwachs x Matrixgewicht. Belastungs-Forecast: Last minus Erholung.
+  VORSCHLAG (noch nicht im Spiel): Trainingsvorlieben, hier nach der vorgeschlagenen Regel aus der Spieler-ID gewuerfelt.
+  Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
+  URL: ?spieler=maru|zynara|…  ?mass=zuwachs|luft  ?nebel=1 (fremdes Team)  ?vorlieben=aus  ?still=1 (ohne Mockup-Leiste)
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --pow:#e2574c;--spe:#5fc27a;--men:#5aa2e6;--soc:#e8c34a;
+  --z0:#62d394;--z1:#e8c34a;--z2:#f08a3c;--z3:#ff5a52;
+  --lieb:#ff7fa3; --unlieb:#9d8cff;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem;
+}
+/* Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px). Die Wurzelgroesse waechst mit Breite UND Hoehe. */
+html{font-size:clamp(12.5px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+svg.f{width:1em;height:1em;fill:currentColor;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)}
+.c-pow{--c:var(--pow)} .c-spe{--c:var(--spe)} .c-men{--c:var(--men)} .c-soc{--c:var(--soc)} .c-bal{--c:var(--leise)}
+
+.demo{height:2.25rem;display:flex;align-items:center;gap:.9rem;padding:0 .9rem 0 5rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem}
+.demo a{color:var(--leise);padding:.1rem .55rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+body.still .demo{display:none}
+
+.app{--kopf:2.25rem;display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - var(--kopf));background:var(--grund)}
+body.still .app{--kopf:0rem}
+.rail{display:flex;flex-direction:column;gap:.2rem;padding:.6rem;background:#080b11;border-right:1px solid var(--linie);overflow:hidden}
+.rail .logo{width:2.75rem;height:2.75rem;border-radius:.55rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.5rem;flex:none}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail a{position:relative;height:2.75rem;border-radius:.55rem;display:flex;align-items:center;padding-left:.72rem;font-size:1.25rem;color:var(--stumm);flex:none}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.6rem;top:.55rem;bottom:.55rem;width:.19rem;border-radius:2px;background:var(--gold)}
+.rail .luecke{flex:1}
+
+main{display:grid;grid-template-rows:auto auto minmax(0,1fr);min-width:0;min-height:0}
+.hero{display:flex;align-items:center;gap:1.4rem;padding:.7rem 1.2rem .65rem;border-bottom:1px solid var(--linie);background:linear-gradient(90deg,rgba(242,160,61,.10),rgba(6,8,12,0) 45%)}
+.hero .crest{width:3.6rem;height:3.6rem;border-radius:.6rem;overflow:hidden;border:2px solid var(--heim);flex:none}
+.hero .crest img{width:100%;height:100%;object-fit:cover}
+.hero em{font-style:normal;font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold)}
+.hero h1{margin:.1rem 0 .1rem;font:400 2rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hero .lage{font-size:.92rem;color:var(--leise);white-space:nowrap} .hero .lage b{color:var(--creme);font-weight:600}
+.hero .sp{flex:1}
+.kpi{min-width:7.4rem;padding:.42rem 1.15rem .5rem 1.25rem;background:rgba(14,19,29,.82);border:1px solid var(--linie);clip-path:polygon(.75rem 0,100% 0,calc(100% - .75rem) 100%,0 100%)}
+.kpi strong{display:block;font-size:1.6rem;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap}
+.kpi span{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.reiter{display:flex;gap:.2rem;padding:0 1.2rem;border-bottom:1px solid var(--linie);height:2.5rem;align-items:stretch}
+.reiter a{display:flex;align-items:center;padding:0 1rem;font:400 1.05rem/1 var(--haus);color:var(--leise);border-bottom:.16rem solid transparent}
+.reiter a.an{color:var(--gold);border-bottom-color:var(--gold)}
+.reiter .sp{flex:1}
+.reiter .hin{align-self:center;font-size:.86rem;color:var(--leise)} .reiter .hin b{color:var(--creme)}
+
+.seite{display:grid;grid-template-columns:28.5rem minmax(0,1fr) 27.5rem;gap:.72rem;padding:.75rem 1rem .8rem;min-height:0}
+.pan{display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden;min-width:0;min-height:0}
+.pk{display:flex;align-items:center;gap:.6rem;padding:0 .9rem;border-bottom:1px solid var(--linie);height:2.7rem;flex:none}
+.pk h2{min-width:0;margin:0;font:400 1.19rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk h2 b{display:inline-grid;place-items:center;width:1.4rem;height:1.4rem;margin-right:.35rem;border-radius:50%;background:var(--gold);color:#17120a;font:700 .9rem/1 var(--zahl);vertical-align:.1em}
+.pk small{font-size:.86rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk .sp{flex:1}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:.3rem;overflow:hidden;flex:none}
+.seg a{padding:.18rem .65rem;font-size:.84rem;font-weight:700;letter-spacing:.04em;color:var(--leise);border-left:1px solid var(--linie);white-space:nowrap;position:relative}
+.seg a:first-child{border-left:0}
+.seg a:hover{color:var(--tinte);background:var(--flaeche-3)}
+.seg a.an{background:var(--gold);color:#17120a}
+.seg a .wu{position:absolute;right:.12rem;top:.08rem;width:.38rem;height:.38rem;border-radius:50%;background:var(--lieb)}
+
+/* KADERLISTE */
+.kl{flex:1;min-height:0;display:grid;grid-auto-rows:minmax(0,1fr)}
+.kh,.kz{display:grid;grid-template-columns:2.5rem minmax(0,1fr) 5.7rem 6.3rem 3.2rem;gap:.55rem;align-items:center;padding:0 .7rem}
+.kh{height:1.9rem;flex:none;border-bottom:1px solid var(--linie);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:700}
+.kh span{white-space:nowrap} .kh .r{text-align:right}
+.kh a{color:inherit} .kh a.an{color:var(--gold)}
+.kz{border-bottom:1px solid var(--linie);position:relative;min-height:0}
+.kz:last-child{border-bottom:0}
+.kz:hover{background:var(--flaeche-2)}
+.kz.an{background:linear-gradient(90deg,rgba(240,195,90,.16),rgba(240,195,90,.03))}
+.kz.an::before{content:"";position:absolute;left:0;top:0;bottom:0;width:.19rem;background:var(--gold)}
+.kz .po{width:2.5rem;height:2.5rem;border-radius:.4rem;overflow:hidden;border:1px solid var(--c);position:relative}
+.kz .po img{width:100%;height:100%;object-fit:cover;object-position:center 18%}
+.kz.verl .po img{filter:grayscale(1) brightness(.6)}
+.kz .nm{min-width:0}
+.kz .nm b{display:block;font:400 1.08rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kz .nm span{font-size:.8rem;color:var(--c);font-weight:700;letter-spacing:.04em;white-space:nowrap}
+.kz .nm span i{font-style:normal;color:var(--leise);font-weight:500}
+.kz .zi{min-width:0;font-size:.9rem;line-height:1.1;white-space:nowrap}
+.kz .zi b{display:block;color:var(--c);font-weight:700;overflow:hidden;text-overflow:ellipsis}
+.kz .zi span{font-size:.76rem;color:var(--leise)}
+.kz .dz{text-align:right;font-size:1.15rem;font-weight:700}
+.kz .dz small{display:block;font-size:.68rem;font-weight:600;color:var(--stumm);letter-spacing:.06em}
+.vl{display:flex;flex-direction:column;gap:.12rem;min-width:0}
+.vp{display:flex;align-items:center;gap:.22rem;font-size:.76rem;font-weight:700;line-height:1;white-space:nowrap;color:var(--c)}
+.vp svg{font-size:.78rem} .vp.l svg{color:var(--lieb)} .vp.u svg{color:var(--unlieb)}
+.vp.u{opacity:.92}
+.vp.q{color:var(--stumm)} .vp.q svg{color:var(--stumm)}
+.vp.akt{align-self:flex-start;padding:.08rem .3rem;margin:-.08rem -.3rem;border-radius:.25rem;background:color-mix(in srgb,var(--c) 22%,transparent);box-shadow:0 0 0 1px var(--gold)}
+.kfuss{flex:none;padding:.5rem .8rem;border-top:1px solid var(--linie);font-size:.82rem;color:var(--leise);line-height:1.25}
+.kfuss b{color:var(--creme);font-weight:600}
+.stufe{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.08rem .35rem;border-radius:.2rem;border:1px solid var(--linie-2);color:var(--leise);white-space:nowrap}
+.stufe.s2{color:var(--gut);border-color:rgba(98,211,148,.5)} .stufe.s1{color:var(--acht);border-color:rgba(243,181,74,.5)}
+
+/* HEATMAP */
+.hm{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:.6rem;padding:.6rem}
+.band{display:grid;grid-template-rows:auto auto minmax(0,1fr);min-height:0;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);border-radius:.5rem;overflow:hidden;background:linear-gradient(180deg,color-mix(in srgb,var(--c) 11%,#0c1017),#0c1017 60%)}
+.bk{display:flex;align-items:center;gap:.6rem;height:2.5rem;padding:0 .7rem;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 38%,#0c1017),color-mix(in srgb,var(--c) 8%,#0c1017));border-bottom:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.bk .ic{display:grid;place-items:center;width:1.7rem;height:1.7rem;border-radius:.35rem;background:var(--c);color:#10141c;font-size:1.15rem}
+.bk h3{margin:0;font:400 1.3rem/1 var(--haus);color:#fff}
+.bk h3 small{font:600 .8rem/1 var(--zahl);letter-spacing:.1em;text-transform:uppercase;color:color-mix(in srgb,var(--c) 70%,#fff);margin-left:.35rem}
+.bk .sp{flex:1}
+.bk .best{font-size:.84rem;color:var(--leise);white-space:nowrap} .bk .best b{color:#fff;font-size:1rem}
+.bk .kf{font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.1rem .4rem;border-radius:.2rem;background:var(--c);color:#10141c;white-space:nowrap}
+.sph,.zl{display:grid;grid-template-columns:minmax(0,1fr) repeat(3,5.1rem);gap:.3rem;padding:0 .5rem 0 .6rem;align-items:center}
+.sph{height:1.4rem;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:700}
+.sph span{text-align:center} .sph span:first-child{text-align:left}
+.zln{display:grid;grid-auto-rows:minmax(0,1fr);gap:.3rem;padding-bottom:.45rem;min-height:0}
+.zl{min-height:0;height:100%}
+.zl .dn{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:.1rem;border-left:.2rem solid var(--c);padding-left:.5rem;height:100%}
+.zl .dn b{display:flex;align-items:center;gap:.3rem;font:400 1.12rem/1 var(--haus);color:#fff;white-space:nowrap}
+.zl .dn b svg{font-size:.9rem} .zl .dn b svg.lieb{color:var(--lieb)} .zl .dn b svg.unlieb{color:var(--unlieb)}
+.zl .dn span{font-size:.8rem;color:var(--leise);white-space:nowrap} .zl .dn span b{display:inline;font:600 .86rem/1 var(--zahl);color:var(--creme)}
+.zl.lieb .dn{background:linear-gradient(90deg,rgba(255,127,163,.14),transparent 80%)}
+.zl.unlieb .dn{background:linear-gradient(90deg,rgba(157,140,255,.14),transparent 80%)}
+.hz{position:relative;height:100%;min-height:0;border-radius:.35rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.05rem;
+  background:color-mix(in srgb,var(--c) calc(var(--t)*1%),#111723);border:1px solid color-mix(in srgb,var(--c) calc(18% + var(--t)*.6%),transparent);color:#fff;text-align:center}
+.hz b{font-size:1.28rem;font-weight:700;line-height:1}
+.hz span{font-size:.68rem;font-weight:600;letter-spacing:.06em;opacity:.85;line-height:1}
+.hz.hell{color:#10141c}
+.hz.kalt b{color:var(--leise)} .hz.kalt span{color:var(--stumm)}
+.hz:hover{outline:2px solid #fff;outline-offset:-2px}
+.hz.an{outline:.19rem solid var(--gold);outline-offset:-1px;box-shadow:0 0 1rem rgba(240,195,90,.55);z-index:2}
+.hz.an::after{content:"Ziel";position:absolute;top:-.5rem;right:-.3rem;font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:var(--gold);color:#17120a;padding:.05rem .3rem;border-radius:.2rem}
+.hz.best::before{content:"";position:absolute;left:.25rem;top:.25rem;width:.42rem;height:.42rem;border-radius:50%;background:#fff;box-shadow:0 0 .4rem #fff}
+.hz .dk{position:absolute;left:.2rem;bottom:.12rem;font-size:.56rem;font-weight:700;letter-spacing:.06em;color:var(--warn);opacity:1}
+.hz.hell .dk{color:#7a1410}
+.hmf{flex:none;display:flex;align-items:center;gap:1rem;padding:.45rem .9rem;border-top:1px solid var(--linie);font-size:.84rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.hmf b{color:var(--creme);font-weight:600}
+.skala{display:flex;align-items:center;gap:.35rem}
+.skala i{display:block;width:7rem;height:.6rem;border-radius:.3rem;background:linear-gradient(90deg,#111723,var(--pow))}
+.skala i.s2{background:linear-gradient(90deg,#111723,var(--spe))} .skala i.s3{background:linear-gradient(90deg,#111723,var(--men))} .skala i.s4{background:linear-gradient(90deg,#111723,var(--soc))}
+.skala .st{display:flex;flex-direction:column;gap:.1rem} .skala .st i{width:5rem;height:.22rem}
+.hmf .p{display:inline-flex;align-items:center;gap:.3rem}
+.hmf .p i{width:.5rem;height:.5rem;border-radius:50%;background:#fff;display:inline-block}
+
+/* VORSCHAU */
+.vs{flex:1;min-height:0;display:flex;flex-direction:column;gap:.6rem;padding:.65rem .8rem .7rem}
+.sk{display:grid;grid-template-columns:4.1rem minmax(0,1fr) auto;gap:.7rem;align-items:center;flex:none}
+.sk .po{width:4.1rem;height:4.1rem;border-radius:.5rem;overflow:hidden;border:2px solid var(--c)}
+.sk .po img{width:100%;height:100%;object-fit:cover;object-position:center 18%}
+.sk h3{margin:0;font:400 1.55rem/1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sk .kl2{font-size:.86rem;font-weight:700;color:var(--c);letter-spacing:.04em} .sk .kl2 i{font-style:normal;font-weight:500;color:var(--leise)}
+.sk .tr{font-size:.78rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mo{display:flex;flex-direction:column;align-items:flex-end;gap:.2rem;font-size:.82rem;color:var(--leise);white-space:nowrap}
+.mo b{font-size:1.2rem;color:#fff}
+.mo svg{width:1.4rem;height:1.4rem;vertical-align:-.3rem}
+.kasten{flex:none;border:1px solid var(--linie);border-radius:.45rem;background:var(--flaeche-2);padding:.5rem .65rem}
+.kasten.vor{border-color:rgba(255,127,163,.45);background:linear-gradient(180deg,rgba(255,127,163,.09),var(--flaeche-2))}
+.kasten h4{margin:0 0 .35rem;display:flex;align-items:center;gap:.4rem;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700;white-space:nowrap}
+.kasten h4 .sp{flex:1} .kasten h4 em{font-style:normal;color:var(--creme);letter-spacing:.04em;text-transform:none;font-size:.84rem}
+.vch{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem}
+.vc{border-radius:.35rem;padding:.32rem .45rem;border:1px solid color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 14%,#0c1017);min-width:0}
+.vc b{display:flex;align-items:center;gap:.3rem;font:400 1rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden}
+.vc b svg{font-size:.85rem;color:var(--lieb)} .vc.u b svg{color:var(--unlieb)}
+.vc span{display:block;font-size:.76rem;color:var(--leise);white-space:nowrap} .vc span i{font-style:normal;font-weight:700}
+.vc.akt{box-shadow:0 0 0 2px var(--gold)}
+.vtx{margin:.38rem 0 0;font-size:.84rem;line-height:1.25;color:var(--leise)} .vtx b{color:var(--creme);font-weight:600}
+.wahl{display:flex;align-items:center;gap:.6rem;flex-wrap:nowrap}
+.wahl .zn{min-width:0;flex:1}
+.wahl .zn>b{display:block;font:400 1.3rem/1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wahl .zn span{font-size:.82rem;color:var(--leise);white-space:nowrap}
+.wahl .zn span b{font-weight:700}
+.wahl .zn span i{font-style:normal;font-weight:700;color:var(--c)}
+.fk{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.4rem}
+.fk span{font-size:.78rem;font-weight:600;padding:.1rem .45rem;border-radius:.9rem;border:1px solid var(--linie-2);color:var(--creme);white-space:nowrap}
+.fk span.g{border-color:rgba(98,211,148,.55);color:var(--gut)} .fk span.s{border-color:rgba(255,96,88,.55);color:var(--warn)} .fk span.l{border-color:rgba(255,127,163,.6);color:var(--lieb)} .fk span.u{border-color:rgba(157,140,255,.6);color:var(--unlieb)}
+.ar{display:grid;grid-template-columns:2.4rem 2.5rem minmax(0,1fr) 3rem;gap:.5rem;align-items:center;height:1.45rem;font-size:.9rem}
+.ar .ab{font-weight:700;color:var(--c)} .ar .an2{color:var(--leise);font-size:.8rem}
+.ar .ba{position:relative;height:.55rem;border-radius:.3rem;background:#0a0e15;overflow:hidden}
+.ar .ba i{position:absolute;left:0;top:0;bottom:0;background:var(--c);opacity:.55}
+.ar .ba u{position:absolute;top:0;bottom:0;background:#fff}
+.ar .ba s{position:absolute;top:-.1rem;bottom:-.1rem;width:.14rem;background:var(--warn)}
+.ar .gw{text-align:right;font-weight:700}
+.an6{display:grid;grid-template-columns:1fr 1fr;gap:.12rem .9rem}
+.a6{display:grid;grid-template-columns:.5rem minmax(0,1fr) auto auto;gap:.4rem;align-items:center;font-size:.9rem;height:1.4rem;white-space:nowrap}
+.a6 i{width:.5rem;height:.5rem;border-radius:50%;background:var(--c)}
+.a6 span{overflow:hidden;text-overflow:ellipsis} .a6 em{font-style:normal;color:var(--leise);font-size:.8rem} .a6 b{font-weight:700}
+.a6.zielz span{color:var(--gold);font-weight:700}
+.bf{display:grid;grid-template-columns:repeat(6,1fr);gap:.3rem;align-items:end;height:3.4rem;position:relative}
+.bf .s{position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:.1rem}
+.bf .s i{display:block;width:100%;border-radius:.2rem .2rem 0 0;background:var(--z0);min-height:.15rem}
+.bf .s.z1 i{background:var(--z1)} .bf .s.z2 i{background:var(--z2)} .bf .s.z3 i{background:var(--z3)}
+.bf .s b{font-size:.78rem;font-weight:700;line-height:1}
+.bfl{display:grid;grid-template-columns:repeat(6,1fr);gap:.3rem;font-size:.66rem;color:var(--stumm);text-align:center;letter-spacing:.06em;margin-top:.15rem}
+.bfl span.e{color:var(--heim);font-weight:700}
+.kn{margin-top:auto;display:grid;grid-template-columns:auto 1fr;gap:.5rem;flex:none}
+.kn a{height:2.5rem;display:grid;place-items:center;border-radius:.4rem;border:1px solid var(--linie-2);font:400 1.05rem/1 var(--haus);color:var(--leise);padding:0 1rem;white-space:nowrap}
+.kn a.haupt{background:var(--gold);border-color:var(--gold);color:#17120a}
+.kn a.haupt.aus{background:var(--flaeche-3);border-color:var(--linie);color:var(--stumm);cursor:default}
+.ruht{flex:none;border:1px solid rgba(255,96,88,.5);background:rgba(255,96,88,.1);border-radius:.4rem;padding:.4rem .6rem;font-size:.86rem;color:#ffd0cc;line-height:1.25}
+.ruht b{color:#fff}
+.fh,.fr{display:grid;grid-template-columns:3.4rem minmax(0,1.1fr) 6.5rem repeat(3,minmax(0,1fr)) minmax(0,.9fr);gap:.7rem;align-items:center;padding:0 1rem}
+.fh{height:2rem;flex:none;border-bottom:1px solid var(--linie);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:700}
+.fh .r{text-align:right}
+.fl{flex:1;min-height:0;display:grid;grid-auto-rows:minmax(0,1fr)}
+.fr{border-bottom:1px solid var(--linie)}
+.fr .po{width:3.4rem;height:3.4rem;border-radius:.45rem;overflow:hidden;border:1px solid var(--c)}
+.fr .po img{width:100%;height:100%;object-fit:cover;object-position:center 18%}
+.fr .nm b{display:block;font:400 1.3rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fr .nm span{font-size:.9rem;color:var(--c);font-weight:700}
+.fz{display:block;border-radius:.4rem;padding:.5rem .65rem;border:1px solid color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 16%,#0c1017);min-width:0}
+.fz b{display:flex;align-items:center;gap:.35rem;font:400 1.02rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden}
+.fz b svg{font-size:.95rem} .fz b svg.lieb{color:var(--lieb)} .fz b svg.unlieb{color:var(--unlieb)}
+.fz span{display:block;margin-top:.15rem;font-size:.8rem;color:var(--leise);white-space:nowrap}
+.fz.q{border:1px dashed var(--linie-2);background:repeating-linear-gradient(135deg,#0e131d 0 .5rem,#111723 .5rem 1rem)}
+.fz.q b{color:var(--stumm);font:600 1rem/1.05 var(--zahl);letter-spacing:.04em} .fz.q span{color:var(--stumm)}
+.bd{text-align:right;min-width:0} .bd b{display:block;font:400 1.1rem/1.05 var(--haus);color:var(--c);white-space:nowrap} .bd span{font-size:.86rem;color:var(--leise)}
+.nebelhin{flex:1;display:grid;place-items:center;text-align:center;color:var(--leise);font-size:1rem;line-height:1.4;padding:2rem}
+.nebelhin b{color:var(--creme)}
+.tip{position:fixed;z-index:99;max-width:21rem;padding:.5rem .7rem;border-radius:.4rem;background:#05070b;border:1px solid var(--linie-2);box-shadow:0 .6rem 1.6rem rgba(0,0,0,.6);font-size:.86rem;line-height:1.3;color:var(--tinte);pointer-events:none;display:none}
+.tip b{color:var(--gold)} .tip i{font-style:normal;color:var(--leise)}
+</style>
+</head>
+<body>
+<div class="demo" id="demo"></div>
+<div class="app">
+  <nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img src="../team-logos/D-P.jpg" alt=""></div>
+    <a><svg class="i" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></a>
+    <a><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.200-5.500 6.500-5.500s5.900 1.900 6.500 5.500M16 4.800a3.500 3.500 0 0 1 0 6.400M18.500 14.800c1.700.8 2.700 2.500 3 5.200"/></svg></a>
+    <a class="an"><svg class="i" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></svg></a>
+    <a><svg class="i" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></a>
+    <a><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.500 9.500h4a1.500 1.500 0 0 1 0 3h-3a1.500 1.500 0 0 0 0 3h4"/></svg></a>
+    <span class="luecke"></span>
+    <a><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="crest"><img src="../team-logos/D-P.jpg" alt=""></div>
+      <div>
+        <em>Entwicklung · Training</em>
+        <h1>Death Peaches</h1>
+        <span class="lage">Liga 2 · Saison 1 · <b>Spieltag 12 von 20</b> · noch <b>9 Trainings</b> bis Saisonende</span>
+      </div>
+      <span class="sp"></span>
+      <div class="kpi"><strong class="t" id="k1">–</strong><span>Zuwachs Kader bis Ende</span></div>
+      <div class="kpi"><strong class="t" id="k2">–</strong><span>trainieren ihren Liebling</span></div>
+      <div class="kpi"><strong class="t" id="k3">–</strong><span>trainieren Ungeliebtes</span></div>
+      <div class="kpi"><strong class="t" id="k4">–</strong><span>Training ruht (verletzt)</span></div>
+    </header>
+    <nav class="reiter">
+      <a>Kader</a><a>Spieler</a><a class="an">Plan</a><a>Gebäude</a><a>Liga</a>
+      <span class="sp"></span>
+      <span class="hin">Ziel und Weg sind <b>jederzeit wechselbar</b>, der Wechsel wirkt ab dem nächsten Spieltag.</span>
+    </nav>
+    <div class="seite">
+      <section class="pan" id="p-kader"></section>
+      <section class="pan" id="p-heat"></section>
+      <section class="pan" id="p-vor"></section>
+    </div>
+  </main>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const DATEN={"M":{"power":{"tdm":28,"mini-dm":16,"battlefield":10,"gewichtheben":28,"climbing":8,"staffel":0,"time-trial":5,"spurt":10,"tennis":0,"hockey":18,"showcase":11,"speed-schach":0,"takeshis-castle":0,"breaking":10,"wettessen":0,"basketball":7,"football":6,"eiskunstlauf":0,"fechten":10,"i-spy":0},"health":{"tdm":20,"mini-dm":20,"battlefield":8,"gewichtheben":16,"climbing":10,"staffel":2,"time-trial":0,"spurt":6,"tennis":0,"hockey":18,"showcase":3,"speed-schach":0,"takeshis-castle":4,"breaking":18,"wettessen":22,"basketball":0,"football":14,"eiskunstlauf":0,"fechten":4,"i-spy":2},"determination":{"tdm":6,"mini-dm":0,"battlefield":4,"gewichtheben":12,"climbing":16,"staffel":4,"time-trial":0,"spurt":15,"tennis":6,"hockey":4,"showcase":14,"speed-schach":14,"takeshis-castle":18,"breaking":10,"wettessen":16,"basketball":0,"football":8,"eiskunstlauf":6,"fechten":6,"i-spy":8},"stamina":{"tdm":14,"mini-dm":16,"battlefield":4,"gewichtheben":2,"climbing":26,"staffel":16,"time-trial":15,"spurt":4,"tennis":12,"hockey":10,"showcase":0,"speed-schach":0,"takeshis-castle":6,"breaking":8,"wettessen":22,"basketball":6,"football":6,"eiskunstlauf":0,"fechten":0,"i-spy":0},"speed":{"tdm":0,"mini-dm":0,"battlefield":0,"gewichtheben":6,"climbing":12,"staffel":24,"time-trial":22,"spurt":18,"tennis":6,"hockey":12,"showcase":8,"speed-schach":10,"takeshis-castle":4,"breaking":0,"wettessen":0,"basketball":10,"football":0,"eiskunstlauf":10,"fechten":16,"i-spy":8},"dexterity":{"tdm":0,"mini-dm":10,"battlefield":0,"gewichtheben":6,"climbing":12,"staffel":8,"time-trial":25,"spurt":12,"tennis":12,"hockey":4,"showcase":9,"speed-schach":7,"takeshis-castle":6,"breaking":2,"wettessen":0,"basketball":8,"football":0,"eiskunstlauf":18,"fechten":20,"i-spy":8},"awareness":{"tdm":2,"mini-dm":0,"battlefield":10,"gewichtheben":0,"climbing":8,"staffel":12,"time-trial":12,"spurt":7,"tennis":20,"hockey":8,"showcase":0,"speed-schach":21,"takeshis-castle":8,"breaking":0,"wettessen":0,"basketball":14,"football":11,"eiskunstlauf":14,"fechten":15,"i-spy":5},"intelligence":{"tdm":6,"mini-dm":0,"battlefield":16,"gewichtheben":0,"climbing":0,"staffel":0,"time-trial":18,"spurt":0,"tennis":22,"hockey":0,"showcase":10,"speed-schach":28,"takeshis-castle":11,"breaking":2,"wettessen":8,"basketball":16,"football":0,"eiskunstlauf":8,"fechten":4,"i-spy":18},"will":{"tdm":0,"mini-dm":14,"battlefield":0,"gewichtheben":7,"climbing":8,"staffel":8,"time-trial":0,"spurt":14,"tennis":0,"hockey":4,"showcase":0,"speed-schach":14,"takeshis-castle":22,"breaking":28,"wettessen":26,"basketball":0,"football":10,"eiskunstlauf":0,"fechten":0,"i-spy":12},"charisma":{"tdm":10,"mini-dm":0,"battlefield":20,"gewichtheben":23,"climbing":0,"staffel":10,"time-trial":0,"spurt":0,"tennis":4,"hockey":0,"showcase":27,"speed-schach":6,"takeshis-castle":14,"breaking":0,"wettessen":0,"basketball":11,"football":4,"eiskunstlauf":28,"fechten":0,"i-spy":9},"spirit":{"tdm":12,"mini-dm":0,"battlefield":16,"gewichtheben":0,"climbing":0,"staffel":16,"time-trial":0,"spurt":0,"tennis":18,"hockey":12,"showcase":16,"speed-schach":0,"takeshis-castle":0,"breaking":0,"wettessen":0,"basketball":22,"football":25,"eiskunstlauf":16,"fechten":0,"i-spy":13},"torment":{"tdm":2,"mini-dm":24,"battlefield":12,"gewichtheben":0,"climbing":0,"staffel":0,"time-trial":3,"spurt":14,"tennis":0,"hockey":10,"showcase":2,"speed-schach":0,"takeshis-castle":7,"breaking":22,"wettessen":6,"basketball":6,"football":16,"eiskunstlauf":0,"fechten":25,"i-spy":17}},"D":[{"id":"basketball","n":"Basketball","c":"social","pc":6},{"id":"battlefield","n":"Battlefield","c":"social","pc":2},{"id":"breaking","n":"Breaking","c":"power","pc":4},{"id":"climbing","n":"Climbing","c":"speed","pc":6},{"id":"eiskunstlauf","n":"Eiskunst","c":"social","pc":3},{"id":"fechten","n":"Fechten","c":"speed","pc":5},{"id":"football","n":"Football","c":"social","pc":4},{"id":"gewichtheben","n":"Gewichtheben","c":"power","pc":6},{"id":"hockey","n":"Hockey","c":"power","pc":5},{"id":"i-spy","n":"I Spy","c":"mental","pc":6},{"id":"mini-dm","n":"Mini DM","c":"power","pc":2},{"id":"showcase","n":"Showcase","c":"social","pc":5},{"id":"speed-schach","n":"Schach","c":"mental","pc":2},{"id":"spurt","n":"Spurt","c":"speed","pc":2},{"id":"staffel","n":"Staffel","c":"speed","pc":3},{"id":"takeshis-castle","n":"Takeshi","c":"mental","pc":4},{"id":"tdm","n":"TDM","c":"power","pc":3},{"id":"tennis","n":"Tennis","c":"mental","pc":3},{"id":"time-trial","n":"Time Trial","c":"speed","pc":4},{"id":"wettessen","n":"Wettessen","c":"mental","pc":5}],"P":[{"id":"player-2687-maru","n":"Maru","kl":"Sprinter","ra":"Human","tp":["Healthy","FiredUp"],"tn":["Feisty"],"a":{"power":43.1,"health":48.6,"determination":61.1,"stamina":67.3,"speed":78,"dexterity":81,"awareness":52.1,"intelligence":29.1,"will":55.2,"charisma":33.1,"spirit":39.1,"torment":27.1},"ce":{"power":75,"health":66,"determination":64,"stamina":73,"speed":79,"dexterity":81,"awareness":69,"intelligence":31,"will":61,"charisma":50,"spirit":52,"torment":53},"e":{"basketball":37,"battlefield":24.5,"breaking":40.8,"climbing":63.4,"eiskunstlauf":42.4,"fechten":45.9,"football":33.2,"gewichtheben":42.2,"hockey":43.6,"i-spy":33.5,"mini-dm":40,"showcase":38.8,"speed-schach":41.6,"spurt":53.2,"staffel":59,"takeshis-castle":42,"tdm":37.9,"tennis":42,"time-trial":56.8,"wettessen":44.1},"rg":{"basketball":82,"battlefield":131,"breaking":58,"climbing":3,"eiskunstlauf":59,"fechten":36,"football":81,"gewichtheben":39,"hockey":41,"i-spy":83,"mini-dm":67,"showcase":65,"speed-schach":60,"spurt":4,"staffel":11,"takeshis-castle":36,"tdm":73,"tennis":70,"time-trial":20,"wettessen":31},"fat":57.4,"mod":"hart","ziel":{"disziplinId":"staffel","weg":1,"gesetztAm":"2026-11-22T22:18:55.292Z"},"mo":47,"fo":47.4,"inj":"healthy","port":"/portraits/maru.jpg"},{"id":"player-1009-zynara","n":"Zynara","kl":"Mage","ra":"Lizard","tp":["FiredUp","Motivated"],"tn":["Feisty","Mercenary","Obsessive"],"a":{"power":31.4,"health":15.3,"determination":77.0,"stamina":27.6,"speed":76.0,"dexterity":25.0,"awareness":44,"intelligence":88.0,"will":88,"charisma":63.0,"spirit":45.5,"torment":60.8},"ce":{"power":81,"health":76,"determination":87,"stamina":79,"speed":89,"dexterity":78,"awareness":44,"intelligence":90,"will":88,"charisma":75,"spirit":77,"torment":85},"e":{"basketball":46.5,"battlefield":46.8,"breaking":46.2,"climbing":34,"eiskunstlauf":44.8,"fechten":43.1,"football":41.8,"gewichtheben":40.5,"hockey":29.8,"i-spy":75.2,"mini-dm":33.5,"showcase":49.4,"speed-schach":72.8,"spurt":51.2,"staffel":46.6,"takeshis-castle":68.7,"tdm":26.9,"tennis":44.4,"time-trial":43.2,"wettessen":45},"rg":{"basketball":22,"battlefield":13,"breaking":28,"climbing":82,"eiskunstlauf":38,"fechten":51,"football":30,"gewichtheben":55,"hockey":113,"i-spy":1,"mini-dm":89,"showcase":10,"speed-schach":2,"spurt":7,"staffel":30,"takeshis-castle":2,"tdm":113,"tennis":42,"time-trial":57,"wettessen":28},"fat":72.5,"mod":"hart","ziel":{"disziplinId":"showcase","weg":0,"gesetztAm":"2026-11-22T22:26:03.475Z"},"mo":44,"fo":28,"inj":"injured","port":"/portraits/zynara.jpg"},{"id":"player-1703-brightpaw","n":"Brightpaw","kl":"Badass","ra":"Animal","tp":["Caring","Loyal"],"tn":["Timid"],"a":{"power":54.9,"health":21.7,"determination":20.0,"stamina":64.0,"speed":61.1,"dexterity":36.0,"awareness":56.0,"intelligence":27.0,"will":67.0,"charisma":82,"spirit":87,"torment":41.2},"ce":{"power":84,"health":88,"determination":30,"stamina":89,"speed":64,"dexterity":56,"awareness":77,"intelligence":54,"will":84,"charisma":82,"spirit":87,"torment":87},"e":{"basketball":59.5,"battlefield":48.6,"breaking":36.6,"climbing":37.6,"eiskunstlauf":53.1,"fechten":34.4,"football":53.1,"gewichtheben":43.6,"hockey":43,"i-spy":43.2,"mini-dm":38.6,"showcase":49.1,"speed-schach":33.5,"spurt":36.5,"staffel":67.9,"takeshis-castle":40.5,"tdm":43.4,"tennis":43.2,"time-trial":40,"wettessen":33.2},"rg":{"basketball":6,"battlefield":8,"breaking":70,"climbing":68,"eiskunstlauf":16,"fechten":87,"football":6,"gewichtheben":31,"hockey":50,"i-spy":29,"mini-dm":73,"showcase":11,"speed-schach":92,"spurt":66,"staffel":3,"takeshis-castle":47,"tdm":49,"tennis":54,"time-trial":78,"wettessen":86},"fat":37.8,"mod":"leicht","ziel":{"disziplinId":"climbing","weg":0,"gesetztAm":"2026-11-22T22:26:03.476Z"},"mo":63,"fo":58.7,"inj":"healthy","port":"/portraits/brightpaw.jpg"},{"id":"player-0645-emilia","n":"Emilia","kl":"Rogue","ra":"Demon","tp":["Sexy","FiredUp"],"tn":["Diva"],"a":{"power":21.1,"health":5.1,"determination":42.1,"stamina":29.1,"speed":89,"dexterity":74.5,"awareness":63.1,"intelligence":36.1,"will":3.1,"charisma":34.4,"spirit":74.1,"torment":49.1},"ce":{"power":40,"health":52,"determination":48,"stamina":71,"speed":89,"dexterity":79,"awareness":67,"intelligence":66,"will":35,"charisma":73,"spirit":79,"torment":51},"e":{"basketball":47.9,"battlefield":26.9,"breaking":12.7,"climbing":25.5,"eiskunstlauf":47.8,"fechten":48.5,"football":25.6,"gewichtheben":18.4,"hockey":27.7,"i-spy":37.2,"mini-dm":18.7,"showcase":40.4,"speed-schach":34.2,"spurt":35.9,"staffel":52.2,"takeshis-castle":20.3,"tdm":18.5,"tennis":46,"time-trial":51.1,"wettessen":9.2},"rg":{"basketball":15,"battlefield":106,"breaking":181,"climbing":122,"eiskunstlauf":23,"fechten":24,"football":116,"gewichtheben":163,"hockey":120,"i-spy":60,"mini-dm":157,"showcase":57,"speed-schach":90,"spurt":69,"staffel":19,"takeshis-castle":142,"tdm":161,"tennis":29,"time-trial":31,"wettessen":191},"fat":21.1,"mod":"hart","ziel":{"disziplinId":"staffel","weg":0,"gesetztAm":"2026-11-22T22:26:03.476Z"},"mo":36,"fo":15.4,"inj":"recovering","port":"/portraits/emilia.jpg"},{"id":"player-0606-lilithara","n":"Lilithara","kl":"Sprinter","ra":"Demon","tp":["Flexible","FiredUp"],"tn":["Devious"],"a":{"power":7.0,"health":17.0,"determination":41.1,"stamina":41.0,"speed":86.5,"dexterity":70.1,"awareness":68.4,"intelligence":55.4,"will":31.0,"charisma":52.0,"spirit":72,"torment":22.0},"ce":{"power":57,"health":28,"determination":72,"stamina":55,"speed":88,"dexterity":88,"awareness":79,"intelligence":79,"will":61,"charisma":67,"spirit":72,"torment":75},"e":{"basketball":56.3,"battlefield":34.9,"breaking":16.4,"climbing":34.1,"eiskunstlauf":60.3,"fechten":42.3,"football":26.3,"gewichtheben":21.8,"hockey":26,"i-spy":43.1,"mini-dm":18.9,"showcase":43.7,"speed-schach":46,"spurt":34.1,"staffel":65.3,"takeshis-castle":33.3,"tdm":20.4,"tennis":59.8,"time-trial":56.6,"wettessen":19.4},"rg":{"basketball":7,"battlefield":71,"breaking":170,"climbing":81,"eiskunstlauf":10,"fechten":57,"football":110,"gewichtheben":146,"hockey":123,"i-spy":32,"mini-dm":156,"showcase":32,"speed-schach":36,"spurt":76,"staffel":6,"takeshis-castle":72,"tdm":149,"tennis":11,"time-trial":21,"wettessen":157},"fat":33.2,"mod":"mittel","ziel":null,"mo":55,"fo":50.3,"inj":"healthy","port":"/portraits/lilithara.jpg"},{"id":"player-0933-zyra","n":"Zyra","kl":"Charger","ra":"Demon","tp":["FiredUp","Ambitious"],"tn":["Scandalous","ColdBlooded"],"a":{"power":70.4,"health":35.9,"determination":59.0,"stamina":58.3,"speed":60.0,"dexterity":42.0,"awareness":33.0,"intelligence":29.0,"will":49.7,"charisma":48.1,"spirit":35.0,"torment":80.0},"ce":{"power":82,"health":47,"determination":82,"stamina":73,"speed":73,"dexterity":55,"awareness":57,"intelligence":79,"will":77,"charisma":62,"spirit":81,"torment":81},"e":{"basketball":32.9,"battlefield":39.3,"breaking":47.3,"climbing":43.7,"eiskunstlauf":32.9,"fechten":47.6,"football":42.3,"gewichtheben":45.3,"hockey":44.5,"i-spy":40.5,"mini-dm":45.8,"showcase":41.3,"speed-schach":28.2,"spurt":49.4,"staffel":40.4,"takeshis-castle":40.6,"tdm":43.1,"tennis":25.9,"time-trial":40,"wettessen":42},"rg":{"basketball":103,"battlefield":52,"breaking":25,"climbing":33,"eiskunstlauf":110,"fechten":32,"football":27,"gewichtheben":20,"hockey":32,"i-spy":46,"mini-dm":31,"showcase":53,"speed-schach":112,"spurt":10,"staffel":71,"takeshis-castle":46,"tdm":52,"tennis":134,"time-trial":78,"wettessen":50},"fat":76.0,"mod":"hart","ziel":{"disziplinId":"hockey","weg":0,"gesetztAm":"2026-11-22T22:26:03.476Z"},"mo":60,"fo":23.2,"inj":"healthy","port":"/portraits/zyra.jpg"},{"id":"player-1534-queen-loriana","n":"Queen Loriana","kl":"Bard","ra":"Human","tp":["Eloquent","Resourceful","Cool"],"tn":[],"a":{"power":19.5,"health":7.4,"determination":53.0,"stamina":9.2,"speed":65.0,"dexterity":69.0,"awareness":73,"intelligence":73.0,"will":66.0,"charisma":87,"spirit":84,"torment":7.0},"ce":{"power":71,"health":17,"determination":79,"stamina":70,"speed":73,"dexterity":71,"awareness":74,"intelligence":79,"will":71,"charisma":87,"spirit":84,"torment":25},"e":{"basketball":72.4,"battlefield":48.4,"breaking":19.9,"climbing":24.8,"eiskunstlauf":90.8,"fechten":36,"football":38.4,"gewichtheben":37.3,"hockey":24.2,"i-spy":61.3,"mini-dm":17.2,"showcase":69.3,"speed-schach":70.1,"spurt":34.6,"staffel":62.4,"takeshis-castle":49.8,"tdm":24.6,"tennis":69,"time-trial":46.8,"wettessen":22.8},"rg":{"basketball":2,"battlefield":9,"breaking":152,"climbing":129,"eiskunstlauf":1,"fechten":83,"football":52,"gewichtheben":63,"hockey":138,"i-spy":3,"mini-dm":167,"showcase":3,"speed-schach":4,"spurt":73,"staffel":7,"takeshis-castle":9,"tdm":126,"tennis":3,"time-trial":41,"wettessen":133},"fat":80.1,"mod":"leicht","ziel":{"disziplinId":"fechten","weg":0,"gesetztAm":"2026-11-22T22:26:03.476Z"},"mo":85,"fo":47.7,"inj":"healthy","port":"/portraits/queen-loriana.jpg"},{"id":"player-1188-conan","n":"Conan","kl":"Mage","ra":"Human","tp":["Disciplined","Eloquent","Flexible"],"tn":[],"a":{"power":16.5,"health":33.3,"determination":67.0,"stamina":37.0,"speed":29.0,"dexterity":33.0,"awareness":91,"intelligence":97,"will":70.2,"charisma":45.0,"spirit":38.0,"torment":22.0},"ce":{"power":67,"health":52,"determination":88,"stamina":56,"speed":69,"dexterity":59,"awareness":91,"intelligence":97,"will":74,"charisma":65,"spirit":87,"torment":76},"e":{"basketball":43.6,"battlefield":43.1,"breaking":34.7,"climbing":32.8,"eiskunstlauf":43.1,"fechten":29.2,"football":33.3,"gewichtheben":25.4,"hockey":23.3,"i-spy":46.8,"mini-dm":24.8,"showcase":36.7,"speed-schach":78.9,"spurt":31,"staffel":34.4,"takeshis-castle":54.8,"tdm":25.3,"tennis":60.9,"time-trial":42.3,"wettessen":44},"rg":{"basketball":47,"battlefield":23,"breaking":79,"climbing":92,"eiskunstlauf":53,"fechten":113,"football":80,"gewichtheben":117,"hockey":145,"i-spy":14,"mini-dm":129,"showcase":76,"speed-schach":1,"spurt":97,"staffel":96,"takeshis-castle":4,"tdm":121,"tennis":8,"time-trial":65,"wettessen":32},"fat":49.2,"mod":"hart","ziel":{"disziplinId":"takeshis-castle","weg":1,"gesetztAm":"2026-11-22T22:29:36.167Z"},"mo":61,"fo":67.7,"inj":"healthy","port":"/portraits/conan.jpg"},{"id":"player-0919-amarie","n":"Amarie","kl":"Charger","ra":"Divine","tp":["Ambitious","Diligent"],"tn":["Mercenary","Paranoid"],"a":{"power":81,"health":66.4,"determination":49.0,"stamina":54.0,"speed":68.0,"dexterity":64.0,"awareness":61.0,"intelligence":40.0,"will":13.3,"charisma":45.0,"spirit":19.3,"torment":58.6},"ce":{"power":81,"health":75,"determination":56,"stamina":69,"speed":79,"dexterity":82,"awareness":82,"intelligence":82,"will":60,"charisma":70,"spirit":79,"torment":81},"e":{"basketball":40.1,"battlefield":41.6,"breaking":40.6,"climbing":47.9,"eiskunstlauf":40.7,"fechten":60.8,"football":33.9,"gewichtheben":52.3,"hockey":54.5,"i-spy":29.9,"mini-dm":44.8,"showcase":42,"speed-schach":35.2,"spurt":47.9,"staffel":41.4,"takeshis-castle":31.3,"tdm":48.7,"tennis":36.6,"time-trial":51.9,"wettessen":33.6},"rg":{"basketball":70,"battlefield":33,"breaking":60,"climbing":14,"eiskunstlauf":72,"fechten":17,"football":76,"gewichtheben":12,"hockey":10,"i-spy":95,"mini-dm":37,"showcase":43,"speed-schach":85,"spurt":15,"staffel":60,"takeshis-castle":85,"tdm":19,"tennis":89,"time-trial":30,"wettessen":83},"fat":76.0,"mod":"leicht","ziel":{"disziplinId":"climbing","weg":1,"gesetztAm":"2026-11-22T22:29:36.167Z"},"mo":57,"fo":52.6,"inj":"healthy","port":"/portraits/amarie.jpg"},{"id":"player-0607-aeon-flux","n":"Aeon Flux","kl":"Sprinter","ra":"Elf","tp":["Motivated","FiredUp"],"tn":["Devious","Mercenary","Paranoid"],"a":{"power":44.4,"health":44.6,"determination":20.1,"stamina":56.1,"speed":90,"dexterity":80,"awareness":60.1,"intelligence":50,"will":1.1,"charisma":10.1,"spirit":35.1,"torment":64.1},"ce":{"power":62,"health":53,"determination":59,"stamina":69,"speed":90,"dexterity":80,"awareness":62,"intelligence":50,"will":7,"charisma":71,"spirit":70,"torment":67},"e":{"basketball":42.7,"battlefield":25.2,"breaking":24.6,"climbing":42.5,"eiskunstlauf":35.8,"fechten":64.7,"football":24.1,"gewichtheben":24.3,"hockey":43.4,"i-spy":31.3,"mini-dm":40.1,"showcase":25.1,"speed-schach":33.2,"spurt":43.2,"staffel":44.7,"takeshis-castle":19,"tdm":29.5,"tennis":43,"time-trial":71.3,"wettessen":19.6},"rg":{"basketball":55,"battlefield":125,"breaking":128,"climbing":41,"eiskunstlauf":87,"fechten":7,"football":136,"gewichtheben":136,"hockey":42,"i-spy":93,"mini-dm":65,"showcase":126,"speed-schach":93,"spurt":31,"staffel":35,"takeshis-castle":155,"tdm":106,"tennis":57,"time-trial":2,"wettessen":154},"fat":26.2,"mod":"mittel","ziel":{"disziplinId":"showcase","weg":2,"gesetztAm":"2026-11-22T22:29:36.167Z"},"mo":49,"fo":52.3,"inj":"healthy","port":"/portraits/aeon-flux.jpg"}],"F":[{"n":"PIX-E","kl":"Bard","port":"/portraits/pix-e.jpg","id":"player-2662-pix-e","e":{"basketball":43,"battlefield":39.4,"breaking":18.3,"climbing":24.4,"eiskunstlauf":47.2,"fechten":19.4,"football":27,"gewichtheben":27.8,"hockey":23.5,"i-spy":32.2,"mini-dm":18.1,"showcase":44.4,"speed-schach":39,"spurt":18.9,"staffel":42.8,"takeshis-castle":32,"tdm":27.2,"tennis":43.1,"time-trial":32.9,"wettessen":24.3}},{"n":"Roddox Harthelm","kl":"Warlord","port":"/portraits/roddox-harthelm.jpg","id":"player-2742-roddox-harthelm","e":{"basketball":29.1,"battlefield":41.4,"breaking":33.7,"climbing":34.5,"eiskunstlauf":28.9,"fechten":20.2,"football":34.4,"gewichtheben":53.1,"hockey":43.4,"i-spy":18.5,"mini-dm":39.8,"showcase":40.5,"speed-schach":24.8,"spurt":21.7,"staffel":24.3,"takeshis-castle":24.5,"tdm":64.5,"tennis":26.8,"time-trial":24.6,"wettessen":38.7}},{"n":"Pudgrim","kl":"Tank","port":"/portraits/pudgrim.jpg","id":"player-2089-pudgrim","e":{"basketball":20,"battlefield":33.4,"breaking":45.1,"climbing":34,"eiskunstlauf":21.2,"fechten":25.3,"football":44.6,"gewichtheben":34.8,"hockey":42.2,"i-spy":21.6,"mini-dm":47.8,"showcase":24.7,"speed-schach":12.5,"spurt":24.3,"staffel":24.1,"takeshis-castle":23.7,"tdm":44.6,"tennis":19,"time-trial":18.3,"wettessen":45.8}},{"n":"Belma","kl":"Mage","port":"/portraits/belma.jpg","id":"player-1074-belma","e":{"basketball":43.9,"battlefield":47.5,"breaking":19.2,"climbing":8.5,"eiskunstlauf":52.8,"fechten":8.8,"football":27.9,"gewichtheben":23.4,"hockey":7.9,"i-spy":45.5,"mini-dm":9.3,"showcase":46.4,"speed-schach":60.9,"spurt":9.4,"staffel":25,"takeshis-castle":47.6,"tdm":17.3,"tennis":46.1,"time-trial":16.3,"wettessen":24.1}},{"n":"Braugh","kl":"Warlord","port":"/portraits/braugh.jpg","id":"player-0318-braugh","e":{"basketball":19.6,"battlefield":32.5,"breaking":34.7,"climbing":33,"eiskunstlauf":29.1,"fechten":33.4,"football":24.6,"gewichtheben":48.3,"hockey":38.1,"i-spy":17.7,"mini-dm":40.4,"showcase":39.6,"speed-schach":13.1,"spurt":26.4,"staffel":23.4,"takeshis-castle":22.4,"tdm":44.8,"tennis":16.1,"time-trial":23.5,"wettessen":27.9}},{"n":"Lightning","kl":"Warlord","port":"/portraits/lightning.jpg","id":"player-0314-lightning","e":{"basketball":28.2,"battlefield":39.4,"breaking":38.7,"climbing":17.8,"eiskunstlauf":27.8,"fechten":42,"football":34.9,"gewichtheben":40.8,"hockey":40.5,"i-spy":27.3,"mini-dm":41.4,"showcase":29,"speed-schach":25.3,"spurt":26.3,"staffel":18.3,"takeshis-castle":21.2,"tdm":41.3,"tennis":24.7,"time-trial":25.9,"wettessen":24.3}},{"n":"Zinnik","kl":"Rogue","port":"/portraits/zinnik.jpg","id":"player-2513-zinnik","e":{"basketball":24.9,"battlefield":9.7,"breaking":24.8,"climbing":40.6,"eiskunstlauf":28,"fechten":68,"football":9.6,"gewichtheben":24.9,"hockey":36,"i-spy":21.2,"mini-dm":30.2,"showcase":18.4,"speed-schach":27.1,"spurt":47.1,"staffel":34.5,"takeshis-castle":18.6,"tdm":20,"tennis":26.2,"time-trial":62.6,"wettessen":15.8}}],"ligaN":195};
+const Q=new URLSearchParams(location.search);
+const $=id=>document.getElementById(id);
+const z=(v,n=1)=>Number(v).toFixed(n).replace(".",",");
+const pm=(v,n=2)=>(v>=0?"+":"−")+z(Math.abs(v),n);
+const ACHSE={power:"pow",health:"pow",stamina:"pow",torment:"pow",speed:"spe",dexterity:"spe",awareness:"spe",intelligence:"men",will:"men",determination:"men",charisma:"soc",spirit:"soc"};
+const AK={power:"STR",health:"VIT",stamina:"STA",intelligence:"INT",awareness:"AWA",determination:"DET",speed:"SPD",dexterity:"DEX",charisma:"CHA",will:"WIL",spirit:"SPI",torment:"TOR"};
+const AN={power:"Power",health:"Health",stamina:"Stamina",intelligence:"Intelligence",awareness:"Awareness",determination:"Determination",speed:"Speed",dexterity:"Dexterity",charisma:"Charisma",will:"Will",spirit:"Spirit",torment:"Torment"};
+const ATTR=Object.keys(DATEN.M);
+const KAT={power:"pow",speed:"spe",mental:"men",social:"soc"};
+const BAND=[["pow","POW","Kraft"],["spe","SPE","Tempo"],["men","MEN","Kopf"],["soc","SOC","Auftritt"]];
+const GEGEN={pow:"men",men:"pow",spe:"soc",soc:"spe"};
+const KLASSE={Berserker:"pow",Warlord:"pow",Tank:"pow",Badass:"pow",Sprinter:"spe",Rogue:"spe",Charger:"spe",Mage:"men",Overseer:"men",Tactician:"men",Bard:"soc",Hero:"soc",Templar:"soc"};
+const SATZ={leicht:.178,mittel:.226,hart:.32}, LAST={leicht:6,mittel:12,hart:22}, MODN={leicht:"Leicht",mittel:"Mittel",hart:"Hart"};
+const ANTEIL=[.6,.25,.15];
+/* VORSCHLAG Trainingsvorlieben: Wirkung auf das Trainingsbudget und die Moral */
+const V_LIEB=1.10, V_UNLIEB=0.80, MORAL_LIEB=3, MORAL_UNLIEB=-6, TENDENZ=0.15;
+const VORLIEBEN_AN=Q.get("vorlieben")!=="aus";
+const D=DATEN.D.map(d=>({...d,f:KAT[d.c]}));
+const DI=Object.fromEntries(D.map(d=>[d.id,d]));
+const ICON={
+  pow:'<svg class="i" viewBox="0 0 24 24"><path d="M3 9v6M6.500 6v12M17.500 6v12M21 9v6M6.500 12h11"/></svg>',
+  spe:'<svg class="i" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>',
+  men:'<svg class="i" viewBox="0 0 24 24"><path d="M2 12s3.600-7 10-7 10 7 10 7-3.600 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  soc:'<svg class="i" viewBox="0 0 24 24"><path d="M12 3l2.700 5.600 6.100.8-4.500 4.300 1.100 6.100L12 16.900 6.600 19.800l1.100-6.100L3.200 9.400l6.100-.8z"/></svg>'};
+const HERZ='<svg class="f lieb" viewBox="0 0 24 24"><path d="M12 21.350l-1.450-1.320C5.400 15.360 2 12.280 2 8.500 2 5.420 4.420 3 7.500 3c1.740 0 3.410.810 4.500 2.090C13.090 3.810 14.760 3 16.500 3 19.580 3 22 5.420 22 8.500c0 3.780-3.400 6.860-8.550 11.540L12 21.350z"/></svg>';
+const DAUMEN='<svg class="f unlieb" viewBox="0 0 24 24"><path d="M15 3H6c-.830 0-1.540.500-1.840 1.220l-3.020 7.050c-.090.230-.140.470-.140.730v2c0 1.100.900 2 2 2h6.310l-.950 4.570-.030.320c0 .410.170.790.440 1.060L9.830 23l6.590-6.590c.360-.360.580-.860.580-1.410V5c0-1.100-.900-2-2-2zm4 0v12h4V3h-4z"/></svg>';
+const FRAGE='<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.500 9.500a2.500 2.500 0 1 1 3.500 2.300c-.700.300-1 .800-1 1.700M12 17v.01"/></svg>';
+
+function fnv(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0)/0xffffffff}
+/* Die vorgeschlagene Wuerfelregel (Konzept Abschnitt 3.1): stark zufaellig, leichte Tendenz zu Klassenfarbe und eigener Staerke. */
+function vorlieben(p){
+  const kf=KLASSE[p.kl]||null, sort=[...D].sort((a,b)=>p.e[b.id]-p.e[a.id]).map(d=>d.id);
+  const top=new Set(sort.slice(0,5)), unten=new Set(sort.slice(-5));
+  const sl=d=>fnv(p.id+":lieb:"+d.id)+(kf&&d.f===kf?TENDENZ:0)+(top.has(d.id)?TENDENZ:0);
+  const su=d=>fnv(p.id+":unlieb:"+d.id)+(kf&&d.f===GEGEN[kf]?TENDENZ:0)+(unten.has(d.id)?TENDENZ:0);
+  const lieb=[...D].sort((a,b)=>sl(b)-sl(a)).slice(0,2).map(d=>d.id);
+  const unlieb=[...D].filter(d=>!lieb.includes(d.id)).sort((a,b)=>su(b)-su(a))[0].id;
+  return {lieb,unlieb};
+}
+function vArt(p,did){if(!VORLIEBEN_AN)return 0;return p.v.lieb.includes(did)?1:p.v.unlieb===did?-1:0}
+function vFaktor(p,did){const a=vArt(p,did);return a>0?V_LIEB:a<0?V_UNLIEB:1}
+function top3(did){return ATTR.map((a,i)=>({a,g:DATEN.M[a][did],i})).filter(x=>x.g>0).sort((x,y)=>y.g-x.g||x.i-y.i).slice(0,3)}
+function profil(did,weg){const t=top3(did);const r=[t[weg],...t.filter((_,i)=>i!==weg)];return r.map((x,i)=>({a:x.a,g:x.g,anteil:ANTEIL[i]}))}
+function restST(p){return p.verl?Math.max(0,20-p.zurueck+1):9}
+/* Zuwachs je Attribut bis Saisonende fuer (Ziel, Weg, Modus): eine Rechnung fuer Heatmap, Vorschau und Kaderliste. */
+function zuwachs(p,did,weg,mod){
+  const budget=SATZ[mod]*restST(p)*vFaktor(p,did), out={}, brems=[];
+  for(const e of profil(did,weg)){
+    const rest=p.ce?p.ce[e.a]-p.a[e.a]:20;
+    const f=rest<=.5?.05:rest<=6?.45:1; if(f<1)brems.push(e.a);
+    out[e.a]=Math.min(Math.max(rest,0),budget*e.anteil*f);
+  }
+  return {att:out,brems,summe:Object.values(out).reduce((a,b)=>a+b,0)};
+}
+function eigDelta(zu,did){let s=0;for(const a in zu.att)s+=zu.att[a]*DATEN.M[a][did]/100;return s}
+function luft(p,did){let s=0;for(const a of ATTR)s+=Math.max(0,(p.ce?p.ce[a]:99)-p.a[a])*DATEN.M[a][did]/100;return s}
+
+const P=DATEN.P.map(p=>{
+  const verl=p.inj==="injured";
+  const q={...p,kf:KLASSE[p.kl]||"bal",verl,zurueck:verl?13:12,key:p.n.toLowerCase().replace(/[^a-z]+/g,"-")};
+  q.v=vorlieben(q);
+  q.ist={did:p.ziel?p.ziel.disziplinId:[...D].sort((a,b)=>p.e[b.id]-p.e[a.id])[0].id,weg:p.ziel?p.ziel.weg:0,mod:p.mod||"mittel"};
+  q.neu={...q.ist};
+  return q;
+});
+const WUNSCH={Maru:"mittel","Queen Loriana":"leicht",Zyra:"mittel"};
+let S={sp:Math.max(0,P.findIndex(p=>p.key===(Q.get("spieler")||"maru"))),mass:Q.get("mass")==="luft"?"luft":"zuwachs",nebel:Q.get("nebel")==="1",sort:"reihe"};
+if(Q.get("still")==="1")document.body.classList.add("still");
+
+function vpille(p,did,art,kurz){const d=DI[did];const akt=p.neu.did===did;
+  return `<span class="vp ${art>0?"l":"u"} c-${d.f}${akt?" akt":""}" data-tip="${art>0?"<b>Lieblingsdisziplin</b><br>Training mit diesem Ziel: Budget ×1,10 und +3 Moral, solange es Ziel ist.":"<b>Ungeliebte Disziplin</b><br>Training mit diesem Ziel: Budget ×0,80 und −6 Moral, solange es Ziel ist."}">${art>0?HERZ:DAUMEN}${d.n}</span>`}
+
+function zeichneKader(){
+  const el=$("p-kader");
+  const zeilen=P.map((p,i)=>{const zu=zuwachs(p,p.neu.did,p.neu.weg,p.neu.mod);return {p,i,dz:p.verl&&restST(p)===0?0:eigDelta(zu,p.neu.did)}});
+  if(S.sort==="dz")zeilen.sort((a,b)=>b.dz-a.dz);
+  if(S.sort==="vor")zeilen.sort((a,b)=>vArt(b.p,b.p.neu.did)-vArt(a.p,a.p.neu.did)||a.p.n.localeCompare(b.p.n));
+  el.innerHTML=`<div class="pk"><h2>Kader</h2><small>${P.length} Spieler · Death Peaches</small></div>
+  <div class="kh"><span></span><a data-sort="reihe" class="${S.sort==="reihe"?"an":""}">Spieler</a><span>Ziel · Weg</span><a data-sort="vor" class="${S.sort==="vor"?"an":""}">Vorlieben</a><a data-sort="dz" class="r ${S.sort==="dz"?"an":""}">Δ Eig. ▾</a></div>
+  <div class="kl">${zeilen.map(({p,i,dz})=>{const d=DI[p.neu.did];const pr=profil(p.neu.did,p.neu.weg);const geaendert=p.neu.did!==p.ist.did||p.neu.weg!==p.ist.weg||p.neu.mod!==p.ist.mod;
+    return `<a class="kz c-${p.kf}${i===S.sp&&!S.nebel?" an":""}${p.verl?" verl":""}" data-sp="${i}" data-nebel="0">
+      <span class="po"><img src="..${p.port}" alt=""></span>
+      <span class="nm"><b>${p.n}</b><span>${p.kl} <i>· ${p.verl?"verletzt":MODN[p.neu.mod]}</i></span></span>
+      <span class="zi c-${d.f}"><b>${d.n}${geaendert?" •":""}</b><span>${p.neu.weg===0?"Primärweg":"Nebenweg"} ${AK[pr[0].a]}</span></span>
+      <span class="vl">${VORLIEBEN_AN?vpille(p,p.v.lieb[0],1)+vpille(p,p.v.lieb[1],1)+vpille(p,p.v.unlieb,-1):'<span class="vp q">Regel aus</span>'}</span>
+      <span class="dz t ${dz>0?"plus":"null"}">${pm(dz)}<small>${p.verl?"ab ST "+p.zurueck:"bis Ende"}</small></span></a>`}).join("")}</div>
+  <div class="kfuss"><b>Vorlieben:</b> ${HERZ} zwei Lieblingsdisziplinen (Budget ×1,10, +3 Moral), ${DAUMEN} eine ungeliebte (×0,80, −6 Moral) – nur wenn sie das Trainingsziel ist. „•“ = offene Änderung.</div>`;
+}
+
+function zeichneHeat(){
+  const p=P[S.sp], el=$("p-heat");
+  if(S.nebel){
+    const st=[2,2,1,1,0,0,0], sn=["unbekannt","beobachtet","gescoutet"];
+    const ber=(v,s)=>s===2?z(v):s===1?`${Math.floor(v/5)*5}–${Math.floor(v/5)*5+5}`:`${Math.floor(v/10)*10}–${Math.floor(v/10)*10+10}`;
+    const zelle=(id,art,sicht)=>sicht?`<span class="fz c-${DI[id].f}"><b>${art>0?HERZ:DAUMEN}${DI[id].n}</b><span>${BAND.find(b=>b[0]===DI[id].f)[1]} · ${art>0?"trainiert ×1,10":"trainiert ×0,80"}</span></span>`:`<span class="fz q"><b>${FRAGE}unbekannt</b><span>${art>0?"Lieblingsdisziplin":"ungeliebte Disziplin"}</span></span>`;
+    el.innerHTML=`<div class="pk"><h2>Cash Creators</h2><small>fremdes Team · Vorlieben unter Scouting-Nebel</small><span class="sp"></span><div class="seg"><a data-nebel="0">Mein Spieler</a><a class="an">Fremdes Team</a></div></div>
+    <div class="fh"><span></span><span>Spieler</span><span>Scouting</span><span>Liebling 1</span><span>Liebling 2</span><span>Ungeliebt</span><span class="r">Beste Disziplin</span></div>
+    <div class="fl">${DATEN.F.map((f,i)=>{const v=vorlieben({id:f.id,kl:f.kl,e:f.e});const kf=KLASSE[f.kl]||"bal";const s=st[i];const bd=[...D].sort((a,b)=>f.e[b.id]-f.e[a.id])[0];
+      return `<div class="fr c-${kf}"><span class="po"><img src="..${f.port}" alt=""></span><span class="nm"><b>${f.n}</b><span>${f.kl}</span></span><span><span class="stufe s${s}">${sn[s]}</span></span>${zelle(v.lieb[0],1,s>=1)}${zelle(v.lieb[1],1,s>=2)}${zelle(v.unlieb,-1,s>=2)}<span class="bd c-${bd.f}"><b>${bd.n}</b><span class="t">Eignung ${ber(f.e[bd.id],s)}</span></span></div>`}).join("")}</div>
+    <div class="hmf"><span><b>unbekannt:</b> nichts</span><span><b>beobachtet:</b> eine Lieblingsdisziplin</span><span><b>gescoutet:</b> alle drei</span><span class="sp" style="flex:1"></span><span>Sortiert wird nach Stufe, dann Name – nie nach verdecktem Inhalt.</span></div>`;
+    return}
+  const mod=p.neu.mod;
+  const zellen={}; let max=0, min=1e9, best=null;
+  for(const d of D)for(let w=0;w<3;w++){
+    const zu=zuwachs(p,d.id,w,mod); const v=S.mass==="luft"?Math.max(0,(p.ce?p.ce[profil(d.id,w)[0].a]:99)-p.a[profil(d.id,w)[0].a]):eigDelta(zu,d.id);
+    zellen[d.id+w]={v,zu}; if(v>max){max=v;best=d.id+w} if(v<min)min=v;
+  }
+  const kf=p.kf;
+  el.innerHTML=`<div class="pk"><h2><b>1</b>Ziel und Weg</h2><small>${p.n}: ${S.mass==="luft"?"Luft des Weg-Attributs bis zur Decke":"Eignungszuwachs im Ziel bis Saisonende"} · Intensität ${MODN[mod]}</small><span class="sp"></span>
+    <div class="seg"><a data-mass="zuwachs" class="${S.mass==="zuwachs"?"an":""}">Zuwachs</a><a data-mass="luft" class="${S.mass==="luft"?"an":""}">Luft bis Decke</a></div><div class="seg"><a class="an">Mein Spieler</a><a data-nebel="1">Fremdes Team</a></div></div>
+  <div class="hm">${BAND.map(([f,k,n])=>{
+    const ds=D.filter(d=>d.f===f).sort((a,b)=>Math.max(...[0,1,2].map(w=>zellen[b.id+w].v))-Math.max(...[0,1,2].map(w=>zellen[a.id+w].v)));
+    let bb=null,bv=-1; for(const d of ds)for(let w=0;w<3;w++)if(zellen[d.id+w].v>bv){bv=zellen[d.id+w].v;bb=d}
+    return `<div class="band c-${f}"><div class="bk"><span class="ic">${ICON[f]}</span><h3>${k}<small>${n}</small></h3>${kf===f?'<span class="kf">Klassenfarbe</span>':kf!=="bal"&&GEGEN[kf]===f?'<span class="kf" style="background:transparent;color:var(--leise);border:1px solid var(--linie-2)">Gegenfarbe</span>':""}<span class="sp"></span><span class="best">am meisten: <b class="t">${S.mass==="luft"?z(bv,0):pm(bv)}</b> ${bb.n}</span></div>
+      <div class="sph"><span>Disziplin · Eignung · Rang Liga</span><span>Primärweg</span><span>Nebenweg</span><span>Nebenweg</span></div>
+      <div class="zln">${ds.map(d=>{const va=vArt(p,d.id);
+        return `<div class="zl${va>0?" lieb":va<0?" unlieb":""}"><span class="dn" ${va?`data-tip="${va>0?"<b>Lieblingsdisziplin</b> von "+p.n+"<br>Budget ×1,10 · +3 Moral":"<b>Ungeliebte Disziplin</b> von "+p.n+"<br>Budget ×0,80 · −6 Moral"}"`:""}><b>${d.n}${va>0?HERZ:va<0?DAUMEN:""}</b><span><b class="t">${z(p.e[d.id])}</b> · Rang <b class="t">${p.rg[d.id]}</b>/${DATEN.ligaN}</span></span>
+        ${[0,1,2].map(w=>{const c=zellen[d.id+w],pr=profil(d.id,w),t=max>min?Math.pow((c.v-min)/(max-min),1.25):0;const an=p.neu.did===d.id&&p.neu.weg===w;
+          const tip=`<b>${d.n} · ${w===0?"Primärweg":"Nebenweg"} ${AN[pr[0].a]}</b><br>${pr.map(e=>`${AK[e.a]} ${Math.round(e.anteil*100)} % (Matrix ${e.g}) <i>${z(p.a[e.a])} → Decke ${p.ce?p.ce[e.a]:"?"}</i> ${pm(c.zu.att[e.a])}`).join("<br>")}<br>Eignung ${d.n}: ${z(p.e[d.id])} → <b>${z(p.e[d.id]+eigDelta(c.zu,d.id),2)}</b>${va?`<br>${va>0?"Lieblingsdisziplin ×1,10":"Ungeliebt ×0,80"}`:""}${c.zu.brems.length?`<br><i>Decke bremst: ${c.zu.brems.map(a=>AK[a]).join(", ")}</i>`:""}`;
+          return `<a class="hz${t>.62&&(f==="soc"||f==="spe")?" hell":""}${t<.2?" kalt":""}${an?" an":""}${d.id+w===best?" best":""}" style="--t:${(4+t*90).toFixed(1)}" data-z="${d.id}|${w}" data-tip='${tip}'><b class="t">${S.mass==="luft"?z(c.v,0):pm(c.v)}</b><span>${AK[pr[0].a]} 60 %</span>${c.zu.brems.includes(pr[0].a)?'<span class="dk">DECKE</span>':""}</a>`}).join("")}</div>`}).join("")}</div></div>`}).join("")}</div>
+  <div class="hmf"><span class="skala"><span>wenig</span><span class="st"><i></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span><span>viel ${S.mass==="luft"?"Luft":"Zuwachs"}</span></span>
+    <span class="p"><i></i>beste Zelle</span><span>${HERZ} Liebling ×1,10</span><span>${DAUMEN} ungeliebt ×0,80</span><span><b style="color:var(--warn);font-size:.7rem;letter-spacing:.06em">DECKE</b> bremst</span>
+    <span class="sp" style="flex:1"></span><span>Zahl: <b>${S.mass==="luft"?"Punkte bis zur Decke":"Eignung bis Saisonende"}</b></span></div>`;
+}
+
+function gesicht(m){const c=m>=80?"#62d394":m>=60?"#a6d36a":m>=40?"#e8c34a":m>=20?"#f08a3c":"#ff5a52";const mund=m>=60?"M8 14.500c1.200 1.600 6.800 1.600 8 0":m>=40?"M8.500 15h7":"M8 16c1.200-1.600 6.800-1.600 8 0";
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9.500"/><path d="M9 9.500v.500M15 9.500v.500"/><path d="${mund}"/></svg>`}
+
+function zeichneVor(){
+  const el=$("p-vor");
+  if(S.nebel){el.innerHTML=`<div class="pk"><h2>Die Regel in Zahlen</h2><small>Vorschlag 22.11.</small></div><div class="vs">
+    <div class="kasten vor"><h4>${HERZ} Zwei Lieblingsdisziplinen</h4><p class="vtx" style="margin:0">Ist eine davon das Trainingsziel: <b class="plus">+10 % Trainingsbudget</b> und <b class="plus">+3 Moral</b>, solange sie Ziel bleibt.</p></div>
+    <div class="kasten" style="border-color:rgba(157,140,255,.45)"><h4>${DAUMEN} Eine ungeliebte Disziplin</h4><p class="vtx" style="margin:0">Ist sie das Trainingsziel: <b class="minus">−20 % Trainingsbudget</b> und <b class="minus">−6 Moral</b>, solange sie Ziel bleibt.</p></div>
+    <div class="kasten"><h4>Warum 10 und 20</h4><p class="vtx" style="margin:0">Zwei von zwanzig Disziplinen geben +10 %, eine gibt −20 %: bei zufälliger Zielwahl hebt sich das <b>genau auf</b> (2 × 10 = 1 × 20). Zum Vergleich: Signatur-Attribut ×1,15, schwaches Attribut ×0,80, Fokusachse +8 %.</p></div>
+    <div class="kasten"><h4>Wie gewürfelt wird</h4><p class="vtx" style="margin:0">Fest je Spieler aus seiner ID, <b>stark zufällig</b>. Leichte Tendenz: Lieblinge eher in der Klassenfarbe und unter den besten fünf, die ungeliebte eher in der Gegenfarbe und unter den schwächsten fünf.</p></div>
+    <div class="kasten"><h4>Was sich nicht ändert</h4><p class="vtx" style="margin:0">Die Matrix, die Leistungs-Hälfte der Entwicklung (40 %), die Wertung im Spiel. Die Vorliebe wirkt <b>nur</b> auf das Trainingsbudget – und nur, wenn die Disziplin das Ziel ist.</p></div>
+    <div class="kasten"><h4>Sichtbarkeit</h4><p class="vtx" style="margin:0">Eigenes Team: immer. Fremde: nach Scouting-Stufe. Eine Einstellung schaltet den Nebel ganz ab.</p></div>
+  </div>`;return}
+  const p=P[S.sp], d=DI[p.neu.did], zu=zuwachs(p,p.neu.did,p.neu.weg,p.neu.mod), pr=profil(p.neu.did,p.neu.weg);
+  const va=vArt(p,d.id), dMo=va>0?MORAL_LIEB:va<0?MORAL_UNLIEB:0, wu=WUNSCH[p.n];
+  const ank=D.map(x=>({d:x,dz:eigDelta(zu,x.id)})).sort((a,b)=>b.dz-a.dz).slice(0,6);
+  const geaendert=p.neu.did!==p.ist.did||p.neu.weg!==p.ist.weg||p.neu.mod!==p.ist.mod;
+  /* Belastungs-Forecast: Trainingslast je Spieltag, Erholung 22 je Spieltag, Einsatz +9 an jedem zweiten Spieltag (Modell). */
+  let f=p.fat; const bf=[];
+  for(let i=0;i<6;i++){const st=12+i; const ruht=p.verl&&st<p.zurueck; const eins=!ruht&&i%2===0;
+    f=Math.max(0,Math.min(100,f+(ruht?0:LAST[p.neu.mod])+(eins?9:0)-(ruht?30:22))); bf.push({st,f,eins,ruht})}
+  el.innerHTML=`<div class="pk"><h2><b>2</b>Vorschau</h2><small>bis Saisonende</small><span class="sp"></span><div class="seg" id="segmod">${["leicht","mittel","hart"].map(m=>`<a data-mod="${m}" class="${p.neu.mod===m?"an":""}" ${wu===m?'data-tip="<b>Wunsch des Spielers</b><br>Diese Intensität wünscht er sich."':""}>${MODN[m]}${wu===m?'<i class="wu"></i>':""}</a>`).join("")}</div></div>
+  <div class="vs">
+    <div class="sk c-${p.kf}"><span class="po"><img src="..${p.port}" alt=""></span>
+      <div style="min-width:0"><h3>${p.n}</h3><div class="kl2">${p.kl} <i>· ${p.ra}</i></div><div class="tr">${[...p.tp,...p.tn].join(" · ")}</div></div>
+      <div class="mo"><span>${gesicht(p.mo)} <b class="t">${p.mo}</b>${dMo?` <b class="t ${dMo>0?"plus":"minus"}" style="font-size:.95rem">${dMo>0?"+":"−"}${Math.abs(dMo)}</b>`:""}</span><span>Moral · Form <b class="t" style="font-size:.95rem">${z(p.fo,0)}</b></span></div></div>
+    ${p.verl?`<div class="ruht"><b>Nicht einsetzbar bis Spieltag 12.</b> Das Training ruht, Ziel und Intensität gelten ab der Rückkehr (Spieltag ${p.zurueck}). Gerechnet werden <b>${restST(p)} statt 9</b> Trainings; keine Trainingslast, solange er fehlt.</div>`:""}
+    ${VORLIEBEN_AN?`<div class="kasten vor"><h4>Trainingsvorlieben<span class="sp"></span><em>fest je Spieler</em></h4>
+      <div class="vch">${p.v.lieb.map(id=>`<div class="vc c-${DI[id].f}${p.neu.did===id?" akt":""}"><b>${HERZ}${DI[id].n}</b><span>Liebling · <i class="plus">×1,10</i></span></div>`).join("")}<div class="vc u c-${DI[p.v.unlieb].f}${p.neu.did===p.v.unlieb?" akt":""}"><b>${DAUMEN}${DI[p.v.unlieb].n}</b><span>ungeliebt · <i class="minus">×0,80</i></span></div></div>
+      <p class="vtx">${va>0?`<b>Trainiert seine Lieblingsdisziplin:</b> +10 % Trainingsbudget und <b class="plus">+3 Moral</b>, solange ${d.n} das Ziel ist.`:va<0?`<b>Trainiert, was er nicht mag:</b> −20 % Trainingsbudget und <b class="minus">−6 Moral</b>, solange ${d.n} das Ziel ist.`:`${d.n} ist ihm gleich: kein Bonus, kein Abzug. Ein Herz in der Heatmap brächte +10 % Budget und +3 Moral.`}</p></div>`:""}
+    <div class="kasten c-${d.f}"><h4>Gewählt${geaendert?' · offene Änderung':""}<span class="sp"></span><em>${restST(p)} Trainings · ${MODN[p.neu.mod]}</em></h4>
+      <div class="wahl"><span class="bk" style="background:none;border:0;padding:0;height:auto"><span class="ic">${ICON[d.f]}</span></span><div class="zn"><b>${d.n}</b><span>${p.neu.weg===0?"Primärweg":"Nebenweg"} über <i>${AN[pr[0].a]}</i> · Eignung <b class="t" style="color:var(--creme)">${z(p.e[d.id])}</b> → <b class="t plus">${z(p.e[d.id]+eigDelta(zu,d.id),2)}</b></span></div></div>
+      <div style="margin-top:.4rem">${pr.map(e=>{const a=p.a[e.a],c=p.ce?p.ce[e.a]:99,g=zu.att[e.a];return `<div class="ar c-${ACHSE[e.a]}" data-tip="<b>${AN[e.a]}</b><br>heute ${z(a)} · Decke ${c} · Matrixgewicht ${e.g}${zu.brems.includes(e.a)?"<br><i>Die Decke bremst diesen Anteil.</i>":""}"><span class="ab">${AK[e.a]}</span><span class="an2 t">${Math.round(e.anteil*100)} %</span><span class="ba"><i style="width:${a}%"></i><u style="left:${a}%;width:${Math.max(.6,g)}%"></u><s style="left:${c}%"></s></span><span class="gw t plus">${pm(g)}</span></div>`}).join("")}</div>
+      <div class="fk"><span>Satz ${z(SATZ[p.neu.mod],3)} je Spieltag</span>${va>0?'<span class="l">Liebling ×1,10</span>':va<0?'<span class="u">ungeliebt ×0,80</span>':""}${zu.brems.length?`<span class="s">Decke bremst ${zu.brems.map(a=>AK[a]).join(", ")}</span>`:'<span class="g">keine Decke im Weg</span>'}</div></div>
+    <div class="kasten"><h4>Wo das ankommt · Top 6<span class="sp"></span><em>Eignung bis Saisonende</em></h4>
+      <div class="an6">${ank.map(x=>`<div class="a6 c-${x.d.f}${x.d.id===d.id?" zielz":""}"><i></i><span>${x.d.n}</span><em class="t">${z(p.e[x.d.id])}</em><b class="t plus">${pm(x.dz)}</b></div>`).join("")}</div></div>
+    <div class="kasten"><h4>Belastung · nächste 6 Spieltage<span class="sp"></span><em>heute ${z(p.fat,0)}</em></h4>
+      <div class="bf">${bf.map(b=>`<div class="s z${b.f>=80?3:b.f>=50?2:b.f>=25?1:0}" data-tip="<b>Spieltag ${b.st}</b><br>Belastung ${z(b.f,0)}${b.ruht?" · Training ruht":""}${b.eins?" · Einsatz erwartet":""}"><b class="t">${z(b.f,0)}</b><i style="height:${Math.max(4,b.f*.62)}%"></i></div>`).join("")}</div>
+      <div class="bfl">${bf.map(b=>`<span class="${b.eins?"e":""}">ST ${b.st}${b.ruht?" ruht":b.eins?" ●":""}</span>`).join("")}</div></div>
+    <div class="kn"><a data-reset="1">Verwerfen</a><a class="haupt${geaendert?"":" aus"}" data-ok="1">${geaendert?"Plan übernehmen · ab Spieltag "+(p.verl?p.zurueck:12):"Plan ist aktuell"}</a></div>
+  </div>`;
+}
+
+function kpis(){
+  let s=0,l=0,u=0,r=0;
+  for(const p of P){s+=eigDelta(zuwachs(p,p.neu.did,p.neu.weg,p.neu.mod),p.neu.did);const a=vArt(p,p.neu.did);if(a>0)l++;if(a<0)u++;if(p.verl)r++}
+  $("k1").textContent=pm(s,1);$("k2").textContent=l+" / "+P.length;$("k3").textContent=u+" / "+P.length;$("k4").textContent=r;
+}
+function alles(){zeichneKader();zeichneHeat();zeichneVor();kpis();demo()}
+function demo(){
+  const p=P[S.sp];
+  $("demo").innerHTML=`<b>Mockup Training R2 · 22.11.</b> <a class="${!S.nebel&&S.mass==="zuwachs"?"an":""}" data-mass="zuwachs" data-nebel="0">Heatmap Zuwachs</a><a class="${!S.nebel&&S.mass==="luft"?"an":""}" data-mass="luft" data-nebel="0">Heatmap Luft</a><a class="${S.nebel?"an":""}" data-nebel="1">Fremdes Team (Nebel)</a>
+    <span>Spieler:</span>${P.map((q,i)=>`<a data-sp="${i}" data-nebel="0" class="${!S.nebel&&i===S.sp?"an":""}">${q.n}</a>`).join("")}`;
+}
+document.addEventListener("click",e=>{
+  const a=e.target.closest("a"); if(!a)return; const ds=a.dataset; let neu=false; const p=P[S.sp];
+  if(ds.nebel!==undefined){S.nebel=ds.nebel==="1";neu=true}
+  if(ds.sp!==undefined){S.sp=+ds.sp;neu=true}
+  if(ds.mass){S.mass=ds.mass;neu=true}
+  if(ds.sort){S.sort=ds.sort;neu=true}
+  if(ds.mod){p.neu.mod=ds.mod;neu=true}
+  if(ds.z){const [id,w]=ds.z.split("|");p.neu.did=id;p.neu.weg=+w;neu=true}
+  if(ds.reset){p.neu={...p.ist};neu=true}
+  if(ds.ok&&!a.classList.contains("aus")){p.ist={...p.neu};neu=true}
+  if(neu){$("tip").style.display="none";alles()}
+});
+const tip=$("tip");
+document.addEventListener("mousemove",e=>{
+  const t=e.target.closest("[data-tip]"); if(!t){tip.style.display="none";return}
+  tip.innerHTML=t.dataset.tip; tip.style.display="block";
+  const r=tip.getBoundingClientRect(); let x=e.clientX+14,y=e.clientY+16;
+  if(x+r.width>innerWidth-8)x=e.clientX-r.width-14; if(y+r.height>innerHeight-8)y=e.clientY-r.height-12;
+  tip.style.left=x+"px";tip.style.top=y+"px";
+});
+alles();
+</script>
+</body>
+</html>
