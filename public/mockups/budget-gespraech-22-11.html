@@ -117,6 +117,12 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 /* Vorstand */
 .vs-kopf{display:grid;grid-template-columns:7.5rem minmax(0,1fr);gap:.75rem;align-items:center}
 .vs-kopf svg{width:7.5rem;height:8.4rem;display:block}
+/* Vorstands-Porträt (PixelLab, public/portraits/vorstand/): liegt über dem CSS-Gesicht; fehlt das Bild, bleibt das Gesicht stehen */
+.vs-bild{position:relative;display:block;width:7.5rem;height:8.4rem;border-radius:.6rem;overflow:hidden}
+.vs-bild img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 20%;image-rendering:pixelated;border-radius:.6rem;border:2px solid rgba(244,230,196,.3)}
+.vs-bild.zusage img{border-color:rgba(98,211,148,.75)} .vs-bild.gegen img{border-color:rgba(243,181,74,.8)} .vs-bild.nein img{border-color:rgba(255,96,88,.8)}
+.vs-bild .rasse{position:absolute;left:0;right:0;bottom:0;padding:.9rem .35rem .2rem;font:600 .72rem/1 var(--zahl);letter-spacing:.06em;text-transform:uppercase;text-align:center;color:#f4e6c4;background:linear-gradient(transparent,rgba(6,8,12,.88))}
+.vs-bild.ohne .rasse{display:none}
 .vs-kopf h3{margin:0;font:400 1.5rem/1.05 var(--haus);color:#fff}
 .vs-kopf p{margin:.3rem 0 0;font-size:.94rem;line-height:1.25;color:var(--leise)}
 .werte{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
@@ -399,6 +405,14 @@ function toepfe(t,z,a){
     gesperrt:t.kasse-transfer0,vorbehalt:Math.max(0,t.kasse-transfer0-(ruecklage-angezapft)-puffer),nT,nG,kader,zielRang,folge,sofort,alles,amb,rl,ok};
 }
 
+/* ============================== Vorstands-Porträt (Stilprobe PixelLab, je Charakter eine Rasse der Olympiade) */
+const PORTRAET={antreiber:{datei:"antreiber-orc",rasse:"Orc"},kaufmann:{datei:"kaufmann-dwarf",rasse:"Dwarf"},kassenwart:{datei:"kassenwart-construct",rasse:"Construct"}};
+const OHNE_BILD=P.get("portraet")==="aus";
+function portraet(ch,urteil,rahmen){
+  const p=PORTRAET[ch];
+  if(!p||OHNE_BILD)return `<span class="vs-bild ohne">${gesicht(ch,urteil)}</span>`;
+  return `<span class="vs-bild ${rahmen||""}">${gesicht(ch,urteil)}<img src="../portraits/vorstand/${p.datei}.png" alt="Vorstand, ${CHARAKTER[ch].name} (${p.rasse})" onerror="this.parentNode.classList.add('ohne');this.remove()"><span class="rasse">${p.rasse}</span></span>`;
+}
 /* ============================== Vorstand als SVG (Miene je Urteil, Akzent je Charakter) */
 function gesicht(ch,urteil){
   const akz={antreiber:"#e0637a",kaufmann:"#f0c35a",kassenwart:"#4fc7b2"}[ch];
@@ -446,7 +460,7 @@ function zeichne(nurZahlen){
   const skala=Math.max(30,a.preis,a.gewicht)*1.08;
   el("vorstand").innerHTML=`<div class="pk"><h2>Der Vorstand</h2><span class="sp"></span><span class="hin">antwortet nach fester Regel</span></div>
   <div class="kb">
-    <div class="vs-kopf">${gesicht(ch.art,Z.schritt===1?"gegen":a.urteil)}<div><span class="gk">Charakter aus der Team-Identität</span><h3>${CHARAKTER[ch.art].name}</h3><p>${CHARAKTER[ch.art].satz}</p></div></div>
+    <div class="vs-kopf">${portraet(ch.art,Z.schritt===1?"gegen":a.urteil,Z.schritt===1?"":a.urteil)}<div><span class="gk">Charakter aus der Team-Identität</span><h3>${CHARAKTER[ch.art].name}</h3><p>${CHARAKTER[ch.art].satz}</p></div></div>
     <div class="werte"><div><span class="gk">Vertrauen</span><strong class="t">${f1(t.vertrauen)}</strong></div><div><span class="gk">Finanzwert</span><strong class="t">${f1(t.finanz)}</strong></div><div><span class="gk">Ambition</span><strong class="t">${f1(t.ambition)}</strong></div></div>
     <div class="blase ${Z.schritt===1?"":kl}">${Z.schritt===1?"":`<div class="urteil"><b>${wort}</b><span class="sp"></span>${Z.schritt===3&&Z.sign?'<span class="marke gut">gestempelt</span>':""}</div>`}<div>${rede}</div>
       ${Z.schritt>1&&a.urteil==="gegen"?`<button class="btn ja" data-a="gegenan"><svg class="i"><use href="#i-haken"/></svg>Gegenangebot annehmen</button>`:""}</div>

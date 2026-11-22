@@ -33,6 +33,18 @@ So verteilen sich die 32 Teams mit ihrem Identitäts-Vertrauen (`data/generated/
 | 70 % | 4 | N-N 2,9 · T-T 2,4 · Z-H 2,3 · A-A 1,7 |
 | 50 % | 0 | — |
 
+### Nachtrag 22.11.: Rückmeldung zum Mockup
+
+* **Konzept bestätigt.** Chris wörtlich: „Ansonsten mega gut vom Konzept, das gefällt mir!“
+* **Kredite ab Saison 1 frei.** Wörtlich: „geben wir Kredite auch ab S1 frei“. Das Kreditfenster gilt damit schon vor dem
+  ersten Draft; das Gespräch hängt ohnehin an derselben Phasenprüfung (`imFenster`, `lib/finance/vorstand-gespraech.ts:122`,
+  Aktion `credit_borrow`). Für den Bau: Phasenregel für Saison 1 öffnen, Kredit in beiden Töpfen wie ab Saison 2 behandeln.
+* **Mehr Puffer als Messvariante** (Chris' Vorschlag, noch keine Entscheidung): alle Startbudgets +25, je Budget-Rang über
+  die 32 Teams zusätzlich +2. Wird neben der Untergrenze 80 % gemessen, siehe Abschnitt 6.
+* **Porträts für den Vorstand.** Wörtlich: „ich find das nice, dass du n Bild im Mockup drin hast für die Trainer, könnten
+  wir da auch welche generieren? Also so Portraits? Passend zum Trainertyp? Können auch andere Rassen sein, die wir in der
+  Oly haben!“ Stilprobe bestellt, siehe Abschnitt 9.
+
 ## 1. Bewertung
 
 ### Was „zwei Töpfe ab Saison 1“ löst
@@ -233,9 +245,27 @@ Kader zum Start von Saison 1 Median unter 12 oder ein Team unter 10, oder Bottom
 Wert mit `spielraumS1`). Erwartet wird im Gegenzug: Kader S2/S3 nicht mehr unter S1, Σ Kasse zum Saisonstart flacher,
 keine Teams über dem Topf. Reißt das Kriterium, ist der erste Hebel Frage 1.
 
+**Vier Läufe nebeneinander** (gleiche Saaten, gleiches Abbruchkriterium), damit die Puffer-Frage mit Zahlen entschieden wird:
+
+| Lauf | Quote in Saison 1 | Startbudgets |
+|---|---|---|
+| A · Entscheidung pur | nach Vertrauen, 70 % möglich | unverändert |
+| B · Untergrenze 80 % | mindestens 80 % in Saison 1 (Frage 1) | unverändert |
+| C · Mehr Startgeld (Chris, 22.11.) | nach Vertrauen | alle +25 C, je Budget-Rang zusätzlich +2 C |
+| D · beides | mindestens 80 % | wie C |
+
+Zu Lauf C: gelesen als Staffel über die 32 Budget-Ränge, das Team mit dem größten Startbudget bekommt +25 C, jeder Rang
+darunter 2 C mehr, das ärmste also +87 C (Formel `+25 + 2 × (Rang − 1)`). In der Summe sind das 1 792 C mehr in der Liga
+(800 C aus dem Sockel, 992 C aus der Staffel), und der Abstand zwischen reichstem und ärmstem Team schrumpft um 62 C.
+**Diese Lesart vor dem Messlauf mit Chris bestätigen** (die andere Richtung, mehr für die Reichen, würde den Abstand
+vergrößern und den knappen Teams am wenigsten helfen). Mitzumessen bei C und D: Σ Kasse zum Start von Saison 2 und 3
+(mehr Startgeld darf nicht einfach liegen bleiben), Ablösepreise im Draft und die Bottom-4-Stärke. Kredite sind in allen
+vier Läufen ab Saison 1 offen.
+
 ## 7. Offene Fragen an Chris
 
-1. **Untergrenze der Quote nur in Saison 1?** Die Hochrechnung sperrt in Saison 1 rund 21 % aller Budgets, vier Teams starten
+1. **Untergrenze der Quote nur in Saison 1, oder mehr Startgeld?** (Chris, 22.11.: zusätzlich die Variante „alle +25, je
+   Budget-Rang +2“ messen, Abschnitt 6, Läufe B bis D.) Die Hochrechnung sperrt in Saison 1 rund 21 % aller Budgets, vier Teams starten
    mit 70 %. *Empfehlung:* erst messen; nur wenn das Abbruchkriterium reißt, in Saison 1 mindestens 80 % (die Stufe 70 % gäbe
    es dann erst ab Saison 2). Die Halbierung der Rücklage bleibt in jedem Fall.
 2. **Wartet der Draft auf alle Menschen?** *Empfehlung:* in Saison 1 ja (einmaliger Termin, der Draft braucht ohnehin alle);
@@ -270,3 +300,65 @@ wenn der Ausblick unter 8 liegt.
 | `2-kassenwart-80` | Cash Creators, 80 %, Kassenwart, Gegenangebot Gehaltsdeckel |
 | `3-vereinbarung` | Ehrgeizig, 5 C in den Transfer verschoben, gestempelt |
 | `3-kaufmann-alles` | Cold Steel, Alles auf eine Karte mit Gehaltsdeckel, vor der Unterschrift |
+
+## 9. Vorstands-Porträts: Stilprobe (22.11.)
+
+**Charaktere im Code:** genau drei, `GespraechCharakter = "antreiber" | "kaufmann" | "kassenwart"`
+(`lib/finance/vorstand-gespraech.ts:35`), abgeleitet aus Finanzwert und Ambition der Team-Identität (`gespraechCharakter`,
+`vorstand-gespraech.ts:114-120`). **Rassen im Bestand** (`data/generated/oly-player-stats.json`, 2 984 Spieler): Human 995,
+Demon 343, Construct 334, Elf 213, Animal 204, Divine 162, Alien 132, Orc 109, Aqua 104, Dwarf 101, Lizard 94, Dragon 48,
+Tauren 47, Plant 32, Mutant 23, Voidborn 19, Goblin 17, Gnom 5.
+
+**Bestellt:** drei statische Porträts, je Charakter eine andere Rasse. Keine Figur, keine Animation. Endpunkt
+`/create-image-pixflux`, 192×224, mit Hintergrund (Vorstandszimmer, Lampenlicht), je ein POST ohne Wiederholung unter
+`flock /tmp/pixellab-bestell.lock` (`scripts/pixellab-vorstand-portraets.py`). Schätzung vorher: 3 Generationen.
+
+| Datei (`public/portraits/vorstand/`) | Charakter | Rasse | Akzent | `usage.generations` |
+|---|---|---|---|---:|
+| `antreiber-orc.png` | Der Antreiber | Orc | rote Krawatte, verschränkte Arme | 1,0 |
+| `kaufmann-dwarf.png` | Der Kaufmann | Dwarf | goldene Krawatte, Taschenuhr | 1,0 |
+| `kassenwart-construct.png` | Der Kassenwart | Construct | türkise Linsen und Krawatte, Kassenbuch | 1,0 |
+| **Summe** | | | | **3,0** |
+
+Guthaben laut `/balance` vorher 306,54, nachher 303,54 (Differenz 3,0, deckt sich mit der Summe). Reserve 150 unberührt.
+Alle drei waren beim ersten Versuch brauchbar, nichts wurde wiederholt. Prompts und Saaten: `public/portraits/vorstand/quellen.json`.
+
+**Zum Stil:** Die Spieler-Porträts unter `public/portraits/` sind gemalt (400×400, JPG), PixelLab liefert Pixel-Art. Die
+Vorstands-Porträts sind deshalb im 2D-HD-Look der Arenen gehalten und übernehmen von den Spieler-Porträts die dunkle, warm
+beleuchtete Bühne. Im Mockup stehen sie nie neben einem Spieler-Porträt; wo beide auf einer Seite landen (Office), bleibt
+das Vorstandsbild klein und gerahmt. Ob der Stilbruch zu den gemalten Porträts stört, ist die eine Frage an Chris.
+
+**Im Mockup** (`public/mockups/budget-gespraech-22-11.html`): das Porträt liegt über dem CSS-Gesicht (`portraet()`,
+Zuordnung `PORTRAET`). Fehlt die Datei oder lädt sie nicht, bleibt das CSS-Gesicht stehen; `?portraet=aus` zeigt den Rückfall
+gezielt. **Angepasst:** das CSS-Gesicht zeigte das Urteil als Miene; ein festes Bild kann das nicht, deshalb trägt jetzt der
+Rahmen des Porträts die Urteilsfarbe (grün Zusage, gelb Gegenangebot, rot Ablehnung), dieselbe wie die Sprechblase. Die
+Rasse steht klein im Bildfuß.
+
+Geprüft mit Playwright bei 1920×1080: keine JS-Fehler, kein Seitenscroll, Bilder geladen, Rückfall bei blockierter Datei
+geprüft; alle Aufnahmen angesehen. Bilder unter `docs/design/budget-gespraech-22-11/`:
+
+| Datei (`-1920` ganze Seite, `-ausschnitt` linke Karte) | Zeigt |
+|---|---|
+| `portraet-antreiber-orc` | Death Peaches, Gegenangebot, gelber Rahmen |
+| `portraet-kaufmann-dwarf` | Cold Steel, Zusage, grüner Rahmen |
+| `portraet-kassenwart-construct` | Cash Creators, Gegenangebot |
+| `portraet-rueckfall-css` | `?portraet=aus`, das alte CSS-Gesicht |
+
+### Vorschlag für den vollen Satz (nicht bestellt, erst nach Chris' OK)
+
+Ein Bild kostet über `create-image-pixflux` eine Generation; gerechnet wird mit rund 15 % Fehlversuchen (ein Fehlversuch
+wird neu formuliert und bewusst neu bestellt, nie automatisch wiederholt).
+
+| Variante | Umfang | Neue Bilder | Kosten (mit Fehlversuchen) |
+|---|---|---:|---:|
+| A · Kernsatz | 3 Charaktere × 6 Rassen (Human, Demon, Construct, Elf, Orc, Dwarf) | 15 | rund 18 |
+| B · ein Vorstand je Team | 32 Teams, Rasse nach Team-Thema, Charakter nach Identität | 29 | rund 34 |
+| C · volle Matrix | 3 Charaktere × 18 Rassen | 51 | rund 60 |
+| Zusatz · Mienen | je Porträt drei Urteile (Zusage, Gegenangebot, Ablehnung) | ×3 | ×3, dazu Bild-zu-Bild für die Wiedererkennung |
+
+**Empfehlung: B.** 32 feste Gesichter, eines je Verein, wirken wie Personen und nicht wie Typen; der Charakter eines Teams
+steht mit der Identität fest, und die Rasse folgt dem Thema des Teams (das die KI-Kaderplanung schon kennt,
+`lib/ai/team-theme-composition-service.ts`). A ist der Sparweg (Zuordnung je Team fest aus der Team-ID), C lohnt erst, wenn
+Vorstände wechseln können. Die Mienen empfehle ich nicht: dreifache Kosten, und der farbige Rahmen sagt dasselbe. Bei einem
+Guthaben von 303,5 und der Reserve 150 sind rund 153 Generationen frei, die sich die Porträts mit den anderen offenen
+Bestellungen (Beute-Icons, Arenen) teilen; B passt hinein, C nur knapp.

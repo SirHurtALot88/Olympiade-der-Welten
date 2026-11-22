@@ -1,0 +1,38 @@
+{
+ "antreiber-orc.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "192x224",
+  "charakter": "antreiber",
+  "rasse": "Orc",
+  "saat": 2211,
+  "generationen": 1.0,
+  "guthaben_vorher": 306.54,
+  "guthaben_nachher": 305.54,
+  "prompt": "stern ambitious orc club chairman, green skin, tusks, slicked back black hair, sharp dark suit with a crimson red tie, intense demanding stare, arms crossed, bust portrait, head and shoulders, facing the viewer, dark boardroom background with warm lamp light, detailed pixel art character portrait, 2D HD RPG style, rich shading, clean dark outline"
+ },
+ "kaufmann-dwarf.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "192x224",
+  "charakter": "kaufmann",
+  "rasse": "Dwarf",
+  "saat": 2212,
+  "generationen": 1.0,
+  "guthaben_vorher": 305.54,
+  "guthaben_nachher": 304.54,
+  "prompt": "shrewd dwarf merchant club chairman, braided grey beard with gold rings, fine dark waistcoat with a golden yellow tie and gold pocket watch chain, calm weighing look, slight knowing smile, bust portrait, head and shoulders, facing the viewer, dark boardroom background with warm lamp light, detailed pixel art character portrait, 2D HD RPG style, rich shading, clean dark outline"
+ },
+ "kassenwart-construct.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "192x224",
+  "charakter": "kassenwart",
+  "rasse": "Construct",
+  "saat": 2213,
+  "generationen": 1.0,
+  "guthaben_vorher": 304.54,
+  "guthaben_nachher": 303.54,
+  "prompt": "cautious brass clockwork construct robot treasurer, round head with two round glowing teal lens eyes like spectacles, riveted metal face, dark accountant suit with a teal tie, holding a ledger book close, bust portrait, head and shoulders, facing the viewer, dark boardroom background with warm lamp light, detailed pixel art character portrait, 2D HD RPG style, rich shading, clean dark outline"
+ }
+}
