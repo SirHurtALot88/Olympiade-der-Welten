@@ -30,6 +30,7 @@ import {
   type RunMiniDmFfaPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import { battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import type { GameState } from "@/lib/data/olyDataTypes";
 
 /**
@@ -114,7 +115,7 @@ type DuellAuftrag = {
     /** Strategie-Vorlage je Disziplin [Heim, Gast]; fehlt bei neutral/Flagge aus (s. `bereiteFixturesVor`). */
     strategieByDisciplineId?: Record<string, [string | null, string | null]>;
     /** Climbing-Format des Spieltags (Canyon live, 18.11.); nur fuer Climbing gesetzt (s. `bereiteFixturesVor`). */
-    formatByDisciplineId?: { climbing: "standard" | "canyon" };
+    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu" };
   }>;
 };
 
@@ -446,6 +447,7 @@ export async function runBattlefieldPodFixturesNode(
 ): Promise<Array<BattlefieldPodFixtureResult | null>> {
   if (pods.length === 0) return [];
   const { vorbereitet, einsatzfaehig } = bereiteBattlefieldPodsVor(gameState, pods, options);
+  const format = battlefieldFormatFuer(gameState, options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null);
   const laufbarePods = vorbereitet.filter((_, index) => einsatzfaehig[index]);
   if (laufbarePods.length === 0) return vorbereitet.map(() => null);
   const bootstrapPod = laufbarePods[0]!;
@@ -458,7 +460,7 @@ export async function runBattlefieldPodFixturesNode(
         teams: pod.kaderJeTeam,
         seed: pod.seed,
         platzJeTeam: pod.platzJeTeam,
-        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption() },
+        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption(format) },
       })),
     },
     options.nodeTimeoutMs ?? resolveArenaNodeTimeoutMs(),

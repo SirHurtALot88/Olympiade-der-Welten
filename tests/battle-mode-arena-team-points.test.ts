@@ -531,6 +531,29 @@ describe("resolveArenaPpsReferenz mit rolle-Parameter (Hockey-Produktivierung)",
     expect(resolveArenaPpsReferenz("gewichtheben", 6, "torwart")).toEqual(resolveArenaPpsReferenz("gewichtheben", 6, "feld"));
   });
 
+  it("Torwart-Referenz je Regel (22.11.): 'alt' liefert bit-genau die alten Zeilen aus main, 'neu' die neu gezogenen", () => {
+    // Alte Zeilen (Stand vor der Hockey-Torwart-Regel, origin/main): n=4 -> 11.19 / 18.16, n=3 -> 8.42 / 16.99.
+    expect(resolveArenaPpsReferenz("hockey", 4, "torwart", "alt").referenz).toEqual({ iMittel: 11.19, iKrass: 18.16 });
+    expect(resolveArenaPpsReferenz("hockey", 3, "torwart", "alt").referenz).toEqual({ iMittel: 8.42, iKrass: 16.99 });
+    expect(resolveArenaPpsReferenz("hockey", 4, "torwart", "neu").referenz).toEqual({ iMittel: 11.21, iKrass: 17.13 });
+    expect(resolveArenaPpsReferenz("hockey", 4, "torwart").referenz).toEqual(resolveArenaPpsReferenz("hockey", 4, "torwart", "neu").referenz);
+    // Feldspieler: von der Regel unberuehrt.
+    expect(resolveArenaPpsReferenz("hockey", 4, "feld", "alt")).toEqual(resolveArenaPpsReferenz("hockey", 4, "feld", "neu"));
+  });
+
+  it("computeIndividualBoxscorePps...: ein Torwart-Eintrag eines 'alt'-Spieltags bekommt die alte Referenz, 'neu' die neue (C2)", () => {
+    const wert = 14;
+    const fx: ArenaFixtureResult[] = [
+      { homeTeamId: "a", awayTeamId: "b", seiten: [1, 0], boxscore: [{ name: "TW", wert, playerId: "tw", side: "home", torwart: true }] },
+    ];
+    const alt = computeIndividualBoxscorePpsFromFixtureResults(fx, 4, "hockey", "c2", "alt").get("tw");
+    const neu = computeIndividualBoxscorePpsFromFixtureResults(fx, 4, "hockey", "c2", "neu").get("tw");
+    expect(alt).not.toBe(neu);
+    const altAlt = computeIndividualBoxscorePpsFromFixtureResults(fx, 4, "hockey", "aus", "alt").get("tw");
+    const neuAlt = computeIndividualBoxscorePpsFromFixtureResults(fx, 4, "hockey", "aus", "neu").get("tw");
+    expect(altAlt).not.toBe(neuAlt);
+  });
+
   it("resolveHockeyPpsReferenz(n, 'torwart') delegiert korrekt", () => {
     expect(resolveHockeyPpsReferenz(6, "torwart")).toEqual(resolveArenaPpsReferenz("hockey", 6, "torwart"));
   });

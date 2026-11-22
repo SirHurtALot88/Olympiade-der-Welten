@@ -72,3 +72,13 @@ Draft-Ergebnisseite · Belastung/Resistenz-Stufen · Inbox (Trainingswünsche, V
 Widersprüche, Laufzeit-Quoten, Lieblingsspieler) · Bonuszahlungen Spieler/Team · Spielerprofil Leistung (All-Time-Ränge)
 und Karriere (Einsätze, PP, Achsen mit Rang, OVR, MVS, MW, VK) · Seiten-Sichtung auf neuen Standard ·
 PixelLab-Remakes Spurt und Gewichtheben + Altlasten-Audit mit Guard-Test.
+
+## Geparkt — Ligagröße (Chris 22.11.)
+
+- **Neue Teams und Aufsteiger nur notiert, nicht umgesetzt.** Mockup und Datenvorschlag liegen in
+  `public/mockups/neue-teams-40-21-11.html`, `docs/design/neue-teams-40-21-11.md`,
+  `docs/design/neue-teams-40-21-11/vorschlag.json` (10 Teams, alle für Liga 2; Aufsteiger-Vorschlag M-S, D-P, V-V, T-G).
+  Chris: erst umsetzen, wenn mit 16 Teams je Liga alles sauber läuft — 20er-Ligen hießen, alle Layouts anzupassen.
+- **Alternative offen:** bei 16 Teams je Liga bleiben und eine **3. Liga mit 16 Teams** dazunehmen (48 Teams).
+  Die Team-Vorschläge wären dann Kandidaten für Liga 3 (sie sind auf Liga-2-Niveau kalibriert, müssten für Liga 3
+  nach unten nachgezogen werden, und es bräuchte weitere 6–8 Teams).

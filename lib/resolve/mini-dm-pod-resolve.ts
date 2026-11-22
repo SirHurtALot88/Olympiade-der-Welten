@@ -754,27 +754,50 @@ export type BattlefieldPodRohdaten = {
   teamIds: readonly [string, string, string, string];
   /** k = Kadergroesse des Spielplan-Slots, 2..6. */
   playerCount: number;
+  /**
+   * Das Format, in dem dieser Pod gespielt wurde (22.11.). FEHLT in Snapshots von vor dem 22.11.: das ist dann das
+   * Gefecht je Ort ("orte3"), das einzige Format, das es damals gab -- seine Referenz liegt in `feldgroessenOrte3`.
+   */
+  format?: "orte3" | "domination5";
   teams: readonly BattlefieldPodTeamRohdaten[];
 };
 
-const BATTLEFIELD_POD_REFERENZ = battlefieldPodReferenzJson as unknown as MiniDmFfaReferenzJson;
+const BATTLEFIELD_POD_REFERENZ_JSON = battlefieldPodReferenzJson as unknown as MiniDmFfaReferenzJson & {
+  feldgroessenOrte3?: Record<string, MiniDmFfaReferenzFeldgroesse>;
+};
+
+/**
+ * Die Referenz je Format (22.11.): `feldgroessen` = Fuenf-Punkte-Domination (Standard), `feldgroessenOrte3` = das alte
+ * Gefecht je Ort. Ohne Angabe gilt das Standardformat.
+ */
+function battlefieldPodReferenz(format: "orte3" | "domination5" = "domination5"): MiniDmFfaReferenzJson {
+  return format === "orte3"
+    ? { feldgroessen: BATTLEFIELD_POD_REFERENZ_JSON.feldgroessenOrte3 ?? BATTLEFIELD_POD_REFERENZ_JSON.feldgroessen }
+    : BATTLEFIELD_POD_REFERENZ_JSON;
+}
 
 /** M90 der Punkte-Luecken zwischen aufeinanderfolgenden Plaetzen je k (`data/generated/battlefield-pod-referenz.json`). */
-export function resolveBattlefieldPodMargeReferenz(playerCount: number | null | undefined): { m90: number } | null {
+export function resolveBattlefieldPodMargeReferenz(
+  playerCount: number | null | undefined,
+  format: "orte3" | "domination5" = "domination5",
+): { m90: number } | null {
   const eintrag = resolveNaechsteMiniDmFfaFeldgroesse(
     playerCount,
     (e) => Number.isFinite(e.m90) && (e.m90 as number) > 0,
-    BATTLEFIELD_POD_REFERENZ,
+    battlefieldPodReferenz(format),
   );
   return eintrag ? { m90: eintrag.m90 as number } : null;
 }
 
 /** p50/p99,5 der rohen Kampfrichterwertung je Kaempfer und k -- fuer die Spieler-PP. */
-export function resolveBattlefieldPodSpielerPpReferenz(playerCount: number | null | undefined): { p50: number; p995: number } | null {
+export function resolveBattlefieldPodSpielerPpReferenz(
+  playerCount: number | null | undefined,
+  format: "orte3" | "domination5" = "domination5",
+): { p50: number; p995: number } | null {
   const eintrag = resolveNaechsteMiniDmFfaFeldgroesse(
     playerCount,
     (e) => Boolean(e.spieler) && e.spieler!.p995 > e.spieler!.p50,
-    BATTLEFIELD_POD_REFERENZ,
+    battlefieldPodReferenz(format),
   );
   return eintrag?.spieler ?? null;
 }
@@ -831,7 +854,7 @@ export function berechneBattlefieldPodOverride(input: {
     return a.teamId.localeCompare(b.teamId);
   });
   const niveauReferenz = resolveNiveauReferenz("pps", input.disciplineId, input.playerCount);
-  const margeReferenz = resolveBattlefieldPodMargeReferenz(k);
+  const margeReferenz = resolveBattlefieldPodMargeReferenz(k, input.rohdaten.format ?? "orte3");
   const sortiert = sortiertRoh.map((team, index) => {
     const naechster = sortiertRoh[index + 1];
     const eigenePunkte = MINI_DM_POD_TEAM_PUNKTE[index] ?? 0;

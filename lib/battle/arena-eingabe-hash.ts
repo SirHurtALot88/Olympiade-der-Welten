@@ -10,9 +10,10 @@ import { buildArenaStrategieBeide } from "@/lib/foundation/battle-arena/arena-st
 import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
 import { buildArenaMatchSeed, buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
 import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
-import { BATTLEFIELD_POD_FORMAT } from "@/lib/battle/arena-resolved-disciplines";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
+import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 
 /**
  * PP-SKALA IM EINGABE-HASH (18.11.): der Vorlauf rechnet die Spieler-PP mit (Boxscore -> PP). Wechselt
@@ -113,7 +114,9 @@ export function berechneArenaEingabeHash(input: {
     .update(JSON.stringify({ disciplineId: input.disciplineId, teile, mutatoren, motorHash: leseMotorDateiHash(), ...ppSkalaTeil(input.gameState, input.matchdayId),
       // CLIMBING-FORMAT (Canyon live, 18.11., lib/resolve/climbing-format.ts): nur fuer Climbing, damit ein
       // Formatwechsel nach dem Vorlauf die Vorberechnung verwirft; jede andere Disziplin behaelt ihren Hash.
-      ...(input.disciplineId === "climbing" ? { climbingFormat: climbingFormatFuer(input.gameState, input.matchdayId) } : {}) }))
+      ...(input.disciplineId === "climbing" ? { climbingFormat: climbingFormatFuer(input.gameState, input.matchdayId) } : {}),
+      // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): nur fuer Hockey, aus demselben Grund.
+      ...(input.disciplineId === "hockey" ? { hockeyTorwart: hockeyTorwartFuer(input.gameState, input.matchdayId) } : {}) }))
     .digest("hex");
 }
 
@@ -262,8 +265,9 @@ export function berechneBattlefieldPodEingabeHash(input: {
       JSON.stringify({
         disciplineId: "battlefield",
         ...ppSkalaTeil(input.gameState, input.matchdayId),
-        // Format-Umschalter (17.11.): im Standard "orte3" bleibt der Hash Zeichen fuer Zeichen der alte.
-        format: BATTLEFIELD_POD_FORMAT === "orte3" ? "pod-gefecht-je-ort" : `pod-${BATTLEFIELD_POD_FORMAT}`,
+        // Format-Umschalter (17.11.): "orte3" bleibt der Hash Zeichen fuer Zeichen der alte. Seit 22.11. je Spieltag
+        // aus dem Spielstand-Stempel (lib/resolve/battlefield-format.ts): ein Wechsel nach dem Vorlauf verwirft ihn.
+        format: ((f) => (f === "orte3" ? "pod-gefecht-je-ort" : `pod-${f}`))(battlefieldFormatFuer(input.gameState, input.matchdayId)),
         playerCount: input.playerCount,
         teile,
         mutatoren,

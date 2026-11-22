@@ -15,7 +15,7 @@
  *     dieselbe Zahl, die Ledger und Anzeige sehen).
  */
 import type { DisciplineTeamResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-types";
-import { berechneDuellErgebnisE1, berechnePodErgebnisE1 } from "@/lib/resolve/ergebnis-skala";
+import { berechneDuellErgebnisE1, berechnePodErgebnisE1, type PodAnkerVariante } from "@/lib/resolve/ergebnis-skala";
 
 type SpielerZeile = { teamId: string; disciplineSide?: string | null; pointsAwarded?: number | null };
 
@@ -29,6 +29,8 @@ export function wendeErgebnisSkalaE1An(input: {
   spielerZeilen: readonly SpielerZeile[];
   disciplineId: string;
   playerCount: number | null | undefined;
+  /** Battlefield: Anker-Variante des Spieltag-Formats (`orte3` = altes Format, alte Anker). */
+  podVariante?: PodAnkerVariante;
 }): void {
   const ppJeSeite = new Map<string, number[]>();
   for (const z of input.spielerZeilen) {
@@ -53,6 +55,7 @@ export function wendeErgebnisSkalaE1An(input: {
       seiten: zeile.duellSeiten ?? null,
       leistungEigen: leistung(zeile.teamId, zeile.disciplineSide),
       leistungGegner: gegner ? leistung(gegner.teamId, gegner.disciplineSide) : null,
+      variante: input.podVariante,
     });
     zeile.verhaeltnis = e1.verhaeltnis;
     zeile.ergebnisNormiert = e1.ergebnis;
@@ -74,6 +77,7 @@ export function wendeErgebnisSkalaE1An(input: {
     const e1 = berechnePodErgebnisE1({
       disciplineId: input.disciplineId,
       playerCount: input.playerCount,
+      podVariante: input.podVariante,
       sortiert: sortiert.map((z, i) => ({
         luecke: i === 0 ? 0 : typeof z.marge === "number" ? z.marge : 0,
         leistung: leistung(z.teamId, z.disciplineSide),

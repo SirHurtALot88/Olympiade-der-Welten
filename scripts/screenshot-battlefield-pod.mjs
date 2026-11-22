@@ -21,6 +21,9 @@ const GANZE_SEITE = process.argv.includes("--ganze-seite");
 const JE_SEITE = Number((process.argv.find((a) => a.startsWith("--je-seite=")) || "--je-seite=4").split("=")[1]);
 // --vorspulen=<Kampfsekunden>: statt Echtzeit-Abspielen per Sonden-Ticks bis zu dieser Kampfzeit (deterministisch).
 const VORSPULEN = Number((process.argv.find((a) => a.startsWith("--vorspulen=")) || "--vorspulen=0").split("=")[1]);
+// --viewport=1920x1080 (22.11.): Fenstergroesse fuer die Abgleich-Aufnahmen; --duell zeigt statt des Pods das Zweier-Duell.
+const [VIEW_B, VIEW_H] = (process.argv.find((a) => a.startsWith("--viewport=")) || "--viewport=1300x900").split("=")[1].split("x").map(Number);
+const DUELL = process.argv.includes("--duell");
 const [format, out, wartenText] = argumente;
 if (!["orte3", "domination5"].includes(format) || !out) {
   console.error("Nutzung: node scripts/screenshot-battlefield-pod.mjs <orte3|domination5> <ausgabe.png> [wartenMs] [--ganze-seite]");
@@ -45,16 +48,16 @@ const server = await new Promise((resolve) => {
 let browser;
 try {
   browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
-  const seite = await browser.newPage({ viewport: { width: 1300, height: 900 } });
+  const seite = await browser.newPage({ viewport: { width: VIEW_B, height: VIEW_H } });
   const fehler = [];
   seite.on("pageerror", (e) => fehler.push(String(e)));
   await seite.goto(`http://127.0.0.1:${server.address().port}/mockups/battle-mode.html`, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.setDisc, null, { timeout: 30000 });
-  const stand = await seite.evaluate(({ teams, format, JE_SEITE }) => {
-    window.__arena.battlefieldPodAnzeigen({ teams, k: JE_SEITE, saat: 4242, aufstellung: null, format });
+  const stand = await seite.evaluate(({ teams, format, JE_SEITE, DUELL }) => {
+    if (!DUELL) window.__arena.battlefieldPodAnzeigen({ teams, k: JE_SEITE, saat: 4242, aufstellung: null, format });
     window.__arena.setDisc("battlefield");
     return window.__arena.battlefieldPodStand();
-  }, { teams, format, JE_SEITE });
+  }, { teams, format, JE_SEITE, DUELL });
   console.log("Pod-Stand nach Aufbau:", stand ? JSON.stringify({ namen: stand.namen }) : "kein Pod");
   await seite.click("#t2");
   await sendungsrahmenAus(seite, { countdown: true, finale: false, nachlauf: false });

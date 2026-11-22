@@ -69,32 +69,32 @@
     "battlefield": {
       "feldgroessen": {
         "2": {
-          "rTop": 4.47,
-          "rMed": 1.065,
-          "zellen": 4
+          "rTop": 4.71,
+          "rMed": 1.455,
+          "zellen": 2
         },
         "3": {
-          "rTop": 5.72,
-          "rMed": 0.52,
+          "rTop": 5.87,
+          "rMed": 1.22,
           "zellen": 4
         },
         "4": {
-          "rTop": 5.17,
-          "rMed": 1,
+          "rTop": 4.69,
+          "rMed": 1.19,
           "zellen": 4
         },
-        "5": {
-          "rTop": 5.02,
-          "rMed": 1.2,
-          "zellen": 4
+        "6": {
+          "rTop": 5.51,
+          "rMed": 1.51,
+          "zellen": 2
         }
       },
-      "rTop": 5.23,
-      "rMed": 1,
-      "faktor": 0.956,
-      "medianTagesbester": 5.23,
-      "zellen": 20,
-      "zellenRoh": 16,
+      "rTop": 5.54,
+      "rMed": 1.25,
+      "faktor": 0.9025,
+      "medianTagesbester": 5.54,
+      "zellen": 12,
+      "zellenRoh": 12,
       "zensiert": 0
     },
     "breaking": {
@@ -301,38 +301,38 @@
     "hockey": {
       "feldgroessen": {
         "2": {
-          "rTop": 6.33,
-          "rMed": 1.12,
+          "rTop": 4.29,
+          "rMed": 1.165,
           "zellen": 2
         },
         "3": {
-          "rTop": 3.76,
-          "rMed": 1.27,
-          "zellen": 2
+          "rTop": 5.62,
+          "rMed": 1.185,
+          "zellen": 10
         },
         "4": {
-          "rTop": 10.47,
-          "rMed": 1.32,
-          "zellen": 2
+          "rTop": 5.27,
+          "rMed": 1.315,
+          "zellen": 4
         },
         "5": {
-          "rTop": 6.84,
-          "rMed": 1.375,
-          "zellen": 8
+          "rTop": 4.75,
+          "rMed": 1.445,
+          "zellen": 4
         },
         "6": {
-          "rTop": 5.19,
+          "rTop": 4.99,
           "rMed": 1.49,
-          "zellen": 2
+          "zellen": 4
         }
       },
-      "rTop": 6.84,
-      "rMed": 1.34,
-      "faktor": 0.731,
-      "medianTagesbester": 6.84,
-      "zellen": 20,
-      "zellenRoh": 16,
-      "zensiert": 3
+      "rTop": 5.51,
+      "rMed": 1.36,
+      "faktor": 0.9074,
+      "medianTagesbester": 5.51,
+      "zellen": 24,
+      "zellenRoh": 24,
+      "zensiert": 0
     },
     "i-spy": {
       "feldgroessen": {
@@ -684,6 +684,96 @@
       "zellen": 20,
       "zellenRoh": 16,
       "zensiert": 1
+    },
+    "battlefieldOrte3": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 4.47,
+          "rMed": 1.065,
+          "zellen": 4
+        },
+        "3": {
+          "rTop": 5.72,
+          "rMed": 0.52,
+          "zellen": 4
+        },
+        "4": {
+          "rTop": 5.17,
+          "rMed": 1,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 5.02,
+          "rMed": 1.2,
+          "zellen": 4
+        }
+      },
+      "rTop": 5.23,
+      "rMed": 1,
+      "faktor": 0.956,
+      "medianTagesbester": 5.23,
+      "zellen": 20,
+      "zellenRoh": 16,
+      "zensiert": 0
+    },
+    "hockeyAlt": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 6.33,
+          "rMed": 1.12,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 3.76,
+          "rMed": 1.27,
+          "zellen": 2
+        },
+        "4": {
+          "rTop": 10.47,
+          "rMed": 1.32,
+          "zellen": 2
+        },
+        "5": {
+          "rTop": 6.84,
+          "rMed": 1.375,
+          "zellen": 8
+        },
+        "6": {
+          "rTop": 5.19,
+          "rMed": 1.49,
+          "zellen": 2
+        }
+      },
+      "rTop": 6.84,
+      "rMed": 1.34,
+      "faktor": 0.731,
+      "medianTagesbester": 6.84,
+      "zellen": 20,
+      "zellenRoh": 16,
+      "zensiert": 3
+    }
+  },
+  "battlefieldQuellen": {
+    "domination5": {
+      "gemessenAm": "2026-11-22",
+      "saves": [
+        "new-game-1795312960220-0jxx84",
+        "new-game-1795314175433-bhzwvn",
+        "new-game-1795314187653-097yfr"
+      ]
+    }
+  },
+  "hockeyQuellen": {
+    "neu": {
+      "gemessenAm": "2026-11-22",
+      "saves": [
+        "new-game-1795318730218-1am0fy",
+        "new-game-1795319344482-gqqlc3",
+        "new-game-1795319944658-o99w1r",
+        "new-game-1795320560244-cu3xl0",
+        "new-game-1795321179875-0hhj8s",
+        "new-game-1795321821877-4vjatg"
+      ]
     }
   }
 }

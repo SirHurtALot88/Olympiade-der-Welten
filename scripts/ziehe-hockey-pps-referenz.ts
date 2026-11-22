@@ -341,6 +341,11 @@ function schreibeErgebnis(
 ) {
   const feldgroessen: Record<string, unknown> = {};
   const feldgroessenTorwart: Record<string, unknown> = {};
+  let altRefs: Record<string, unknown> | null = null;
+  try {
+    const vorher = JSON.parse(readFileSync(ZIEL_DATEI, "utf8"));
+    if (vorher.feldgroessenTorwartAlt) altRefs = { feldgroessenTorwartAlt: vorher.feldgroessenTorwartAlt, torwartAltHinweis: vorher.torwartAltHinweis };
+  } catch { /* keine Vorgaengerdatei */ }
   for (const n of FELDGROESSEN) {
     const feld = feldNachGroesse.get(n);
     if (feld) feldgroessen[String(n)] = feld;
@@ -377,6 +382,8 @@ function schreibeErgebnis(
     fixturesJeFeldgroesse: FIXTURES_ZIEL,
     feldgroessen,
     feldgroessenTorwart,
+    // Alte Torwart-Regel (22.11.): bleibt unveraendert stehen, wird nie neu gezogen.
+    ...(altRefs ?? {}),
   };
   writeFileSync(ZIEL_DATEI, JSON.stringify(ausgabe, null, 1));
   console.log(`Geschrieben: ${ZIEL_DATEI}`);
