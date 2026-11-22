@@ -60,6 +60,17 @@ unter 0,75 rot (`SCHRANKE_ABSOLUT` in `scripts/pruefe-rangtreue-schranke.mjs`, `
 Disziplin zwischen 0,75 und 0,80 besteht, liegt aber unter dem Ziel und bleibt Arbeitsauftrag.
 Über 0,80 bleibt das Ziel, 0,85 das angestrebte Niveau.
 
+**Die Schranke gilt nur gegen die reine Eignung (Chris, 22.11.).** Gemessen wird die Mechanik ohne On-top-Effekte.
+Was obendrauf kommt — Form, Moral, Formkarten, künftig Ausrüstung, Zurufe —, zählt nicht dagegen: „da sind Spieler
+einfach gut drauf, haben bessere Ausrüstung etc. Das MUSS sich ja sogar auswirken, dass Schwächere besser sein könnten.“
+
+**Weitere Grundsätze vom 22.11.:** Ein Abgang durch Vertragsende ist ein **Verkauf** (ablösefrei) — Begriffe und Regeln
+nicht getrennt behandeln. Ligaregeln dürfen sich ändern (z. B. per Abstimmung der Teams), aber **nur befristet**
+(wenige Spieltage bis höchstens eine Saison) als Regel-Stempel im Spielstand, nie dauerhaft im Code. Ligaweite
+Ereignisse treffen **alle Teams gleich**. Ligaformat bleibt vorerst **2×16** (später potentiell 2×20). Entwicklung:
+wenige Spieler werden je Saison deutlich besser, wenige deutlich schlechter, die Masse kaum; Trainingspunkte und
+Leistung (PP) stehen in einem gesunden Verhältnis.
+
 Das ist strenger, als es klingt — aber die Grenze liegt woanders, als der erste Anlauf
 vermutete, und der Unterschied entscheidet, wo man arbeitet.
 
