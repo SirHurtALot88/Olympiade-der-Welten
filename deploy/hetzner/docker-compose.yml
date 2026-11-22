@@ -20,6 +20,9 @@ services:
         # Climbing-Format (Canyon live, 18.11., lib/resolve/climbing-format.ts): derselbe Weg wie oben, ohne
         # eigenen Wert gilt der Server-Schalter OLY_CLIMBING_FORMAT. Leer = Canyon.
         NEXT_PUBLIC_OLY_CLIMBING_FORMAT: ${NEXT_PUBLIC_OLY_CLIMBING_FORMAT:-${OLY_CLIMBING_FORMAT:-}}
+        # Battlefield-Format (Fuenf Punkte live, 22.11., lib/resolve/battlefield-format.ts): derselbe Weg, ohne
+        # eigenen Wert gilt der Server-Schalter OLY_BATTLEFIELD_FORMAT. Leer = fuenf Punkte.
+        NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT: ${NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT:-${OLY_BATTLEFIELD_FORMAT:-}}
     restart: unless-stopped
     # E1 (docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4.1, Fund F11):
     # Chromium braucht beides, nicht nur eins von beiden.
@@ -91,6 +94,10 @@ services:
       # "standard" = Abschalt-Schalter (ab dem naechsten gewerteten Spieltag wieder das alte Format; gebuchte
       # Spieltage bleiben, wie sie gebucht sind). Siehe deploy/hetzner/.env.example.
       OLY_CLIMBING_FORMAT: ${OLY_CLIMBING_FORMAT:-}
+      # Battlefield-Format (Fuenf Punkte live, 22.11., docs/design/battlefield-5punkte-22-11.md): leer = fuenf
+      # Punkte mit Respawn, "alt" = Abschalt-Schalter (ab dem naechsten gewerteten Spieltag wieder das Gefecht je
+      # Ort; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.
+      OLY_BATTLEFIELD_FORMAT: ${OLY_BATTLEFIELD_FORMAT:-}
       # Liga-Draft (Draft-Seite, #1619/#1623, docs/design/draft-neubau-kern-18-11.md): DIESELBE Falle wie oben -- ohne diese
       # Durchreichung erreicht ein Wert aus deploy/hetzner/.env den Container NIE (gefunden in der Abnahme 19.11.,
       # docs/design/abnahme-saison-19-11.md). Leer = Code-Standard (seit 19.11.: neuer Draft mit Draft-Seite); "block" = Rueckweg

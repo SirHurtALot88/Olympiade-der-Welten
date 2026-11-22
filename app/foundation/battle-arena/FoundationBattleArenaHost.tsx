@@ -40,6 +40,7 @@ import {
 import { useArenaStandingsPreview } from "@/lib/foundation/battle-arena/use-arena-standings-preview";
 import { findeArenaPodMitVorschau } from "@/lib/foundation/battle-arena/arena-pod-vorschau";
 import { arenaFormatByDisciplineId } from "@/lib/resolve/climbing-format";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { entscheideMotorNeuaufbau, spielteilSignatur, type ArenaNutzlastSpielteil } from "@/lib/foundation/battle-arena/arena-motor-neuaufbau";
 
 /**
@@ -543,9 +544,9 @@ export default function FoundationBattleArenaHost({
       entwurf,
       vorschau: battlefieldPodTreffer && battlefieldPodTreffer.art !== "heute" ? battlefieldPodTreffer : null,
       ...podSeitenFuer(podTeamIds, podBezugTeamId, podGegnerTeamId),
-      // Format-Umschalter (17.11.): dieselbe Konstante wie die Buchung (BATTLEFIELD_POD_FORMAT); im
-      // Standard "orte3" fehlt das Feld, der Motor zeigt dann das Gefecht je Ort wie bisher.
-      ...battlefieldPodFormatOption(),
+      // Format je Spieltag (22.11.): derselbe Stempel wie die Buchung (`battlefieldFormatFuer`, Spielstand-
+      // Wechselliste) -- ein im alten Format gebuchter Spieltag bleibt in der Wiedergabe "orte3".
+      ...battlefieldPodFormatOption(battlefieldFormatFuer(gameState, matchdayId)),
     };
   }, [battlefieldPod, battlefieldPodTreffer, entwurfsGruppeTeamIds, gameState, saveId, teams, sheetsByPlayerId, podBezugTeamId, podGegnerTeamId, verletzungsstandFuer]);
 

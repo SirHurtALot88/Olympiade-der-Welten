@@ -10,7 +10,7 @@ import { buildArenaStrategieBeide } from "@/lib/foundation/battle-arena/arena-st
 import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
 import { buildArenaMatchSeed, buildBahnPodMatchSeed, buildBattlefieldPodMatchSeed, buildMiniDmFfaPodMatchSeed } from "@/lib/battle/arena-seed";
 import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
-import { BATTLEFIELD_POD_FORMAT } from "@/lib/battle/arena-resolved-disciplines";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
 
@@ -262,8 +262,9 @@ export function berechneBattlefieldPodEingabeHash(input: {
       JSON.stringify({
         disciplineId: "battlefield",
         ...ppSkalaTeil(input.gameState, input.matchdayId),
-        // Format-Umschalter (17.11.): im Standard "orte3" bleibt der Hash Zeichen fuer Zeichen der alte.
-        format: BATTLEFIELD_POD_FORMAT === "orte3" ? "pod-gefecht-je-ort" : `pod-${BATTLEFIELD_POD_FORMAT}`,
+        // Format-Umschalter (17.11.): "orte3" bleibt der Hash Zeichen fuer Zeichen der alte. Seit 22.11. je Spieltag
+        // aus dem Spielstand-Stempel (lib/resolve/battlefield-format.ts): ein Wechsel nach dem Vorlauf verwirft ihn.
+        format: ((f) => (f === "orte3" ? "pod-gefecht-je-ort" : `pod-${f}`))(battlefieldFormatFuer(input.gameState, input.matchdayId)),
         playerCount: input.playerCount,
         teile,
         mutatoren,

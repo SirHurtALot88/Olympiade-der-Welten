@@ -721,6 +721,15 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus.
+**Stand 22.11. (Battlefield Fünf Punkte live): GESAMT 5b9acba4fe42 (75 Eintraege)** — absichtlich bewegt: Battlefield
+bucht und zeigt im Vier-Team-Pod seit Arbeitsliste 21.11. (Welle 4) die Fünf-Punkte-Domination mit Respawn bei sinkenden HP
+(100 → 75 → 50 %, Untergrenze 50 %; `bfd5Gefecht()`, Motor-Vorgabe `BF_POD_FORMAT="domination5"`,
+`docs/design/battlefield-5punkte-22-11.md`). Gegenueber `eaafed96150e` bewegt sich NUR die eine Zeile `spieleBattlefieldPod`
+(`4424ef90cb0c` → `2271b1fad9a4`); die Duell-Zeilen (`spiele battlefield`, `disziplinProbe battlefield`, `spieleArenaDomination`) bleiben
+byte-gleich. Das alte Gefecht je Ort bleibt als Rueckweg geschuetzt: drei eigene Zeilen `spieleBattlefieldPod/orte3 <saat>` mit
+Summe **`BATTLEFIELD-ORTE3 6413fbdc4641`** AUSSERHALB von GESAMT (erste Zeile = der alte Wert `4424ef90cb0c`). Das Format steht je Spieltag im
+Spielstand (`seasonState.battlefieldFormat`, `lib/resolve/battlefield-format.ts`, gebuchte Spieltage behalten ihr Format;
+Umstellung ab dem naechsten gewerteten Spieltag), Rueckweg-Schalter `OLY_BATTLEFIELD_FORMAT=alt` (deploy/hetzner/.env).
 **Stand 21.11. (Arena-Livefehler): GESAMT eaafed96150e bleibt unveraendert** — Staffel-Uebergabe (Stab-Timer in Zuschauer-
 statt Simulationssekunden, Naechster wartet an der Linie, HUD wird beim Wechsel durchsichtig) und Spieler-ohne-Figur-Marke sind
 reine Anzeige. **TDM-Gefecht „Kampf bis zum Ende“ (Chris 21.11.: keine Respawns, EIN Kampf bis ein Team ausgeschaltet ist) bewegt
@@ -747,7 +756,7 @@ entfallen. Zwischenstaende: main mit #1562 `38b176d7185b` (Basketball-Benchmark 
 `d09e10bb872c` (I-Spy-Knack-Motor V2) haben sich NUR die vier Staffel-Eintraege geaendert (`spiele staffel 1/7/42`,
 `spieleBahnPod staffel`; Zwischenstand vor dem Review `8bbc6ea215f6`). Davor: `7c9257b4435c` (Kontakt im klassischen Spurt scharf,
 `--kontakt-aus` -> `e80babacb68c`; I-Spy-Rueckweg `window.__arena.ispyMotor("alt")`). Das Battlefield-
-Domination-Format mit 5 Punkten (`BATTLEFIELD_POD_FORMAT`) ist im Standard AUS und aendert nichts. Eine reine Anzeige-Aenderung an
+Domination-Format mit 5 Punkten (`BATTLEFIELD_POD_FORMAT`) war damals im Standard AUS; seit 22.11. ist es der Standard (s. Stand 22.11. oben). Eine reine Anzeige-Aenderung an
 `public/mockups/battle-mode.engine.js` (Zeichnen, HUD, Interpolation, Bilder auslagern) darf sie
 NICHT veraendern; weicht sie ab, hat die Aenderung die Wertung beruehrt. Neue Felder an Laeufer-/
 Spielerobjekten verschieben sie ebenfalls — Vorher-Werte stattdessen in einer WeakMap bzw. in

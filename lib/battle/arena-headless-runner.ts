@@ -12,6 +12,7 @@ import {
   type ArenaAufstellung,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import type { ArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { seedZuZahl } from "@/lib/battle/arena-seed";
@@ -1777,6 +1778,7 @@ export async function runBattlefieldPodFixtures(
 ): Promise<Array<BattlefieldPodFixtureResult | null>> {
   if (pods.length === 0) return [];
   const { vorbereitet, einsatzfaehig } = bereiteBattlefieldPodsVor(gameState, pods, options);
+  const format = battlefieldFormatFuer(gameState, options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null);
   const seitenPfad = path.resolve(process.cwd(), "public", "mockups", "battle-mode.html");
   if (!existsSync(seitenPfad)) {
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
@@ -1810,7 +1812,7 @@ export async function runBattlefieldPodFixtures(
         teams: pod.kaderJeTeam,
         seed: pod.seed,
         platzJeTeam: pod.platzJeTeam,
-        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption() },
+        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption(format) },
       })),
       timeoutMs,
     });

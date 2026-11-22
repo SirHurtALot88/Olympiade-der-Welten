@@ -527,13 +527,22 @@ export const BATTLEFIELD_POD_VORLAUF_AKTIV = true;
  * vorher). Umschalten ist Chris' Entscheidung nach Sichtung; die Abnahmezahlen stehen im Dokument.
  */
 export type BattlefieldPodFormat = "orte3" | "domination5";
-export const BATTLEFIELD_POD_FORMAT: BattlefieldPodFormat = "orte3";
+/**
+ * SEIT 22.11. STEHT DER STANDARD AUF "domination5" (Welle 4 der Arbeitsliste 21.11., docs/design/
+ * battlefield-5punkte-22-11.md). Das ist nur die VORGABE fuer Aufrufer ohne Spielstand; gebucht und gezeigt wird
+ * das Format je Spieltag aus dem Spielstand-Stempel (`battlefieldFormatFuer()`, lib/resolve/battlefield-format.ts,
+ * Rueckweg-Schalter `OLY_BATTLEFIELD_FORMAT=alt`): ein im alten Format gebuchter Spieltag bleibt "orte3".
+ */
+export const BATTLEFIELD_POD_FORMAT: BattlefieldPodFormat = "domination5";
 
-/** `optionen`-Zusatz fuer `spieleBattlefieldPod()`: leer im Standard, sonst `{ format }`. */
+/**
+ * `optionen`-Zusatz fuer `spieleBattlefieldPod()`: IMMER ausdruecklich `{ format }` (seit 22.11.; vorher fehlte das
+ * Feld im Standard "orte3"). Ausdruecklich, damit Buchung und Anzeige nie auf die Motor-Vorgabe angewiesen sind.
+ */
 export function battlefieldPodFormatOption(
   format: BattlefieldPodFormat = BATTLEFIELD_POD_FORMAT,
-): { format?: BattlefieldPodFormat } {
-  return format === "orte3" ? {} : { format };
+): { format: BattlefieldPodFormat } {
+  return { format };
 }
 
 /**
