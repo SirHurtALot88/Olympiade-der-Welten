@@ -2071,7 +2071,7 @@ Spieltagen.
 
 ## 72. Verbrauchsgegenstände mit bekannten Namen
 
-*Seit Runde 16 (§76) ist der Kiosk kein Pflichteinkauf mehr: Getränke kommen zu zwei je Spieltag gratis vom Getränke-Partner,
+*Die Artikelwerte unten sind seit Runde 18 (§78) durch Charakterwerte mit Plus und Haken ersetzt; maßgeblich ist §78.3. Seit Runde 16 (§76) ist der Kiosk kein Pflichteinkauf mehr: Getränke kommen zu zwei je Spieltag gratis vom Getränke-Partner,
 Einzelartikel nur noch als Truhen-Fund oder seltene Gelegenheit beim Händler. Die Artikelwerte unten bleiben der Rahmen für
 Partner-Linien und Funde.*
 
@@ -2233,40 +2233,45 @@ Seitenscroll, keine Überlappung, keine JS-Fehler.)
 - **Ein Partner je Saison,** gewählt beim Saisonstart, Wechsel nur zum Saisonwechsel. Kostet nichts, zahlt nichts. Delegierbar
   wie der Sponsor; die KI wählt nach dem Disziplin-Profil des Kaders.
 - **Zwei gratis Getränke je Spieltag** aus der Linie des Partners, rotierend (nie zweimal dasselbe hintereinander).
-- **Automatische Vergabe:** an die zwei knappsten Duelle des Spieltags, je an den aufgestellten Spieler mit dem größten
-  `Bonus × Matrixgewicht`. Der Mensch kann umlegen, muss nicht. Kein Mikromanagement.
+- **Automatische Vergabe:** an die zwei knappsten Duelle des Spieltags, je an den aufgestellten Spieler, bei dem der Netto-Wert
+  (Plus × Matrixgewicht abzüglich Minus × Matrixgewicht, §78.4) am größten ist. Der Mensch kann umlegen, muss nicht. Kein Mikromanagement.
 - **Grenze:** die zwei zählen in die Grenze 3 je Team und Spieltag (§72); der dritte Platz bleibt für Funde aus Truhen.
 - **Kiosk:** Einzelartikel nur noch als Truhen-Fund und beim Händler als seltene Gelegenheit.
 
-Werte im Rahmen der Runde 15: ein Attribut +2 bis +4, zwei zusammen höchstens +5, Moral +1 bis +2.
+Werte im Rahmen der Runde 15, in Runde 18 (§78.1) um den Haken-Spielraum erweitert.
 
-| Partner | Profil | Artikel (Wirkung für einen Einsatz) | Passt zu |
+*Seit Runde 18 (§78) haben alle Linien einen Charakter mit Plus und meist einem Haken; die Tabelle unten ersetzt die der Runde 16.
+Acht Partner statt sechs: Jägermeister und Lavazza sind neu.*
+
+| Partner | Charakter | Artikel (Wirkung für einen Einsatz, Haken fett) | Passt zu (höchster Netto-Wert, §78.4) |
 |---|---|---|---|
-| Red Bull | Tempo: Speed | Original +3 Speed; Sugarfree +2 Speed, +2 Dexterity; Summer +3 Speed, Moral +1 | Bahn, Spurt, Staffel, Climbing |
-| Monster | Ausdauer: Stamina, kleiner Haken | Original +4 Stamina (nächster Einsatz −2 Awareness); Ultra +3 Stamina | lange Läufe, Wettessen, Hockey |
-| Coca-Cola | Stimmung: Moral + Speed klein | Classic Moral +2, +1 Speed; Cherry Moral +1, +2 Speed | Teams mit Moral unter 60, Derbys |
-| Gatorade | Erholung: Stamina + Erholung | Cool Blue +3 Stamina, Erholung +5 %; Lemon +2 Stamina, Erholung +5 %; Orange +4 Stamina | Doppelspieltage, müde Stammspieler |
-| Club-Mate | Köpfchen: Awareness, Intelligence | Original +3 Awareness; Granat +2 Awareness, +2 Intelligence; Winter +3 Intelligence | Schießen, Taktik, Bühne, Rätsel |
-| Carlsberg | Geselligkeit: Spirit, Charisma, Moral | Pilsner +2 Spirit, Moral +2 (Alkohol +1); Elephant +3 Charisma, Moral +1 (Alkohol +2); 0,0 % +2 Charisma, Moral +1 | Showdisziplinen, Teams mit Charisma |
+| Red Bull | Tempo, zittrig: Speed, Dexterity; Haken Will | Original +4 Speed, +2 Dexterity, **−2 Will**; Sugarfree +2 Speed, +2 Dexterity; Summer +3 Speed, Moral +1 | Time Trial, Fechten, Staffel, Spurt |
+| Monster | Wumms, unbedacht: Stamina, Power; Haken Awareness | Original +4 Stamina, +2 Power, **−2 Awareness**; Ultra +3 Stamina | TDM, Climbing, Mini DM, Wettessen |
+| Coca-Cola | Stimmung: Moral, Charisma, Speed | Classic Moral +2, +2 Charisma, **−1 Stamina**; Cherry Moral +1, +2 Speed | Eiskunst, Showcase, Staffel; Teams mit Moral unter 60 |
+| Gatorade | Erholung: Stamina, Health, Determination; ohne Haken | Cool Blue +3 Stamina, Erholung +5 %; Lemon +2 Stamina, +2 Health, Erholung +5 %; Orange +3 Stamina, +2 Determination | Climbing, Wettessen, Mini DM, Doppelspieltage |
+| Club-Mate | Wachsam, nervös: Awareness, Dexterity; Haken Health, Will, Power | Original +3 Awareness, +2 Dexterity, **−1 Health**; Granat +2 Awareness, +2 Dexterity, **−1 Will**; Winter +4 Awareness, +2 Dexterity, **−2 Power** | Time Trial, Fechten, Tennis, Eiskunst |
+| Carlsberg | Mut antrinken: Power, Will; Haken Dexterity, Intelligence | Pilsner +2 Power, +2 Will, Moral +2, **−1 Dexterity** (Alkohol +1); Elephant +4 Power, +2 Will, Moral +1, **−2 Intelligence, −1 Dexterity** (Alkohol +2); 0,0 % +2 Charisma, +1 Spirit, Moral +1 | Gewichtheben, TDM, Breaking, Mini DM |
+| Jägermeister (neu) | Skrupellos, kopflos: Torment, Spirit, Will; Haken Awareness, Intelligence | Eiskalt +3 Torment, +3 Spirit, **−2 Awareness, −2 Intelligence** (Alkohol +2); Mut +3 Will, +2 Determination, Moral +1, **−2 Awareness** (Alkohol +1); Orange +2 Spirit, +2 Charisma, Moral +1, **−1 Dexterity** (Alkohol +1) | Football, Mini DM, Breaking, Wettessen |
+| Lavazza (neu) | Denker, überdreht: Intelligence, Awareness; Haken Will, Health | Espresso +3 Intelligence, +2 Awareness, **−1 Will**; Ristretto +4 Intelligence, +2 Determination, **−2 Health**; Decaf +3 Intelligence, Moral +1 | Schach, Tennis, Time Trial, I Spy |
 
 **KI-Wahl des Partners:** Disziplin-Profil des Kaders (welche Attribute in den kommenden Disziplinen am schwersten zählen)
-gegen das Profil der Marke; bei Gleichstand der mit dem geringsten Alkohol-Risiko. Carlsberg nur bei Kaderanteil SOC über 40 %.
+gegen das Profil der Marke; bei Gleichstand der mit dem geringsten Alkohol-Risiko. Alkohol-Partner (Carlsberg, Jägermeister) nur, wenn ihr mittlerer Netto-Wert mindestens 15 % über dem besten alkoholfreien liegt (das Kater-Risiko zählt mit).
 
 ### 76.2 Essens-Abo (ersetzt Einzel-Essen und den Großteil der Ernährungs-Zähler)
 
-Team-weit **eine von fünf Stufen,** Wahl zum Saisonstart und in der Winterpause (sonst fest), Standard Stufe 3, delegierbar,
-die KI wählt nach Finanzwert (unter 4 Stufe 1 bis 2, 4 bis 6 Stufe 3, ab 7 Stufe 4, ab 9 Stufe 5). Wirkung je Spieler und Spieltag.
+Team-weit **eine von fünf Stufen,** Wahl zum Saisonstart und in der Winterpause (sonst fest), Standard Stufe 3 für alle Teams, delegierbar,
+**Standard ist Hausmannskost (Stufe 3) für alle Teams, Mensch wie KI** (Chris, 22.11.: „standard is hausmannskost für alle teams“). Die KI wählt nicht mehr nach Finanzwert, sondern bleibt auf Stufe 3; sie weicht nur automatisch ab, wenn der Vorstand den Gehaltstopf so kürzt, dass das Abo nicht mehr passt (dann eine Stufe runter, nie unter 1, mit Postfach, §77.2). Der Mensch stellt zum Saisonstart und in der Winterpause um. Wirkung je Spieler und Spieltag.
 **Preis und Topf wurden in Runde 17 geändert (§77): der Preis gilt je Spieler, nicht mehr als Team-Pauschale, und der Posten
 läuft im Gehaltstopf.** Die Spalte „Kosten“ unten ist deshalb der Preis je Spieler und Saison; die Team-Pauschalen 0,5/1,0/1,5/2,5/3,5 C
 der Runde 16 gelten nicht mehr.
 
 | Stufe | Name | Preis je Spieler und Saison | Vorteil | Nachteil |
 |---|---|---:|---|---|
-| 1 | Imbissbude | 0,10 C | Moral +1, +1 Power im Einsatz | 10 % je Spieler und Spieltag verstimmter Magen (−3 % Eignung an diesem Spieltag); zählt für die Fast-Food-Saisonschwelle |
+| 1 | Imbissbude | 0,10 C | Moral +1, +1 Power im Einsatz | träge: −1 Speed im Einsatz; 10 % je Spieler und Spieltag verstimmter Magen (−3 % Eignung an diesem Spieltag); zählt für die Fast-Food-Saisonschwelle |
 | 2 | Kantine | 0,18 C | Moral +1 | 4 % Magen-Risiko |
 | 3 | Hausmannskost | 0,25 C | neutral | kein Risiko, keine Boni |
-| 4 | Sportküche | 0,40 C | Erholung +5 % | kein Risiko |
-| 5 | Ernährungsteam | 0,60 C | Erholung +8 %, Verletzungsrisiko −5 %, +1 Stamina im Einsatz | Lazy-Spieler −1 Moral (Gemecker) |
+| 4 | Sportküche | 0,40 C | Erholung +5 %, +1 Health im Einsatz | kein Risiko |
+| 5 | Ernährungsteam | 0,60 C | Erholung +8 %, Verletzungsrisiko −5 %, +1 Stamina und +1 Determination im Einsatz | Lazy-Spieler −1 Moral (Gemecker) |
 
 **Traits:** Healthy bekommt Stufe 4 und 5 doppelt und hat das halbe Magen-Risiko; FaintHearted +5 Punkte Magen-Risiko; Lazy
 +1 Moral bei Stufe 1 und 2. Nichts liegt über +3 im Einsatz; die Erholungs- und Verletzungswerte sind Dauerwerte und klein.
@@ -2340,7 +2345,7 @@ Spieltag wird auf 0,01 C gerundet angezeigt (0,175 C erscheint als 0,17 oder 0,1
 - **Vorstands-Kürzung wie bei Gehältern:** der Posten zählt zum Gehaltstopf und unterliegt dessen Freigabe (höchstens auf 75 % gekürzt).
   Wird der Topf zu knapp für Gehälter plus Verpflegung, **fällt das Abo automatisch um eine Stufe, nie unter Stufe 1,** und es kommt eine
   Nachricht ins Postfach (Typ Finanz, mit Stufe alt/neu und der Ersparnis). Sobald der Topf wieder reicht, bleibt die niedrigere Stufe bis zur
-  nächsten freien Wahl (Saisonstart oder Winterpause); die KI-Teams folgen derselben Regel.
+  nächsten freien Wahl (Saisonstart oder Winterpause); die KI-Teams folgen derselben Regel (sie bleiben sonst auf Stufe 3, kein Finanzwert-Staffeln mehr).
 - **Kaufen und Verpflichten** erhöhen die Verpflegungskosten sofort. Die **Kaufvorschau** zeigt „Gehalt + Verpflegung“ (z. B. 6,5 C + 0,25 C
   je Saison, je Spieltag 0,325 + 0,0125 C); die Prüfung gegen den Gehaltstopf rechnet beides, Mensch und KI gleich. Beim Verkauf fließt
   die Verpflegung zusammen mit dem Gehalt zu 100 % in den Gehaltstopf zurück.
@@ -2375,3 +2380,128 @@ Abo für ein 14er-Team plus Funde (0,3 C) gegen die Reparatur voll ausgerüstete
 Vergleich: ein Legendäres im Dauereinsatz kostet etwa 2 C Reparatur je Saison (§67); das Standard-Abo kostet für 14 Spieler fast zwei
 Legendäre, Stufe 5 gut vier. Gegenüber Runde 16 (1,8 C im Standard) ist die Verpflegung damit rund doppelt so teuer und wächst mit dem
 Kader, so wie Chris es wollte: der Abo-Preis ist eine echte Entscheidung zwischen Geld und Risiko, kein Schnäppchen mehr.
+
+## 78. Runde 18: Werte mit Charakter
+
+Chris, 22.11., wörtlich: „essen und trinken ist so abgenommen — was du noch anpassen kannst sind wirklich die stats, es muss nicht nur
+speed ausdauer moral sein, es können auch andere dinge sein. Cocktails vllt für den spirit oder torment weil skrupelloser oder so, oder
+manches power weil man aggressiver wird usw aber dafür weniger aware oder intelligent. Spiel mal etwas mehr damit“. Preise, Abo-Preise,
+Zähler und die Grenze 3 je Team und Spieltag bleiben (§72 bis §77). Geändert werden nur die Werte der Artikel: jeder bekommt einen Charakter.
+Dazu Chris, 22.11.: „standard is hausmannskost für alle teams“ (eingearbeitet in §76.2, §77.2). Startwerte zum Messen.
+Mockup: `public/mockups/zwischen-den-spieltagen-22-11.html?ansicht=verbrauch`, Aufnahmen aus der echten Seite:
+![Verbrauch 1920](zwischen-den-spieltagen-22-11/verbrauch-1920.png)
+![Verbrauch 2560](zwischen-den-spieltagen-22-11/verbrauch-2560.png)
+
+### 78.1 Rahmen (nice to have bleibt)
+
+- Jeder Artikel hat ein **Plus und meist einen Haken** (Minus), der zur Wirkung passt: wer sich Mut antrinkt, wird kopflos; wer Kaffee kippt, wird
+  nervös; wer Fast Food isst, wird träge. Gesundes und Wasser haben keinen Haken, Cola-Linien und Süßes nur einen kleinen.
+- **Ein Plus-Attribut höchstens +4, Plus-Summe höchstens +5.** Nur wenn der Artikel ein echtes Minus von mindestens −2 trägt, darf die Plus-Summe
+  +6 sein (ein Attribut dann höchstens +5; im Bestand ist +4 der höchste Einzelwert). Minus je Attribut −1 bis −3. Moral weiter +1 bis +2
+  und nicht in der Summe. Nichts erreicht ein seltenes Ausrüstungsteil (+8); ein Standard-Teil (+3) bleibt die Messlatte.
+- Der Haken gilt im selben Einsatz wie das Plus (er ersetzt die Nebenwirkung „nächster Einsatz“ der Runde 15). Magen und Alkohol laufen
+  als Zähler und Ereignisse (§76.2) unverändert daneben.
+
+### 78.2 Charaktere
+
+| Typ | Plus | Haken |
+|---|---|---|
+| Cocktail, Schnaps | Torment, Spirit, Charisma (skrupellos, enthemmt); „Mut antrinken“: Will, Determination | Awareness, Intelligence, Dexterity |
+| Bier | Power, Will (aggressiver, mutiger) | Intelligence, Dexterity |
+| Energy | Speed, Dexterity, Stamina | Will (zittrig) oder Awareness |
+| Kaffee, Mate, Tee | Intelligence, Awareness | Will oder Health (nervös) |
+| Fast Food | Power, Health (Pizza: Determination, Currywurst: Torment) | Speed, Stamina (träge) |
+| Gesundes | Health, Stamina, Determination, Power, Awareness | kein Haken |
+| Süßes | Charisma, Moral, kurz Speed | Determination |
+
+### 78.3 Artikelwerte der Funde (Einzelartikel aus Truhen und Händler, ersetzen die Tabelle in §72)
+
+Preise und Zähler wie in §72. Plus-Summe, Minus-Summe in Klammern.
+
+| Artikel | Plus | Haken | Zähler und Hinweis |
+|---|---|---|---|
+| Aperol Spritz | +4 Charisma, +2 Spirit, Moral +2 (+6) | −2 Awareness (−2) | Alkohol +1 |
+| Mojito (Bacardí) | +4 Spirit, +1 Charisma (+5) | −2 Dexterity (−2) | Alkohol +1 |
+| Caipirinha (Pitú) | +3 Torment, +2 Spirit (+5) | −3 Intelligence (−3) | Alkohol +2 |
+| Espresso Martini (Kahlúa) | +3 Awareness, +2 Charisma (+5) | −2 Stamina (−2) | Alkohol +1 |
+| Tequila Shot (José Cuervo) | +3 Will, +2 Torment (+5) | −2 Awareness (−2) | Alkohol +2 |
+| Guinness | +3 Health, +2 Determination (+5) | −2 Speed (−2) | Alkohol +1 |
+| Döner | +3 Power, +2 Health, Moral +2 (+5) | −2 Speed (−2) | 20 % Magen, Magen +2 |
+| Big Mac (McDonald's) | +4 Power, +2 Health, Moral +2 (+6) | −2 Stamina (−2) | 20 % Magen, Magen +2 |
+| Whopper (Burger King) | +3 Health, +2 Power (+5) | −2 Speed (−2) | 15 % Magen, Magen +2 |
+| Pizza (Domino's) | +4 Determination, Moral +2 (+4) | −2 Speed (−2) | 15 % Magen, Magen +2 |
+| Currywurst | +3 Torment, +2 Power (+5) | −2 Stamina (−2) | 25 % Magen, Magen +2 |
+| Bucket (KFC) | +4 Health, +2 Power, Moral +2 (+6) | −3 Speed (−3) | 20 % Magen, Magen +2 |
+| Poke Bowl | +3 Stamina, +2 Health (+5) | kein Haken | Gesund |
+| Proteinriegel (PowerBar) | +3 Power, +1 Determination (+4) | kein Haken | Gesund |
+| Smoothie (innocent) | +3 Awareness (+3) | kein Haken | Gesund |
+| Banane (Chiquita) | +3 Stamina (+3) | kein Haken | Gesund |
+| Haferflocken (Kölln) | +2 Stamina, +2 Determination (+4) | kein Haken | Gesund |
+| Wasser (Volvic) | +1 Stamina, Erschöpfung nach dem Einsatz −5 % | kein Haken | Gesund |
+| Grüner Tee (Teekanne) | +2 Intelligence, +2 Awareness (+4) | −1 Power (−1) | Ruhe, kein Zähler |
+| Haribo Goldbären | +2 Charisma, +2 Speed, Moral +2 (+4) | −2 Determination (−2) | Zucker |
+| Snickers | +3 Stamina, Moral +1 (+3) | −1 Determination (−1) | Zucker |
+| Pepsi | +3 Dexterity, Moral +1 (+3) | −1 Stamina (−1) | Zucker |
+
+Die alten Fund-Artikel Jägermeister und Carlsberg sind Partner-Linien geworden (§76.1). Die frühere 20-%-Magen-Regel mit −4 Stamina
+ist durch den sicheren Haken ersetzt; die Magen-Wahrscheinlichkeit bleibt als Zähler (§76.2).
+
+### 78.4 Passt zu: Netto-Wert gegen die offizielle Matrix
+
+`Netto(Artikel, Disziplin) = Σ Plus × Gewicht − Σ Minus × Gewicht`, Gewichte aus `lib/player-generator/official-discipline-weights.ts`
+(nur gelesen, nicht geändert). Die Spalte „Passt zu“ nennt die Disziplinen mit dem höchsten Netto-Wert, dort tragen die Plus-Attribute
+wirklich Gewicht (ab 10 Punkten in der Matrix). Beispiele, gemessen:
+
+| Artikel | Höchster Netto-Wert | Schlechtester |
+|---|---|---|
+| Red Bull Original | Time Trial 138, Fechten 104, Staffel 96 | Wettessen −52 |
+| Monster Original | TDM 108, Climbing 104, Mini DM 96 | Schach −42 |
+| Carlsberg Elephant | Gewichtheben 120, TDM 100, Breaking 90 | Tennis −56 |
+| Jägermeister Eiskalt | Football 101, Mini DM 72, Breaking 62 | Schach −98 |
+| Jägermeister Mut | Wettessen 110, Breaking 104, Takeshi 86 | Basketball −28 |
+| Lavazza Ristretto | Schach 140, Tennis 100, I Spy 84 | Mini DM −40 |
+| Aperol Spritz | Showcase 140, Eiskunst 116, Battlefield 92 | Fechten −30 |
+| Tequila Shot | Breaking 128, Mini DM 90, Wettessen 90 | Tennis −40 |
+| Big Mac | Gewichtheben 140, TDM 124, Hockey 88 | Staffel −28 |
+| Poke Bowl | Wettessen 110, Climbing 98, Mini DM 88 | Eiskunst 0 |
+
+Ein Artikel kann in einer Disziplin deutlich negativ sein (der Haken zählt): ein Eiskalt in Schach ist ein Fehlgriff. Das ist gewollt,
+es macht die Wahl zu einer Entscheidung und nicht zu einem Dauer-Plus.
+
+### 78.5 Abdeckung: jedes der zwölf Attribute ist Plus
+
+| Attribut | Artikel mit Plus (Partner-Linien und Funde) | Matrix, Disziplinen mit Gewicht ab 10 |
+|---|---|---|
+| Power | Monster Original, Carlsberg Pilsner und Elephant, Döner, Big Mac, Whopper, Currywurst, Bucket, Proteinriegel | TDM 28, Gewichtheben 28, Hockey 18, Mini DM 16 |
+| Health | Gatorade Lemon, Guinness, Döner, Big Mac, Whopper, Bucket, Poke Bowl, Abo Stufe 4 | TDM 20, Mini DM 20, Wettessen 22, Hockey 18, Breaking 18 |
+| Determination | Gatorade Orange, Jägermeister Mut, Lavazza Ristretto, Guinness, Pizza, Haferflocken, Abo Stufe 5 | Climbing 16, Takeshi 18, Wettessen 16, Spurt 15 |
+| Stamina | Monster, Gatorade (alle), Poke Bowl, Banane, Haferflocken, Snickers, Abo Stufe 5 | Climbing 26, Wettessen 22, Mini DM 16, Staffel 16 |
+| Speed | Red Bull (alle), Coca-Cola Cherry, Haribo | Staffel 24, Time Trial 22, Spurt 18, Fechten 16 |
+| Dexterity | Red Bull Original und Sugarfree, Club-Mate (alle), Pepsi | Time Trial 25, Fechten 20, Eiskunst 18 |
+| Awareness | Club-Mate (alle), Lavazza Espresso, Espresso Martini, Smoothie, Grüner Tee | Schach 21, Tennis 20, Fechten 15, Basketball 14 |
+| Intelligence | Lavazza (alle), Grüner Tee | Schach 28, Tennis 22, Time Trial 18, I Spy 18 |
+| Will | Carlsberg Pilsner und Elephant, Jägermeister Mut, Tequila Shot | Breaking 28, Wettessen 26, Takeshi 22, Mini DM 14 |
+| Charisma | Coca-Cola Classic, Carlsberg 0,0 %, Jägermeister Orange, Aperol, Mojito, Espresso Martini, Haribo | Eiskunst 28, Showcase 27, Gewichtheben 23, Battlefield 20 |
+| Spirit | Carlsberg 0,0 %, Jägermeister Eiskalt und Orange, Aperol, Mojito, Caipirinha | Football 25, Basketball 22, Tennis 18, Battlefield 16 |
+| Torment | Jägermeister Eiskalt, Caipirinha, Tequila Shot, Currywurst | Fechten 25, Mini DM 24, Breaking 22, I Spy 17 |
+
+Dünn belegt sind Intelligence (nur Lavazza und Tee), Torment und Will (je vier Artikel, dafür mit hohem Netto in den passenden Disziplinen);
+Lücken sind das nicht, aber im Bau lohnt ein Blick, ob die Verteilung der Truhenfunde diese Attribute seltener zieht.
+
+### 78.6 KI-Regel (ergänzt §72 und §76.1)
+
+Die KI wählt einen Artikel für einen Einsatz nur, wenn der **Netto-Wert in der Disziplin des Einsatzes klar positiv** ist: Netto mindestens 30
+und mindestens die Hälfte des Plus-Anteils (`Σ Plus × Gewicht`). **Das Minus zählt mit:** ein Artikel, dessen Haken dort schwerer wiegt als
+das Plus, wird nicht gewählt, auch wenn das Plus allein groß wäre (Beispiel: Eiskalt in Schach, Netto −98). Unter den passenden Artikeln
+gewinnt der höchste Netto-Wert, sonst gelten die Grenzen aus §72 (knappes Duell oder Derby, höchstens 3 je Team und Spieltag, einer je
+Spieler). Das gilt auch für die automatische Vergabe der Partner-Getränke an die zwei knappsten Duelle (§76.1): auch dort entscheidet der
+Netto-Wert, der Mensch kann umlegen. Alkohol-Artikel nie, wenn der Zähler dadurch auf die Schwelle 3 stiege. Der Essens-Abo-Standard ist für
+die KI Stufe 3 (§76.2).
+
+### 78.7 Messung beim Bau
+
+- `einflussVon`: Partner- und Fundwerte sind on top und dürfen weder die Pp-Abweichung (Pflicht ≤ 25) noch rho je Spiel (Mindestschranke 0,75)
+  berühren; gebucht wird in Einsatz und Zerlegung (§54), nicht in der reinen Eignung.
+- Spot-Check: der Haken wirkt im selben Einsatz sichtbar (Zerlegung, Spalte „Gegenstand“); gezeigt = gebucht.
+- Anteil der Alkohol-Partner bei den KI-Teams (Netto-Vorsprung 15 %) und Kater-Ereignisse je Saison zählen; ein Alkohol-Partner darf nicht
+  zum Standard der KI werden.
