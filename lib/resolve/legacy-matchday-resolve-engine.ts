@@ -55,6 +55,7 @@ import { wendeErgebnisSkalaE1An } from "@/lib/resolve/ergebnis-skala-anwenden";
 import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
+import { breakingFormatFuer } from "@/lib/resolve/breaking-format";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   ArenaAusfall,
@@ -1391,7 +1392,9 @@ export function buildLegacyMatchdayResolvePreview(
               ? "torwartAlt"
               : disciplineId === "basketball" && basketballPusteFuer(base.gameState, base.matchdayId) === "alt"
                 ? "pusteAlt"
-                : "standard",
+                : disciplineId === "breaking" && breakingFormatFuer(base.gameState, base.matchdayId) === "gauntlet"
+                  ? "gauntletAlt"
+                  : "standard",
       });
     }
 

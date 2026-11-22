@@ -5305,6 +5305,33 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	    });
 	  }
 
+	  // BREAKING-WAFFENFOLGE (22.11., lib/lineups/breaking-waffen.ts): die gesetzten Spieler der Seite in Slot-Reihenfolge.
+	  function breakingWaffenSpieler(disciplineSide: "d1" | "d2") {
+	    return slots
+	      .filter((slot) => slot.disciplineSide === disciplineSide)
+	      .map((slot, index) => ({ activePlayerId: selections[slot.key], slotNr: index + 1 }))
+	      .filter((eintrag): eintrag is { activePlayerId: string; slotNr: number } => Boolean(eintrag.activePlayerId))
+	      .map((eintrag) => ({ ...eintrag, name: getCaptainDisplayName(eintrag.activePlayerId) ?? "Spieler" }));
+	  }
+
+	  // Eine Waffe je Gang setzen; `null` = die KI waehlt. Eine Folge ohne gesetzte Waffe wird geloescht (Feld fehlt = Standard).
+	  function updateBreakingWaffe(disciplineSide: "d1" | "d2", activePlayerId: string, gang: number, waffe: string | null) {
+	    setDraft(null);
+	    setModifiers((current) => {
+	      const seite = { ...current[disciplineSide] };
+	      const alle = { ...(seite.breakingWaffen ?? {}) };
+	      const folge = [...(alle[activePlayerId] ?? [])];
+	      while (folge.length <= gang) folge.push(null);
+	      folge[gang] = waffe;
+	      while (folge.length > 0 && folge[folge.length - 1] === null) folge.pop();
+	      if (folge.length > 0) alle[activePlayerId] = folge;
+	      else delete alle[activePlayerId];
+	      if (Object.keys(alle).length > 0) seite.breakingWaffen = alle;
+	      else delete seite.breakingWaffen;
+	      return { ...current, [disciplineSide]: seite };
+	    });
+	  }
+
 	  function updateDisciplineIntensityStage(disciplineSide: "d1" | "d2", intensity: MatchdayIntensityStage) {
 	    // Die letzte Vorschau BLEIBT stehen (Chris 18.11.: „erwartet“ sprang erst runter, dann wieder hoch). Form-,
 	    // Captain-, Mutator- und Team-Power-Anteile je Platz kommen aus dieser Vorschau (buildSlotPreviewByKey);
@@ -6462,6 +6489,11 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         onUpdateDisciplineIntensity={updateDisciplineIntensityStage}
         getDisciplineStrategie={strategieVorlagenAktiv ? getDisciplineStrategie : undefined}
         onUpdateDisciplineStrategie={strategieVorlagenAktiv ? updateDisciplineStrategie : undefined}
+        breakingWaffen={{
+          spieler: (seite) => breakingWaffenSpieler(seite),
+          folge: (seite, activePlayerId) => modifiers[seite]?.breakingWaffen?.[activePlayerId] ?? [],
+          setze: updateBreakingWaffe,
+        }}
         playerFilter={playerFilter}
         onPlayerFilterChange={setPlayerFilter}
         rosterShortfall={lineupRosterShortfall}

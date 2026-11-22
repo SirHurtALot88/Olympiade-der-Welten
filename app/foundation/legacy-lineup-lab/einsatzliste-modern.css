@@ -1610,3 +1610,14 @@ button.elm-pr:hover {
 .elm-pause .elm-pause__bald {
   color: #f0c35a;
 }
+
+/* ---- Breaking: Waffen je Gang (22.11., lib/lineups/breaking-waffen.ts) ---- */
+.elm-waffen { display: grid; gap: 6px; margin-top: 8px; }
+.elm-waffen small { color: var(--bc-text-3, #8f98ab); line-height: 1.3; }
+.elm-waffen-zeile { display: grid; grid-template-columns: minmax(0, 1fr) repeat(3, minmax(74px, 96px)); gap: 6px; align-items: center; }
+.elm-waffen-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--schrift-zahl); }
+.elm-waffen-name b { display: inline-block; min-width: 1.2em; color: var(--bc-text-3, #8f98ab); }
+.elm-waffen-zeile select {
+  min-width: 0; padding: 4px 6px; border-radius: 6px; font-family: var(--schrift-zahl); font-size: 14px;
+  color: inherit; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14);
+}
