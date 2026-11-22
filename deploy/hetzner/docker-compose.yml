@@ -119,6 +119,10 @@ services:
       # plusminus), "aus" = Rueckweg (neue Saisons alt), "aus-sofort" = Notbremse (Gegenfarbe und Duellgewicht aus, auch mitten in
       # der Saison). Nur Server: der Browser loest die Regel nie selbst auf, sie steht im Spielstand. Siehe deploy/hetzner/.env.example.
       OLY_FORMKARTEN_PLUSMINUS: ${OLY_FORMKARTEN_PLUSMINUS:-}
+      # Spielerentwicklung (22.11., docs/design/entwicklung-balance-22-11.md): leer = Standard (neue Saisons bekommen die Regel neu:
+      # Liga-Mittel um 0, wenige starke Auf- und Absteiger, PP-Faktor auf das Training), "alt" = Rueckweg (neue Saisons wie vor dem
+      # 22.11.; gestempelte Saisons rechnen weiter wie gestempelt). Nur Server: die Regel steht im Spielstand. Siehe deploy/hetzner/.env.example.
+      OLY_ENTWICKLUNG: ${OLY_ENTWICKLUNG:-}
       # Breaking-Format (22.11., docs/design/breaking-tagteam-22-11.md): leer = Tag-Team (6 gegen 6, je Team einer im Ring,
       # Gang mit zwei Phasen, verdeckter Wechsel, Waffe frei waehlbar), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten
       # Spieltag wieder der Gauntlet; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.

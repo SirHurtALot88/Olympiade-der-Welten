@@ -14,6 +14,7 @@ import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factor
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
 import { stempleFormkartenRegelBeimAnlegen } from "@/lib/resolve/formkarten-regel";
+import { stempleEntwicklungsRegelBeimAnlegen } from "@/lib/resolve/entwicklung-regel";
 import { stempleBelastungsRegelBeimAnlegen } from "@/lib/fatigue/belastung-regel-stempel";
 import { stempleFinanzenJeSpieltagBeimAnlegen } from "@/lib/finance/finanzen-je-spieltag";
 import {
@@ -660,7 +661,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     // (Rueckweg: OLY_FINANZEN_JE_SPIELTAG=aus).
     stempleFinanzenJeSpieltagBeimAnlegen(
       stempleBelastungsRegelBeimAnlegen(
-        stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers))),
+        stempleEntwicklungsRegelBeimAnlegen(stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)))),
       ),
     ),
     input.saveId,

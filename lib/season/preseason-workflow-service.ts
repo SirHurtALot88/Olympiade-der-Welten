@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
+import { entwicklungsRegelFuerSpielmodus } from "@/lib/resolve/entwicklung-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
 import { finanzenJeSpieltagFuerNeueSaison } from "@/lib/finance/finanzen-je-spieltag";
 import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
@@ -674,6 +675,9 @@ function buildNextSeasonGameState(
     // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
     // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
     formkartenRegel: nextFormkartenRegel,
+    // ENTWICKLUNGSREGEL (22.11., lib/resolve/entwicklung-regel.ts): gilt ab der FOLGENDEN Saison; Training je Spieltag und
+    // Saisonende-Wirkung muessen in einer Saison dieselbe Regel haben, der Saisonwechsel ist deshalb der einzige Wechselort.
+    entwicklungsRegel: entwicklungsRegelFuerSpielmodus(save.gameState, nextSeasonId) ?? null,
     // BELASTUNGSREGEL (21.11., lib/fatigue/belastung-regel-stempel.ts): Chris: ab der FOLGENDEN Saison
     // gilt Belastung/Resistenz mit Pause nach Spieltag 10 — der Saisonwechsel ist der Ort, an dem ein
     // bestehender Spielstand umschaltet. Nur Battle-Doppelsaisons; die Pause der alten Saison verfaellt.

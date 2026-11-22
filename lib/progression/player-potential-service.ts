@@ -10,8 +10,9 @@ import type {
 // repeated O(n) scans through playerPotential for the same player in the same state.
 const scoutPotentialCache = new WeakMap<GameState, Map<string, PlayerScoutPotential>>();
 import { buildPlayerAxisStarProfile } from "@/lib/scouting/player-axis-star-rating";
-import { buildHiddenAttributeCeilingsFromPotentialScore } from "@/lib/scouting/player-attribute-ceiling-service";
+import { buildHiddenAttributeCeilingsFromPotentialScore, entwicklungNeuDriftVerschiebung } from "@/lib/scouting/player-attribute-ceiling-service";
 import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
+import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
 import {
   attachPotentialCeilingToRecord,
   applyAxisCeilingSeasonDrift,
@@ -990,6 +991,8 @@ export function applySeasonEndPotentialUpdate(input: {
   record: PlayerPotentialRecord;
   growthOutlook?: PlayerGrowthOutlook | null;
   gameState?: GameState | null;
+  /** Entwicklung neu: Liga-Schnitt der Drift-Verschiebungen, vom Batch gemessen (s. `applySeasonEndPotentialUpdates`). */
+  entwicklungNeuDriftZentrum?: number;
 }): PlayerPotentialRecord {
   const currentScore = input.record.hiddenPotentialScore;
   if (!isFiniteNumber(currentScore)) return input.record;
@@ -1075,6 +1078,8 @@ export function applySeasonEndPotentialUpdate(input: {
     playerId: input.player.id,
     seasonId: input.seasonId,
     growthOutlook: outlook,
+    entwicklungNeu: entwicklungNeuFuer(input.gameState),
+    entwicklungNeuDriftZentrum: input.entwicklungNeuDriftZentrum,
   });
 
   return buildPotentialRecordWithCeilings({
@@ -1101,22 +1106,25 @@ export function applySeasonEndPotentialUpdates(input: {
   const existingRecords = new Map(
     (input.gameState.playerPotential ?? []).map((record) => [record.playerId, record] as const),
   );
-  return input.gameState.players.map((player) => {
-    const record = existingRecords.get(player.id) ?? buildPlayerPotentialRecord({
-      saveId: input.saveId,
-      player,
-    });
-    const insight = buildPlayerDevelopmentInsight({
-      gameState: input.gameState,
-      player,
-    });
-    return applySeasonEndPotentialUpdate({
+  const insights = input.gameState.players.map((player) => ({
+    player,
+    record: existingRecords.get(player.id) ?? buildPlayerPotentialRecord({ saveId: input.saveId, player }),
+    outlook: buildPlayerDevelopmentInsight({ gameState: input.gameState, player }).growthOutlook,
+  }));
+  // Entwicklung neu: der Liga-Schnitt der Ausblick-Verschiebungen wird abgezogen, damit die Drift der Decken den Mittelwert nicht
+  // verschiebt, egal wie die Ausblicke gerade verteilt sind (nur Spieler mit Attribut-Decken zaehlen).
+  const driftZentrum = entwicklungNeuFuer(input.gameState)
+    ? insights.reduce((summe, e) => summe + entwicklungNeuDriftVerschiebung(e.outlook), 0) / Math.max(1, insights.length)
+    : 0;
+  return insights.map(({ player, record, outlook }) =>
+    applySeasonEndPotentialUpdate({
       saveId: input.saveId,
       seasonId: input.seasonId,
       player,
       record,
-      growthOutlook: insight.growthOutlook,
+      growthOutlook: outlook,
       gameState: input.gameState,
-    });
-  });
+      entwicklungNeuDriftZentrum: driftZentrum,
+    }),
+  );
 }

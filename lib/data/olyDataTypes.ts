@@ -4246,6 +4246,11 @@ export type SeasonState = {
    */
   formkartenRegel?: { seasonId: string; regel: "alt" | "plusminus" } | null;
   /**
+   * ENTWICKLUNGSREGEL DIESER SAISON (22.11., lib/resolve/entwicklung-regel.ts): "neu" (PP-Faktor auf das Training, Ertragskurve,
+   * Verfall, mittelwertneutrale Potentialdrift) oder "alt". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel.
+   */
+  entwicklungsRegel?: { seasonId: string; regel: "alt" | "neu" } | null;
+  /**
    * BASKETBALL-PUSTE-REGEL DIESER SAISON (22.11., lib/resolve/basketball-puste.ts): Wechselliste "alt"/"neu" je Spieltag,
    * gesetzt beim Laden. Gebuchte Spieltage behalten ihre Regel.
    */

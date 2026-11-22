@@ -8,6 +8,15 @@ import type {
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
 import { ppSkalaUmrechnung } from "@/lib/resolve/pp-skala";
+import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
+import {
+  entwicklungsKurvenSkala,
+  entwicklungsParameter,
+  ertragsFaktor,
+  fokusFaktor,
+  trainingsAnkommFaktor,
+  verfallSumme,
+} from "@/lib/training/entwicklung-neu";
 import {
   getAcademyDevelopmentBoostPct,
   getFacilityEfficiency,
@@ -29,6 +38,7 @@ import {
   getCombinedAttributeTrainingMultiplier,
 } from "@/lib/foundation/player-potential-display-service";
 import {
+  getAttributeGrowthMultiplier,
   getAttributeHeadroom,
   getPerformanceHeadroomGrowthMultiplier,
   resolvePlayerPotentialRecordFromGameState,
@@ -800,6 +810,69 @@ function getPerformanceRecords(gameState: GameState, playerId: string): PlayerDi
   return getPerformanceIndex(gameState).byPlayerId.get(playerId) ?? [];
 }
 
+/**
+ * ENTWICKLUNG NEU (22.11.): Leistungsrang eines Spielers in der Liga dieser Saison, 0 (schwaecher als alle) bis 1 (staerker als
+ * alle), aus demselben Leistungssignal je Einsatz wie der Leistungskanal (`getPerformanceSetpoints`: Score, Rang in der
+ * Disziplin, PP-Beitrag). Spieler mit weniger als `einsatzMin` Einsaetzen gehen nicht in die Rangfolge ein und bekommen
+ * `rangWenigEinsaetze`. Je Spielstand einmal gerechnet (WeakMap wie der Leistungsindex).
+ */
+type LeistungsRangIndex = { sortiert: number[]; signalJeSpieler: Map<string, number> };
+const leistungsRangCache = new WeakMap<GameState, LeistungsRangIndex>();
+
+function getLeistungsRangIndex(gameState: GameState): LeistungsRangIndex {
+  const cached = leistungsRangCache.get(gameState);
+  if (cached) return cached;
+  const p = entwicklungsParameter();
+  const ppEinsatzFaktor = ppSkalaUmrechnung(gameState).einsatz;
+  const signalJeSpieler = new Map<string, number>();
+  for (const [playerId, records] of getPerformanceIndex(gameState).byPlayerId) {
+    if (records.length < p.einsatzMin) continue;
+    let summe = 0;
+    for (const record of records) summe += getPerformanceSetpoints(record, ppEinsatzFaktor);
+    signalJeSpieler.set(playerId, summe / records.length);
+  }
+  const index = { sortiert: [...signalJeSpieler.values()].sort((a, b) => a - b), signalJeSpieler };
+  leistungsRangCache.set(gameState, index);
+  return index;
+}
+
+function getLeistungsRang(gameState: GameState, playerId: string): number {
+  const p = entwicklungsParameter();
+  const index = getLeistungsRangIndex(gameState);
+  const signal = index.signalJeSpieler.get(playerId);
+  if (signal == null || index.sortiert.length < 2) return p.rangWenigEinsaetze;
+  // Anteil der Spieler mit kleinerem Signal (untere Mitte bei Gleichstand).
+  let lo = 0;
+  let hi = index.sortiert.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (index.sortiert[mid]! < signal) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo / (index.sortiert.length - 1);
+}
+
+/** Gebuchter Trainingszuwachs je Attribut dieser Saison (Summe der Spieltage aus dem Verlauf) und Ausfalltage. */
+function getGebuchtesTraining(gameState: GameState, player: Player) {
+  const akku = player.seasonTrainingAccumulator;
+  const zuwachs: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
+  let ausfallTage = 0;
+  if (!akku || akku.seasonId !== gameState.season.id) return { zuwachs, ausfallTage, dominanz: 0.5 };
+  const jeZiel = new Map<string, number>();
+  for (const zeile of akku.verlauf ?? []) {
+    if (zeile.s === "v") ausfallTage += 1;
+    if (zeile.s === "t" && zeile.d) jeZiel.set(zeile.d, (jeZiel.get(zeile.d) ?? 0) + 1);
+    if (zeile.s !== "t" || !zeile.z) continue;
+    for (const [attribute, wert] of Object.entries(zeile.z) as Array<[PlayerGeneratorAttributeName, number]>) {
+      zuwachs[attribute] = (zuwachs[attribute] ?? 0) + wert;
+    }
+  }
+  // Anteil des meistgewaehlten Trainingsziels an den Trainingstagen mit Ziel; mit weniger als fuenf Tagen neutral.
+  const mitZiel = [...jeZiel.values()].reduce((a, b) => a + b, 0);
+  const dominanz = mitZiel >= 5 ? Math.max(...jeZiel.values()) / mitZiel : 0.5;
+  return { zuwachs, ausfallTage, dominanz };
+}
+
 function getDisciplineWeightDistribution(disciplineId: string) {
   if (!officialDisciplineWeightOrder.includes(disciplineId as OfficialDisciplineWeightId)) {
     return null;
@@ -912,10 +985,12 @@ function buildOrganicRegressionBreakdown(input: {
   marketValuePressurePerAttribute: number;
   /** Anteilige Spieltag-Skalierung der Regression (0..1, Default 1 = volle Saison). */
   regressionScale?: number;
+  /** Grundabbau je Attribut (Entwicklung neu: `abbauBasis`; Standard = alter Wert). */
+  basePerAttribute?: number;
 }): OrganicRegressionBreakdown {
   const attributeCount = PROGRESSION_ATTRIBUTE_ORDER.length;
   const scale = normalizeRegressionScale(input.regressionScale);
-  const baseFlatTotal = roundValue(-ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE * attributeCount * scale, 2);
+  const baseFlatTotal = roundValue(-(input.basePerAttribute ?? ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE) * attributeCount * scale, 2);
   const marketValueTotal = roundValue(-input.marketValuePressurePerAttribute * attributeCount * scale, 2);
   return {
     baseFlatTotal,
@@ -970,6 +1045,8 @@ function getOrganicPerformanceGrowthMultiplier(input: {
   potentialGapStars: number;
   /** Gedämpfter Potenzial-Gap-Beschleuniger (>= 1), s. getPerformanceGapAccelerator. */
   gapAccelerator: number;
+  /** Entwicklung neu (22.11.): stetige Ertragskurve statt der alten Stufen am Rand der Decke. */
+  entwicklungNeu?: boolean;
 }) {
   const affinity = getAttributeAffinityKind(input.attribute, input.affinityProfile);
   const headroom = getAttributeHeadroom({
@@ -977,7 +1054,9 @@ function getOrganicPerformanceGrowthMultiplier(input: {
     attribute: input.attribute,
     record: input.record,
   });
-  const base = getOrganicGrowthMultiplier(affinity) * getPerformanceHeadroomGrowthMultiplier(headroom.headroom);
+  const base =
+    getOrganicGrowthMultiplier(affinity) *
+    (input.entwicklungNeu ? Math.max(0.3, ertragsFaktor(headroom.headroom)) : getPerformanceHeadroomGrowthMultiplier(headroom.headroom));
   // A genuinely capped attribute never gets a bailout — the individual cap always wins.
   // Das gilt auch für den Gap-Beschleuniger: an der eigenen Decke wird nichts beschleunigt.
   if (headroom.state === "capped") return base;
@@ -1273,6 +1352,19 @@ export function buildOrganicSeasonProgression(input: {
     playerId: input.player.id,
     playerRating: input.player.rating,
   });
+  // ENTWICKLUNG NEU (22.11., lib/resolve/entwicklung-regel.ts): PP-Faktor auf den gebuchten Trainingszuwachs, stetige
+  // Ertragskurve, Verfall, Leistungsskala. Nur mit Stempel "neu"; `entSaisonende` = die Saisonend-Rechnung, nicht der Tageszuwachs.
+  const entNeu = entwicklungNeuFuer(input.gameState);
+  const entSaisonende = entNeu && !nurTraining;
+  const entP = entwicklungsParameter();
+  const entRang = entSaisonende ? getLeistungsRang(input.gameState, input.player.id) : 0;
+  const entGebucht = entSaisonende ? getGebuchtesTraining(input.gameState, input.player) : null;
+  const entFaktor = entSaisonende
+    ? trainingsAnkommFaktor(performanceSignals.appearances, entRang, entP) * fokusFaktor(entGebucht?.dominanz ?? 0.5, entP)
+    : 1;
+  // Abbau haengt an der Leistung: wer unter der Mitte der Liga abschneidet, baut staerker ab, wer darueber liegt, schwaecher.
+  const entAbbauFaktor = entSaisonende ? Math.max(0.2, 1 + entP.abbauLeistungsKopplung * (0.5 - entRang)) : 1;
+  const entVerfall = entSaisonende ? verfallSumme(entGebucht?.ausfallTage ?? 0, entP) : 0;
   const marktwertBase = getMarktwertForRegression(input.player);
   // B2: soft-knee the market value driving regression so extreme-value stars aren't penalized without bound.
   const marketValuePressurePerAttribute = roundValue(
@@ -1289,6 +1381,7 @@ export function buildOrganicSeasonProgression(input: {
     marktwertBase,
     marketValuePressurePerAttribute,
     regressionScale,
+    basePerAttribute: entNeu ? entP.abbauBasis : undefined,
   });
   const affinityProfile = resolveSeasonalAffinityProfile({
     player: input.player,
@@ -1312,12 +1405,14 @@ export function buildOrganicSeasonProgression(input: {
       axisPoStars: axisPoStars ?? undefined,
       affinityGrowthMultiplier: organicAffinityMult,
     });
-    const trainingMultiplier = getOrganicTrainingGrowthMultiplier(
-      trainingGrowthMultiplier,
-      attributeHeadroom.state,
-      starSnapshot.potentialGap,
-      performanceSignals,
-    );
+    // Entwicklung neu: der Zustandsschritt (1 / 0,45 / 0,05) wird durch die stetige Ertragskurve ersetzt.
+    const trainingMultiplier =
+      getOrganicTrainingGrowthMultiplier(
+        trainingGrowthMultiplier,
+        attributeHeadroom.state,
+        starSnapshot.potentialGap,
+        performanceSignals,
+      ) * (entNeu ? ertragsFaktor(attributeHeadroom.headroom) / getAttributeGrowthMultiplier(attributeHeadroom.state) : 1);
     const performanceGrowthMultiplier = getOrganicPerformanceGrowthMultiplier({
       player: input.player,
       attribute,
@@ -1326,6 +1421,7 @@ export function buildOrganicSeasonProgression(input: {
       signals: performanceSignals,
       potentialGapStars: starSnapshot.potentialGap,
       gapAccelerator: performanceGapAccelerator,
+      entwicklungNeu: entNeu,
     });
     // B1: headroom-aware regression — a capped/closing attribute plateaus instead of eroding at full
     // speed (mirror of the growth throttle, but gentle). Open attributes keep full regression.
@@ -1334,14 +1430,25 @@ export function buildOrganicSeasonProgression(input: {
     // im Saisonende-Apply immer 1 → identische Rechnung wie bisher.
     const regression = nurTraining
       ? 0
-      : -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) *
-        regressionHeadroomMultiplier *
-        regressionScale;
-    const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
+      : -((entNeu ? entP.abbauBasis : ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE) + marketValuePressurePerAttribute) *
+          regressionHeadroomMultiplier *
+          regressionScale *
+          entAbbauFaktor -
+        entVerfall / PROGRESSION_ATTRIBUTE_ORDER.length;
+    // Entwicklung neu: SP bestimmen, WOHIN ein Spieler waechst, PP, WIE VIEL davon ankommt: der je Spieltag gebuchte Zuwachs wird
+    // am Saisonende um (Faktor - 1) korrigiert; ein Mehr (Faktor > 1) folgt der Ertragskurve, ein Weniger nimmt Zuwachs zurueck.
+    const entGebuchtAttribut = entGebucht?.zuwachs[attribute] ?? 0;
+    const entKorrektur = entSaisonende
+      ? (entFaktor - 1) * entGebuchtAttribut * (entFaktor > 1 ? ertragsFaktor(attributeHeadroom.headroom) : 1)
+      : 0;
+    const training =
+      applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier) +
+      entKorrektur;
     const performanceDelta = nurTraining
       ? 0
       : applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *
-        performanceWeightMultiplier;
+        performanceWeightMultiplier *
+        (entNeu ? entP.leistungsSkala : 1);
     const delta = roundValue(regression + training + performanceDelta, nurTraining ? 4 : 2);
     const before = attributesBefore[attribute];
     // Harte Ceiling-Bindung: Attributwachstum darf das (reconciled) Attribut-Ceiling
@@ -1370,13 +1477,14 @@ export function buildOrganicSeasonProgression(input: {
       affinity,
       trainingGrowthMultiplier,
       performanceGrowthMultiplier,
+      korrektur: entKorrektur,
     };
   });
   // Spillover-Nachlauf: Der Teil des Budgets, den die Fokus-Attribute nicht aufnehmen konnten
   // (Budget − auf Fokus angewendet), wird zu TRAINING_SPILLOVER_SHARE gleichmäßig auf die
   // NICHT-fokussierten, noch nicht gecappten Attribute verteilt (deterministischer ±Jitter).
   // Getrennt als `spillover` geführt und in Delta/After eingerechnet.
-  const focusAppliedTraining = rawAttributeBreakdown.reduce((sum, entry) => sum + entry.training, 0);
+  const focusAppliedTraining = rawAttributeBreakdown.reduce((sum, entry) => sum + entry.training - entry.korrektur, 0);
   // Der gebundene Rest kann das Budget nie übersteigen (bei Klassen mit negativen Nebenwirkungen
   // auf die Fokus-Stats würde `budget − focusApplied` sonst über das Budget hinauslaufen).
   const boundRest = Math.min(trainingSetpoints, Math.max(0, trainingSetpoints - focusAppliedTraining));
@@ -1407,6 +1515,28 @@ export function buildOrganicSeasonProgression(input: {
         entry.after = after;
         entry.delta = roundValue(after - entry.before, nurTraining ? 3 : 2);
       });
+    }
+  }
+  // ENTWICKLUNG NEU: die Entwicklungskurve fuehrt die GESAMTE Saisonentwicklung eines Spielers (je Spieltag gebuchtes Training
+  // plus die Saisonend-Rechnung): kleine Summen werden gedaempft (die Masse bleibt "kaum veraendert"), grosse verstaerkt
+  // (wenige Schuebe und Einbrueche). Vorzeichen und Verteilung auf die Attribute bleiben. Das schon gebuchte Training steht
+  // auf den Attributen; die Saisonend-Rechnung bucht nur die Differenz zum Kurvenwert nach (kann also Training zuruecknehmen).
+  if (entSaisonende) {
+    const gebuchtJeAttribut = (attribute: PlayerGeneratorAttributeName) => entGebucht?.zuwachs[attribute] ?? 0;
+    const rohSumme = rawAttributeBreakdown.reduce(
+      (sum, e) => sum + gebuchtJeAttribut(e.attribute) + e.regression + e.training + e.spillover + e.performance,
+      0,
+    );
+    const skala = entwicklungsKurvenSkala(rohSumme, entP);
+    for (const entry of rawAttributeBreakdown) {
+      const gebucht = gebuchtJeAttribut(entry.attribute);
+      const gesamt = (gebucht + entry.regression + entry.training + entry.spillover + entry.performance) * skala;
+      entry.regression = roundValue(entry.regression * skala, 2);
+      entry.training = roundValue((entry.training + gebucht) * skala - gebucht, 2);
+      entry.spillover = roundValue(entry.spillover * skala, 2);
+      entry.performance = roundValue(entry.performance * skala, 2);
+      entry.after = roundValue(clamp(entry.before + (gesamt - gebucht), 1, ceilingCapByAttribute[entry.attribute]), 1);
+      entry.delta = roundValue(entry.after - entry.before, 2);
     }
   }
   const attributeBreakdown = rawAttributeBreakdown;
@@ -1466,7 +1596,7 @@ export function buildOrganicSeasonProgression(input: {
             : ("neutral" as const),
     })),
     facilityModifierPct,
-    baseRegressionPerAttribute: ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
+    baseRegressionPerAttribute: entNeu ? entP.abbauBasis : ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
     marketValuePressureTotal,
     marketValuePressurePerAttribute,
     marketValueMaintenanceReliefPct: 0,
