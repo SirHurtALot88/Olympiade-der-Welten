@@ -301,8 +301,11 @@ export function platzPreisAusMarkt(gameState: GameState): { fee: number; salary:
 
 /**
  * Reine Funktion der Kaderpflicht-Freigabe, damit Planer und Sperre dieselbe Zahl rechnen (kaufRahmen.grenzeFuer).
- * Unter dem Minimum: Kosten der fehlenden Plaetze, gedeckt aus der GANZEN Kasse (inkl. Notruecklage, ohne Vertrauensverlust).
- * Zwischen Minimum und Opt: Plaetze bis Opt zum Platzpreis, soweit Kasse ueber der Notruecklage da ist.
+ * Review 22.11. Befund 1: NUR der Pflichtkader (`kaderMin`, im Spiel `VORSTAND_PFLICHT_KADER` = 8) ist quotenfrei: Kosten der fehlenden
+ * Plaetze, gedeckt aus der GANZEN Kasse (inkl. Notruecklage, ohne Vertrauensverlust). Alles darueber (Minimum der Identitaet bis Opt)
+ * unterliegt der Vorstandsquote wie jeder andere Kauf; der fruehere Zuschlag "Plaetze bis Opt aus der Kasse ueber der Notruecklage"
+ * hob die Quote nach jedem Vertragsablauf-Saisonende fuer fast jedes Team auf (27 von 32 Teams ueber Topf, Messung 22.11.).
+ * `kaderOpt` bleibt im Eingabetyp, damit Aufrufer unveraendert sind; es wirkt hier nicht mehr.
  */
 export function kaderpflichtZuschlag(input: {
   kaderIst: number;
@@ -314,17 +317,10 @@ export function kaderpflichtZuschlag(input: {
   notruecklage: number;
 }): { abloese: number; gehalt: number } {
   const fehltMin = Math.max(0, input.kaderMin - input.kaderIst);
-  const fehltOpt = Math.max(0, input.kaderOpt - input.kaderIst);
   if (fehltMin > 0) {
     return {
       abloese: Math.max(0, Math.min(Math.max(0, input.cash), fehltMin * input.platzAbloese)),
       gehalt: fehltMin * input.platzGehalt,
-    };
-  }
-  if (fehltOpt > 0) {
-    return {
-      abloese: Math.max(0, Math.min(fehltOpt * input.platzAbloese, input.cash - input.notruecklage)),
-      gehalt: fehltOpt * input.platzGehalt,
     };
   }
   return { abloese: 0, gehalt: 0 };
@@ -473,7 +469,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   // Kaderpflicht-Freigabe (Chris 18.11.): Geld da, aber nicht freigegeben, waehrend das Team das Minimum nicht erreicht oder sich dem Opt
   // nicht naehern kann, ist ein Notfall: der Rahmen ist dann nie kleiner als die Kosten dieser Plaetze (Platzpreis, Ablose UND Gehalt).
   const kaderIst = gameState.rosters.filter((r) => r.teamId === teamId).length;
-  const kaderMin = Math.max(VORSTAND_PFLICHT_KADER, identity?.playerMin ?? 0);
+  const kaderMin = VORSTAND_PFLICHT_KADER;
   const kaderOpt = Math.max(kaderMin, identity?.playerOpt ?? kaderMin);
   const platz = gedeckelt ? platzPreisAusMarkt(gameState) : { fee: 0, salary: 0 };
   const zuschlag = gedeckelt
@@ -490,7 +486,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   if (kpGehalt > 0.004) gehaltFrei += kpGehalt;
   const kaderpflichtAktiv = kpAbloese > 0.004 || kpGehalt > 0.004;
   const kaderpflichtText = kaderpflichtAktiv
-    ? `Kaderpflicht: Vorstand gibt ${zahlText(kpAbloese)} C frei (Kader ${kaderIst}/${kaderIst < kaderMin ? kaderMin : kaderOpt})`
+    ? `Kaderpflicht: Vorstand gibt ${zahlText(kpAbloese)} C frei (Kader ${kaderIst}/${kaderMin}, nur der Pflichtkader ist quotenfrei)`
     : null;
 
   return {

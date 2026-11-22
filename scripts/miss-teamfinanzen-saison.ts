@@ -98,8 +98,8 @@ const STOP_AFTER = arg("stop-after", "");
 const NUR_ANLAGE = process.argv.includes("--nur-anlage");
 /** Vorhandene (kopierte) Anlage-SQLite weiterverwenden: saveId, ab dem Draft laufen. */
 const VON_ANLAGE = arg("von-anlage", "");
-/** "block" (Standard, alter Hintergrund-Draft) oder "einzelschritt" (neuer Liga-Draft Pick fuer Pick). */
-const DRAFT_ART = arg("draft", "block") as "block" | "einzelschritt";
+/** "einzelschritt" (Standard seit 22.11., wie die App: Liga-Draft Pick fuer Pick) oder "block" (alter Hintergrund-Draft; setzt seit Befund 9 dieselbe Roster-Kennung `draftPickS1`). */
+const DRAFT_ART = arg("draft", "einzelschritt") as "block" | "einzelschritt";
 
 /**
  * S1-KADERBAU-VARIANTEN (18.11., Messung "S1 ohne Draft"):

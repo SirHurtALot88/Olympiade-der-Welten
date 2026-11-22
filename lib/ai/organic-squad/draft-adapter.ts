@@ -40,6 +40,7 @@ import {
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
 import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
+import { computePlayerQuality } from "@/lib/ai/organic-squad/quality";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
@@ -940,6 +941,14 @@ const UPGRADE_SWAP_UPLIFT = Number(process.env.OLY_UPGRADE_SWAP_UPLIFT ?? 1.5) |
 /** Absolute headroom (MW) the replacement budget must also clear, so tiny-MW swaps still need real cash. */
 const UPGRADE_SWAP_MIN_HEADROOM = Number(process.env.OLY_UPGRADE_SWAP_MIN_HEADROOM ?? 10) || 10;
 
+/**
+ * Review 22.11. Befund 3: KERNSCHUTZ. Die besten drei Spieler eines Kaders (nach Staerke-Qualitaet) verkauft ein Team nur noch in
+ * Finanznot (Kasse unter dem Puffer). Gemessen verkaufte ein sparsames Team (D-L) in zwei Fenstern seine Top-5-Eignung 45 bis 50
+ * zum Marktwert und kaufte 11 bis 21 zurueck, obwohl der freie Pool im Median 57,8 hielt: der Verkaufserloes (`wThrift x saleValue`)
+ * schlug den Staerkeverlust, solange der Vorstand den Abstieg nicht bestrafte. 0 oder `OLY_KI_KERNSCHUTZ=0` schaltet ab.
+ */
+const KERNSCHUTZ_ANZAHL = process.env.OLY_KI_KERNSCHUTZ === "0" ? 0 : Math.max(0, Number(process.env.OLY_KI_KERNSCHUTZ ?? 3) || 0);
+
 export type OrganicSellDecision = {
   /** Domain player id (matches OrganicPlayerView.playerId / Player.id). */
   playerId: string;
@@ -1109,12 +1118,26 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
 
   // Floor is ROSTER_MIN in-season, 0 at season end (allowBelowMin). Only players clearing
   // SELL_THRESHOLD are shed, highest-sellUtility first — keepers (negative sellUtility) never sell.
+  let kernIds: Set<string> | null = null;
   while (held.length > rosterMin) {
     const state = buildState();
+    // Kernschutz (Befund 3): einmal je Plan aus dem Kader zu Beginn bestimmt; faellt weg, sobald das Team in Finanznot ist.
+    if (kernIds == null) {
+      kernIds = new Set(
+        KERNSCHUTZ_ANZAHL > 0
+          ? [...held]
+              .sort((a, b) => computePlayerQuality(b, state.needAxisWeights) - computePlayerQuality(a, state.needAxisWeights))
+              .slice(0, KERNSCHUTZ_ANZAHL)
+              .map((view) => view.playerId)
+          : [],
+      );
+    }
+    const finanznot = teamDistressed || state.cash < ctx.cashBuffer;
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
     for (const view of held) {
       if (blockedFloorPlayerIds.has(view.playerId)) continue; // kept by the think-twice floor gate
+      if (!finanznot && kernIds.has(view.playerId)) continue; // Kernschutz
       const jitter =
         input.draftSeed && ORGANIC_SELL_JITTER > 0
           ? ORGANIC_SELL_JITTER * (draftUnit(`${input.draftSeed}:${view.playerId}`) - 0.5)
@@ -1181,6 +1204,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       let weakest: OrganicPlayerView | null = null;
       let weakestUtility = -Infinity;
       for (const view of held) {
+        if (kernIds?.has(view.playerId) && !(teamDistressed || state.cash < ctx.cashBuffer)) continue; // Kernschutz (Befund 3)
         const utility = sellUtility(view, state);
         if (utility > weakestUtility) {
           weakestUtility = utility;

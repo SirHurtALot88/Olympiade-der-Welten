@@ -22,11 +22,35 @@ function isCurrentPreseasonSale(entry: TransferHistoryEntry, seasonId: string) {
   );
 }
 
+function saisonNummerAusId(seasonId: string): number | null {
+  const m = /(\d+)\s*$/.exec(seasonId);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Review 22.11. (Chris: „Vertrag auslaufen lassen ist dasselbe wie ein Verkauf“): ein Abgang durch Vertragsende gilt fuer die
+ * Rueckkauf-Sperre wie ein Verkauf. Er traegt die Saison, in der der Vertrag endete (also die Vorsaison des Kauffensters), und
+ * zaehlt nur, solange danach niemand den Spieler verpflichtet hat (sonst gaebe es ihn nicht mehr im freien Pool). Ablauf am
+ * Ende von Saison N sperrt den Rueckkauf im Kauffenster von Saison N+1 — vorher kauften KI-Teams ihre ausgelaufenen Spieler fuer
+ * die volle Ablöse zurueck (11 Faelle, 267,7 C), statt zu verlaengern.
+ */
+function isRecentContractEndExit(entry: TransferHistoryEntry, seasonId: string, gameState: GameState) {
+  if (entry.transferType !== "contract_exit" || entry.fromTeamId == null) return false;
+  if (entry.seasonId === seasonId) return true;
+  const aktuell = saisonNummerAusId(seasonId);
+  const eintrag = saisonNummerAusId(entry.seasonId);
+  if (aktuell == null || eintrag == null || eintrag !== aktuell - 1) return false;
+  // Nur, wenn der Spieler seither bei niemandem unter Vertrag war.
+  return !gameState.transferHistory.some(
+    (spaeter) => spaeter.playerId === entry.playerId && spaeter.transferType === "buy" && Date.parse(spaeter.happenedAt) > Date.parse(entry.happenedAt),
+  );
+}
+
 export function buildRecentlySoldByTeam(gameState: GameState, seasonId = gameState.season.id) {
   const byTeam = new Map<string, Map<string, RecentlySoldPlayer>>();
 
   for (const entry of gameState.transferHistory) {
-    if (!isCurrentPreseasonSale(entry, seasonId) || !entry.fromTeamId) {
+    if ((!isCurrentPreseasonSale(entry, seasonId) && !isRecentContractEndExit(entry, seasonId, gameState)) || !entry.fromTeamId) {
       continue;
     }
 

@@ -499,13 +499,13 @@ describe("KI-Schonung R4: Reha-Bau im laufenden Spiel", () => {
 // ---------------------------------------------------------------------------------------------
 // R5: Kader auffuellen
 // ---------------------------------------------------------------------------------------------
-describe("KI-Schonung R5: Teams unter 10 Spielern werden bevorzugt aufgefuellt", () => {
-  it("hebt das Planer-Ziel auf Spitzenbedarf minus 2, aber nie ueber das Kadermaximum", () => {
+describe("KI-Schonung R5: Teams unter 11 Spielern werden bevorzugt aufgefuellt (Review 22.11.)", () => {
+  it("hebt das Planer-Ziel auf Spitzenbedarf minus 1, aber nie ueber das Kadermaximum", () => {
     const gameState = rehaSpielstand({ teams: [{ id: "KI-D", modus: "ai", kader: 9, cash: 40 }] });
-    expect(kiMindestKaderFuerRotation(12)).toBe(10);
+    expect(kiMindestKaderFuerRotation(12)).toBe(11);
     expect(resolveSpitzenbedarf(gameState)).toBe(12);
     const ziele = resolvePlannerRosterTargets(gameState, "KI-D");
-    expect(ziele.playerOpt).toBe(10);
+    expect(ziele.playerOpt).toBe(11);
     expect(ziele.playerMin).toBe(8);
   });
 

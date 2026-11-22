@@ -38,6 +38,7 @@ import { applyContractRenewalAction, previewContractRenewalAction } from "@/lib/
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import type { ContractStatus, GameState, Player } from "@/lib/data/olyDataTypes";
+import { isRecentlySoldBySameTeam } from "@/lib/market/anti-rebuy-guard";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
@@ -530,6 +531,8 @@ async function runTeamCycle(input: {
     const candidates: Player[] = [];
     for (const item of freeAgentItems) {
       if (input.excludeBuyPlayerIds.has(item.playerId) || rosterPlayerIds.has(item.playerId)) continue;
+      // Verkauf = Vertragsende (Befund 7): kein Rueckkauf des eigenen Abgangs im selben Fenster.
+      if (isRecentlySoldBySameTeam({ gameState, teamId: input.teamId, playerId: item.playerId })) continue;
       const player = playersById.get(item.playerId);
       if (player) candidates.push(player);
     }

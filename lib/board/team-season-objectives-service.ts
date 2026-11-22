@@ -512,6 +512,25 @@ function resolveLeagueScopedRows(input: {
 }
 
 /**
+ * Review 22.11. Befund 2: die Erwartung haengt nicht allein an der aktuellen Kaderstaerke. Wer seinen Kader selbst schwaecht, senkte
+ * sonst die Latte mit (Platz 16 bei erwartetem Platz 16 = "erfuellt", Vertrauen stieg bei zwei letzten Plaetzen auf 9,8). Der
+ * Erwartungsrang ist deshalb der MITTELWERT aus dem Rang nach aktueller Staerke und dem Ligarang der letzten abgeschlossenen
+ * Saison (`seasonSnapshots`): der Abbau des Kaders zieht die Erwartung nur zur Haelfte nach, ein Aufsteiger bekommt umgekehrt
+ * Rueckenwind. Symmetrisch, damit der Liga-Schnitt der Vertrauensaenderungen nicht kippt. Ohne Vorjahr (Saison 1) oder ohne
+ * gameState bleibt der Rang unveraendert. Abschalten: OLY_BOARD_ERWARTUNG_ANKER=0.
+ */
+function vorjahresRangMischung(gameState: GameState | null | undefined, teamId: string, aktuellerRang: number, teamCount: number): number {
+  if (!gameState || process.env.OLY_BOARD_ERWARTUNG_ANKER === "0") return aktuellerRang;
+  const aktuelleSaison = gameState.season?.id;
+  const snaps = (gameState.seasonState?.seasonSnapshots ?? []).filter((snap) => snap.seasonId !== aktuelleSaison && snap.status !== "dry_run");
+  const letzte = snaps[snaps.length - 1];
+  const vorjahr = letzte?.finalStandings?.find((zeile) => zeile.teamId === teamId)?.rank ?? null;
+  if (vorjahr == null || !Number.isFinite(vorjahr) || vorjahr < 1) return aktuellerRang;
+  const gedeckelt = Math.min(Math.max(1, teamCount), vorjahr);
+  return clamp(Math.round((aktuellerRang + gedeckelt) / 2), 1, Math.max(1, teamCount));
+}
+
+/**
  * Where a team's squad strength says it "should" finish in the league, independent of the
  * board's ambition. Used as the baseline that #6 (expectation-rank) and #2a (upset-avoidance)
  * measure against.
@@ -538,7 +557,8 @@ export function computeTeamExpectation(input: {
     return (right.marketValueTotal ?? 0) - (left.marketValueTotal ?? 0);
   });
   const index = ranked.findIndex((row) => row.teamId === input.row.teamId);
-  const expectedRank = index >= 0 ? index + 1 : Math.max(1, teamCount);
+  const expectedRankRoh = index >= 0 ? index + 1 : Math.max(1, teamCount);
+  const expectedRank = vorjahresRangMischung(input.gameState, input.row.teamId, expectedRankRoh, teamCount);
   const strengthPct = clamp(teamCount > 1 ? (teamCount - expectedRank) / (teamCount - 1) : 1, 0, 1);
   // Normalize identity ambition (1..10, default 5) onto roughly -1..1.
   const ambitionMod = clamp(((input.identity?.ambition ?? 5) - 5) / 5, -1, 1);
@@ -942,7 +962,8 @@ function resolveExpectedLeagueRank(input: {
     rowsByTeamId: scopedRowsByTeamId,
     metric: "marketValueTotal",
   }).rank;
-  return Math.round((ppsRank * 2 + marketValueRank) / 3);
+  const rangRoh = Math.round((ppsRank * 2 + marketValueRank) / 3);
+  return vorjahresRangMischung(input.gameState, input.teamId, rangRoh, scopedRowsByTeamId.size);
 }
 
 /**

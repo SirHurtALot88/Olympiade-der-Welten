@@ -169,34 +169,44 @@ describe("Kaderpflicht-Freigabe (Chris 18.11.): Geld da, nicht freigegeben, Kade
     } as unknown as GameState;
   }
 
-  it("6 Spieler, 87 C Kasse, hoher Finanzwert: der Rahmen reicht fuer mindestens 4 sinnvolle Kaeufe (Platzpreis 20 C, Gehalt 5 C)", () => {
+  it("6 Spieler, 87 C Kasse, hoher Finanzwert: der Rahmen reicht fuer die 2 Plaetze bis zum Pflichtkader 8 (Platzpreis 20 C, Gehalt 5 C); darueber gilt die Quote", () => {
     const gs = team(6, 87, { playerMin: 10, playerOpt: 12 });
     const rahmen = kaufRahmen(gs, "A");
     expect(rahmen.stand.kaderpflicht.platzAbloese).toBe(20);
     let fee = 0;
     let sal = 0;
-    for (let k = 0; k < 4; k += 1) {
+    for (let k = 0; k < 2; k += 1) {
       const g = rahmen.grenzeFuer(6 + k, fee, sal);
       expect(20).toBeLessThanOrEqual(g.fee + 1e-9);
       expect(5).toBeLessThanOrEqual(g.salary + 1e-9);
       fee += 20;
       sal += 5;
     }
-    expect(rahmen.stand.kaderpflicht.text).toContain("Kaderpflicht: Vorstand gibt");
     expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: 20, salary: 5, rosterBefore: 6, playerMin: 10 }).ok).toBe(true);
   });
 
-  it("auch die Gehaltsseite wird freigegeben: Kader am Minimum, Gehaltstopf leer, Weg Richtung Opt (Befund Z-H aus #1634)", () => {
-    const basis = { kaderMin: 9, kaderOpt: 12, platzAbloese: 20, platzGehalt: 5, notruecklage: 15, cash: 87 };
-    // Am Minimum: Gehalt der Plaetze bis Opt (3 x 5 C) unabhaengig von Kasse und Gehaltstopf
-    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9 }).gehalt).toBe(15);
-    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9, cash: 5 }).gehalt).toBe(15);
-    // Unter dem Minimum: Gehalt der fehlenden Plaetze bis Minimum
-    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 7 }).gehalt).toBe(10);
-    // Die Grenze fuer den naechsten Kauf nimmt das Groessere aus Rahmen nach Quote und Kaderpflicht
+  it("Review 22.11. Befund 1: nur der Pflichtkader 8 ist quotenfrei; am Minimum der Identitaet (9) und bis Opt gibt es KEINEN Zuschlag", () => {
+    const basis = { kaderMin: 8, kaderOpt: 12, platzAbloese: 20, platzGehalt: 5, notruecklage: 15, cash: 87 };
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 8 })).toEqual({ abloese: 0, gehalt: 0 });
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9 })).toEqual({ abloese: 0, gehalt: 0 });
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 10, cash: 5 })).toEqual({ abloese: 0, gehalt: 0 });
+    // Unter dem Pflichtkader: Gehalt der fehlenden Plaetze bis 8
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 6 }).gehalt).toBe(10);
+    // Die Grenze fuer den naechsten Kauf ueber 8 ist der Rahmen nach Quote, nie der Platzpreis bis Opt
     const rahmen = kaufRahmen(team(9, 87, { playerMin: 9, playerOpt: 12 }), "A");
-    expect(rahmen.grenzeFuer(9, 0, 0).salary).toBeGreaterThanOrEqual(15 - 1e-9);
-    expect(rahmen.grenzeFuer(9, 0, 1000).salary).toBeGreaterThanOrEqual(15 - 1e-9);
+    expect(rahmen.stand.kaderpflicht.aktiv).toBe(false);
+    expect(rahmen.grenzeFuer(9, 0, 1000).salary).toBeLessThan(1000);
+  });
+
+  it("Befund 1, Quote greift: Team mit 9 Spielern unter niedrigem Vertrauen darf nicht ueber den freien Betrag kaufen", () => {
+    const gs = team(9, 200, { playerMin: 10, playerOpt: 13, vertrauen: 2 });
+    const rahmen = kaufRahmen(gs, "A");
+    const freiTopf = rahmen.stand.investition.frei;
+    expect(freiTopf).toBeLessThan(200);
+    expect(pruefeKaufGegenVorstandFreigabe(gs, "A", { fee: freiTopf + 5, salary: 1, rosterBefore: 9, playerMin: 10 }).ok).toBe(false);
+    // dasselbe Team unter dem Pflichtkader (7) darf immer kaufen
+    const klein = team(7, 200, { playerMin: 10, playerOpt: 13, vertrauen: 2 });
+    expect(pruefeKaufGegenVorstandFreigabe(klein, "A", { fee: 20, salary: 5, rosterBefore: 7, playerMin: 10 }).ok).toBe(true);
   });
 
   it("Team bei Opt: keine Wirkung", () => {
@@ -212,15 +222,11 @@ describe("Kaderpflicht-Freigabe (Chris 18.11.): Geld da, nicht freigegeben, Kade
     expect(rahmen.grenzeFuer(6, 0, 0).fee).toBeLessThanOrEqual(30 + 1e-9);
   });
 
-  it("zwischen Minimum und Opt wirkt sie nur mit Geld ueber der Notruecklage; unter dem Minimum aus der ganzen Kasse", () => {
-    const basis = { kaderMin: 9, kaderOpt: 12, platzAbloese: 20, platzGehalt: 5, notruecklage: 15 };
-    // Kader 9 (= Minimum), Opt 12: 3 Plaetze x 20 = 60, aber nur Kasse ueber der Notruecklage zaehlt
-    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9, cash: 87 }).abloese).toBe(60);
-    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9, cash: 30 }).abloese).toBe(15);
-    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 9, cash: 12 }).abloese).toBe(0);
-    // Kader 6 (unter dem Minimum): 3 x 20 = 60 aus der GANZEN Kasse, auch unter der Notruecklage
-    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 6, cash: 87 }).abloese).toBe(60);
-    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 6, cash: 12 }).abloese).toBe(12);
+  it("Kaderpflicht: nur unter dem Pflichtkader, aus der GANZEN Kasse; darueber nichts", () => {
+    const basis = { kaderMin: 8, kaderOpt: 12, platzAbloese: 20, platzGehalt: 5, notruecklage: 15 };
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 8, cash: 87 })).toEqual({ abloese: 0, gehalt: 0 });
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 5, cash: 87 }).abloese).toBe(60);
+    expect(kaderpflichtZuschlag({ ...basis, kaderIst: 5, cash: 12 }).abloese).toBe(12);
     expect(kaderpflichtZuschlag({ ...basis, kaderIst: 12, cash: 87 })).toEqual({ abloese: 0, gehalt: 0 });
   });
 

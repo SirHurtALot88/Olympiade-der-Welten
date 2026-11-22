@@ -24,6 +24,7 @@ import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { resolveAiBulkTeamWriteScope, type AiBulkTeamWriteScopeInput } from "@/lib/room/ai-bulk-team-write-scope";
+import { ermittleDelegierteTransferTeamIds, mitDelegiertenAlsKi } from "@/lib/ai/ki-delegierte-transfers";
 import { istEinzelschrittDraftAktiv, ligaDraftDieserSaison, ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 
 /**
@@ -186,10 +187,13 @@ async function executeAiPreseasonBackgroundWork(input: {
   seasonId: string;
   baseRecord: AiPreseasonAutomationRunRecord;
   aiTeamIds: string[];
+  /** Menschenteams mit `transfers: "ki"` (Review 22.11. Befund 10): kaufen und verkaufen im Fenster wie KI-Teams. */
+  delegierteTeamIds?: string[];
   setupDraftMode: boolean;
   protectedSave: NonNullable<ReturnType<PersistenceService["getSaveById"]>>;
 }): Promise<AiPreseasonAutomationRunRecord> {
   const { saveId, seasonId, baseRecord, aiTeamIds, setupDraftMode, protectedSave } = input;
+  const kaufTeamIds = [...aiTeamIds, ...(input.delegierteTeamIds ?? []).filter((id) => !aiTeamIds.includes(id))];
   const persistence = createPersistenceService();
 
   try {
@@ -363,7 +367,7 @@ async function executeAiPreseasonBackgroundWork(input: {
           confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
           transferPhase: LOCAL_TRANSFER_WINDOW_PHASE,
           teamScope: "all",
-          targetTeamIds: aiTeamIds,
+          targetTeamIds: kaufTeamIds,
           allowBuys: false,
           skipIfExistingMarketTransfers: false,
           progressLog: false,
@@ -378,7 +382,7 @@ async function executeAiPreseasonBackgroundWork(input: {
 
     const kreditNotizen: string[] = [];
     const kreditPass = () => {
-      for (const teamId of aiTeamIds) {
+      for (const teamId of kaufTeamIds) {
         const aktuell = persistence.getSaveById(saveId);
         if (!aktuell) break;
         const entscheidung = resolveAiLoanDecision(aktuell.gameState, teamId);
@@ -439,7 +443,7 @@ async function executeAiPreseasonBackgroundWork(input: {
           confirmToken: AI_MARKET_APPLY_CONFIRM_TOKEN,
           transferPhase: LOCAL_TRANSFER_WINDOW_PHASE,
           teamScope: "all",
-          targetTeamIds: aiTeamIds,
+          targetTeamIds: kaufTeamIds,
           allowBuys: true,
           skipIfExistingMarketTransfers: false,
           progressLog: false,
@@ -458,7 +462,7 @@ async function executeAiPreseasonBackgroundWork(input: {
       fensterNotizen.push(`fenster_nachrunde:${nachrundeKaeufe}`);
       const nachKauf = persistence.getSaveById(saveId);
       completedTeams = nachKauf
-        ? aiTeamIds.filter((teamId) => nachKauf.gameState.rosters.some((r) => r.teamId === teamId)).length
+        ? kaufTeamIds.filter((teamId) => nachKauf.gameState.rosters.some((r) => r.teamId === teamId)).length
         : 0;
     } else {
       kreditPass();
@@ -553,9 +557,9 @@ async function executeAiPreseasonBackgroundWork(input: {
      */
     // Owner request: after a season with too many injuries, an AI team should buy one or two
     // cheap depth players. Runs AFTER the regular market pipeline above (so it only tops up
-    // whatever that pipeline already did) and is scoped to the same AI-only `aiTeamIds` — see
+    // whatever that pipeline already did) and is scoped to the same AI-only `kaufTeamIds` — see
     // lib/ai/ai-injury-depth-topup-service.ts for the injury signal / cheap-price / afford gating.
-    const injuryDepthTopup = applyAiInjuryDepthTopup({ saveId, seasonId, aiTeamIds });
+    const injuryDepthTopup = applyAiInjuryDepthTopup({ saveId, seasonId, aiTeamIds: kaufTeamIds });
 
     /**
      * KEIN MINUS MEHR, WENN DAS FENSTER ZU IST.
@@ -580,7 +584,7 @@ async function executeAiPreseasonBackgroundWork(input: {
     let notkredite: Array<{ teamId: string; principal: number }> = [];
     if (gemeinsamesFenster) {
       // KASSENSTURZ (gemeinsames Fenster): Ruecklage → Kredit → Notkredit → Notverkauf als letztes Mittel.
-      const kassensturz = fuehreKiKassensturzAus({ saveId, seasonId, aiTeamIds, persistence });
+      const kassensturz = fuehreKiKassensturzAus({ saveId, seasonId, aiTeamIds: kaufTeamIds, persistence });
       notkredite = kassensturz.notkredite.map((k) => ({ teamId: k.teamId, principal: k.betrag }));
       kreditNotizen.push(
         `kassensturz:minus=${kassensturz.imMinus.length}:kredite=${kassensturz.kredite.length}:notkredite=${kassensturz.notkredite.length}:notverkaeufe=${kassensturz.notverkaeufe.length}:offen=${kassensturz.nochImMinus.length}`,
@@ -771,6 +775,10 @@ export async function fuehreKiPreseasonLaufAus(input: {
       activeOwnerId: scopeOwnerId,
     }).writableTeamIds;
     const aiTeamIds = getAiTeamIds(protectedSave.gameState, callerWritableTeamIds);
+    // Befund 10: delegierte Menschenteams (Bereich Transfers = KI) nehmen ab Saison 2 am Kauffenster teil.
+    const delegierteTeamIds = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds)
+      ? []
+      : ermittleDelegierteTransferTeamIds(protectedSave.gameState, callerWritableTeamIds);
     const startedAt = nowIso();
     const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
 
@@ -797,11 +805,11 @@ export async function fuehreKiPreseasonLaufAus(input: {
     const baseRecord: AiPreseasonAutomationRunRecord = {
       runId: `ai-preseason-${saveId}-${seasonId}-${Date.now()}`,
       seasonId,
-      status: aiTeamIds.length === 0 ? "skipped" : "running",
-      mode: aiTeamIds.length === 0 ? "none" : setupDraftMode ? "setup_draft" : "season_market",
+      status: aiTeamIds.length + delegierteTeamIds.length === 0 ? "skipped" : "running",
+      mode: aiTeamIds.length + delegierteTeamIds.length === 0 ? "none" : setupDraftMode ? "setup_draft" : "season_market",
       startedAt,
       completedAt: null,
-      aiTeamsTotal: aiTeamIds.length,
+      aiTeamsTotal: aiTeamIds.length + delegierteTeamIds.length,
       aiTeamsCompleted: 0,
       managerActionsApplied: 0,
       transferBuysApplied: 0,
@@ -810,7 +818,7 @@ export async function fuehreKiPreseasonLaufAus(input: {
       blockingReasons: [],
     };
 
-    if (aiTeamIds.length === 0) {
+    if (aiTeamIds.length + delegierteTeamIds.length === 0) {
       const skippedRecord: AiPreseasonAutomationRunRecord = { ...baseRecord, completedAt: nowIso() };
       writeRunRecord(saveId, skippedRecord);
       return antwort({
@@ -836,14 +844,19 @@ export async function fuehreKiPreseasonLaufAus(input: {
 
     writeRunRecord(saveId, baseRecord);
     handedToExecute = true;
-    const finalRun = await executeAiPreseasonBackgroundWork({
-      saveId,
-      seasonId,
-      baseRecord,
-      aiTeamIds,
-      setupDraftMode,
-      protectedSave,
-    });
+    // Die delegierten Teams laufen im Kauffenster als KI-Teams (`controlMode` "ai" nur fuer die Dauer des Laufs) und bekommen ihren
+    // Modus danach zurueck; stirbt der Lauf, setzt `protectManualPlayerTeams` ihn beim naechsten Lauf wieder auf "manual".
+    const finalRun = await mitDelegiertenAlsKi(persistence, saveId, delegierteTeamIds, () =>
+      executeAiPreseasonBackgroundWork({
+        saveId,
+        seasonId,
+        baseRecord,
+        aiTeamIds,
+        delegierteTeamIds,
+        setupDraftMode,
+        protectedSave,
+      }),
+    );
 
     const succeeded = finalRun.status === "completed";
     return antwort(

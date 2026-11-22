@@ -19,7 +19,7 @@ type FoundationAiNeedsCompareStatus = "matched" | "partial" | "deviated" | "reto
 type MarketNegotiationOutcomeTone = "success" | "warning" | "error";
 
 export function getTransferTypeLabel(type: "buy" | "sell" | "contract_exit") {
-  if (type === "contract_exit") return "Contract Exit";
+  if (type === "contract_exit") return "Verkauf (Vertragsende)";
   return type === "buy" ? "Kauf" : "Verkauf";
 }
 
