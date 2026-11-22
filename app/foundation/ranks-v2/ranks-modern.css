@@ -1,0 +1,163 @@
+/*
+ * RANKS MODERN (22.11.). Vorlage: public/mockups/ranks-modern-22-11.html, Tokens/Bausteine: components/foundation/broadcast
+ * (Wurzelklasse `bc`), Stil-Block der Mockups: public/mockups/kredite-ranks-leaders-22-11/basis.css. Hier nur, was diese Seite ist.
+ * Alles in em, die Wurzel setzt die Schriftgröße: sie wächst mit dem Fenster (2560x1440 füllt, 1710x1112 quetscht nichts).
+ */
+.rk {
+  --rk-u: clamp(12px, min(1.22vh, 0.78vw), 21px);
+  --rk-pow: #e8695c;
+  --rk-spe: #5fcf8f;
+  --rk-men: #62a6ec;
+  --rk-soc: #f0c35a;
+  --rk-silber: #c9d2de;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Schale (Kopf, Rand, Fuß) wächst mit der Breite; ohne den Zuschlag scrollt die Seite. */
+  height: max(640px, calc(100dvh - 152px - max(0px, (100vw - 1700px) * 0.04)));
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r);
+  overflow: hidden;
+  background: var(--bc-grund);
+  font-size: var(--rk-u);
+}
+.rk .bc-hero { grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; --bc-kul-deckkraft: 0.5; padding: 0.85em 1.25em 0; gap: 1.4em; }
+.rk .bc-hero__mitte { justify-content: flex-start; }
+.rk .bc-hero__titel { font-size: 2.1em; }
+.rk .bc-hero__sub { font-size: 0.94em; }
+.rk .bc-hero__crest { width: 3.9em; height: 3.9em; }
+.rk .bc-reiter { max-width: 25em; padding-right: 1.4em; }
+.rk .bc-reiter__ey { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-frist { text-align: right; white-space: nowrap; padding-bottom: 0.85em; }
+.rk-frist em { display: block; font-style: normal; font-size: 0.72em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--bc-leise); font-weight: 600; }
+.rk-frist strong { display: block; font-size: 1.5em; line-height: 1.1; font-weight: 700; color: var(--bc-creme); }
+.rk-frist strong small { font-size: 0.6em; color: var(--bc-leise); font-weight: 500; }
+.rk-frist small { display: block; font-size: 0.8em; color: var(--bc-stumm); font-weight: 500; }
+
+.rk-work { flex: 1; min-height: 0; display: grid; gap: 0.75em; padding: 0.75em 0.9em; grid-template-columns: minmax(0, 1fr) minmax(21em, 24em); }
+.rk-pan { min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--bc-flaeche-1); border: 1px solid var(--bc-linie); border-radius: var(--bc-r); overflow: hidden; }
+.rk-pk { flex: none; display: flex; align-items: center; gap: 0.5em; padding: 0.5em 0.75em; border-bottom: 1px solid var(--bc-linie); min-height: 2.85em; }
+.rk-pk h2 { margin: 0; font: 400 1.2em/1 var(--bc-haus); color: var(--bc-creme); white-space: nowrap; }
+.rk-sp { flex: 1; }
+.rk-hin { font-size: 0.84em; color: var(--bc-stumm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-bereich { color: var(--bc-leise); font-weight: 600; white-space: nowrap; }
+.rk-seg { display: inline-flex; border: 1px solid var(--bc-linie-2); border-radius: 7px; overflow: hidden; flex: none; }
+.rk-seg button { text-align: center; height: 1.9em; padding: 0 0.7em; font-weight: 600; font-size: 0.88em; color: var(--bc-leise); border-right: 1px solid var(--bc-linie); white-space: nowrap; background: none; border-top: 0; border-bottom: 0; border-left: 0; cursor: pointer; font-family: inherit; }
+.rk-seg button:last-child { border-right: 0; }
+.rk-seg button:hover { background: var(--bc-flaeche-2); color: var(--bc-tinte); }
+.rk-seg button[aria-pressed="true"] { background: var(--bc-creme); color: #17120a; }
+.rk-btn { height: 1.9em; padding: 0 0.7em; border-radius: 6px; border: 1px solid var(--bc-linie-2); background: var(--bc-flaeche-2); color: var(--bc-tinte); font: 600 0.84em var(--bc-zahl); cursor: pointer; white-space: nowrap; }
+.rk-btn:hover { background: var(--bc-flaeche-3); border-color: var(--bc-creme); }
+
+/* Tooltip */
+.rk [data-tip] { position: relative; }
+.rk [data-tip]:hover::after, .rk [data-tip]:focus-visible::after {
+  content: attr(data-tip); position: absolute; z-index: 90; left: 50%; top: calc(100% + 7px); transform: translateX(-50%); width: max-content; max-width: 22em; white-space: pre-line;
+  padding: 0.4em 0.6em; border-radius: 6px; background: #020305; border: 1px solid var(--bc-linie-2); color: var(--bc-tinte); font: 500 0.86em/1.3 var(--bc-zahl); letter-spacing: 0; text-transform: none; text-align: left; pointer-events: none; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+}
+.rk [data-tip].tipl::after { left: auto; right: 0; transform: none; }
+.rk [data-tip].tipll::after { left: 0; transform: none; }
+
+/* Zeilen-Raster */
+.rk-tl { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+.rk-th, .rk-tz { display: grid; gap: 0.6em; align-items: center; padding: 0 0.75em; width: 100%; }
+.rk-th { flex: none; position: sticky; top: 0; z-index: 5; height: 2.1em; background: var(--bc-flaeche-2); border-bottom: 1px solid var(--bc-linie); font-size: 0.74em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bc-stumm); font-weight: 600; }
+.rk-th button { display: inline-flex; align-items: center; gap: 0.25em; letter-spacing: inherit; text-transform: inherit; font-weight: inherit; color: inherit; white-space: nowrap; height: 100%; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; font-size: inherit; text-align: inherit; }
+.rk-th button:hover { color: var(--bc-tinte); }
+.rk-th button.so { color: var(--bc-gold); }
+.rk-th button .pf { font-size: 0.9em; opacity: 0; }
+.rk-th button.so .pf { opacity: 1; }
+.rk-th .r, .rk-tz .r { text-align: right; justify-content: flex-end; }
+.rk-th .m, .rk-tz .m { text-align: center; justify-content: center; }
+.rk-tz { flex: 1 1 0; min-height: 1.95em; max-height: 3.3em; border-bottom: 1px solid rgba(244, 230, 196, 0.06); color: var(--bc-tinte); position: relative; cursor: pointer; }
+.rk-tz:hover { background: rgba(255, 255, 255, 0.035); }
+.rk-tz.wir { background: linear-gradient(90deg, rgba(242, 160, 61, 0.22), rgba(242, 160, 61, 0.05) 60%, transparent); }
+.rk-tz.wir::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--bc-heim); }
+.rk-tz.sel { box-shadow: inset 0 0 0 1px var(--bc-gold); }
+.rk-tz .rg { font-weight: 700; font-size: 1.08em; color: var(--bc-creme); }
+.rk-tz .rg small { display: block; font-size: 0.62em; font-weight: 500; color: var(--bc-stumm); line-height: 1; }
+.rk-tz .z { font-weight: 600; font-size: 1.05em; }
+.rk-team { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
+.rk-team img, .rk-team .ph { width: 1.6em; height: 1.6em; border-radius: 0.3em; object-fit: cover; flex: none; border: 1px solid var(--bc-linie); }
+.rk-team .ph { display: grid; place-items: center; font-size: 0.6em; color: var(--bc-leise); background: var(--bc-flaeche-3); }
+.rk-team b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-sz { display: flex; align-items: center; gap: 0.5em; min-width: 0; }
+.rk-sz .po { width: 1.75em; height: 1.75em; border-radius: 0.3em; object-fit: cover; flex: none; border: 1px solid var(--bc-linie); background: var(--bc-flaeche-3); display: grid; place-items: center; font-size: 0.7em; color: var(--bc-leise); }
+.rk-sz b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-kl { display: inline-flex; align-items: center; gap: 0.3em; color: var(--kf, var(--bc-leise)); font-weight: 600; white-space: nowrap; min-width: 0; }
+.rk-kl img { width: 1.35em; height: 1.35em; object-fit: contain; flex: none; border-radius: 0.25em; background: color-mix(in srgb, var(--kf, #888) 20%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kf, #888) 55%, transparent); }
+.rk-kl span { overflow: hidden; text-overflow: ellipsis; }
+.rk-dzi { width: 1.5em; height: 1.5em; object-fit: contain; flex: none; }
+.rk-marke { display: inline-flex; align-items: center; height: 1.25em; padding: 0 0.4em; border-radius: 3px; font-size: 0.7em; font-weight: 700; letter-spacing: 0.06em; color: #fff; background: var(--bc-warn); flex: none; white-space: nowrap; }
+
+.rk-bk { position: relative; height: 0.42em; border-radius: 99px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.rk-bk i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; background: var(--bf, var(--bc-gold)); }
+.rk-rgc { height: 1.6em; border-radius: 4px; display: grid; place-items: center; font-weight: 700; background: rgba(255, 255, 255, 0.05); }
+.rk-nebel { display: flex; gap: 0.5em; align-items: flex-start; padding: 0.45em 0.6em; border: 1px dashed rgba(154, 167, 186, 0.5); border-radius: 0.35em; background: rgba(154, 167, 186, 0.06); font-size: 0.84em; line-height: 1.25; color: var(--bc-leise); }
+.rk-nebel.fest { border-style: solid; }
+.rk-nebel b { color: var(--bc-tinte); }
+.rk-nebel svg { width: 1.1em; height: 1.1em; margin-top: 0.1em; flex: none; }
+.rk-kf { flex: none; padding: 0.42em 0.75em; border-top: 1px solid var(--bc-linie); font-size: 0.82em; color: var(--bc-stumm); display: flex; gap: 0.9em; align-items: center; white-space: nowrap; overflow: hidden; }
+.rk-kf b { color: var(--bc-leise); font-weight: 600; }
+.rk .plus { color: var(--bc-gut); } .rk .minus { color: var(--bc-warn); } .rk .null { color: var(--bc-stumm); } .rk .gold { color: var(--bc-gold); } .rk .leise { color: var(--bc-leise); } .rk .stumm { color: var(--bc-stumm); }
+.rk .t { font-variant-numeric: tabular-nums; }
+
+/* Matrix */
+.rk-mx .rk-th, .rk-mx .rk-tz { grid-template-columns: 2.5em minmax(8.5em, 1.5fr) repeat(5, minmax(2.5em, 1fr)) repeat(20, minmax(1.9em, 1fr)); gap: 0.22em; padding: 0 0.6em; }
+.rk-mx .rk-th { height: 3.5em; align-items: end; padding-bottom: 0.3em; font-size: 0.72em; }
+.rk-mx .rk-th button { flex-direction: column; gap: 0.1em; justify-content: flex-end; width: 100%; height: auto; border-top: 3px solid var(--kc, transparent); padding-top: 0.25em; border-radius: 2px; }
+.rk-mx .rk-th button img { width: 2em; height: 2em; object-fit: contain; }
+.rk-mx .rk-th button .pf { line-height: 0.6; }
+.rk-mx .rk-th button.tm { flex-direction: row; justify-content: flex-start; border: 0; }
+.rk-mx .rk-th .gr { border-left: 1px solid var(--bc-linie-2); }
+.rk-zelle { height: 1.72em; border-radius: 4px; display: grid; place-items: center; font-weight: 700; font-size: 0.98em; background: rgba(255, 255, 255, 0.04); color: var(--bc-leise); min-width: 0; white-space: nowrap; overflow: hidden; }
+.rk-zelle.w { font-size: 0.82em; font-weight: 600; }
+.rk-zelle.r1 { background: linear-gradient(180deg, #f7d57f, #d9a633); color: #17120a; }
+.rk-zelle.o { background: rgba(98, 211, 148, 0.26); color: #b9f2d2; }
+.rk-zelle.u { background: rgba(255, 96, 88, 0.2); color: #ffb1ac; }
+.rk-zelle.leer { background: none; color: var(--bc-stumm); font-weight: 500; }
+.rk-zelle.neb { background: repeating-linear-gradient(135deg, rgba(154, 167, 186, 0.12) 0 4px, rgba(154, 167, 186, 0.04) 4px 8px); color: var(--bc-leise); }
+.rk-mx .rk-tz .spalt { box-shadow: 0 0 0 1px var(--bc-gold); }
+
+/* Spielerliste */
+.rk-sl .rk-th, .rk-sl .rk-tz { grid-template-columns: 3em minmax(10em, 1.2fr) minmax(7em, 0.7fr) 5.5em 4.6em 4.2em repeat(4, 3.6em) minmax(11em, 1.7fr) 3.6em; gap: 0.55em; }
+.rk-sl .rk-tz { flex: none; height: 2.3em; max-height: none; }
+.rk-eig { display: grid; grid-template-columns: 3.6em minmax(0, 1fr); gap: 0.5em; align-items: center; }
+.rk-eig b { text-align: right; font-size: 1.08em; }
+.rk-dzw { flex: none; display: flex; gap: 0.25em; padding: 0.45em 0.6em; border-bottom: 1px solid var(--bc-linie); overflow: hidden; }
+.rk-dzw button { flex: 1 1 0; min-width: 0; height: 2.6em; border-radius: 6px; border: 1px solid var(--bc-linie); display: grid; place-items: center; background: var(--bc-flaeche-2); border-top: 3px solid var(--kc, var(--bc-linie-2)); cursor: pointer; color: inherit; padding: 0; }
+.rk-dzw button img { width: 1.7em; height: 1.7em; object-fit: contain; }
+.rk-dzw button.ges { flex: 1.6 1 0; font-weight: 700; font-size: 0.82em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bc-leise); font-family: inherit; }
+.rk-dzw button:hover { background: var(--bc-flaeche-3); }
+.rk-dzw button[aria-pressed="true"] { border-color: var(--bc-gold); background: rgba(240, 195, 90, 0.16); color: var(--bc-gold); }
+.rk-fchip { display: inline-flex; gap: 0.25em; }
+.rk-fchip button { height: 1.9em; padding: 0 0.55em; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--kf) 50%, transparent); color: var(--kf); font: 700 0.82em var(--bc-zahl); letter-spacing: 0.06em; background: none; cursor: pointer; }
+.rk-fchip button[aria-pressed="true"] { background: var(--kf); color: #0b0d12; }
+
+/* Kontext (Profil) */
+.rk-kx { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0.5em; padding: 0.75em; overflow: hidden; }
+.rk-kx .kopf { flex: none; display: flex; gap: 0.7em; align-items: center; }
+.rk-kx .kopf img.gr, .rk-kx .kopf .gr { width: 3.6em; height: 3.6em; border-radius: 0.5em; object-fit: cover; border: 1px solid var(--bc-linie-2); flex: none; }
+.rk-kx .kopf h3 { margin: 0; font: 400 1.45em/1.05 var(--bc-haus); color: #fff; }
+.rk-kx .kopf p { margin: 0.2em 0 0; font-size: 0.88em; color: var(--bc-leise); }
+.rk-kx .po-g { width: 4.6em !important; height: 4.6em !important; border: 2px solid var(--kf, var(--bc-linie-2)) !important; display: grid; place-items: center; background: var(--bc-flaeche-3); color: var(--bc-leise); }
+.rk-kx h4 { margin: 0; font-size: 0.74em; letter-spacing: 0.14em; text-transform: uppercase; color: var(--bc-leise); font-weight: 600; display: flex; gap: 0.5em; align-items: center; }
+.rk-kx h4 span { flex: 1; height: 1px; background: var(--bc-linie); }
+.rk-pap { flex: none; display: grid; gap: 0.3em; }
+.rk-pap .pz { display: grid; grid-template-columns: 3.2em minmax(0, 1fr) 3.3em 1.3em 3.3em 3.4em; gap: 0.45em; align-items: center; }
+.rk-pap .pz.kp { font-size: 0.72em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bc-stumm); font-weight: 600; }
+.rk-pap .ax { font-weight: 700; letter-spacing: 0.06em; }
+.rk-pap .wert { display: grid; grid-template-columns: minmax(0, 1fr) 3.4em; gap: 0.4em; align-items: center; }
+.rk-dli { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 0.22em; overflow: hidden; }
+.rk-dli .dz { flex: 1 1 0; min-height: 1.2em; max-height: 2.3em; font-size: 0.94em; display: grid; grid-template-columns: 1.6em minmax(0, 1fr) 3.2em 3.2em 3.4em; gap: 0.45em; align-items: center; }
+.rk-dli .rgc { height: 1.4em; }
+.rk-dli .dz b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-dli .dz.kp { flex: none; min-height: 0; font-size: 0.72em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bc-stumm); font-weight: 600; }
+.rk-diff { font-weight: 700; text-align: right; white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  .rk { height: auto; min-height: 640px; }
+  .rk-work { grid-template-columns: minmax(0, 1fr); }
+  .rk-tl { overflow: auto; }
+  .rk-mx .rk-th, .rk-mx .rk-tz, .rk-sl .rk-th, .rk-sl .rk-tz { min-width: 920px; }
+}
