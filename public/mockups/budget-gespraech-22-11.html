@@ -330,12 +330,12 @@ const CHARAKTER={antreiber:{name:"Der Antreiber",satz:"Er will Ergebnisse. Ein h
   kaufmann:{name:"Der Kaufmann",satz:"Er wägt ab. Jede Zusage zählt ähnlich."},
   kassenwart:{name:"Der Kassenwart",satz:"Er hütet die Kasse. Vorsicht und ein Gehaltsdeckel überzeugen ihn."}};
 const ZUSAGE_TEXT={deckel:"Gehaltsdeckel (kein Umschichten ins Gehalt)",vertrauen:"Vertrauen einsetzen (−0,25)"};
-/* Beispielannahmen */
-const GEHALT_JE_SPIELER=6.5, KADERZIEL=13, PFLICHT=8, SPIELTAGE=20, ABLOESE_STAMM=20.8, ABLOESE_ERG=10;
+/* Beispielannahmen. Kaderziel je Team = playerOpt aus der Team-Identitaet des Spielstands (kein fester Wert, keine Rotations-Anhebung). */
+const GEHALT_JE_SPIELER=6.5, PFLICHT=8, SPIELTAGE=20, ABLOESE_STAMM=20.8, ABLOESE_ERG=10;
 const TEAMS={
-  "D-P":{name:"Death Peaches",kasse:240,vertrauen:5.7,finanz:3.05,ambition:6.0,sponsor:84,rang:6},
-  "C-C":{name:"Cash Creators",kasse:215,vertrauen:3.76,finanz:9.72,ambition:2.84,sponsor:68,rang:11},
-  "C-S":{name:"Cold Steel",kasse:315,vertrauen:9.0,finanz:8.32,ambition:7.0,sponsor:105,rang:3},
+  "D-P":{name:"Death Peaches",kasse:240,vertrauen:5.7,finanz:3.05,ambition:6.0,sponsor:84,rang:6,ziel:12},
+  "C-C":{name:"Cash Creators",kasse:215,vertrauen:3.76,finanz:9.72,ambition:2.84,sponsor:68,rang:11,ziel:14},
+  "C-S":{name:"Cold Steel",kasse:315,vertrauen:9.0,finanz:8.32,ambition:7.0,sponsor:105,rang:3,ziel:11},
 };
 const P=new URLSearchParams(location.search);
 const Z={team:TEAMS[P.get("team")]?P.get("team"):"D-P",schritt:Math.min(3,Math.max(1,+(P.get("schritt")||1))),
@@ -382,7 +382,7 @@ function toepfe(t,z,a){
   const ok=a.urteil==="zusage", alles=ok&&z.alles;
   const amb=ok&&!z.alles?z.amb:"ziel", rl=ok&&!z.alles?z.rl:"normal";
   let q=a.q0; if(amb==="hoch")q=qHoch(q); if(amb==="tief")q=qTief(q); if(alles)q=1;
-  const zielgehalt=KADERZIEL*GEHALT_JE_SPIELER, basis=Math.max(t.sponsor,zielgehalt);
+  const kz=t.ziel, zielgehalt=kz*GEHALT_JE_SPIELER, basis=Math.max(t.sponsor,zielgehalt);
   const gq=q>=1?1:Math.max(GEHALTS_UNTERGRENZE,q), gehalt0=gq*basis;
   const qr=.05+.2*(Math.min(10,Math.max(1,t.finanz))-1)/9;
   const rlVoll=Math.max(qr*t.kasse,GEHALTS_FAKTOR*zielgehalt);
@@ -401,7 +401,7 @@ function toepfe(t,z,a){
   const zielRang=Math.max(1,t.rang+(alles?-2:amb==="hoch"?-1:amb==="tief"?2:0));
   const folge=alles?{ok:.75,nein:-1}:amb==="hoch"?{ok:.5,nein:-.9}:amb==="tief"?{ok:.3,nein:-.4}:{ok:.5,nein:-.4};
   const sofort=(ok&&z.extra.includes("vertrauen")?-.25:0)+(rl==="mutig"?-.5:0)+(rl==="vorsichtig"?.2:0);
-  return {q,gq,basis,zielgehalt,gehalt0,qr,rlVoll,ruecklage,puffer,angezapft,verfuegbar,transfer0,grenze,maxG,maxT,um,transfer,gehalt,
+  return {q,gq,kz,basis,zielgehalt,gehalt0,qr,rlVoll,ruecklage,puffer,angezapft,verfuegbar,transfer0,grenze,maxG,maxT,um,transfer,gehalt,
     gesperrt:t.kasse-transfer0,vorbehalt:Math.max(0,t.kasse-transfer0-(ruecklage-angezapft)-puffer),nT,nG,kader,zielRang,folge,sofort,alles,amb,rl,ok};
 }
 
@@ -492,7 +492,7 @@ function zeichne(nurZahlen){
           <div class="summe"><span>Transfertopf</span><b class="t">${f1(T.transfer0)} C<small>${f1(T.gesperrt)} C bleiben gesperrt auf dem Konto</small></b></div></div></div>
       <div class="karte"><h3>Gehaltstopf<span class="sp"></span><span class="marke" style="background:var(--gast)">Verträge</span></h3><div class="unter">Tragbar ist das Höhere aus erwartetem Sponsor und Gehalt eines vollen Kaders. Gekürzt wird höchstens auf 75 %.</div>
         <div class="rech"><div><span>Sponsor, erwartet</span><b class="t">${f1(t.sponsor)} C</b></div>
-          <div><span>Zielgehalt<small>${KADERZIEL} Spieler × ${f1(GEHALT_JE_SPIELER)} C</small></span><b class="t">${f1(T.zielgehalt)} C</b></div>
+          <div><span>Zielgehalt<small>${T.kz} Spieler × ${f1(GEHALT_JE_SPIELER)} C</small></span><b class="t">${f1(T.zielgehalt)} C</b></div>
           <div><span>× Gehaltsquote</span><b class="t">${pz(T.gq)}</b></div>
           <div class="summe"><span>Gehaltstopf je Saison</span><b class="t">${f1(T.gehalt0)} C<small>${f2(T.gehalt0/SPIELTAGE)} C je Spieltag</small></b></div></div></div>
       <div class="karte"><h3>Saisonziel</h3><div class="unter">Der Vorstand erwartet einen Rang. Erfüllt bringt Vertrauen, verfehlt kostet Vertrauen. Geld nimmt er nie weg.</div>
@@ -574,8 +574,8 @@ function zeichne(nurZahlen){
       <div class="leg"><span style="--c:var(--gast)">frei für Verträge</span><span style="--c:#3a4254">tragbar wären ${f1(T.basis)} C</span></div></div>
     <div class="eck"><div><span class="gk">Freigabe</span><strong class="t">${pz(T.q)}</strong></div><div><span class="gk">Zielrang</span><strong class="t">${T.zielRang}.</strong></div><div><span class="gk">Rücklage</span><strong class="t">${f1(T.ruecklage-T.angezapft)} C</strong></div></div>
     <div class="kader"><span class="gk">Kader-Ausblick · Beispielpreise</span>
-      <div class="plaetze">${Array.from({length:14},(_,i)=>`<i class="${i<T.kader?"voll":""}${i<PFLICHT?" pflicht":""}${i===KADERZIEL-1?" ziel":""}"></i>`).join("")}</div>
-      <p>Reicht für etwa <b class="t" style="color:var(--tinte)">${T.kader} Spieler</b> (Pflicht ${PFLICHT}, Ziel ${KADERZIEL}). Es bindet der <b style="color:${T.nT<T.nG?"var(--heim)":"var(--gast)"}">${T.nT<T.nG?"Transfertopf":"Gehaltstopf"}</b>: Ablösen für ${f1(T.nT)}, Gehälter für ${f1(T.nG)} Spieler.${T.kader<PFLICHT?` <b style="color:var(--gut)">Der Pflichtkader von ${PFLICHT} ist trotzdem frei.</b>`:""}</p></div>
+      <div class="plaetze">${Array.from({length:14},(_,i)=>`<i class="${i<T.kader?"voll":""}${i<PFLICHT?" pflicht":""}${i===T.kz-1?" ziel":""}"></i>`).join("")}</div>
+      <p>Reicht für etwa <b class="t" style="color:var(--tinte)">${T.kader} Spieler</b> (Pflicht ${PFLICHT}, Ziel ${T.kz}). Es bindet der <b style="color:${T.nT<T.nG?"var(--heim)":"var(--gast)"}">${T.nT<T.nG?"Transfertopf":"Gehaltstopf"}</b>: Ablösen für ${f1(T.nT)}, Gehälter für ${f1(T.nG)} Spieler.${T.kader<PFLICHT?` <b style="color:var(--gut)">Der Pflichtkader von ${PFLICHT} ist trotzdem frei.</b>`:""}</p></div>
     <div class="gegen-v"><span class="gk">Gegenüber dem Vorschlag des Vorstands</span>
       <div><span>Transfertopf</span><b class="t ${dl(T.transfer-V0.transfer)}">${dv(T.transfer-V0.transfer)} C</b></div>
       <div><span>Gehaltstopf je Saison</span><b class="t ${dl(T.gehalt-V0.gehalt)}">${dv(T.gehalt-V0.gehalt)} C</b></div>
