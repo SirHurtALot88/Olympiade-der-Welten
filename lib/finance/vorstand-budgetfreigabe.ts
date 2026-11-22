@@ -37,7 +37,7 @@
  */
 
 import type { GameState, VorstandBudgetZustand } from "@/lib/data/olyDataTypes";
-import { istJeSpieltagSaison, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
+import { spieltagBuchungenNochOffen, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
 import { berechneKiRuecklage, KI_RUECKLAGE_GEHALTS_FAKTOR } from "@/lib/finance/ki-ruecklage";
 import { erwarteterSponsorFuerPlanung } from "@/lib/finance/sponsor-erwartung";
@@ -355,7 +355,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   // FINANZEN JE SPIELTAG (22.11.): Gehalt, Sponsor-Basis und Gebaeude-Betrieb laufen je Spieltag ueber die Kasse. Sie sind
   // keine Transfer-Ausgabe und duerfen die Freigabe der Saison nicht Spieltag fuer Spieltag schrumpfen: die Quote rechnet
   // weiter auf die Kasse VOR diesen Buchungen, die harte Grenze `min(cash, ...)` unten schuetzt die echte Kasse.
-  const jeSpieltagGebucht = istJeSpieltagSaison(gameState) ? summeSpieltagBuchungen(gameState, teamId).cashDelta : 0;
+  const jeSpieltagGebucht = spieltagBuchungenNochOffen(gameState, teamId) ? summeSpieltagBuchungen(gameState, teamId).cashDelta : 0;
   const anfangskasse = cash + kaeufe + gebaeude - verkaeufe - jeSpieltagGebucht;
   const ausgegebenTransfer = kaeufe + gebaeude;
 

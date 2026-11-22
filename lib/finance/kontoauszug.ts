@@ -24,6 +24,8 @@ export type KontoauszugArt =
   | "gehalt_und_sponsor_saisonende"
   | "gehalt_spieltag"
   | "sponsor_basis_spieltag"
+  | "rang_abschlag_spieltag"
+  | "rang_schlussausgleich"
   | "gebaeude_einnahme_spieltag"
   | "gebaeude_unterhalt_spieltag"
   | "apron"
@@ -102,7 +104,18 @@ export function buildKontoauszuege(gameState: GameState, seasonId?: string | nul
   }
 
   // 2) Sponsor- und Gehaltszeilen (Auszahlungslog; die Saisonende-Zeilen enthalten auch den Gehaltsabzug).
+  const hatRangAbschlaege = new Set(
+    (gameState.seasonState.spieltagFinanzen ?? []).filter((b) => (b.rangAbschlag ?? 0) !== 0).map((b) => `${b.seasonId}:${b.teamId}`),
+  );
   for (const l of gameState.seasonState.sponsorPayoutLogs ?? []) {
+    // RANG-ABSCHLAG (22.11.): die Zeile "Tabellenplatz" ist in Saisons mit Abschlaegen der Schlussausgleich.
+    if (l.phase === "season_end" && (l.componentId ?? "").endsWith(":v3:rank") && hatRangAbschlaege.has(`${l.seasonId}:${l.teamId}`)) {
+      add(l.teamId, {
+        seasonId: l.seasonId, matchdayId: null, phase: "saisonende", art: "rang_schlussausgleich",
+        quelle: "sponsorPayoutLogs", text: "Rangprämie Schlussausgleich", betrag: l.cashDelta, zeit: l.createdAt,
+      });
+      continue;
+    }
     add(l.teamId, {
       seasonId: l.seasonId, matchdayId: null, phase: l.phase === "season_end" ? "saisonende" : "unbekannt",
       art: l.phase === "season_end" ? "gehalt_und_sponsor_saisonende" : "sponsor",
@@ -116,6 +129,11 @@ export function buildKontoauszuege(gameState: GameState, seasonId?: string | nul
     const basis = { seasonId: b.seasonId, matchdayId: b.matchdayId, phase: "saison" as const, quelle: "spieltagFinanzen", zeit: b.createdAt };
     add(b.teamId, { ...basis, art: "gehalt_spieltag", text: `Gehalt Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.gehalt });
     add(b.teamId, { ...basis, art: "sponsor_basis_spieltag", text: `Sponsor-Basis Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.sponsorBasis });
+    add(b.teamId, {
+      ...basis, art: "rang_abschlag_spieltag",
+      text: `Rangprämie Abschlag Spieltag ${b.matchdayIndex}/${b.matchdayCount}${b.rang != null ? ` (Platz ${b.rang})` : ""}`,
+      betrag: b.rangAbschlag ?? 0,
+    });
     add(b.teamId, { ...basis, art: "gebaeude_einnahme_spieltag", text: `Gebäude-Einnahme Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.gebaeudeEinnahme });
     add(b.teamId, { ...basis, art: "gebaeude_unterhalt_spieltag", text: `Gebäude-Unterhalt Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.gebaeudeUnterhalt });
   }

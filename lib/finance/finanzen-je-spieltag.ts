@@ -10,6 +10,8 @@
  *   sponsorBasis       die garantierte Saisonbasis des Sponsorvertrags (Rang und Sonderziel bleiben am Saisonende)
  *   gebaeudeEinnahme   Fan-Shop und Arena (Saisoneinnahme / N)
  *   gebaeudeUnterhalt  Unterhalt der gebauten Gebaeude (Saisonunterhalt / N)
+ *   rangAbschlag       (Chris, 22.11.) Vorschuss auf die Rangpraemie: 0,8 x (Leiter(Platz) - Sockel) / N; der Schlussausgleich
+ *                      am Saisonende bucht Rangpraemie(Endrang) minus Summe der Abschlaege (darf negativ sein)
  *
  * DIESE DATEI IST CLIENT-SICHER (kein node:fs/crypto, keine Sponsor- und Gebaeude-Dienste): sie haelt den Stempel,
  * das Ledger-Lesen und die Anteilsrechnung. Das SCHREIBEN der Buchung liegt in `finanzen-je-spieltag-buchung.ts`.
@@ -31,6 +33,8 @@ export type SpieltagTeilsummen = {
   sponsorBasis: number;
   gebaeudeEinnahme: number;
   gebaeudeUnterhalt: number;
+  /** Summe der Rang-Abschlaege auf die Sponsor-Rangpraemie (22.11.). */
+  rangAbschlag: number;
   cashDelta: number;
   /** Anzahl gebuchter Spieltage dieses Teams in der Saison. */
   anzahl: number;
@@ -101,12 +105,13 @@ export function summeSpieltagBuchungen(
   teamId: string,
   seasonId?: string,
 ): SpieltagTeilsummen {
-  const out: SpieltagTeilsummen = { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, cashDelta: 0, anzahl: 0 };
+  const out: SpieltagTeilsummen = { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, rangAbschlag: 0, cashDelta: 0, anzahl: 0 };
   for (const b of spieltagBuchungenDerSaison(gameState, teamId, seasonId)) {
     out.gehalt += b.gehalt;
     out.sponsorBasis += b.sponsorBasis;
     out.gebaeudeEinnahme += b.gebaeudeEinnahme;
     out.gebaeudeUnterhalt += b.gebaeudeUnterhalt;
+    out.rangAbschlag += b.rangAbschlag ?? 0;
     out.cashDelta += b.cashDelta;
     out.anzahl += 1;
   }
@@ -115,9 +120,41 @@ export function summeSpieltagBuchungen(
     sponsorBasis: runde1(out.sponsorBasis),
     gebaeudeEinnahme: runde1(out.gebaeudeEinnahme),
     gebaeudeUnterhalt: runde1(out.gebaeudeUnterhalt),
+    rangAbschlag: runde1(out.rangAbschlag),
     cashDelta: runde1(out.cashDelta),
     anzahl: out.anzahl,
   };
+}
+
+/**
+ * Die Kasse, nach der KI-Entscheidungen mitten in der Saison urteilen (Chris, 22.11.): die Kasse VOR den Spieltagsbuchungen,
+ * `kasse - Summe der Ledger-cashDelta` (dieselbe Rechnung wie `anfangskasse` des Vorstands). Im Altmodus rutschte die Kasse
+ * mitten in der Saison nie um Gehalt, Basis und Gebaeude; ohne diese Rueckrechnung wuerde die KI-Verlaengerung durch die
+ * niedrigere Zwischenkasse zurueckhaltender. Die harte Grenze bleibt die echte Kasse (Vorstands-Freigabe, Kauf-Pruefung).
+ * Ohne Stempel, ohne Buchung oder fuer ein Team ohne Ledger: die echte Kasse, unveraendert.
+ */
+export function kasseVorSpieltagsbuchungen(
+  gameState: Pick<GameState, "season" | "seasonState">,
+  teamId: string,
+  kasse: number,
+): number {
+  if (!spieltagBuchungenNochOffen(gameState, teamId)) return kasse;
+  const gebucht = summeSpieltagBuchungen(gameState, teamId).cashDelta;
+  return gebucht === 0 ? kasse : runde1(kasse - gebucht);
+}
+
+/**
+ * Stehen die Spieltagsbuchungen dieses Teams noch "offen" gegen die Saisonabrechnung? Ja, solange die Saison im Modus je
+ * Spieltag laeuft und die Saisonende-Abrechnung des Teams (Marke `season_end` im Sponsor-Log) noch nicht gebucht ist. Danach
+ * enthaelt die Kasse schon alles, was der Altmodus am Saisonende gebucht haette (Rang-Schlussausgleich und Basis-Rest
+ * gleichen das Ledger aus); eine Rueckrechnung um das Ledger waere dann doppelt.
+ */
+export function spieltagBuchungenNochOffen(gameState: Pick<GameState, "season" | "seasonState">, teamId: string): boolean {
+  if (!istJeSpieltagSaison(gameState)) return false;
+  const seasonId = gameState.seasonState.seasonId ?? gameState.season?.id;
+  return !(gameState.seasonState.sponsorPayoutLogs ?? []).some(
+    (log) => log.seasonId === seasonId && log.teamId === teamId && log.phase === "season_end",
+  );
 }
 
 /** Anteil der Saison, der noch NICHT je Spieltag gebucht ist (0 im Normalfall; 1 vor Spieltag 1). */

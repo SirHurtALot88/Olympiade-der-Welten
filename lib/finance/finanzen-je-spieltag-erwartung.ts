@@ -6,13 +6,15 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { computeFacilitySeasonCash } from "@/lib/finance/season-end-guv";
 import { kaderJahresgehaltAmSpieltag, spieltageDerSaison } from "@/lib/finance/finanzen-je-spieltag";
-import { sponsorBasisJahr } from "@/lib/sponsor/sponsor-settlement-service";
+import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
 
 export type ErwarteteSpieltagBuchung = {
   gehalt: number;
   sponsorBasis: number;
   gebaeudeEinnahme: number;
   gebaeudeUnterhalt: number;
+  /** Rang-Abschlag beim aktuellen Tabellenplatz (22.11.). */
+  rangAbschlag: number;
   netto: number;
 };
 
@@ -25,5 +27,10 @@ export function erwarteteSpieltagBuchung(gameState: GameState, teamId: string): 
   const sponsorBasis = teil(sponsorBasisJahr(gameState, teamId));
   const gebaeudeEinnahme = teil(gebaeude.income);
   const gebaeudeUnterhalt = -teil(gebaeude.paidUpkeep);
-  return { gehalt, sponsorBasis, gebaeudeEinnahme, gebaeudeUnterhalt, netto: gehalt + sponsorBasis + gebaeudeEinnahme + gebaeudeUnterhalt };
+  // Offene Spieltage laufen mit dem aktuellen Platz weiter (gleiche Rechnung wie die Buchung).
+  const rangAbschlag = sponsorRangAbschlag(gameState, teamId, sponsorRangFuerAbschlag(gameState, teamId), n).abschlag;
+  return {
+    gehalt, sponsorBasis, gebaeudeEinnahme, gebaeudeUnterhalt, rangAbschlag,
+    netto: gehalt + sponsorBasis + gebaeudeEinnahme + gebaeudeUnterhalt + rangAbschlag,
+  };
 }

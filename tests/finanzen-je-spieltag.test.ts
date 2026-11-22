@@ -10,10 +10,17 @@ import {
   summeSpieltagBuchungen,
   teileJahresbetrag,
 } from "@/lib/finance/finanzen-je-spieltag";
+import { kasseVorSpieltagsbuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { bucheSpieltagFinanzen } from "@/lib/finance/finanzen-je-spieltag-buchung";
 import { erwarteteSpieltagBuchung } from "@/lib/finance/finanzen-je-spieltag-erwartung";
 import { berechneGebaeudeSaisonbetraege } from "@/lib/facilities/facility-season-end-service";
-import { applySponsorSettlement, getSeasonSponsorCashByTeam, sponsorBasisJahr } from "@/lib/sponsor/sponsor-settlement-service";
+import {
+  applySponsorSettlement,
+  getSeasonSponsorCashByTeam,
+  previewSponsorSettlement,
+  sponsorBasisJahr,
+  sponsorRangAbschlag,
+} from "@/lib/sponsor/sponsor-settlement-service";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 import { berechneVorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 
@@ -345,5 +352,135 @@ describe("Sonderfaelle", () => {
     // Freigegebene Gesamtsumme des Transfertopfs ist unveraendert (die harte Grenze ist die echte Kasse).
     expect(standNeu.freigegebenGesamt).toBeCloseTo(standAlt.freigegebenGesamt, 6);
     expect(standNeu.nochFrei).toBeLessThanOrEqual(standAlt.nochFrei + 1e-9);
+  });
+});
+
+
+/* ================================================================ Rang-Abschlag (Chris, 22.11.) */
+
+/** Setzt den Tabellenplatz eines Teams (nur das Feld, das der Sponsor-Rang liest). */
+function mitPlatz(gameState: GameState, teamId: string, rank: number): GameState {
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      standings: { ...(gameState.seasonState.standings ?? {}), [teamId]: { teamId, rank, points: 10 } as never },
+    },
+  };
+}
+
+const rangZeile = (gs: GameState) =>
+  previewSponsorSettlement(gs, "season_end").rows.find((r) => r.teamId === TEAM && r.kind === "rank")!.cashDelta;
+
+describe("Rang-Abschlag je Spieltag", () => {
+  it("Abschlag = 0,8 x (Leiter(Platz) - Sockel) / N, mit Platz in der Zeile, gleich fuer jeden Spieltag bei gleichem Platz", () => {
+    const { neu } = fixture();
+    const gs = buchAlle(mitPlatz(neu, TEAM, 2), 3);
+    const n = neu.season.matchdayIds.length;
+    const { praemie, abschlag } = sponsorRangAbschlag(gs, TEAM, 2, n);
+    expect(praemie).toBeGreaterThan(0);
+    expect(Math.abs(abschlag - (0.8 * praemie) / n)).toBeLessThanOrEqual(0.05);
+    const zeilen = (gs.seasonState.spieltagFinanzen ?? []).filter((z) => z.teamId === TEAM);
+    expect(zeilen).toHaveLength(3);
+    for (const z of zeilen) {
+      expect(z.rangAbschlag).toBe(abschlag);
+      expect(z.rang).toBe(2);
+    }
+    // Kasse = Summe der Buchungen bleibt exakt, der Abschlag steckt in cashDelta.
+    const z = zeilen[0]!;
+    expect(z.cashDelta).toBeCloseTo(z.gehalt + z.sponsorBasis + z.gebaeudeEinnahme + z.gebaeudeUnterhalt + abschlag, 6);
+    expect(summeSpieltagBuchungen(gs, TEAM).rangAbschlag).toBeCloseTo(3 * abschlag, 6);
+  });
+
+  it("offene Spieltage rechnen mit dem aktuellen Platz weiter: die Erwartung traegt den Abschlag", () => {
+    const { neu } = fixture();
+    const gs = mitPlatz(neu, TEAM, 2);
+    const n = neu.season.matchdayIds.length;
+    const erw = erwarteteSpieltagBuchung(gs, TEAM);
+    expect(Math.abs(erw.rangAbschlag - sponsorRangAbschlag(gs, TEAM, 2, n).abschlag)).toBeLessThanOrEqual(0.05);
+    expect(erw.netto).toBeCloseTo(erw.gehalt + erw.sponsorBasis + erw.gebaeudeEinnahme + erw.gebaeudeUnterhalt + erw.rangAbschlag, 9);
+  });
+
+  it("Schlussausgleich positiv: Platz verbessert sich, Summe Abschlaege + Ausgleich = Praemie(Endrang) exakt", () => {
+    const { neu } = fixture();
+    let gs = buchAlle(mitPlatz(neu, TEAM, 20), 10);
+    gs = buchAlle(mitPlatz(gs, TEAM, 5), undefined);
+    gs = mitPlatz(gs, TEAM, 1);
+    const praemie = rangZeile(gs);
+    const abschlaege = summeSpieltagBuchungen(gs, TEAM).rangAbschlag;
+    const ende = applySponsorSettlement({ gameState: gs, saveId: "t", execute: true, deductSalary: true }).gameState;
+    const log = (ende.seasonState.sponsorPayoutLogs ?? []).find((l) => l.teamId === TEAM && (l.componentId ?? "").endsWith(":v3:rank"))!;
+    expect(log.cashDelta).toBeGreaterThan(0);
+    expect(Math.round((abschlaege + log.cashDelta) * 10) / 10).toBe(praemie);
+    // Der Kontoauszug nennt die Zeile "Rangpraemie Schlussausgleich".
+    const konto = buildKontoauszuege(ende, ende.season.id).get(TEAM)!;
+    expect(konto.zeilen.some((z) => z.art === "rang_schlussausgleich" && z.text === "Rangprämie Schlussausgleich")).toBe(true);
+    expect(konto.zeilen.filter((z) => z.art === "rang_abschlag_spieltag")).toHaveLength(ende.season.matchdayIds.length);
+    expect(konto.zeilen.find((z) => z.art === "rang_abschlag_spieltag")!.text).toMatch(/^Rangprämie Abschlag Spieltag 1\/\d+ \(Platz 20\)$/);
+  });
+
+  it("Schlussausgleich negativ: Platz faellt ab, der Ausgleich zieht von der Kasse ab, die Summe stimmt weiter", () => {
+    const { neu } = fixture();
+    let gs = buchAlle(mitPlatz(neu, TEAM, 1));
+    gs = mitPlatz(gs, TEAM, 32);
+    const praemie = rangZeile(gs);
+    const abschlaege = summeSpieltagBuchungen(gs, TEAM).rangAbschlag;
+    expect(abschlaege).toBeGreaterThan(praemie);
+    const vorher = cashVon(gs, TEAM);
+    const ende = applySponsorSettlement({ gameState: gs, saveId: "t", execute: true, deductSalary: true }).gameState;
+    const log = (ende.seasonState.sponsorPayoutLogs ?? []).find((l) => l.teamId === TEAM && (l.componentId ?? "").endsWith(":v3:rank"))!;
+    expect(log.cashDelta).toBeLessThan(0);
+    expect(Math.round((abschlaege + log.cashDelta) * 10) / 10).toBe(praemie);
+    expect(cashVon(ende, TEAM)).toBeLessThan(vorher + 1e-9 + 100);
+    // Sponsor der Saison (Logs + Ledger) enthaelt die Praemie genau einmal.
+    const sponsor = getSeasonSponsorCashByTeam(ende).get(TEAM) ?? 0;
+    const vorschau = getSeasonSponsorCashByTeam(gs).get(TEAM) ?? 0;
+    expect(Math.abs(sponsor - vorschau)).toBeLessThanOrEqual(0.15);
+  });
+
+  it("Endkasse bleibt gleich dem Altmodus, auch mit wechselnden Plaetzen (Abschlag + Ausgleich = Praemie)", () => {
+    const { alt, neu } = fixture();
+    const endPlatz = 7;
+    const altEnde = applySponsorSettlement({ gameState: mitPlatz(alt, TEAM, endPlatz), saveId: "t", execute: true, deductSalary: true }).gameState;
+    let gs = buchAlle(mitPlatz(neu, TEAM, 3), 12);
+    gs = buchAlle(mitPlatz(gs, TEAM, 11));
+    const neuEnde = applySponsorSettlement({ gameState: mitPlatz(gs, TEAM, endPlatz), saveId: "t", execute: true, deductSalary: true }).gameState;
+    const geb = berechneGebaeudeSaisonbetraege(alt, TEAM);
+    const altKasse = cashVon(altEnde, TEAM) + geb.income - geb.upkeep;
+    expect(Math.abs(cashVon(neuEnde, TEAM) - altKasse)).toBeLessThanOrEqual(0.15);
+  });
+
+  it("Ruckweg und Pause: ohne Stempel kein Abschlag, die Saisonpause bucht keinen", () => {
+    const { alt, neu } = fixture();
+    const ohne = bucheSpieltagFinanzen(mitPlatz(alt, TEAM, 2), alt.season.matchdayIds[0]!);
+    expect(ohne.seasonState.spieltagFinanzen ?? []).toHaveLength(0);
+    const pause = bucheSpieltagFinanzen(mitPlatz(neu, TEAM, 2), "pause-nach-spieltag-10");
+    expect(pause.seasonState.spieltagFinanzen ?? []).toHaveLength(0);
+    // Im Altmodus bucht das Saisonende die volle Rangpraemie (kein Ledger, kein Ausgleich).
+    const praemie = rangZeile(mitPlatz(alt, TEAM, 2));
+    const ende = applySponsorSettlement({ gameState: mitPlatz(alt, TEAM, 2), saveId: "t", execute: true, deductSalary: true }).gameState;
+    const log = (ende.seasonState.sponsorPayoutLogs ?? []).find((l) => l.teamId === TEAM && (l.componentId ?? "").endsWith(":v3:rank"))!;
+    expect(log.cashDelta).toBe(praemie);
+  });
+
+  it("ohne Sponsorvertrag kein Abschlag", () => {
+    const { neu } = fixture();
+    const gs = buchAlle(neu, 1);
+    const anderes = neu.teams[3]!.teamId;
+    expect(gs.seasonState.spieltagFinanzen!.find((z) => z.teamId === anderes)!.rangAbschlag).toBe(0);
+  });
+});
+
+describe("Kasse fuer KI-Entscheidungen (Verlaengerung)", () => {
+  it("mitten in der Saison die Kasse vor den Spieltagsbuchungen, nach der Saisonabrechnung die echte Kasse", () => {
+    const { neu } = fixture();
+    const gs = buchAlle(mitPlatz(neu, TEAM, 2), 5);
+    const L = summeSpieltagBuchungen(gs, TEAM).cashDelta;
+    expect(L).not.toBe(0);
+    expect(kasseVorSpieltagsbuchungen(gs, TEAM, cashVon(gs, TEAM))).toBeCloseTo(cashVon(gs, TEAM) - L, 6);
+    const ende = applySponsorSettlement({ gameState: buchAlle(gs), saveId: "t", execute: true, deductSalary: true }).gameState;
+    expect(kasseVorSpieltagsbuchungen(ende, TEAM, cashVon(ende, TEAM))).toBe(cashVon(ende, TEAM));
+    // ohne Stempel immer die echte Kasse
+    expect(kasseVorSpieltagsbuchungen(fixture().alt, TEAM, 12.3)).toBe(12.3);
   });
 });

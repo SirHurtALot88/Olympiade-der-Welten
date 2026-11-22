@@ -1977,6 +1977,14 @@ export type SpieltagFinanzBuchung = {
   sponsorBasis: number;
   gebaeudeEinnahme: number;
   gebaeudeUnterhalt: number;
+  /**
+   * RANG-ABSCHLAG (Chris, 22.11.): Vorschuss auf die Sponsor-Rangpraemie, 0,8 x (Leiter(Platz nach diesem Spieltag) - Sockel) / N.
+   * Fehlt in Zeilen, die vor dieser Regel gebucht wurden (dann 0). Der Schlussausgleich am Saisonende bucht
+   * Rangpraemie(Endrang) - Summe dieser Abschlaege.
+   */
+  rangAbschlag?: number;
+  /** Tabellenplatz, nach dem der Abschlag berechnet wurde (Anzeige: "Platz x"). */
+  rang?: number | null;
   cashDelta: number;
   rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number };
   createdAt: string;

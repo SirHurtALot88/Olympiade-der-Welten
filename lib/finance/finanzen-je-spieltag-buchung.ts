@@ -1,6 +1,7 @@
 /**
  * FINANZEN JE SPIELTAG — die BUCHUNG (22.11., docs/design/finanzen-je-spieltag-22-11.md).
  *
+ * Vier Fluesse plus (22.11.) der Rang-Abschlag auf die Sponsor-Rangpraemie.
  * Laeuft beim Spieltagsabschluss (`lib/season/matchday-progress-service.ts`), nach dem gespielten Spieltag, fuer ALLE
  * Teams gleich — Mensch, KI und delegierte Teams (kein Zweig nach Besitzer). Gebucht wird nur in einer Saison mit
  * Stempel (`istJeSpieltagSaison`), sonst gibt die Funktion den Spielstand unveraendert zurueck.
@@ -20,7 +21,7 @@ import {
   spieltageDerSaison,
   teileJahresbetrag,
 } from "@/lib/finance/finanzen-je-spieltag";
-import { sponsorBasisJahr } from "@/lib/sponsor/sponsor-settlement-service";
+import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
 
 export function spieltagBuchungsId(seasonId: string, matchdayId: string, teamId: string): string {
   return `spieltag-finanz:${seasonId}:${matchdayId}:${teamId}`;
@@ -73,7 +74,11 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
     const sponsor = teileJahresbetrag(j.sponsorBasis, n, rest0.sponsorBasis);
     const einnahme = teileJahresbetrag(j.gebaeudeEinnahme, n, rest0.gebaeudeEinnahme);
     const unterhalt = teileJahresbetrag(j.gebaeudeUnterhalt, n, rest0.gebaeudeUnterhalt);
-    const delta = runde1(-gehalt.betrag + sponsor.betrag + einnahme.betrag - unterhalt.betrag);
+    // RANG-ABSCHLAG (Chris, 22.11.): 80 % der Rangpraemie bei heutigem Tabellenplatz, zu 1/N. Der Schlussausgleich am
+    // Saisonende bucht Endrang-Praemie minus Summe der Abschlaege. Ohne Sponsorvertrag 0.
+    const rang = sponsorRangFuerAbschlag(gameState, team.teamId);
+    const rangAbschlag = sponsorRangAbschlag(gameState, team.teamId, rang, n).abschlag;
+    const delta = runde1(-gehalt.betrag + sponsor.betrag + einnahme.betrag - unterhalt.betrag + rangAbschlag);
     neue.push({
       id: spieltagBuchungsId(seasonId, matchdayId, team.teamId),
       seasonId,
@@ -85,6 +90,8 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
       sponsorBasis: sponsor.betrag,
       gebaeudeEinnahme: einnahme.betrag,
       gebaeudeUnterhalt: unterhalt.betrag === 0 ? 0 : -unterhalt.betrag,
+      rangAbschlag,
+      rang: rangAbschlag === 0 ? null : rang,
       cashDelta: delta,
       rest: { gehalt: gehalt.rest, sponsorBasis: sponsor.rest, gebaeudeEinnahme: einnahme.rest, gebaeudeUnterhalt: unterhalt.rest },
       createdAt: jetzt,

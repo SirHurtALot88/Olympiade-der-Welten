@@ -364,7 +364,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const spieltagZeilen = (gameState.seasonState.spieltagFinanzen ?? []).filter((z) => z.seasonId === seasonId && z.teamId === teamId);
       const sponsorCashIn = round(
         teamSponsorLogs.filter((log) => log.cashDelta > 0).reduce((sum, log) => sum + log.cashDelta, 0) +
-          spieltagZeilen.reduce((sum, z) => sum + z.sponsorBasis, 0),
+          spieltagZeilen.reduce((sum, z) => sum + z.sponsorBasis + (z.rangAbschlag ?? 0), 0),
       );
       const salaryPaidOut = round(
         Math.abs(teamSponsorLogs.filter((log) => log.cashDelta < 0).reduce((sum, log) => sum + log.cashDelta, 0)) +

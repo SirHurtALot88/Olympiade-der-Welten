@@ -177,7 +177,19 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     basisJeSpieltag > 0
       ? [{ kind: "base" as SponsorOfferComponentKind, label: `${getSponsorComponentKindLabel("base")} (je Spieltag gebucht)`, rewardCash: round1(basisJeSpieltag) }]
       : [];
-  const sponsorComponents = [...basisKomponenteJeSpieltag, ...gebuchteKomponenten, ...projizierteKomponenten];
+  // Rang-Abschlaege (22.11.): nach der Abrechnung steht der Schlussausgleich in den Logs, die Abschlaege im Ledger.
+  const rangAbschlaegeJeSpieltag =
+    istJeSpieltagSaison(gameState) &&
+    (gameState.seasonState.sponsorPayoutLogs ?? []).some(
+      (log) => log.seasonId === gameState.season.id && log.teamId === teamId && log.phase === "season_end",
+    )
+      ? summeSpieltagBuchungen(gameState, teamId).rangAbschlag
+      : 0;
+  const rangKomponenteJeSpieltag =
+    rangAbschlaegeJeSpieltag !== 0
+      ? [{ kind: "rank" as SponsorOfferComponentKind, label: `${getSponsorComponentKindLabel("rank")} (Abschläge je Spieltag)`, rewardCash: round1(rangAbschlaegeJeSpieltag) }]
+      : [];
+  const sponsorComponents = [...basisKomponenteJeSpieltag, ...rangKomponenteJeSpieltag, ...gebuchteKomponenten, ...projizierteKomponenten];
   // DIE EINE Sponsor-Einnahme dieser Saison — dieselbe Zahl wie im Saisonstand und in der GuV.
   const sponsorTotal = round1(getSeasonSponsorCashByTeam(gameState).get(teamId) ?? 0);
   // Der Schätz-Proxy greift NUR noch, wenn es überhaupt keine Sponsor-Buchung und keinen Vertrag
