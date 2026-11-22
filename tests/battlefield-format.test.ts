@@ -35,7 +35,7 @@ afterEach(() => {
   else process.env.NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT = alt.browser;
 });
 
-describe("Climbing-Format: Schalter", () => {
+describe("Battlefield-Format: Schalter", () => {
   it("Vorgabe ist domination5; 'orte3'/'alt' schaltet ab", () => {
     delete process.env.OLY_BATTLEFIELD_FORMAT;
     delete process.env.NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT;
@@ -49,7 +49,7 @@ describe("Climbing-Format: Schalter", () => {
   });
 });
 
-describe("Climbing-Format: Stempel beim Laden", () => {
+describe("Battlefield-Format: Stempel beim Laden", () => {
   it("neue Saison: ganze Saison Fuenf Punkte", () => {
     delete process.env.OLY_BATTLEFIELD_FORMAT;
     const g = stempleBattlefieldFormat(spielstand([])) as unknown as { seasonState: { battlefieldFormat: unknown } };
@@ -140,5 +140,50 @@ describe("Battlefield-Referenz je Format", () => {
     }
     // k=2: 78 (fuenf Punkte) gegen 104 (Gefecht je Ort)
     expect(resolveBattlefieldPodMargeReferenz(2)!.m90).not.toBe(resolveBattlefieldPodMargeReferenz(2, "orte3")!.m90);
+  });
+});
+
+describe("Battlefield-Format: mehrere Spieltage ohne Neuladen (Review 22.11.)", () => {
+  // Das Buchen schreibt den Stempel VOR dem Ergebnis fest (legacy-matchday-result-apply-service.ts). Hier derselbe Ablauf
+  // in einem Prozess, ohne dass der Spielstand zwischendurch durch die Lade-Migration geht.
+  function buche(g: any, id: string) {
+    const gestempelt: any = stempleBattlefieldFormat(g);
+    return {
+      ...gestempelt,
+      seasonState: {
+        ...gestempelt.seasonState,
+        matchdayResults: [...gestempelt.seasonState.matchdayResults, { seasonId: "s1", matchdayId: id }],
+      },
+    };
+  }
+
+  it("Saisonwechsel + Spieltag 1 + 2 ohne Neuladen: die gebuchten Spieltage bleiben im neuen Format", () => {
+    delete process.env.OLY_BATTLEFIELD_FORMAT;
+    delete process.env.NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT;
+    let g: any = spielstand([]);
+    g = buche(g, "md-1");
+    g = buche(g, "md-2");
+    // Die Lade-Migration (Neuladen) aendert danach nichts mehr.
+    const geladen: any = stempleBattlefieldFormat(g);
+    expect(geladen.seasonState.battlefieldFormat).toEqual({ seasonId: "s1", wechsel: [{ ab: null, format: "domination5" }] });
+    for (const id of IDS) expect(battlefieldFormatFuer(geladen, id)).toBe("domination5");
+  });
+
+  it("ohne das Festschreiben waere es falsch gewesen (Beleg fuer den Rueckfall)", () => {
+    delete process.env.OLY_BATTLEFIELD_FORMAT;
+    delete process.env.NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT;
+    const ungestempelt = spielstand(["md-1", "md-2"]);
+    expect(battlefieldFormatFuer(ungestempelt, "md-1")).toBe("orte3");
+  });
+
+  it("Schalter dazwischen: gebuchte Spieltage behalten ihr Format, der naechste folgt dem Schalter", () => {
+    delete process.env.OLY_BATTLEFIELD_FORMAT;
+    delete process.env.NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT;
+    let g: any = spielstand([]);
+    g = buche(g, "md-1");
+    g = buche(g, "md-2");
+    process.env.OLY_BATTLEFIELD_FORMAT = "orte3";
+    g = buche(g, "md-3");
+    expect(["md-1", "md-2", "md-3", "md-4"].map((id) => battlefieldFormatFuer(g, id))).toEqual(["domination5", "domination5", "orte3", "orte3"]);
   });
 });

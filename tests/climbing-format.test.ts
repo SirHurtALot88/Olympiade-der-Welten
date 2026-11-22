@@ -127,3 +127,48 @@ describe("Climbing-Format: Stempel beim Laden", () => {
     expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-2", "climbing")).toEqual({ climbing: "canyon" });
   });
 });
+
+describe("Climbing-Format: mehrere Spieltage ohne Neuladen (Review 22.11.)", () => {
+  // Das Buchen schreibt den Stempel VOR dem Ergebnis fest (legacy-matchday-result-apply-service.ts). Hier derselbe Ablauf
+  // in einem Prozess, ohne dass der Spielstand zwischendurch durch die Lade-Migration geht.
+  function buche(g: any, id: string) {
+    const gestempelt: any = stempleClimbingFormat(g);
+    return {
+      ...gestempelt,
+      seasonState: {
+        ...gestempelt.seasonState,
+        matchdayResults: [...gestempelt.seasonState.matchdayResults, { seasonId: "s1", matchdayId: id }],
+      },
+    };
+  }
+
+  it("Saisonwechsel + Spieltag 1 + 2 ohne Neuladen: die gebuchten Spieltage bleiben im neuen Format", () => {
+    delete process.env.OLY_CLIMBING_FORMAT;
+    delete process.env.NEXT_PUBLIC_OLY_CLIMBING_FORMAT;
+    let g: any = spielstand([]);
+    g = buche(g, "md-1");
+    g = buche(g, "md-2");
+    // Die Lade-Migration (Neuladen) aendert danach nichts mehr.
+    const geladen: any = stempleClimbingFormat(g);
+    expect(geladen.seasonState.climbingFormat).toEqual({ seasonId: "s1", wechsel: [{ ab: null, format: "canyon" }] });
+    for (const id of IDS) expect(climbingFormatFuer(geladen, id)).toBe("canyon");
+  });
+
+  it("ohne das Festschreiben waere es falsch gewesen (Beleg fuer den Rueckfall)", () => {
+    delete process.env.OLY_CLIMBING_FORMAT;
+    delete process.env.NEXT_PUBLIC_OLY_CLIMBING_FORMAT;
+    const ungestempelt = spielstand(["md-1", "md-2"]);
+    expect(climbingFormatFuer(ungestempelt, "md-1")).toBe("standard");
+  });
+
+  it("Schalter dazwischen: gebuchte Spieltage behalten ihr Format, der naechste folgt dem Schalter", () => {
+    delete process.env.OLY_CLIMBING_FORMAT;
+    delete process.env.NEXT_PUBLIC_OLY_CLIMBING_FORMAT;
+    let g: any = spielstand([]);
+    g = buche(g, "md-1");
+    g = buche(g, "md-2");
+    process.env.OLY_CLIMBING_FORMAT = "standard";
+    g = buche(g, "md-3");
+    expect(["md-1", "md-2", "md-3", "md-4"].map((id) => climbingFormatFuer(g, id))).toEqual(["canyon", "canyon", "standard", "standard"]);
+  });
+});

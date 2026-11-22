@@ -146,20 +146,28 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield Domination mit fuenf Punkten
 
   // Review D1 (17.11.): mit Respawn ist "einziges stehendes Team" eine Momentaufnahme, kein Sieg-Weg.
   // Im Fuenf-Punkte-Format entscheiden die Punkte -- mehr Punkte heisst nie schlechterer Platz.
-  // Review N5 (seit 22.11.): der Echtzeit-Pod (alter Drei-Orte-Kampf) laeuft immer im Format orte3, auch bei Vorgabe domination5.
-  it("Platzierung nach Punkten (kein 'letztes Team steht'-Vorrang), Echtzeit laeuft immer als orte3", async () => {
+  // Review N5 (seit 22.11.): der Echtzeit-Pod (alter Drei-Orte-Kampf) laeuft ohne ausdrueckliches Format als orte3 und meldet
+  // das (`podFormat`); "echtzeit" + "domination5" ausdruecklich wird abgelehnt (Opus-Review 22.11., Punkt 6).
+  it("Platzierung nach Punkten (kein 'letztes Team steht'-Vorrang), Echtzeit: orte3 gemeldet, domination5 abgelehnt", async () => {
     const teams = vierTeams();
     const r = await seite.evaluate((teams) => {
       const A = (window as unknown as { __arena: Arena }).__arena;
       const laeufe = [1, 7, 42, 1337, 4711, 9001].map((s) =>
         A.spieleBattlefieldPod(teams, s, null, { formSaat: s, jeSeite: 3, format: "domination5" }).teams);
-      const echtzeit = A.spieleBattlefieldPod(teams, 1, null, { formSaat: 1, jeSeite: 3, format: "domination5", echtzeit: true });
-      return { laeufe, echtzeit: { format: echtzeit.format, podFormat: echtzeit.podFormat ?? null }, danach: A.battlefieldFormat() };
+      const echtzeit = A.spieleBattlefieldPod(teams, 1, null, { formSaat: 1, jeSeite: 3, echtzeit: true });
+      let abgelehnt = "";
+      try {
+        A.spieleBattlefieldPod(teams, 1, null, { formSaat: 1, jeSeite: 3, format: "domination5", echtzeit: true });
+      } catch (e) {
+        abgelehnt = String((e as Error).message);
+      }
+      return { laeufe, echtzeit: { format: echtzeit.format, podFormat: echtzeit.podFormat ?? null }, abgelehnt, danach: A.battlefieldFormat() };
     }, teams);
     for (const t of r.laeufe) {
       for (const a of t) for (const b of t) if (a.punkte > b.punkte) expect(a.eventPlatz).toBeLessThan(b.eventPlatz);
     }
-    expect(r.echtzeit).toEqual({ format: "echtzeit", podFormat: null });
+    expect(r.echtzeit).toEqual({ format: "echtzeit", podFormat: "orte3" });
+    expect(r.abgelehnt).toContain("nur im Format orte3");
     expect(r.danach).toBe("domination5");
   }, LAUF_TIMEOUT_MS);
 

@@ -1,5 +1,5 @@
 {
-  "hinweis": "Ergebnisskala E1 (docs/design/ergebnisskala-18-11.md, lib/resolve/ergebnis-skala.ts): je Disziplin und Format (duell | pod) knoten = Siegmarge (Duell) bzw. Spanne Platz 1 bis 4 (Pod) im nativen Motorwert an den Lagen 0,025/0,05/0,1/0,2/.../0,9/0,95/0,975 der gemessenen Verteilung (Median -> Abstand 3 bzw. Spanne 5, ab 0,975 -> 10); margeQuelle relativ = |a-b|/(a+b) fuer Seitensummen mit stark wechselnder Groessenordnung (Variationskoeffizient > 0,5); margeQuelle leistung = der Motor liefert im Duell weniger als 3 verschiedene Siegmargen, dann Leistungsabstand der Seiten (mittlere C2-PP Sieger minus Verlierer); lP5/lP50/lP95 = Perzentile der mittleren Spieler-PP (Skala C2) einer Seite -> Niveau 0,05/0,5/0,95. feldgroessen: dieselben Anker je Feldgroesse (ab 12 Siegen bzw. 6 Pods), sonst Disziplin-weit. Geschrieben von scripts/werte-ergebnisskala-aus.ts --schreibe-kalibrierung.",
+  "hinweis": "Ergebnisskala E1 (docs/design/ergebnisskala-18-11.md, lib/resolve/ergebnis-skala.ts): je Disziplin und Format (duell | pod) knoten = Siegmarge (Duell) bzw. Spanne Platz 1 bis 4 (Pod) im nativen Motorwert an den Lagen 0,025/0,05/0,1/0,2/.../0,9/0,95/0,975 der gemessenen Verteilung (Median -> Abstand 3 bzw. Spanne 5, ab 0,975 -> 10); margeQuelle relativ = |a-b|/(a+b) fuer Seitensummen mit stark wechselnder Groessenordnung (Variationskoeffizient > 0,5); margeQuelle leistung = der Motor liefert im Duell weniger als 3 verschiedene Siegmargen, dann Leistungsabstand der Seiten (mittlere C2-PP Sieger minus Verlierer); lP5/lP50/lP95 = Perzentile der mittleren Spieler-PP (Skala C2) einer Seite -> Niveau 0,05/0,5/0,95. feldgroessen: dieselben Anker je Feldgroesse (ab 12 Siegen bzw. 6 Pods), sonst Disziplin-weit. Geschrieben von scripts/werte-ergebnisskala-aus.ts --schreibe-kalibrierung. Battlefield-Pod je Format (22.11.): pod = Fuenf-Punkte-Domination (Standard), podOrte3 = altes Gefecht je Ort fuer schon so gebuchte Spieltage; gezogen mit --nur-battlefield-pod [--format=orte3].",
   "gemessenAm": "2026-11-18",
   "quellen": [
     {
@@ -107,6 +107,113 @@
     },
     "battlefield": {
       "pod": {
+        "knoten": [
+          38,
+          44.3,
+          67,
+          90,
+          112.6,
+          129.6,
+          145,
+          152.4,
+          159.8,
+          160,
+          162,
+          162,
+          162
+        ],
+        "lP5": 0.391,
+        "lP50": 1.421,
+        "lP95": 3.181,
+        "n": 48,
+        "feldgroessen": {
+          "2": {
+            "knoten": [
+              36.35,
+              36.7,
+              37.4,
+              62.8,
+              101,
+              108,
+              114,
+              126.4,
+              155.8,
+              161.2,
+              162,
+              162,
+              162
+            ],
+            "lP5": 0.201,
+            "lP50": 0.905,
+            "lP95": 3.339,
+            "n": 8
+          },
+          "3": {
+            "knoten": [
+              57.5,
+              59,
+              72,
+              90,
+              101,
+              126,
+              132,
+              148,
+              151,
+              160,
+              160,
+              160.5,
+              161.25
+            ],
+            "lP5": 0.384,
+            "lP50": 1.368,
+            "lP95": 3.229,
+            "n": 16
+          },
+          "4": {
+            "knoten": [
+              57.5,
+              77,
+              99,
+              128,
+              133,
+              144,
+              150,
+              154,
+              160,
+              160,
+              162,
+              162.5,
+              163.25
+            ],
+            "lP5": 0.657,
+            "lP50": 1.456,
+            "lP95": 3.114,
+            "n": 16
+          },
+          "6": {
+            "knoten": [
+              70.35,
+              70.7,
+              71.4,
+              100,
+              142.6,
+              146.8,
+              152,
+              156.4,
+              157.8,
+              159.2,
+              160,
+              160,
+              160
+            ],
+            "lP5": 0.798,
+            "lP50": 1.574,
+            "lP95": 2.496,
+            "n": 8
+          }
+        }
+      },
+      "podOrte3": {
         "knoten": [
           0,
           0,
@@ -2064,6 +2171,26 @@
           }
         }
       }
+    }
+  },
+  "battlefieldPodQuellen": {
+    "pod": {
+      "gemessenAm": "2026-11-22",
+      "format": "domination5",
+      "quellen": [
+        {
+          "saveId": "new-game-1795312960220-0jxx84",
+          "modus": "roh"
+        },
+        {
+          "saveId": "new-game-1795314175433-bhzwvn",
+          "modus": "roh"
+        },
+        {
+          "saveId": "new-game-1795314187653-097yfr",
+          "modus": "roh"
+        }
+      ]
     }
   }
 }

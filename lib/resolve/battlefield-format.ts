@@ -32,7 +32,10 @@
  *                                       Wieder einschalten haengt den naechsten Wechsel an, ebenso sauber.
  *
  * WANN DER STEMPEL GESETZT WIRD: beim Laden eines Spielstands (`stempleBattlefieldFormat()` in save-repository.ts,
- * neben den anderen Lade-Migrationen), rein und idempotent. Ein laufender Spielstand ohne Stempel bekommt "orte3"
+ * neben den anderen Lade-Migrationen) UND beim Buchen jedes Spieltags, VOR dem Schreiben des Ergebnisses
+ * (legacy-matchday-result-apply-service.ts), jeweils rein und idempotent. Der zweite Ort schliesst den Rueckfall unten:
+ * ohne ihn nimmt die Lade-Migration "gebuchte Spieltage ohne Stempel = orte3" an, auch wenn in derselben Prozesslaufzeit
+ * (Saisonwechsel, Spieltag 1, Spieltag 2, ohne Neuladen) schon Spieltage im neuen Format gebucht wurden. Ein laufender Spielstand ohne Stempel bekommt "orte3"
  * fuer alle schon gewerteten Spieltage und ab dem naechsten das Format des Schalters; eine neue Saison (Stempel einer
  * anderen Saison) beginnt mit dem Format des Schalters. Nur Battle-Spielstaende (der Manager-Modus kennt die Arena nicht).
  *
@@ -139,7 +142,7 @@ export function stempleBattlefieldFormat<T extends Pick<GameState, "seasonState"
 }
 
 /**
- * DAS CLIMBING-FORMAT EINES SPIELTAGS. Mit gueltigem Stempel: der letzte Wechsel, dessen Spieltag nicht nach
+ * DAS BATTLEFIELD-FORMAT EINES SPIELTAGS. Mit gueltigem Stempel: der letzte Wechsel, dessen Spieltag nicht nach
  * `matchdayId` liegt (unbekannter Spieltag: der zuletzt gueltige). Ohne Stempel (ein Spielstand, der noch
  * nicht durch die Lade-Migration ging, oder ein Manager-Spielstand): dieselbe Regel auf dem Stempel, den die
  * Migration setzen wuerde.

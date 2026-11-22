@@ -134,3 +134,47 @@ Pp-Abweichung (Budget-Methode, 48 Läufe), Strom 0 / Strom 10 000 000:
 | `scripts/miss-battlefield-pod-ffa-abnahme.mjs … --format=… [--d5='{"respawnHpSchritt":0.2}']` | rho/Pp, neu mit Konstanten-Überschreibung |
 | `scripts/ziehe-battlefield-pod-referenz.mjs [--format=orte3\|domination5]` | Referenz je Format |
 | `scripts/screenshot-battlefield-pod.mjs <format> <png> [--vorspulen=s] [--viewport=BxH] [--duell] [--ganze-seite]` | Abgleich-Aufnahmen |
+
+## 8. Review-Funde und Behebung (Opus-Review 22.11.)
+
+**1. E1-Anker je Format (Muss).** `ergebnis-skala-kalibrierung.json` → `battlefield.pod` war am 18.11. im Format `orte3` gemessen; die
+Spannen Platz 1–4 sind im Fünf-Punkte-Format deutlich größer (Median k=4: 104 → 158), fast jeder neue Pod wäre ein 10:0 gewesen und hätte
+`verhaeltnis` und den Tabellen-Tiebreaker verzerrt. Jetzt: `battlefield.pod` = Fünf-Punkte (neu gemessen), `battlefield.podOrte3` = die
+unveränderten alten Knoten. `berechnePodErgebnisE1({ podVariante })` / `ergebnisSkalaAnker(…, podVariante)` wählen nach dem Format DES
+Spieltags (`battlefieldFormatFuer(gameState, matchdayId)` in `legacy-matchday-resolve-engine.ts`), gebuchte `orte3`-Spieltage rechnen also wie
+vorher. Messung: drei frische Battle-Saves (32 KI-Teams, je 20 Spieltage, `OLY_PP_SKALA=roh`, `miss-pp-skala.ts`, Node-Motor), 48 Pods
+(k=2: 8, k=3: 16, k=4: 16, k=6: 8; k=5 kam nicht vor und fällt auf den Disziplin-weiten Anker), Befehl
+`npx tsx scripts/werte-ergebnisskala-aus.ts --nur-battlefield-pod <abzug.json> …` (mischt nur Battlefield in die Datei; `--format=orte3` für das
+alte Format). Median der Spanne Platz 1–4 (alt → neu): k=2 152 → 114, k=3 128 → 132, k=4 92 → 150, Disziplin-weit 96 → 145; oberster Knoten
+(2,5 %) k=4 149 → 163. Das Skript reicht das Format jetzt an `resolveBattlefieldPodMargeReferenz` durch (Nebenbefund).
+
+**2. C2-PP-Anker (Sollte).** Gemessen an denselben drei Saves (12 Zellen; vorher 20): Tagesbester Median 5,23 → 5,54 (bleibt bei 5 PP),
+Median-Einsatz 1,00 → 1,25 (mit den alten Ankern wäre er auf rund 1,5 PP gestiegen, bei k=2 noch mehr). Deshalb Anker je Format:
+`pp-skala-kalibrierung.json` → `battlefield` (Fünf-Punkte) und `battlefieldOrte3` (alt, unverändert); `ppSkalaAnker(…, "orte3")`,
+`skaliereUngedeckelt`/`ppAusKurveSkaliert({ variante })`, in `battlefield-pod-matchday.ts` nach dem Format des Spieltags. Je Feldgröße
+(rTop/rMed): k=2 4,71/1,46 (2 Zellen), k=3 5,87/1,22, k=4 4,69/1,19, k=6 5,51/1,51. Befehl
+`node scripts/werte-pp-skala-aus.mjs --nur-battlefield <abzug.json> …`. Die E1-Leistungsanker (lP5/50/95) sind danach mit den neuen PP-Ankern
+neu gezogen. Der Ledger rechnet Pod-Zeilen nicht neu (sie sind persistiert), dort ändert sich nichts. Stichprobe klein (12 Zellen, je k 2–4):
+beim nächsten Nachkalibrieren mit mehr Saves erweitern.
+
+**3. Stempel-Rückfall (Sollte).** Der Rückfall „gebuchte Spieltage ohne Stempel = altes Format“ der Lade-Migration traf auch einen Spielstand,
+der in derselben Prozesslaufzeit ohne Neuladen schon Spieltage im neuen Format gebucht hatte. Jetzt schreibt der Buchungsweg
+(`legacy-matchday-result-apply-service.ts`) beide Stempel (Battlefield, Climbing) VOR dem Ergebnis fest (`stempleBattlefieldFormat` /
+`stempleClimbingFormat`, rein, idempotent); eine neue Saison ohne gewertete Spieltage bekommt das Format des Schalters. Gebuchte
+Spieltage bleiben unangetastet. Tests „mehrere Spieltage ohne Neuladen“ in `battlefield-format.test.ts` und `climbing-format.test.ts`.
+
+**4. Kopierreste:** Kommentar „DAS CLIMBING-FORMAT EINES SPIELTAGS“ und `describe("Climbing-Format: …")` in den Battlefield-Dateien korrigiert.
+
+**5. Aufnahmen aus der echten App** (`scripts/screenshot-battlefield-app.ts`, Dev-Server gegen Kopie des live-save-Abbilds, Reiter Arena
+des Battle-Arena-Hosts, Vorschau des nächsten Battlefield-Spieltags, 3:26 Kampfzeit): `app-pod-1920x1080.png`, `app-pod-2560x1440.png`
+(+ `-ganz`). Befund: bei 2560×1440 füllt die Bühne die ganze Breite; bei 1920×1080 begrenzt die Höhe die 16:9-Bühne (1688 von 1920 px, je
+rund 116 px Rand), das ist das Verhalten des Hosts für alle Disziplinen, nicht Battlefield-spezifisch. Die HP-Stufe („50 %“) wird jetzt nach
+den Namen gesetzt, wählt rechts/links des Balkens bzw. darüber die erste Lage ohne Überdeckung eines Namens oder einer anderen Zahl und entfällt
+sonst (das schraffierte Balkenstück zeigt die Stufe weiter); in den neuen Aufnahmen überdeckt sie keinen Namen. Reine Zeichnung.
+
+**6. Echtzeit-Pod:** `echtzeit` + ausdrücklich `format:"domination5"` wird wieder abgelehnt (Fehler statt stillem `orte3`); `echtzeit` ohne
+Format läuft als `orte3` und meldet `podFormat:"orte3"` in der Ergebniszeile. Test in `battlefield-domination5.test.ts`.
+
+**Fingerabdruck:** unverändert **GESAMT `5b9acba4fe42`** (und `BATTLEFIELD-ORTE3 6413fbdc4641`, `CLIMBING-STANDARD 164b3d846334`,
+`TDM-GEFECHT 4f5a6af94a46`): E1/PP-Anker sitzen in TypeScript hinter dem Motor, die HP-Zahl ist Zeichnung, die Echtzeit-Änderung betrifft
+keine gebuchte Zeile.

@@ -59160,6 +59160,7 @@
       }
     }
     const spaeteLabels=[];
+    const hpStufenTags=[];
     for(const u of U){
       const c=kampfSeitenFarbe(u.side);
       const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
@@ -59211,8 +59212,9 @@
         // nicht mehr gefuellt werden kann, ist dunkel schraffiert, dazu die Stufe als kleine Zahl.
         if(u.bfHp!=null&&u.bfHp<1&&KP&&KP.pod&&KP.pod.format==="domination5"){
           ctx.fillStyle="rgba(10,10,14,.85)";ctx.fillRect(x-w/2+w*u.bfHp,y+26,w*(1-u.bfHp),3);
-          ctx.font="700 10px 'Barlow Condensed',sans-serif";ctx.lineWidth=2.5;ctx.strokeStyle="rgba(0,0,0,.85)";ctx.fillStyle="#ffd37a";
-          const tx=Math.round(u.bfHp*100)+" %";ctx.textAlign="left";ctx.strokeText(tx,x+w/2+3,y+27.5);ctx.fillText(tx,x+w/2+3,y+27.5);ctx.textAlign="center";
+          // Die Zahl wird erst nach den Namen gesetzt (`hpStufenTags`, s. Beschriftungen zuletzt): dort kennt man alle
+          // Namensrechtecke und waehlt eine Lage, die keinen Namen und keine andere Zahl ueberdeckt.
+          hpStufenTags.push({x,y,w,tx:Math.round(u.bfHp*100)+" %",alpha:ctx.globalAlpha});
         }
         if(u.skills){
           ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+30,w,2);
@@ -59292,6 +59294,38 @@
         ctx.globalAlpha=l.alpha;ctx.font=l.fontStr;
         ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(l.txt,l.x,l.y);
         ctx.fillStyle=l.farbe;ctx.fillText(l.txt,l.x,l.y);
+      }
+      ctx.restore();
+    }
+    // HP-STUFE (22.11., Fuenf-Punkte-Pod): kleine Zahl neben dem Balken, nie ueber einem Namen. Kandidaten: rechts vom
+    // Balken, links, rechts/links ueber dem Balken; genommen wird die erste Lage ohne Ueberdeckung mit einem Namen
+    // (gemessen mit der Schrift der Beschriftung) oder einer schon gesetzten Zahl. Passt keine, entfaellt die Zahl --
+    // das schraffierte Balkenstueck zeigt die Stufe weiter.
+    if(hpStufenTags.length){
+      ctx.save();
+      const rects=[];
+      for(const l of spaeteLabels){
+        ctx.font=l.fontStr;const hb=ctx.measureText(l.txt).width/2+2;
+        rects.push({x0:l.x-hb,x1:l.x+hb,y0:l.y-7,y1:l.y+7});
+      }
+      ctx.font="700 10px 'Barlow Condensed',sans-serif";ctx.lineWidth=2.5;ctx.strokeStyle="rgba(0,0,0,.85)";ctx.fillStyle="#ffd37a";ctx.textBaseline="middle";
+      const trifft=(r)=>rects.some(q=>r.x0<q.x1&&r.x1>q.x0&&r.y0<q.y1&&r.y1>q.y0);
+      for(const g of hpStufenTags){
+        const tw=ctx.measureText(g.tx).width+2;
+        const kand=[
+          {ax:g.x+g.w/2+3,ay:g.y+27.5,al:"left"},
+          {ax:g.x-g.w/2-3,ay:g.y+27.5,al:"right"},
+          {ax:g.x+g.w/2+3,ay:g.y+19,al:"left"},
+          {ax:g.x-g.w/2-3,ay:g.y+19,al:"right"},
+        ];
+        for(const k of kand){
+          const r={x0:k.al==="left"?k.ax-1:k.ax-tw,x1:k.al==="left"?k.ax+tw:k.ax+1,y0:k.ay-6,y1:k.ay+6};
+          if(trifft(r))continue;
+          rects.push(r);
+          ctx.globalAlpha=g.alpha;ctx.textAlign=k.al;
+          ctx.strokeText(g.tx,k.ax,k.ay);ctx.fillText(g.tx,k.ax,k.ay);
+          break;
+        }
       }
       ctx.restore();
     }
@@ -65867,7 +65901,9 @@
     // ECHTZEIT + FUENF PUNKTE (Review N5, 17.11.): der Echtzeit-Pod ist der alte freie Kampf um DREI
     // Orte (KP.orte aus bau()); "domination5" gibt es nur als Gefecht. Die Kombination hiesse fuenf
     // Orte in der Anzeige und drei in der Wertung -- deshalb abgelehnt statt still gemischt.
-    // Seit der Vorgabe domination5 (22.11.) heisst das: ein Echtzeit-Pod laeuft immer im Format orte3.
+    // Seit der Vorgabe domination5 (22.11.) heisst das: ein Echtzeit-Pod OHNE ausdrueckliches Format laeuft im Format orte3
+    // und meldet das in der Ergebniszeile (`podFormat:"orte3"`); die ausdrueckliche Kombination echtzeit + domination5
+    // lehnt `spieleBattlefieldPod()` ab (Review 22.11.), statt still auf orte3 zu fallen.
     const formatVorLauf=BF_POD_FORMAT;
     if(echtzeit)BF_POD_FORMAT="orte3";
     const M=MOTOREN.battlefield, art=ARENA_ART.battlefield;
@@ -65902,7 +65938,7 @@
       }
       M.lauf();
       const pl=bfPodPlatzierung(), wert=M.wert();
-      return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+t.toFixed(2), format:"echtzeit",
+      return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+t.toFixed(2), format:"echtzeit", podFormat:"orte3",
         besitz:KP.orte.map(o=>o.besitz),
         teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+pl.punkte[s].toFixed(1),
           lebend:pl.lebend[s], rausT:pl.rausT[s]==null?null:+pl.rausT[s].toFixed(2),
@@ -65935,6 +65971,12 @@
     const formVorher=FORMKARTE, formatVorher=BF_POD_FORMAT;
     // FORMAT (17.11.): `optionen.format` ("orte3" | "domination5") gilt nur fuer diesen Lauf.
     if(opt.format!=null)BF_POD_FORMAT=bfPodFormatPruefen(opt.format);
+    // ECHTZEIT + FUENF PUNKTE (Review N5 17.11., nach der Vorgabe-Umstellung 22.11. wieder ausdruecklich): der Echtzeit-Pod
+    // kennt nur den alten freien Kampf um drei Orte; wer "domination5" verlangt, bekommt einen Fehler statt stillem orte3.
+    if(opt.echtzeit&&opt.format==="domination5"){
+      BF_POD_FORMAT=formatVorher;
+      throw new Error("spieleBattlefieldPod: 'echtzeit' gibt es nur im Format orte3, nicht mit 'domination5'.");
+    }
     try{
       const r=bfPodLauf(teams,saat,platzJeTeam,opt.jeSeite,(kader)=>{
         FORMKARTE={...FORMKARTE};
@@ -65946,6 +65988,7 @@
       if(r.format==="gefecht"){ aus.ende=r.ende; aus.takte=r.takte; if(opt.protokoll)aus.gefecht=r.gefecht; }
       // Nur ausserhalb des Standards gemeldet -- im Standard bleibt das Ergebnis Zeichen fuer Zeichen das alte.
       if(r.format==="gefecht"&&BF_POD_FORMAT!=="orte3")aus.podFormat=BF_POD_FORMAT;
+      if(r.format==="echtzeit")aus.podFormat=r.podFormat;
       return aus;
     } finally { FORMKARTE=formVorher; BF_POD_FORMAT=formatVorher; }
   }

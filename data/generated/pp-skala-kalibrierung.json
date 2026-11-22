@@ -69,32 +69,32 @@
     "battlefield": {
       "feldgroessen": {
         "2": {
-          "rTop": 4.47,
-          "rMed": 1.065,
-          "zellen": 4
+          "rTop": 4.71,
+          "rMed": 1.455,
+          "zellen": 2
         },
         "3": {
-          "rTop": 5.72,
-          "rMed": 0.52,
+          "rTop": 5.87,
+          "rMed": 1.22,
           "zellen": 4
         },
         "4": {
-          "rTop": 5.17,
-          "rMed": 1,
+          "rTop": 4.69,
+          "rMed": 1.19,
           "zellen": 4
         },
-        "5": {
-          "rTop": 5.02,
-          "rMed": 1.2,
-          "zellen": 4
+        "6": {
+          "rTop": 5.51,
+          "rMed": 1.51,
+          "zellen": 2
         }
       },
-      "rTop": 5.23,
-      "rMed": 1,
-      "faktor": 0.956,
-      "medianTagesbester": 5.23,
-      "zellen": 20,
-      "zellenRoh": 16,
+      "rTop": 5.54,
+      "rMed": 1.25,
+      "faktor": 0.9025,
+      "medianTagesbester": 5.54,
+      "zellen": 12,
+      "zellenRoh": 12,
       "zensiert": 0
     },
     "breaking": {
@@ -684,6 +684,47 @@
       "zellen": 20,
       "zellenRoh": 16,
       "zensiert": 1
+    },
+    "battlefieldOrte3": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 4.47,
+          "rMed": 1.065,
+          "zellen": 4
+        },
+        "3": {
+          "rTop": 5.72,
+          "rMed": 0.52,
+          "zellen": 4
+        },
+        "4": {
+          "rTop": 5.17,
+          "rMed": 1,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 5.02,
+          "rMed": 1.2,
+          "zellen": 4
+        }
+      },
+      "rTop": 5.23,
+      "rMed": 1,
+      "faktor": 0.956,
+      "medianTagesbester": 5.23,
+      "zellen": 20,
+      "zellenRoh": 16,
+      "zensiert": 0
+    }
+  },
+  "battlefieldQuellen": {
+    "domination5": {
+      "gemessenAm": "2026-11-22",
+      "saves": [
+        "new-game-1795312960220-0jxx84",
+        "new-game-1795314175433-bhzwvn",
+        "new-game-1795314187653-097yfr"
+      ]
     }
   }
 }

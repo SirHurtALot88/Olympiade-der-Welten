@@ -168,7 +168,7 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
         eintrag.playerId,
         // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
         ppSkala !== "aus"
-          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz, modus: ppSkala, playerCount: k })
+          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz, modus: ppSkala, playerCount: k, variante: format === "orte3" ? "orte3" : undefined })
           : ppAusBattlefieldPodWertung(eintrag.wertung, referenz),
       );
     }
