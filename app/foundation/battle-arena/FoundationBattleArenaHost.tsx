@@ -761,7 +761,7 @@ export default function FoundationBattleArenaHost({
   // in der Wiedergabe "standard". Immer gesetzt (auch ohne Climbing an diesem Spieltag), damit die Format-Wahl
   // der Testansicht dieselbe ist wie im naechsten gewerteten Climbing-Spieltag.
   const arenaFormatByDiscipline = useMemo(
-    () => arenaFormatByDisciplineId(gameState, gameState.matchdayState?.matchdayId ?? null, "climbing"),
+    () => arenaFormatByDisciplineId(gameState, gameState.matchdayState?.matchdayId ?? null, "alle"),
     [gameState],
   );
   // Nur ein echter Hinweis, wenn an diesem Spieltag ueberhaupt eine Arena-Disziplin steht --
