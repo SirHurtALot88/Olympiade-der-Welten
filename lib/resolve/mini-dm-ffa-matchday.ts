@@ -27,6 +27,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
+import { ppTagesankerFuer, ppVorTagesanker, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runMiniDmFfaPodFixtures,
@@ -179,6 +180,8 @@ function berechnePlayerPpsAusMotorErgebnis(
   ergebnis: MiniDmFfaPodFixtureResult,
   gesetzteRollenJeTeam: ReadonlyMap<string, Set<string>>,
   ppSkala: PpSkalaModus,
+  /** PP-Tagesanker dieses Spieltags (Saison-Stempel): ungedeckelt rechnen, verteilt wird im Aufrufer. */
+  tagesanker = false,
 ): Map<string, number> {
   const referenz = resolveMiniDmFfaSpielerPpReferenz(k);
   const ppByPlayerId = new Map<string, number>();
@@ -190,7 +193,14 @@ function berechnePlayerPpsAusMotorErgebnis(
       eintrag.playerId,
       // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
       ppSkala !== "aus"
-        ? ppAusKurveSkaliert({ disciplineId: MINI_DM_DISCIPLINE_ID, wert: eintrag.beitrag, referenz, modus: ppSkala, playerCount: k })
+        ? ppAusKurveSkaliert({
+            disciplineId: MINI_DM_DISCIPLINE_ID,
+            wert: eintrag.beitrag,
+            referenz,
+            modus: ppSkala,
+            playerCount: k,
+            ...(tagesanker ? { deckel: false } : {}),
+          })
         : ppAusMiniDmFfaBeitrag(eintrag.beitrag, referenz),
     );
   }
@@ -220,6 +230,8 @@ export type RunMiniDmFfaMatchdayErgebnis = {
   /** `playerId -> PP` ueber ALLE Pods dieses Spieltags zusammen (Team-IDs sind pod-eindeutig, nicht
    *  Spieler-IDs global -- aber ein Spieler steht an einem Spieltag in genau EINEM Pod). */
   playerPpsByPlayerId: Map<string, number>;
+  /** Nur mit Tagesanker: C2-PP VOR dem Anker (gedeckelt wie kalibriert), ausschliesslich fuer E1. */
+  playerPpsVorAnkerByPlayerId?: Map<string, number>;
   warnings: string[];
 };
 
@@ -269,6 +281,7 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
 
   const rohdatenByPodId = new Map<string, MiniDmFfaPodRohdaten>();
   const playerPpsByPlayerId = new Map<string, number>();
+  const tagesanker = ppTagesankerFuer(input.gameState, input.matchdayId);
   const warnings: string[] = [];
 
   pods.forEach((pod, index) => {
@@ -288,10 +301,16 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
     }
     rohdatenByPodId.set(pod.id, uebersetzeMotorErgebnisZuRohdaten(input.gameState, input.matchdayId, pod, k, ergebnis));
     const gesetzteRollenJeTeam = new Map(pod.teamIds.map((teamId) => [teamId, baueGesetzteRollenFuerTeam(input.gameState, teamId, input.matchdayId)] as const));
-    for (const [playerId, pp] of berechnePlayerPpsAusMotorErgebnis(pod, k, ergebnis, gesetzteRollenJeTeam, ppSkalaModus(input.gameState, input.matchdayId))) {
+    for (const [playerId, pp] of berechnePlayerPpsAusMotorErgebnis(pod, k, ergebnis, gesetzteRollenJeTeam, ppSkalaModus(input.gameState, input.matchdayId), tagesanker)) {
       playerPpsByPlayerId.set(playerId, pp);
     }
   });
 
-  return { rohdatenByPodId, playerPpsByPlayerId, warnings };
+  // PP-TAGESANKER (scharf 22.11., Saison-Stempel): ueber alle Pods des Spieltags, s. pp-tagesanker.ts.
+  return {
+    rohdatenByPodId,
+    playerPpsByPlayerId: tagesanker ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    ...(tagesanker ? { playerPpsVorAnkerByPlayerId: ppVorTagesanker(playerPpsByPlayerId) } : {}),
+    warnings,
+  };
 }

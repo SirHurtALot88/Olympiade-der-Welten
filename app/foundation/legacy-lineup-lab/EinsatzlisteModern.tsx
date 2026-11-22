@@ -1840,7 +1840,7 @@ export default function EinsatzlisteModern(props: Props) {
                     {gegner.status === "geschaetzt" ? <>gegen <b>{podGegnerNamen.length > 1 ? podGegnerNamen.join(" · ") : gegner.gegnerName}</b></> : <span data-bc-tip={gegner.grund}>Gegner noch unbekannt</span>}
                   </span>
                   <span>
-                    {waage.vorschau != null && hoverZeile ? <span className="elm-vor">Vorschau: {hoverZeile.karte.name} auf {kuerzelJeSlot.get(fokusSlot?.key ?? "")}</span> : "Schraffur = Unsicherheit der Schätzung"}
+                    {waage.vorschau != null && hoverZeile ? <span className="elm-vor">Vorschau: {hoverZeile.karte.name} auf {kuerzelJeSlot.get(fokusSlot?.key ?? "")}</span> : "Schraffierte Fläche = Schwankungsbreite der Schätzung"}
                   </span>
                 </div>
               </div>

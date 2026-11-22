@@ -10,6 +10,7 @@ import {
   resolveArenaLadderRowHeight,
 } from "@/lib/matchday-arena/arena-ladder-metrics";
 import { useStageAudio } from "./useStageAudio";
+import { mutatorAufloesung } from "@/lib/foundation/discipline-stage/mutator-aufloesung";
 import DisciplineStageResultTable, { type ResultTableRow } from "./DisciplineStageResultTable";
 import DisciplineStageTopPlayersRow from "../DisciplineStageTopPlayersRow";
 import DisciplineStageInjuryRow, { type DisciplineStageInjuredPlayer } from "../DisciplineStageInjuryRow";
@@ -70,6 +71,8 @@ export type NativeStagePlayer = {
    * Ergebnistabelle nach dem Podest je Spieler zeigt (Task #102).
    */
   mutatorPpsBonus?: number | null;
+  /** Mutator-Treffer (Battle-Modus, 22.11.): nur Anzeige in der Aufloesung, nie Teil von `val`/`mods`/Netto. */
+  mutatorHits?: number | null;
   /** Ligaweiter OVR-Rang — einzige Grundlage des Star-Tier-Rings am `PlayerMark` (siehe `player-star-tier.ts`). */
   ovrRank?: number | null;
   /**
@@ -1348,7 +1351,8 @@ export function calcString(p: NativeStagePlayer): string {
   p.mods.forEach((m) => {
     s += m.sign < 0 ? ` − ${fmt1(m.amt)} ${m.k}` : ` + ${fmt1(m.amt)} ${m.k}`;
   });
-  return `${s} = ${fmt1(playerNet(p))}`;
+  const mut = mutatorAufloesung(p.mutatorHits);
+  return `${s} = ${fmt1(playerNet(p))}${mut ? ` · ${mut.lang}` : ""}`;
 }
 // Sauberer vertikaler Breakdown-Stack für die Hovercard: Grundwert oben, je eine
 // Zeile pro echtem Mod aus p.mods (Zahl rechtsbündig, Vorzeichen-farbig), dünner
@@ -1368,6 +1372,11 @@ export function renderBreakdown(p: NativeStagePlayer): ReactNode {
           {row(m.k, `${m.sign > 0 ? "+" : "−"}${fmt1(m.amt)}`, m.sign > 0 ? "var(--nl-good)" : "var(--nl-risk)")}
         </Fragment>,
       )}
+      {mutatorAufloesung(p.mutatorHits) ? (
+        <div data-testid="breakdown-mutator" style={{ fontSize: 11, color: "var(--nl-mutator, #b58be8)", fontStyle: "italic" }}>
+          {mutatorAufloesung(p.mutatorHits)!.kurz} (im Wert enthalten)
+        </div>
+      ) : null}
       <div style={{ borderTop: "1px solid var(--nl-line)", margin: "3px 0 2px" }} />
       {row("Total", fmt1(playerNet(p)), "var(--nl-ink)", { bold: true })}
     </div>
@@ -3832,6 +3841,7 @@ export default function DisciplineStageNativeArena({ teams, slots, onOpenPlayer,
             boniMali: p ? modSum(p.mods) : 0,
             isBest: p ? Math.abs(net - bestNet[s]) < 0.05 && net > 0 : false,
             calc: p ? calcString(p) : "—",
+            mutatorHits: p?.mutatorHits ?? null,
             // Task #102 ("bei allen Diszis fehlt am Ende noch wie viele PPs welcher Spieler
             // mit seiner Leistung erhalten hat"): dieselbe Summe wie Top-Spieler-Chip + Hover-
             // Karte (Team-Anteil + Mutator-Aufschlag). `null` solange dieser Slot noch nicht

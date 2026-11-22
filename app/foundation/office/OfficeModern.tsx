@@ -50,7 +50,7 @@ export default function OfficeModern({ gameState, teamId, onVorstandAktion, kann
   }
   const wappen = getStaticTeamLogoUrl(teamId) ?? gameState.teams.find((t) => t.teamId === teamId)?.logoPath ?? null;
   const s = m.stand;
-  const aufKurs = m.ziele.filter((z) => z.status === "completed" || z.status === "open").length;
+  const aufKurs = m.ziele.filter((z) => z.anzeigeStatus === "completed" || z.anzeigeStatus === "open").length;
   const fordert = vorstandFordertAlleAufEineKarte(gameState, teamId);
   const spieltagText = m.spieltag <= 0 ? "Vor Spieltag 1" : `Nach Spieltag ${m.spieltag} von ${m.spieltageGesamt}`;
   const fragen = (b: VorstandBitteArt) => {

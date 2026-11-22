@@ -51,6 +51,8 @@ export type StagePreviewPlayer = {
    * Aufteilung, die Top-Spieler-Zeile und Hover-Karte schon nutzen (Task #102).
    */
   mutatorPpsBonus: number | null;
+  /** Mutator-Treffer (0/1/2) — nur Anzeige: im Battle-Modus wirken sie als Form, nicht als Punkte (mutator-aufloesung.ts). */
+  mutatorHits?: number | null;
 };
 
 export type StagePreviewTeam = {
@@ -194,6 +196,7 @@ export function buildDisciplineStageTeamsFromPreview(
         mods,
         pointsAwarded: entry.pointsAwarded ?? null,
         mutatorPpsBonus: entry.mutatorPpsBonus ?? null,
+        mutatorHits: entry.mutatorHits ?? null,
       };
     });
 

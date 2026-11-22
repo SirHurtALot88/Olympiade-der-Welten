@@ -18,6 +18,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
+import { ppTagesankerFuer, ppVorTagesanker, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runBattlefieldPodFixtures,
@@ -90,6 +91,8 @@ export type RunBattlefieldPodMatchdayErgebnis = {
   rohdatenByPodId: Map<string, BattlefieldPodRohdaten>;
   /** `playerId -> PP` ueber alle Pods des Spieltags (nur aufgestellte Spieler). */
   playerPpsByPlayerId: Map<string, number>;
+  /** Nur mit Tagesanker: C2-PP VOR dem Anker (gedeckelt wie kalibriert), ausschliesslich fuer E1. */
+  playerPpsVorAnkerByPlayerId?: Map<string, number>;
   warnings: string[];
 };
 
@@ -130,6 +133,7 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
   const format = battlefieldFormatFuer(input.gameState, input.matchdayId);
   const referenz = resolveBattlefieldPodSpielerPpReferenz(k, format);
   const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
+  const tagesanker = ppTagesankerFuer(input.gameState, input.matchdayId);
 
   pods.forEach((pod, index) => {
     const ergebnis = ergebnisse[index] ?? null;
@@ -168,11 +172,25 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
         eintrag.playerId,
         // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
         ppSkala !== "aus"
-          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz, modus: ppSkala, playerCount: k, variante: format === "orte3" ? "orte3" : undefined })
+          ? ppAusKurveSkaliert({
+              disciplineId: BATTLEFIELD_DISCIPLINE_ID,
+              wert: eintrag.wertung,
+              referenz,
+              modus: ppSkala,
+              playerCount: k,
+              variante: format === "orte3" ? "orte3" : undefined,
+              ...(tagesanker ? { deckel: false } : {}),
+            })
           : ppAusBattlefieldPodWertung(eintrag.wertung, referenz),
       );
     }
   });
 
-  return { rohdatenByPodId, playerPpsByPlayerId, warnings };
+  // PP-TAGESANKER (scharf 22.11., Saison-Stempel): ueber alle Pods des Spieltags, s. pp-tagesanker.ts.
+  return {
+    rohdatenByPodId,
+    playerPpsByPlayerId: tagesanker ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    ...(tagesanker ? { playerPpsVorAnkerByPlayerId: ppVorTagesanker(playerPpsByPlayerId) } : {}),
+    warnings,
+  };
 }

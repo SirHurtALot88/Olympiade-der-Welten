@@ -26,13 +26,13 @@ describe("Wertungsskalen je Saison", () => {
     vi.stubEnv("NEXT_PUBLIC_OLY_PP_SKALA", "");
     vi.stubEnv("OLY_ERGEBNIS_SKALA", "");
     vi.stubEnv("NEXT_PUBLIC_OLY_ERGEBNIS_SKALA", "");
-    expect(wertungsSkalenFuerNeueSaison("season-2")).toEqual({ seasonId: "season-2", pp: "c2", ergebnis: "e1" });
+    expect(wertungsSkalenFuerNeueSaison("season-2")).toEqual({ seasonId: "season-2", pp: "c2", ergebnis: "e1", ppTagesanker: true });
   });
 
   it("Rueckweg-Schalter: aus -> neue Saisons alt", () => {
     vi.stubEnv("OLY_PP_SKALA", "aus");
     vi.stubEnv("OLY_ERGEBNIS_SKALA", "aus");
-    expect(wertungsSkalenFuerNeueSaison("season-3")).toEqual({ seasonId: "season-3", pp: "alt", ergebnis: "alt" });
+    expect(wertungsSkalenFuerNeueSaison("season-3")).toEqual({ seasonId: "season-3", pp: "alt", ergebnis: "alt", ppTagesanker: false });
   });
 
   it("bestehender Save ohne Stempel rechnet seine laufende Saison alt zu Ende", () => {
@@ -73,11 +73,11 @@ describe("Wertungsskalen je Saison", () => {
     vi.stubEnv("OLY_PP_SKALA", "");
     vi.stubEnv("OLY_ERGEBNIS_SKALA", "");
     const angelegt = stempleWertungsSkalenBeimAnlegen(mitStempel("season-1"));
-    expect(angelegt.seasonState.wertungsSkalen).toEqual({ seasonId: "season-1", pp: "c2", ergebnis: "e1" });
+    expect(angelegt.seasonState.wertungsSkalen).toEqual({ seasonId: "season-1", pp: "c2", ergebnis: "e1", ppTagesanker: true });
     vi.stubEnv("OLY_PP_SKALA", "aus");
     expect(stempleWertungsSkalenBeimAnlegen(angelegt)).toBe(angelegt);
     const naechste = stempleWertungsSkalen({ ...angelegt.seasonState, seasonId: "season-2" });
-    expect(naechste.wertungsSkalen).toEqual({ seasonId: "season-2", pp: "alt", ergebnis: "e1" });
+    expect(naechste.wertungsSkalen).toEqual({ seasonId: "season-2", pp: "alt", ergebnis: "e1", ppTagesanker: false });
   });
 
   it("Umstellung der laufenden Saison: ab dem naechsten Spieltag C2, gebuchte Zeilen bleiben alt", () => {

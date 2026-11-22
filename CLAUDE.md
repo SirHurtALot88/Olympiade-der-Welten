@@ -60,6 +60,17 @@ unter 0,75 rot (`SCHRANKE_ABSOLUT` in `scripts/pruefe-rangtreue-schranke.mjs`, `
 Disziplin zwischen 0,75 und 0,80 besteht, liegt aber unter dem Ziel und bleibt Arbeitsauftrag.
 Über 0,80 bleibt das Ziel, 0,85 das angestrebte Niveau.
 
+**Die Schranke gilt nur gegen die reine Eignung (Chris, 22.11.).** Gemessen wird die Mechanik ohne On-top-Effekte.
+Was obendrauf kommt — Form, Moral, Formkarten, künftig Ausrüstung, Zurufe —, zählt nicht dagegen: „da sind Spieler
+einfach gut drauf, haben bessere Ausrüstung etc. Das MUSS sich ja sogar auswirken, dass Schwächere besser sein könnten.“
+
+**Weitere Grundsätze vom 22.11.:** Ein Abgang durch Vertragsende ist ein **Verkauf** (ablösefrei) — Begriffe und Regeln
+nicht getrennt behandeln. Ligaregeln dürfen sich ändern (z. B. per Abstimmung der Teams), aber **nur befristet**
+(wenige Spieltage bis höchstens eine Saison) als Regel-Stempel im Spielstand, nie dauerhaft im Code. Ligaweite
+Ereignisse treffen **alle Teams gleich**. Ligaformat bleibt vorerst **2×16** (später potentiell 2×20). Entwicklung:
+wenige Spieler werden je Saison deutlich besser, wenige deutlich schlechter, die Masse kaum; Trainingspunkte und
+Leistung (PP) stehen in einem gesunden Verhältnis.
+
 Das ist strenger, als es klingt — aber die Grenze liegt woanders, als der erste Anlauf
 vermutete, und der Unterschied entscheidet, wo man arbeitet.
 
@@ -284,6 +295,11 @@ E1: je Begegnung 0–10 je Seite (Kantersieg 10:0, Median-Sieg 7:4, Remis bleibt
 „eigener Wert minus Mittel der Gegner“; die Arena zeigt „87 : 79 → 7 : 4“. Anker nachkalibrieren:
 `werte-pp-skala-aus.mjs` dann `werte-ergebnisskala-aus.ts` (je `--schreibe-kalibrierung`). Doku:
 `docs/design/pp-skala-18-11.md` Abschnitt 8, `docs/design/ergebnisskala-18-11.md`.
+**PP-Tagesanker (Chris, 22.11.: „ja“, scharf ab der nächsten Saison):** gegen den Klumpen bei 5,0 werden die Spieler-PP je Disziplin
+und Spieltag über beide Ligen neu verteilt (Mittel der besten drei auf 5,5, weiche Kappe ab 4, Tagesbester um 4,8–5,0).
+Schalter ist der Stempel `seasonState.wertungsSkalen.ppTagesanker` (neues Spiel ab Saison 1 an; bestehender Spielstand erst
+ab dem nächsten Saisonwechsel, gebuchte Spieltage bleiben), jeder Rechenweg fragt `ppTagesankerFuer(gameState, matchdayId)`.
+Rückweg `OLY_PP_TAGESANKER=aus` (neue Saisons), Notbremse `=aus-sofort`. Doku: `docs/design/pp-tagesanker-live-22-11.md`.
 
 ## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
 
