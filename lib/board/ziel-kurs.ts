@@ -111,15 +111,16 @@ export function berechneZielKurs(gameState: GameState, objective: TeamSeasonObje
     return info("auf-kurs", "Noch keine Auswertung.");
   }
 
-  const spieltage = rest === 1 ? "einem Spieltag" : `${rest} Spieltagen`;
+  const offen = rest === 1 ? "noch 1 Spieltag" : `noch ${rest} Spieltage`;
+  const letzte = rest === 1 ? "des letzten Spieltags" : `der letzten ${rest} Spieltage`;
 
   if (roh === "completed") {
     return istMonotonErreichbar(objective.objectiveId)
       ? info("erreicht", "Ziel schon erfüllt.")
-      : info("auf-kurs", `Jetzt erfüllt, bis zum Saisonende bleiben noch ${spieltage}.`);
+      : info("auf-kurs", `Jetzt erfüllt, bis zum Saisonende ${offen}.`);
   }
-  if (roh === "open") return info("auf-kurs", `Noch offen, bis zum Saisonende bleiben noch ${spieltage}.`);
-  if (roh === "at_risk") return info("gefaehrdet", `Knapp unter dem Ziel, noch ${spieltage} zum Aufholen.`);
+  if (roh === "open") return info("auf-kurs", `Noch offen, bis zum Saisonende ${offen}.`);
+  if (roh === "at_risk") return info("gefaehrdet", `Knapp unter dem Ziel, ${offen} zum Aufholen.`);
 
   // roh === "failed": nur mit Beweis "verfehlt".
   if (statusIstBeweis(objective.objectiveId)) {
@@ -133,11 +134,11 @@ export function berechneZielKurs(gameState: GameState, objective: TeamSeasonObje
       { maxPointsPerMatchday: maxPointsPerMatchdayFor(isBattleModeSave(gameState)), remainingMatchdays: rest },
     );
     if (beste != null && beste > zielRang) {
-      return info("verfehlt", `Selbst mit allen Punkten der letzten ${spieltage} höchstens Platz ${beste}, Ziel war Platz ${zielRang}.`);
+      return info("verfehlt", `Selbst mit allen Punkten ${letzte} höchstens Platz ${beste}, Ziel war Platz ${zielRang}.`);
     }
-    return info("gefaehrdet", `Noch ${spieltage} für Platz ${zielRang}: rechnerisch erreichbar, aber aktuell darunter.`);
+    return info("gefaehrdet", `Noch ${rest} Spieltag${rest === 1 ? "" : "e"} für Platz ${zielRang}: rechnerisch erreichbar, aber aktuell darunter.`);
   }
-  return info("gefaehrdet", `Aktuell unter dem Ziel, bis zum Saisonende bleiben noch ${spieltage} — entschieden wird erst dann.`);
+  return info("gefaehrdet", `Aktuell unter dem Ziel, bis zum Saisonende ${offen} — entschieden wird erst dann.`);
 }
 
 /** Roh-Status zurück, damit Abrechnungs-Anzeigen ("Erfüllt/Verfehlt" nach Saisonende) gleich bleiben. */
