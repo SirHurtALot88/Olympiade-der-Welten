@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db/client";
+import { cardmarketDirektPfad } from "@/lib/market/cardmarketDirekt";
+import { rarityFromTitle } from "@/lib/market/rarity";
 import { daysToFirstSale, outOfStock, priceEffects, saleVsMarket } from "@/lib/dashboard/kennzahlen";
 
 export const runtime = "nodejs";
@@ -18,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     prisma.sale.findMany({ where: { articleId: id }, orderBy: { soldAt: "desc" }, take: 200 }),
     prisma.stockMovement.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 40 }),
     prisma.priceChange.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 10 }),
-    prisma.article.findUnique({ where: { id }, select: { createdAt: true, stock: true, currentEk: true, billbeeId: true } }),
+    prisma.article.findUnique({ where: { id }, select: { createdAt: true, stock: true, currentEk: true, billbeeId: true, nameRaw: true, setCode: true } }),
     prisma.marketPriceHistory.findMany({ where: { articleId: id }, orderBy: { at: "asc" }, select: { at: true, priceAvg7: true, priceTrend: true } }),
     prisma.stockLoss.findMany({ where: { articleId: id }, orderBy: { at: "desc" }, take: 50 }),
     prisma.stockMovement.findMany({ where: { articleId: id }, orderBy: { at: "asc" }, select: { at: true, before: true, after: true } }),
@@ -38,6 +40,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const lossCost = losses.reduce((n, l) => n + l.qty * (l.unitEk ?? article?.currentEk ?? 0), 0);
   return NextResponse.json({
     billbeeId: article?.billbeeId ?? null,
+    // Direktlink auf die richtige Cardmarket-Version (nur Rarity-Collection RA01-RA05, sonst null = Suche)
+    cardmarketPfad: article ? cardmarketDirektPfad(article.setCode, rarityFromTitle(article.nameRaw)) : null,
     kennzahlen,
     ekLog: ekLog.map((c) => ({ at: c.at.toISOString(), before: c.before, after: c.after })),
     losses: losses.map((l) => ({ id: l.id, at: l.at.toISOString(), kind: l.kind, qty: l.qty, unitEk: l.unitEk, note: l.note })),
