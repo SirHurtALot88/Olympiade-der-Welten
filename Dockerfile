@@ -41,6 +41,9 @@ ENV NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT=$NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT
 # Hockey-Torwart-Regel (22.11., lib/resolve/hockey-torwart.ts): leer = neue Regel, "alt" = Rueckweg.
 ARG NEXT_PUBLIC_OLY_HOCKEY_TORWART=""
 ENV NEXT_PUBLIC_OLY_HOCKEY_TORWART=$NEXT_PUBLIC_OLY_HOCKEY_TORWART
+# Basketball-Puste (22.11., lib/resolve/basketball-puste.ts): leer = neue Regel, "alt" = Rueckweg.
+ARG NEXT_PUBLIC_OLY_BASKETBALL_PUSTE=""
+ENV NEXT_PUBLIC_OLY_BASKETBALL_PUSTE=$NEXT_PUBLIC_OLY_BASKETBALL_PUSTE
 
 COPY . .
 RUN npm run db:generate

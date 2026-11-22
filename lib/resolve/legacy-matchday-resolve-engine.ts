@@ -54,6 +54,7 @@ import { ergebnisSkalaVersionFuer } from "@/lib/resolve/wertungs-skalen";
 import { wendeErgebnisSkalaE1An } from "@/lib/resolve/ergebnis-skala-anwenden";
 import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
+import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   ArenaAusfall,
@@ -1382,13 +1383,15 @@ export function buildLegacyMatchdayResolvePreview(
         disciplineId,
         playerCount: legacyScorePlayerCountForThisDiscipline,
         // Battlefield-Pod: Anker des Formats DIESES Spieltags (alte Spieltage "orte3" behalten ihre Anker).
-        // Hockey-Duell: Anker der Torwart-Regel DIESES Spieltags (alte Regel = alte Anker).
+        // Hockey-Duell: Anker der Torwart-Regel DIESES Spieltags (alte Regel = alte Anker); Basketball-Duell ebenso mit der Puste-Regel.
         podVariante:
           disciplineId === "battlefield" && battlefieldFormatFuer(base.gameState, base.matchdayId) === "orte3"
             ? "orte3"
             : disciplineId === "hockey" && hockeyTorwartFuer(base.gameState, base.matchdayId) === "alt"
               ? "torwartAlt"
-              : "standard",
+              : disciplineId === "basketball" && basketballPusteFuer(base.gameState, base.matchdayId) === "alt"
+                ? "pusteAlt"
+                : "standard",
       });
     }
 
