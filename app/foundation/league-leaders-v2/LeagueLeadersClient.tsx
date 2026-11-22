@@ -17,6 +17,8 @@ export interface LeagueLeadersClientProps {
   returnContext?: { playerId: string; playerName: string } | null;
   onReturnToPlayer?: () => void;
   onOpenPlayer: (playerId: string) => void;
+  /** Nur Rekorde, Legenden, All-Time und Erfolge (die laufende Saison zeigt `LeadersModern`). */
+  nurMehrsaison?: boolean;
 }
 
 export default function LeagueLeadersClient(props: LeagueLeadersClientProps) {

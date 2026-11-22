@@ -109,3 +109,42 @@ rollt in ihrer Tafel.
 2. **Mehrsaison-Inhalte auf die Historie-Seite verschieben?** Empfehlung: ja, Leaders bleibt die laufende Saison.
 3. **MVP.** In der Saison-Sicht steht der MVP-Zähler des Spielstands, in der Spieltags-Sicht nur das Merkmal
    „MVP-Kandidat“ je Wertung. Soll es je Spieltag genau einen MVP geben, den beide Sichten zeigen?
+
+## 9. Bau (22.11., Freigabe: „die Mockups sehen gut aus, hast die Freigabe die umzusetzen“)
+
+Gebaut ist `app/foundation/league-leaders-v2/LeadersModern.tsx` (mit `leaders-modern.css`, Präfix `ld-`, Wurzel `bc ld`, Kopf aus `BcHero`/`BcReiter`),
+gerechnet wird in `lib/foundation/leaders-modern.ts` (rein). `FoundationLeagueLeadersHost` rendert `LeadersModern`. Reine Leseseite, keine Wertung
+angefasst (Fingerabdruck unverändert).
+
+### Quellen (gezeigt = gebucht)
+
+| Anzeige | Quelle |
+|---|---|
+| PP je Spieler, Einsatz, Disziplin, Spieltag, MVP, Top 10, Bestwert | Punkte-Ledger der Saison (`buildSeasonPointsLedger`), `points` = die gebuchten Punkte (C2, Tagesanker wo gebucht); nichts wird neu skaliert |
+| Hinweis Tagesanker je Spieltag | `ppTagesankerFuer(gameState, matchdayId)`, nie eine Variable |
+| Punkte, S-U-N, Verhältnis, Ergebnisse je Spieltag | Spieltags-Übersichten des Saisonstands (`getUebersicht`), Duell 0 bis 10 (E1), Vierergruppen mit Platzpunkten und `wert` |
+| Medaillen | Hochrechnung „wenn heute Schluss wäre“ je Liga und Disziplin nach der Summe der Ergebnispunkte; Gleichstand: Verhältnis, dann PP der Disziplin. Es wird nichts gebucht. |
+| Pod-Disziplinen (Mini-DM, Takeshi, Staffel, Battlefield) | Entscheidung des PM, so im Mockup: gewertet nach dem Verhältnis (eigener Wert minus Mittel der Gegner, Summe der Einsätze), angezeigt mit Vorzeichen. Welche Disziplinen Pods sind, kommt aus den Daten (`miniDmPods`), nicht aus einer Liste. |
+
+### Mehrsaison-Inhalte
+
+Rekorde, Legenden, All-Time nach Disziplin und Erfolge sind nicht gelöscht. Sie bleiben in `LeagueLeadersNewLook`, das jetzt nur noch diese vier
+Unterseiten zeigt (Prop `nurMehrsaison`); im Kopf von Leaders führt der Knopf „Rekorde & Legenden“ dorthin, mit „Zurück zu Leaders“. Ein
+Umzug auf die Historie-Seite ist nicht „einfach“ (die Panels hängen an `records`/`achievements` aus dem Leaders-Eingang) und bleibt ein Folgeschritt.
+Die alten Ligaleader-Karten (PPS, Achsen, MVS, OVR, Training, Most Improved) sind nur noch im Code der alten Komponente, nicht mehr erreichbar.
+
+### Mockup gegen App: drin / angepasst / fehlt
+
+| Mockup-Merkmal | Stand |
+|---|---|
+| Drei Reiter (Spieler, Teams, Medaillen) mit Kennzahl | drin |
+| Zeitschalter Saison / Spieltag mit Pfeilen, Liga-Schalter | drin (Medaillen nur Saison, Pfeile gesperrt) |
+| Spieler: Podium der ersten drei, sortierbare Bestenliste mit Bereichsfilter, Balken, Einsätze, Ø, Bereiche, MVP, Top 10, Bestwert | drin; Klick auf eine Zeile öffnet das Spielerprofil |
+| 20 Disziplin-Karten mit Top 3, „gespielt n/2“, eigene Karten umrandet | drin |
+| Spieltag: zwei große Karten mit bis zu 16 Spielern, Skala 0 bis 5, Hinweis Tagesanker | drin (Text je nach gebuchtem Tagesanker) |
+| Teams: Bestenliste, Disziplin-Beste Teams, Ergebnisse des Spieltags | drin |
+| Medaillenspiegel, Podium je Disziplin, Marke „Stand heute“ | drin |
+| Kopf-Hintergrund `szenen/basketball/streetcourt.jpg` | angepasst: PixelLab-Kulisse Basketball (alte Szene-Bilder nicht mehr verwenden) |
+| MVP-Zähler | angepasst: Zahl der MVP-Kandidaten-Markierungen der Wertung (`isMvpCandidate`), im Tooltip benannt |
+| „Rekorde & Legenden“ | neu (Knopf im Kopf, siehe oben) |
+| Nebel | entfällt, alles öffentlich |

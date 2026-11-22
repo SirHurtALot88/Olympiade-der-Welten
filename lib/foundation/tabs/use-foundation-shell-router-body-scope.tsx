@@ -13002,6 +13002,8 @@ export function useFoundationShellRouterBodyScope({
 
   const foundationLeagueLeadersHostProps: FoundationLeagueLeadersHostProps = {
     categories: leagueLeaderBoards,
+    ownTeamId: activeManagerTeamId ?? selectedTeamId ?? null,
+    spieltage: seasonV2Spieltage,
     selectedTeamId: activeManagerTeamId,
     seasonLabel: canonicalSeasonLabel,
     gameState,
