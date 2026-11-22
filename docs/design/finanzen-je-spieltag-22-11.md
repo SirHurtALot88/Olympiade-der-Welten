@@ -123,3 +123,44 @@ Zwei Komplettläufe desselben Draft-Standes enden auf verschiedenen Rängen (die
 **Verändert und offen:** die KI-Verlängerung mitten in der Saison liest die Kassenlage. Im ungepaarten Lauf gab es neu 56 Verlängerungen (15 Teams, 8 Gebäude-Upgrades) gegen 90 (22 Teams, 11 Upgrades) alt; das Rauschen zwischen zwei Läufen ist nicht gemessen, die Richtung passt aber zur niedrigeren Kasse. Falls das stört: die Prüfung auf die Kasse vor den Spieltagsbuchungen stellen (`kasse + Σ Ledger`), wie es der Vorstand schon tut.
 
 Aufnahmen aus der echten App (Finanzseite nach Spieltag 8, Team H-R): `docs/design/finanzen-je-spieltag-22-11/` (Übersicht, Station, Kontoauszug; 1920×1080 und 2560×1440). Sichtprüfung: Kassenverlauf mit gebuchten Spieltagen und erwarteter Spieltagsbuchung, Kontoauszug mit Zeilen „Gehalt Spieltag k/20“ und „Sponsor-Basis Spieltag k/20“, Posten „Schon je Spieltag gebucht“ gleicht die Saisonende-Erwartung ab. Kein Überlauf, kein abgeschnittener Text.
+
+## 9. Rang-Abschlag (Entscheidung 22.11.)
+
+Chris, 22.11.: Variante a. Problem aus Abschnitt 8: Teams mit kleiner Sponsor-Basis rutschten mitten in der Saison ins Minus, weil die Rangprämie erst am Saisonende kam.
+
+**Regel.** Je gebuchtem Spieltag k zahlt der Sponsor einen Abschlag auf die Rangprämie (Zeile „Tabellenplatz“, Leiter(Platz) minus Sockel):
+
+    Abschlag_k = 0,8 x (Leiter(Platz nach Spieltag k) - Sockel) / N        N = spieltageDerSaison(gameState)
+
+- Platz = Tabellenplatz nach dem Spieltag (`sponsorRangFuerAbschlag`, dieselbe Zeile `rank` wie die Saisonabrechnung). Ohne gewerteten Stand liefert die Übersicht den Vorjahres-/Startrang, sonst der Startrang des Vertrags, sonst Ligamitte. 80 % statt 100 %, damit der Schlussausgleich selten zurückfordert.
+- Gebucht im selben Ledger und Stempel wie der Rest (`finanzenJeSpieltag`, Rückweg `OLY_FINANZEN_JE_SPIELTAG=aus`): neue Felder `rangAbschlag` und `rang` je Ledger-Zeile, `cashDelta` enthält den Abschlag. Gebuchte Spieltage bleiben. Saisonpause = kein Spieltag = kein Abschlag. Ohne Sponsorvertrag 0.
+- **Schlussausgleich** am Saisonende = Rangprämie(Endrang) minus Summe der Abschläge, als Zeile „Rangprämie Schlussausgleich“ (Kontoauszug-Art `rang_schlussausgleich`). Darf negativ sein (zieht dann von der Kasse ab; die Zeile bleibt auch bei Prämie 0 / Platz 32 erhalten). Summe Abschläge + Ausgleich = Prämie exakt (alles auf 0,1). Sonderziel bleibt komplett am Ende.
+- Mensch, KI und delegierte Teams laufen durch dieselbe Zeile Code; Besitz und aktives Team spielen keine Rolle (kein `teams[0]`).
+
+**Anzeige (gezeigt = gebucht).** Kontoauszug: „Rangprämie Abschlag Spieltag k/N (Platz x)“ und „Rangprämie Schlussausgleich“. Prognose (`erwarteteSpieltagBuchung`) rechnet offene Spieltage mit dem aktuellen Platz weiter; die Saisonende-Erwartung (GuV minus gebucht) zeigt nur den Rest. Sponsor-Aufschlüsselung nach der Abrechnung: „Tabellenplatz (Abschläge je Spieltag)“. Hauptbuch-Abstimmung zählt die Abschläge als Sponsor-Zufluss.
+
+**KI-Verlängerung (offener Punkt aus Abschnitt 7).** `buildPreviewRow` (`lib/contracts/contract-renewal-service.ts`) urteilt mit `kasseVorSpieltagsbuchungen`: Kasse minus Summe der Ledger-`cashDelta`, wie `anfangskasse` des Vorstands. Das gilt nur, solange die Saisonabrechnung des Teams nicht gebucht ist (`spieltagBuchungenNochOffen`); danach enthält die Kasse schon alles, und eine Rückrechnung wäre doppelt. Dieselbe Bedingung gilt jetzt auch im Vorstand (`berechneVorstandBudgetStand`): ein erster Messlauf zeigte, dass die Rückrechnung nach der Abrechnung (Saisonende-Kette, vor dem Saisonwechsel) die Kette um 234 C Σ Kasse verschob und 11 Teams anders kaufen ließ; mit der Bedingung ist die Kette gleich dem Altmodus. Die harten Grenzen (Vorstands-Freigabe, Kaufprüfung) rechnen weiter mit der echten Kasse.
+
+### Messung nach dem Rang-Abschlag
+
+Ungepaarter Lauf (`scripts/miss-teamfinanzen-saison.ts`, 2 Saisons) und paarweise Messung (`scripts/miss-finanzen-je-spieltag-saisonende.ts`, `kauf`), 22.11.:
+
+| Größe | vorher (Abschnitt 8) | mit Rang-Abschlag |
+|---|---:|---:|
+| Teams mit negativer Kasse mitten in der Saison (Saison 1 / 2) | 8 | 4 / 3 |
+| Tiefststand Saison 1 | −42,9 C | −11,6 C (Saison 2: −6,8 C) |
+| Team-Spieltage im Minus | 91 | 36 (Saison 2: 17) |
+| Mittlerer Tiefststand je Team | 3,4 C | 11,5 C (Saison 2: 11,0 C) |
+| Teams im Minus direkt vor dem Abschluss (paarweise) | 8 | 3 (tiefster −14,6 C) |
+| Σ Kasse nach Saisonabschluss, alt / neu | 705,5 / 705,6 | 718,0 / 718,2 |
+| größte Abweichung je Team nach Abschluss | 0,1 | 0,1 (0 Teams über 0,15) |
+| Σ Kasse nach Saisonende-Kette, alt / neu | 1836,33 / 1836,43 | 1763,9 / 1764,1 (0 Teams über 0,15) |
+| Endrang gleich | 32 von 32 | 32 von 32 |
+| KI-Kaufphase Saison 2: Käufe / Verkäufe / Aktionen | 97/63/504 in beiden Wegen | 99/67/504 alt, 98/67/504 neu |
+| Teams mit anderer Kaderänderung | 0 | 1 von 32 (Käufe 99 gegen 98, Preisrauschen) |
+
+Die Läufe sind verschiedene Spielstände (Spieltage nicht reproduzierbar); verglichen werden deshalb Größenordnungen, die paarweisen Zeilen sind exakt. Ehrlich: es bleiben 3 bis 4 Teams zwischendurch im Minus (sehr kleine Basis, tiefer Platz), nur deutlich flacher. Weitere Senkung wäre über die Quote (80 %) möglich, nicht gebaut.
+
+**KI-Verlängerungen mitten in der Saison.** Zählung im Saison-1-Lauf: 49 In-Saison-Verlängerungen bei 19 Teams (vorher im Neu-Modus 56 bei 15 Teams, im Altmodus 90 bei 22 Teams; das Rauschen zwischen Läufen ist nicht gemessen, ein Altmodus-Gegenlauf scheiterte an vollem Datenträger). Saison 2: 17 bei 10 Teams. Belegt ist die Rückrechnung deshalb vor allem über den Test „Kasse für KI-Entscheidungen“: die Kassenwache sieht dieselbe Zahl wie im Altmodus.
+
+Aufnahmen (echte App, Team H-R nach Spieltag 8, 1920x1080 und 2560x1440): `docs/design/finanzen-je-spieltag-22-11/`. Gesehen: Kontoauszug mit „Rangprämie Abschlag Spieltag k/20 (Platz 6)“ je Spieltag, Stationsblatt mit der Zeile, Kassenverlauf mit erwarteter Buchung inklusive Abschlag (−0,8 je Spieltag), Fußzeile mit neuem Erklärtext. Kein Überlauf, kein abgeschnittener Text. Abweichung: das Aufnahme-Team hat nach dem Draft nur 0,9 C Kasse (Draft-Artefakt), daher „Saisonende im Minus“; die Schlussausgleich-Zeile erscheint erst nach dem Saisonabschluss und ist nur im Test belegt.
