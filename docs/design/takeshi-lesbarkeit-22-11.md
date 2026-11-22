@@ -52,13 +52,12 @@ Sendedauer im Vier-Team-Pod (Wandzeit Tempo 1x, Messsonde): **61,8 s -> 122-126 
 `ZEIT_DEHNUNG["takeshis-castle"]` (2,17) bleibt, weil sie in die Zeit-Spalten der Wertungstabelle eingeht: ein
 Test mit 4,3 bewegte `spiele takeshis-castle` (1/7/42) im Fingerabdruck. Stattdessen neue, rein anzeigeseitige
 `ANZEIGE_BREMSE` (Takeshi 2): `loop()` sammelt halb so viele Sechzigstel je Wandsekunde, die Ticks bleiben das feste
-1/60 der Buchung (bahnSimAcc), Interpolation und Kamera laufen weich. HUD-Uhr zählt mit (2:02 am Ende). Quick-Sim
-ungebremst. Bekannte Unschärfe: Zielzeiten in Tabelle und Ticker bleiben im alten Maßstab (ca. 1:02 für ein 2:02-Rennen),
-weil sie durch `zeitFaktor()` laufen; sie jetzt mitzuziehen hieße, die Tabellenwerte (und den Fingerabdruck) zu ändern,
-das ist ein Vorschlag für eine Wertungsrunde.
+1/60 der Buchung (bahnSimAcc), Interpolation und Kamera laufen weich. **Gezeigt = gebucht bei der Zeit:** die HUD-Uhr
+zeigt weiter die gebuchte Simulationszeit (Endstand 1:02, passt zu Tabelle und Ticker) und läuft als Zeitlupe langsamer
+als die Wand; die Phasenanzeige nennt "läuft · Zeitlupe ×½". Quick-Sim ungebremst.
 
 ## Aufnahmen
 
 `docs/design/takeshi-lesbarkeit-22-11/`: `vorher-*`/`nachher-*` je 1920x1080 und 2560x1440 (Start, Lauf, Ende).
-Geprüft: Karte pixelgleich zum Vorher (Absperrbänder, See, Route), Ende-Bild mit "ENDSTAND", Burgpunkten und
+Hinweis: die Aufnahmen entstanden vor der Umstellung der Uhr (dort stand am Ende noch 2:0x). Geprüft: Karte pixelgleich zum Vorher (Absperrbänder, See, Route), Ende-Bild mit "ENDSTAND", Burgpunkten und
 Kaderleiste; keine Seitenfehler.
