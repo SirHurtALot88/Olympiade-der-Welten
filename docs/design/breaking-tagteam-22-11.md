@@ -1,6 +1,8 @@
 # Breaking als Tag-Team-1v1 — Konzept und Mockup (22.11.)
 
-**Reine Konzeptrunde. Kein Engine-Code geändert, nichts bestellt, nichts gemessen.**
+**Gebaut am 22.11. (Abschnitt 10 ff.). Die Abschnitte 1 bis 9 sind das Konzept vom selben Tag und bleiben als Herleitung stehen; wo der Bau
+oder eine Entscheidung von Chris davon abweicht, steht es unten in Abschnitt 10 (Waffe frei wählbar, Anschlagszahlen, Gutschrift,
+Konter-Wechsel aus, Umlauf-Obergrenze). Gemessen wurde in Abschnitt 11.**
 Auftrag (Arbeitsliste 21.11., Welle 4), Chris wörtlich: „Breaking: Tag-Team-1v1 (Tekken/Street-Fighter-Art,
 Ein- und Auswechseln, jeder kommt dran), HP/DMG je Spieler und Waffe unterschiedlich.“
 
@@ -129,7 +131,7 @@ Gegner, ohne dass es in seinen eigenen Wert einging — reines Rauschen für die
 **zugefügte Schaden dem Peiniger gutgeschrieben** (Abschnitt 5). Ob das trägt, entscheidet die Messung, nicht
 dieses Papier.
 
-### 3.3 Die Waffe: Leibgerät nach Klassenfarbe
+### 3.3 Die Waffe: Leibgerät nach Klassenfarbe (ERSETZT durch Chris' Entscheidung vom 22.11., Abschnitt 10.1: Waffe frei wählbar)
 
 Jeder Spieler bringt **sein** Gerät mit. Es hängt an der Klassenfarbe (dieselbe Zuordnung wie bei den
 Formkarten):
@@ -325,7 +327,7 @@ Muster Hockey-Torwart / Climbing-Canyon / Battlefield:
 
 ---
 
-## 9. Offene Fragen an Chris
+## 9. Offene Fragen an Chris (beantwortet, Abschnitt 10)
 
 1. **Waffe = Leibgerät nach Klassenfarbe** (Rot Wucht, Grün Hieb, Blau Zermürbung, Gelb Wahlgerät), fest je
    Spieler — oder soll der Manager das Gerät je Spieler in der Einsatzliste **wählen** dürfen? (Empfehlung:
@@ -335,3 +337,133 @@ Muster Hockey-Torwart / Climbing-Canyon / Battlefield:
    und hält im Mehrspieler den Spieltag an.)
 3. **Darf Breaking dafür eine neue PixelLab-Arena und Geräte-Requisiten bekommen** (rund 25–30 Generationen,
    keine Figuren, keine Animationen)? Die heutige Kulisse ist alt und fällt gegen die neuen Arenen ab.
+
+---
+
+## 10. Bau (22.11.) — was gebaut wurde und wo es vom Konzept abweicht
+
+Motor: `baueTagTeam()` in `public/mockups/battle-mode.engine.js`, neben `baueGauntlet()` (der bleibt als Rückweg unangetastet). Format-Stempel
+`seasonState.breakingFormat` (`lib/resolve/breaking-format.ts`), Schalter `OLY_BREAKING_FORMAT=alt`, Kader-Umschlag
+`formatByDisciplineId.breaking`, Eingabe-Hash, Anker je Format. Ein Wurf je Anschlag (`gauntletRunde()` unverändert), kein `rr()` in der
+Wechsel- und Waffenlogik, keine neuen Felder an Spielerobjekten (Zustand je Teilnehmer in einer `WeakMap`).
+
+### 10.1 Waffe frei wählbar und kombinierbar (Chris, 22.11., ersetzt das Leibgerät nach Klassenfarbe)
+
+Wörtlich im Auftrag: keine feste Waffe nach Klassenfarbe; jeder Spieler darf in jedem Durchgang eine andere Waffe nutzen, **genau eine Waffe je
+Durchgang**; gleiches Schadensbudget je Phase für alle Waffen, nur das Profil unterscheidet sich, sonst wird die Waffe ein Kanal neben der Matrix.
+
+| Waffe | Anschläge je Phase | hält / bricht ein | erholbar | prüft beim Aushaltenden | Budget je Phase bei 50 % Halten |
+|---|---:|---:|---:|---|---:|
+| Wucht | 6 | 7 / 16,5 | 50 % | SPITZENMOMENT | 70,5 |
+| Hieb | 8 | 5 / 12,5 | 50 % | TECHNIK | 70 |
+| Zermürbung | 10 | 4 / 10 | 0 % | NERVEN | 70 |
+
+(Das Konzept nannte 3/4/5 Anschläge; die doppelte Zahl bei halbem Schaden hält das Budget und verdoppelt die Ereignisse, die rho je Spiel
+braucht — gemessen, Abschnitt 11.) Ein „Durchgang“ ist ein **Gang**: in jedem Gang peinigt jeder der beiden Ring-Spieler einmal, mit genau einer
+Waffe. Die Gerätestufe (I/II/III) hängt am Umlauf, nicht an der Waffe; die Gerätenamen sind die vorhandenen Platzhalter-Zeichen (`FOLTER_GERAETE`).
+
+**Wer wählt.** Der Manager setzt in der Einsatzliste je Spieler eine Waffenfolge (Taktik-Block „Waffen je Gang“, drei Felder je Spieler: Gang 1, 2, 3,
+danach wiederholt sich die Folge; `LineupDraftModifierSide.breakingWaffen[activePlayerId]`). Die Reihenfolge der Slots **ist** die Wechselreihenfolge;
+Wechsel gibt es nur vorab (Reihenfolge, Plan), nie live — damit bleibt jeder Spieltag ohne Eingabe berechenbar und mehrspielertauglich. Was er nicht setzt
+(„KI“), füllt die KI deterministisch und ohne zusätzlichen Zufall: die Waffe, deren Kanal beim aktuellen Gegner am schwächsten ist (Konterwahl, Gleichstand
+Wucht, Hieb, Zermürbung). KI-Teams und delegierte Bereiche nutzen dieselbe Funktion; ein vom Menschen gesetzter Plan bleibt bei Delegation erhalten
+(`HUMAN_SIDE_MODIFIER_KEYS`, „Mensch überschreibt, KI respektiert“).
+
+**Gezeigt = gebucht.** Der Plan reist als `waffen` im Aufstellungseintrag zur Arena (`arena-aufstellung-adapter.ts`, `place[name].waffen` im Motor) und
+steht damit im Eingabe-Hash des Vorlaufs; ein geänderter Plan verwirft den Vorlauf. Die Anzeige zeigt je Anschlag Waffe, Gerät, geprüften Kanal und
+ob die Waffe aus dem Plan oder von der KI kommt.
+
+### 10.2 Weitere Abweichungen vom Konzept
+
+| Punkt | Konzept | Gebaut | Grund (gemessen) |
+|---|---|---|---|
+| Gutschrift des Peinigers | zugefügter Schaden x k | erwarteter Schaden des Anschlags x k (4) x Wertungsfaktor aus TECHNIK/SPITZENMOMENT (Steigung 3, ohne Deckel) | aus dem tatsächlichen Schaden und kleinem k: rho 0,77 bis 0,81, Pp 22,5 bis 58. Die Gutschrift am Haltewurf des Gegners trägt fremdes Würfelrauschen in den eigenen Wert und lässt Qual und Entschlossenheit zu schwach (Qual 5 bis 17 % statt 22). Der HP-Schaden bleibt wie im Konzept auf ±15 % gedeckelt. |
+| Konter-Wechsel (KI-Regel 3) | Auslöser bei Teilwert unter 62 | aus (`konterSchwelle:0`); die Konterwahl steckt in der Waffenwahl | kostete rho 0,04 bis 0,07 (n=96: 0,809 mit, 0,847 ohne) |
+| Standzeit | 2 Gänge | 2 Gänge | 3 Gänge maß 0,863 gegen 0,848, kleinerer Spielraum (Spannweite 0,197 gegen 0,111): beim Konzept geblieben |
+| Umlauf-Obergrenze | Notbremse nach Umlauf 3 | Notbremse nach Umlauf 5 (ab Umlauf 3 bleibt die Eskalation auf Stufe III, Schaden x1 / x1,5 / x2,2) | mit Obergrenze 3 endeten 0 bis 6 % der Kämpfe durch Aufgabe; mit 5 enden 100 % durch Aufgabe, im Mittel 21 Gänge und rund 300 Anschläge |
+| Erholung auf der Bank | 6 % der Maximal-HP x (0,5 + AUSDAUER/200) je Gang | wie im Konzept, nur der erholbare Teil | — |
+| HP | 150 + 1,5 x NERVEN | wie im Konzept | — |
+| Notbremse, gleiche Zahl Lebender | Rest-HP-Anteil | wie im Konzept: der Anteil entscheidet über +0,5 auf der Seitenzahl, bei Gleichstand bleibt es ein Remis | — |
+
+Die Provokation (WAGNIS ab 58 fordert die nächste Stufe, bringt mehr Bonus beim Halten) wirkt wie im Gauntlet weiter (`gauntletRunde()`).
+
+## 11. Messung (22.11.)
+
+Vor jedem Bau gemessen wurde mit dem Node-Motor (`--node`), `OLY_FORM_MODUS=echt`, Kader-Familie aus `data/generated/kaderfamilie-live-save.json`.
+Werkzeuge: `scripts/miss-alle-disziplinen.mjs --node <n> breaking [--breaking-format=gauntlet|<json>]`,
+`scripts/messe-arena-einfluss.mjs breaking 48 --saat-versatz=0|10000000 [--breaking-format=...]`, `scripts/poole-arena-einfluss.mjs`, dazu die Sonde
+`scripts/sonde-breaking-tagteam.mjs` (Kampfverlauf: Aufgabe oder Notbremse, Gänge, Anschläge). Der Messhebel `window.__arena.breakingFormat("gauntlet" | <json> | null)`
+stellt Format und Regelkonstanten um.
+
+| Größe | Gauntlet (alt) | Tag-Team (gebaut) |
+|---|---:|---:|
+| rho je Spiel (Median Kader-Familie), n=24 | 0,853 | 0,906 |
+| rho je Spiel, n=48 | 0,856 | 0,900 |
+| rho je Spiel, n=96 | — | 0,897 |
+| rho Saison (Validität), n=96 | 0,881 | 0,930 |
+| Spannweite rho je Spiel, n=96 | 0,161 | 0,103 |
+| Pp-Abweichung Strom 0 / 10 000 000 (n=48) | 10,2 / 10,9 | 8,7 / 10,2 |
+| Pp-Abweichung gepoolt | — | 9,2 |
+| Kämpfe durch Aufgabe | 100 % (Kette) | 100 % (n=48), im Mittel 21 Gänge, rund 300 Anschläge |
+
+Pp je Attribut (gepoolt, Anteil gegen Matrix): Wille 28,4 (28), Qual 21,9 (22), Gesundheit 16,8 (18), Kraft 12,6 (10), Entschlossenheit 11,2 (10),
+Ausdauer 5,9 (8), Geschick 2,4 (2), Intelligenz 0,8 (2). Über der Matrix: nur Kraft (+2,6).
+
+Wie die Zahlen entstanden (Lehre für die nächste Disziplin im selben Muster):
+
+1. **Erster Anlauf** (Gutschrift am tatsächlichen Schaden, k 0,5, Konter an): rho 0,743 bis 0,77, Pp 22,5. Aufgabe 0 % — die Kämpfe endeten an der Notbremse.
+2. **Mehr Ereignisse**: doppelte Anschlagszahl bei halbem Schaden hob rho von 0,77 auf 0,80, die Validität blieb.
+3. **Konter-Wechsel raus**: rho 0,809 auf 0,847 (n=96).
+4. **Gutschrift aus dem eigenen Schlag**, k 4, Steigung 3: rho 0,897 und Pp 8,9. Die Pp-Lücken (Qual -17, Entschlossenheit -10 bei Wille +9, Gesundheit +11) schlossen sich
+   in einem Schritt, weil Qual und Entschlossenheit über TECHNIK in die Wertung des Peinigers laufen.
+
+Das Peiniger-Risiko des Konzepts (Gauntlet bei ±20 % fiel auf 0,784) trat nicht ein: der HP-Schaden ist auf ±15 % gedeckelt, die Gutschrift läuft
+über die eigene Wertung und nicht über den Gegner.
+
+## 12. Fingerabdruck, Schutzsumme, Rückweg, Anker
+
+- `node scripts/pruefe-wertung-fingerabdruck.mjs --node`: **GESAMT f1706311a59b** (75 Einträge); gegenüber `ea36f666cc71` bewegen sich NUR `spiele breaking 1|7|42`
+  (ed316124be88/0a689ade305e/c4bf3bd3603f -> 6304b7506e9f/13da9250d407/d8e357adb979). Schutzsumme **`BREAKING-GAUNTLET 031655024229`** (drei Zeilen
+  `spiele breaking/gauntlet`, bitgleich zu den alten Breaking-Zeilen) außerhalb von GESAMT. Die fünf anderen Schutzsummen sind unverändert.
+- Rückweg: `OLY_BREAKING_FORMAT=alt` (Dockerfile, compose, `.env.example`), ab dem nächsten gewerteten Spieltag; gebuchte Spieltage behalten ihr Format
+  (`seasonState.breakingFormat`, Lade-Migration und Buchungsdienst stempeln). Der Umschlag `formatByDisciplineId.breaking` und der Eingabe-Hash tragen das Format.
+- Anker je Format: C2 (`breaking` neu aus 2 frischen Battle-Saves à 20 Spieltage, 8 Zellen, `OLY_PP_SKALA=roh`, Quick-Sim: rTop 4,61 / rMed 1,17; alt unter
+  `breakingGauntletAlt`), E1 (`breaking.duell` neu, alt unter `duellGauntletAlt`), PP-Referenz (`breaking-pps-referenz.json` neu, alt als `breaking-pps-referenz-gauntlet.json`).
+  Kalibrierskripte mit `--nur-breaking` (`werte-pp-skala-aus.mjs`, `werte-ergebnisskala-aus.ts`).
+- Tests: `tests/breaking-format.test.ts` (Stempel), `tests/breaking-tagteam-regel.test.ts` (Rückweg bitgleich, jeder kommt dran, eine Waffe je Gang, Aufgabe,
+  Plan schlägt KI), `tests/breaking-waffen-aufstellung.test.ts` (Umschlag), `tests/breaking-anker-je-format.test.ts` (Anker und Referenz je Format).
+
+## 13. Abgleich Mockup | App (Aufnahmen aus der Motor-Seite `battle-mode.html`)
+
+Aufnahmen in `docs/design/breaking-tagteam-22-11/`: `app-1920x1080-1-anschlag`, `-2-wechsel`, `-3-mitte`, `-4-endstand`, `app-2560x1440-1-anschlag`, `-3-mitte`,
+`app-1710x1112-1-anschlag`, Vorher `app-alt-canvas`; das Mockup liegt als `1920-*.png`/`2560-*.png`/`1710-*.png` daneben.
+
+| Mockup-Feature | Stand |
+|---|---|
+| Lebensbalken links/rechts mit Name, Rolle, Waffe, Anschlagzähler | drin |
+| erholbarer Anteil im Balken (rot) | drin (rot, nicht schraffiert) |
+| Standzeit-Pips, Einsatzzahl | drin |
+| Klasse als Chip in Klassenfarbe | angepasst: Klassenfarbe als Kante, kein Chip (Platz) |
+| Schaden im Kopf | angepasst: Punkte statt Schaden; Schadenszahl am Ring |
+| Stand in der Mitte, Gang, Umlauf | drin (Gebrochene; Verbliebene zeigt die Kopfleiste der Motor-Seite) |
+| Bankkarten mit HP und Zustand | drin; „nächster“ fehlt (wird erst im Wechselfenster entschieden) |
+| Porträts in Kopf und Bankkarten | fehlt (Platz) |
+| Bankfiguren am Ring-Rand | fehlt (Platz; die Bank steht in den Karten) |
+| Geräte-Plakette (Gerät, Stufe, Waffe, Kanal, Plan/KI) | drin, Geräte-Zeichen sind die Platzhalter-Primitive |
+| „Gerät trifft Kanal“ | drin; Halte-Chance fehlt |
+| Phasenleiste | drin; Raute fürs Wechselfenster fehlt |
+| Verlauf | drin |
+| Wechselfenster mit Grund je Team | drin (zwischen den Figuren) |
+| GIBT AUF / GEBROCHEN | drin |
+| Endstand-Tabelle | angepasst: bestehende Wertungstabelle der Motor-Seite (HP, Gang, Status Ring/Bank/raus) |
+| Kulisse | Platzhalter wie im Mockup; PixelLab-Arena und Geräte-Requisiten kommen separat |
+
+Nicht im Browser geprüft: der Waffenblock der Einsatzliste (Login-Wand); Typprüfung grün, Logik in `breaking-waffen-aufstellung.test.ts`. Stichproben anderer
+Disziplinen entfallen: GESAMT außerhalb der drei Breaking-Zeilen ist bitgleich.
+
+## 14. Offene Punkte
+
+1. Team-Vorlage „Durchwechseln / Stehen lassen“ (Konzept 4) nicht gebaut; Konter-Wechsel aus (rho).
+2. PixelLab-Arena und Geräte-Requisiten (Konzept 6) unverändert offen, nichts bestellt.
+3. Dritter Save für die C2/E1-Anker (mehr Zellen je Feldgröße).
+4. Der Waffenblock der Einsatzliste braucht einen Sichtabgleich in der echten App.

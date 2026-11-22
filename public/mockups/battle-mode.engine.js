@@ -29208,7 +29208,8 @@
     const T=[A,B], akt=[0,0];
     ttSt.get(A[0]).einsaetze=1; ttSt.get(B[0]).einsaetze=1;
     const lebt=(u)=>u.hp>0;
-    const snapDe=(extra)=>Object.assign({hp:alle.map(u=>u.hp),erh:alle.map(u=>Math.round(ttSt.get(u).erh)),akt:[akt[0],akt[1]]},extra);
+    const snapDe=(extra)=>Object.assign({hp:alle.map(u=>u.hp),erh:alle.map(u=>Math.round(ttSt.get(u).erh)),akt:[akt[0],akt[1]],
+      stand:[ttSt.get(T[0][akt[0]]).stand,ttSt.get(T[1][akt[1]]).stand],ein:[ttSt.get(T[0][akt[0]]).einsaetze,ttSt.get(T[1][akt[1]]).einsaetze]},extra);
     const umlaufRoh=(t)=>{ let m=1e9; for(const u of T[t])if(lebt(u))m=Math.min(m,ttSt.get(u).einsaetze); return m===1e9?1e9:1+m; };
     const eligible=(t)=>{
       const bank=T[t].filter((u,i)=>i!==akt[t]&&lebt(u));
@@ -29393,13 +29394,14 @@
     // Entwurfsmasse: Leinwand 1240 x 470 (Standard der Motor-Seite); alles wird mit E auf die echte Leinwand skaliert.
     const E=Math.min(W/1240,H/470), px=(v)=>v*E, ox=(W-1240*E)/2, oy=(H-470*E)/2;
     ctx.save(); ctx.translate(ox,oy);
-    // Grund: Folterkeller (Platzhalter, die PixelLab-Arena kommt separat)
-    const bg=ctx.createRadialGradient(W/2-ox,px(330),0,W/2-ox,px(330),px(760));
-    bg.addColorStop(0,"hsl(18 38% 17%)"); bg.addColorStop(0.5,"hsl(280 30% 9%)"); bg.addColorStop(1,"hsl(270 35% 4%)");
-    ctx.fillStyle=bg; ctx.fillRect(-ox,-oy,W,H);
-    ctx.fillStyle="rgba(0,0,0,.38)"; ctx.beginPath(); ctx.ellipse(px(620),px(318),px(330),px(26),0,0,6.2832); ctx.fill();
+    // Grund: die Kulisse (bodenBuehne, Folterkeller-Platzhalter, die PixelLab-Arena kommt separat) bleibt sichtbar; ein leichter Schleier
+    // unten und oben haelt Tafeln und Zahlen lesbar.
+    const schleier=ctx.createLinearGradient(0,-oy,0,H-oy);
+    schleier.addColorStop(0,"rgba(4,5,9,.55)"); schleier.addColorStop(0.3,"rgba(4,5,9,.22)"); schleier.addColorStop(0.62,"rgba(4,5,9,.12)"); schleier.addColorStop(1,"rgba(4,5,9,.7)");
+    ctx.fillStyle=schleier; ctx.fillRect(-ox,-oy,W,H);
+    ctx.fillStyle="rgba(0,0,0,.30)"; ctx.beginPath(); ctx.ellipse(px(620),px(328),px(330),px(22),0,0,6.2832); ctx.fill();
     // ---- Kopf: Lebensbalken links/rechts, Stand in der Mitte ----
-    const kopfY=px(6), kopfH=px(64), rand=px(8), mitteW=px(178), luecke=px(8), seitenW=(px(1240)-2*rand-mitteW-2*luecke)/2;
+    const kopfY=px(70), kopfH=px(52), rand=px(8), mitteW=px(150), luecke=px(8), seitenW=(px(1240)-2*rand-mitteW-2*luecke)/2;
     for(let t=0;t<2;t++){
       const u=u0[t]; if(!u)continue;
       const x=t===0?rand:px(1240)-rand-seitenW, rolle=(sn&&sn.peiniger===t)?"PEINIGT":(sn&&sn.ertrager===t)?"HÄLT AUS":"BEREIT";
@@ -29408,24 +29410,31 @@
       const kl=ttKlasse.get(u)||"#9aa7ba", wf=(r&&sn&&sn.peiniger===t)?TT_WAFFEN_FARBE[r.waffe]:"#9aa7ba";
       ctx.fillStyle=kl; ctx.fillRect(t===0?x+px(5):x+seitenW-px(8),kopfY,px(3),kopfH);
       const innen=px(14), tx=t===0?x+px(5)+innen:x+seitenW-px(8)-innen, al=t===0?"left":"right";
-      ttText(u.n.length>22?u.n.slice(0,21)+"…":u.n,tx,kopfY+px(19),px(19),"#f4e6c4",al,true);
-      ttText(rolle,tx,kopfY+px(33),px(11),rolle==="PEINIGT"?"#f0c35a":"#eef2f8",al);
-      if(r&&sn&&sn.peiniger===t)ttText(TT.waffen[r.waffe].name+" · "+r.anschlagNr+"/"+r.phasenN,t===0?tx+px(66):tx-px(66),kopfY+px(33),px(11),wf,al);
+      ttText(u.n.length>22?u.n.slice(0,21)+"…":u.n,tx,kopfY+px(17),px(17),"#f4e6c4",al,true);
+      ttText(rolle,tx,kopfY+px(29),px(11),rolle==="PEINIGT"?"#f0c35a":"#eef2f8",al);
+      if(r&&sn&&sn.peiniger===t)ttText(TT.waffen[r.waffe].name+" · "+r.anschlagNr+"/"+r.phasenN,t===0?tx+px(66):tx-px(66),kopfY+px(29),px(11),wf,al);
       const bx=t===0?tx:x+px(5)+innen, bw=seitenW-px(5)-px(8)-2*innen;
-      ttHpBalken(bx,kopfY+px(38),bw,px(14),u,t===1);
-      ttText(Math.max(0,ttHpJetzt(u))+" / "+(u.hpMax||0),t===0?bx+px(5):bx+bw-px(5),kopfY+px(49),px(11),"#fff",al);
-      ttText((u.summe||0)+" Pkt",t===0?bx+bw-px(5):bx+px(5),kopfY+px(49),px(10),"#c9d3e4",t===0?"right":"left");
+      ttHpBalken(bx,kopfY+px(33),bw,px(13),u,t===1);
+      ttText(Math.max(0,ttHpJetzt(u))+" / "+(u.hpMax||0),t===0?bx+px(5):bx+bw-px(5),kopfY+px(43),px(11),"#fff",al);
+      ttText((u.summe||0)+" Pkt",t===0?bx+bw-px(5):bx+px(5),kopfY+px(43),px(10),"#c9d3e4",t===0?"right":"left");
+      if(sn){
+        // Standzeit: zwei Punkte, ein gefuellter je Gang am Stueck; Einsaetze des Spielers in diesem Kampf
+        const stand=sn.stand[t], px0=t===0?x+seitenW-px(96):x+px(18);
+        for(let i=0;i<TT.standzeit;i++){ ctx.fillStyle=i<stand?"#f0c35a":"#1a2231"; ctx.fillRect(px0+i*px(14),kopfY+px(8),px(10),px(7)); }
+        ttText("Standzeit",t===0?px0+TT.standzeit*px(14)+px(4):px0+TT.standzeit*px(14)+px(4),kopfY+px(15),px(9),"#9aa7ba","left");
+        ttText("Einsatz "+sn.ein[t],t===0?x+seitenW-px(30):x+px(30)+px(60),kopfY+px(28),px(10),"#9aa7ba",t===0?"right":"left");
+      }
     }
     const mx=px(1240)/2-mitteW/2;
     ttFlaeche(mx,kopfY,mitteW,kopfH,"rgba(244,230,196,.34)");
     const gebrochen=[0,1].map(s=>(gauntletReihen[1-s]||[]).filter(u=>gauntletRausJetzt(u)).length);
-    ttText("GANG "+(r?r.gang:1)+" · UMLAUF "+(r?Math.min(3,r.umlauf):1),px(1240)/2,kopfY+px(15),px(11),"#f0c35a","center");
-    ttText(String(gebrochen[0]),px(1240)/2-px(36),kopfY+px(51),px(38),farbe[0],"center");
-    ttText(":",px(1240)/2,kopfY+px(47),px(24),"#66738a","center");
-    ttText(String(gebrochen[1]),px(1240)/2+px(36),kopfY+px(51),px(38),farbe[1],"center");
-    ttText("GEBROCHEN",px(1240)/2,kopfY+px(61),px(10),"#9aa7ba","center");
+    ttText("GANG "+(r?r.gang:1)+" · UMLAUF "+(r?Math.min(3,r.umlauf):1),px(1240)/2,kopfY+px(13),px(11),"#f0c35a","center");
+    ttText(String(gebrochen[0]),px(1240)/2-px(32),kopfY+px(41),px(30),farbe[0],"center");
+    ttText(":",px(1240)/2,kopfY+px(38),px(20),"#66738a","center");
+    ttText(String(gebrochen[1]),px(1240)/2+px(32),kopfY+px(41),px(30),farbe[1],"center");
+    ttText("GEBROCHEN",px(1240)/2,kopfY+px(50),px(10),"#9aa7ba","center");
     // ---- Bank: fuenf Karten je Team ----
-    const bankY=kopfY+kopfH+px(6), kW=(seitenW-px(4*5))/5, kH=px(36);
+    const bankY=kopfY+kopfH+px(5), kW=(seitenW-px(4*5))/5, kH=px(32);
     for(let t=0;t<2;t++){
       const reihe=gauntletReihen[t]||[], aktiv=u0[t];
       reihe.filter(u=>u!==aktiv).forEach((u,i)=>{
@@ -29433,25 +29442,25 @@
         ctx.globalAlpha=tot?0.45:1;
         ttFlaeche(x,bankY,kW,kH);
         ctx.fillStyle=ttKlasse.get(u)||"#9aa7ba"; ctx.fillRect(x,bankY,px(3),kH);
-        ttText(u.n.length>13?u.n.slice(0,12)+"…":u.n,x+px(8),bankY+px(13),px(12),"#f4e6c4","left");
+        ttText(u.n.length>13?u.n.slice(0,12)+"…":u.n,x+px(8),bankY+px(12),px(12),"#f4e6c4","left");
         const war=u.aktuell>=0&&u.runden.length>0, erholt=ttErhJetzt(u)>0&&ttHpJetzt(u)<u.hpMax;
         const txt=tot?"GEBROCHEN":erholt?"erholt sich":war?"war dran":"wartet";
-        ttText(txt,x+px(8),bankY+px(24),px(10),tot?"#66738a":erholt?"#62d394":"#9aa7ba","left");
+        ttText(txt,x+px(8),bankY+px(22),px(10),tot?"#66738a":erholt?"#62d394":"#9aa7ba","left");
         ttHpBalken(x+px(6),bankY+kH-px(7),kW-px(12),px(4),u,t===1);
         ctx.globalAlpha=1;
       });
     }
     // ---- Ring: die zwei Aktiven gross ----
-    const fussY=px(292), ringX=[px(620)-px(190),px(620)+px(190)], S=1.7*E;
+    const fussY=px(334), ringX=[px(620)-px(200),px(620)+px(200)], S=1.55*E;
     for(let t=0;t<2;t++){
       const u=u0[t]; if(!u)continue;
-      ctx.save(); ctx.translate(ringX[t],fussY-px(26)*1.7); ctx.scale(S,S);
+      ctx.save(); ctx.translate(ringX[t],fussY-px(26)*1.55); ctx.scale(S,S);
       zeichneSprite(ctx,u,0,0);
       ctx.restore();
     }
     // Geraete-Plakette ueber dem Ring
     if(r){
-      const w=TT.waffen[r.waffe], dev=FOLTER_GERAETE[r.stufe], pw=px(360), ph=px(34), gx=px(620)-pw/2, gy=bankY+kH+px(8);
+      const w=TT.waffen[r.waffe], dev=FOLTER_GERAETE[r.stufe], pw=px(330), ph=px(34), gx=px(620)-pw/2, gy=bankY+kH+px(14);
       ttFlaeche(gx,gy,pw,ph,TT_WAFFEN_FARBE[r.waffe]);
       ctx.fillStyle=TT_WAFFEN_FARBE[r.waffe]; ctx.fillRect(gx,gy,px(4),ph);
       ctx.save(); ctx.translate(gx+px(24),gy+ph/2); ctx.scale(E*0.9,E*0.9); try{dev.zeichne(ctx);}catch(e){} ctx.restore();
@@ -29461,7 +29470,7 @@
       if(ertr){
         const t0=Math.max(0,Math.min(1,jetzt/0.9));
         ctx.globalAlpha=1-t0;
-        ttText("−"+r.schaden,ringX[sn.ertrager],fussY-px(110)-t0*px(28),px(30),r.ereignis===BB().erfolgWort?"#f4e6c4":"#ff6058","center");
+        ttText("−"+r.schaden,ringX[sn.ertrager],fussY-px(120)-t0*px(28),px(30),r.ereignis===BB().erfolgWort?"#f4e6c4":"#ff6058","center");
         ctx.globalAlpha=1;
       }
     }
@@ -29495,21 +29504,22 @@
     ttFlaeche(vx,fy,spalte,fh);
     ttText("VERLAUF",vx+px(10),fy+px(17),px(11),"#f0c35a","left");
     ttVerlauf.slice().reverse().slice(0,5).forEach((e,i)=>ttText(e.txt,vx+px(10),fy+px(38)+i*px(17),px(12),e.haelt?"#eef2f8":"#ff8a7c","left"));
-    // ---- Wechselfenster ----
+    // ---- Wechselfenster: zwischen den beiden Ring-Spielern, damit die Figuren frei bleiben ----
     if(ttFenster&&buehneT<ttFenster.bis){
-      const fw=px(640), fh2=px(84), x=px(620)-fw/2, y=px(150);
+      const fw=px(300), fh2=px(86), x=px(620)-fw/2, y=px(214);
       ttFlaeche(x,y,fw,fh2,"#f0c35a");
-      ttText("WECHSEL · GANG "+(ttFenster.gang-1)+" → "+ttFenster.gang,px(620),y+px(24),px(20),"#f0c35a","center",true);
+      ttText("WECHSEL · GANG "+(ttFenster.gang-1)+" → "+ttFenster.gang,px(620),y+px(21),px(17),"#f0c35a","center",true);
       const GRUND={gebrochen:"gebrochen",standzeit:"Standzeit erreicht",schutz:"unter 25 % HP",konter:"Konter"};
-      ttFenster.eintraege.forEach((e,i)=>ttText(e.raus+" → "+e.rein+" ("+(GRUND[e.grund]||e.grund)+")",e.team===0?x+px(14):x+fw-px(14),y+px(56),px(14),farbe[e.team],e.team===0?"left":"right"));
+      ttFenster.eintraege.forEach((e,i)=>ttText(e.raus+" → "+e.rein+" ("+(GRUND[e.grund]||e.grund)+")",px(620),y+px(42)+i*px(18),px(12),farbe[e.team],"center"));
+      if(!ttFenster.eintraege.length)ttText("beide bleiben im Ring",px(620),y+px(48),px(13),"#9aa7ba","center");
     }
     // ---- Aufgabe ----
     if(letzterGauntletBruch){
       const seit=buehneT-letzterGauntletBruch.bruchT;
       if(seit>=0&&seit<2.2){
         ctx.globalAlpha=Math.min(1,(2.2-seit)*1.5);
-        ttText(gauntletAusscheidenWort(letzterGauntletBruch.u),px(620),px(130),px(44),"#ff6058","center",true);
-        ttText(letzterGauntletBruch.u.n+" scheidet aus",px(620),px(150),px(15),"#f4e6c4","center");
+        ttText(gauntletAusscheidenWort(letzterGauntletBruch.u),px(620),px(270),px(44),"#ff6058","center",true);
+        ttText(letzterGauntletBruch.u.n+" scheidet aus",px(620),px(292),px(15),"#f4e6c4","center");
         ctx.globalAlpha=1;
       }
     }
@@ -32702,7 +32712,7 @@
       // GAUNTLET (Breaking, 22.09.): eigene Unterzeile statt des generischen
       // "N Durchgaenge"-Texts, der hier (variable Zuganzahl je Ueberlebendem) nicht passt.
       : BB().gauntlet
-      ? "Slot für Slot — der Sieger bleibt im Ring, mit seinem aktuellen HP-Stand"
+      ? (ttBauteAktiv?"Tag-Team — ein Gang, zwei Phasen, dann verdeckter Wechsel":"Slot für Slot — der Sieger bleibt im Ring, mit seinem aktuellen HP-Stand")
       : BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
     // Nicht kumulativ ersetzen, s. Feldspiel-Pendant (updateHudFeldspiel): dataset.origHtml
     // haelt die Vorlage fest, damit ein Discipline-Wechsel hin und zurueck nicht ins Leere
