@@ -53,15 +53,14 @@ export const KI_REHA_RUECKLAGE_S1_FAKTOR = 0.5;
 export const KI_SPITZENBEDARF_FALLBACK = 12;
 
 /**
- * R5: Teams mit weniger Spielern als Spitzenbedarf minus dieser Luft werden in der Kaderplanung bevorzugt aufgefuellt.
- * Review 22.11. Befund 4: von 2 auf 1 (Rotationsboden 10 -> 11 bei Spitzenbedarf 12). Gemessen holten Teams mit hoechstens 10
- * Spielern 2 bis 4 Siege weniger als die Kaderstaerke erwarten laesst (Korrelation Siege minus Erwartung mit der Kadergroesse
- * 0,72 / 0,75 in Saison 1 und 2): ein Spitzenspieltag mit 12 Plaetzen und Verletzungen trifft 10er-Kader unmittelbar.
+ * R5 (Chris 22.11.: „das KI-Kaderziel richtet sich nach der hoechsten Platzsumme eines Spieltags, bis 12, plus 1 bis 2 Ersatz,
+ * gedeckelt auf 14“): Ersatzplaetze ueber dem Spitzenbedarf. Gilt ab Saison 1 (Draft) und ab Saison 2 gleich. Gemessen holten Teams
+ * mit hoechstens 10 Spielern 2 bis 4 Siege weniger als die Kaderstaerke erwarten laesst (Review 22.11. Befund 4).
  */
-export const KI_KADER_LUFT_AUFFUELLEN = 1;
-/** R5: Auffuell-Ziel ist mindestens diese Kadergroesse (Spitzenbedarf minus Luft). */
+export const KI_KADER_ERSATZ_PLAETZE = 1;
+/** R5: Auffuell-Ziel = Spitzenbedarf (hoechstens 12) plus Ersatz, mindestens 8; die Obergrenze 14 setzt `playerMax`. */
 export function kiMindestKaderFuerRotation(spitzenbedarf: number): number {
-  return Math.max(8, spitzenbedarf - KI_KADER_LUFT_AUFFUELLEN);
+  return Math.max(8, Math.min(12, spitzenbedarf) + KI_KADER_ERSATZ_PLAETZE);
 }
 
 /** Hoechster Spieltagsbedarf (Summe beider Disziplinen) im Spielplan der Saison; ohne Spielplan der Fallback. */

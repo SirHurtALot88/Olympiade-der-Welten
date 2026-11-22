@@ -40,6 +40,8 @@ import {
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
 import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
+import { DEFAULT_ROSTER_MAX } from "@/lib/foundation/roster-limits";
+import { kiMindestKaderFuerRotation, resolveSpitzenbedarf } from "@/lib/ai/ki-schonung-reha-regeln";
 import { computePlayerQuality } from "@/lib/ai/organic-squad/quality";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
@@ -495,6 +497,9 @@ function buildOrganicPlanContext(input: {
     resolveGmBias(input.gameState, input.team.teamId),
     variationSeed,
   );
+  // Chris 22.11.: Kaderziel mindestens Spitzenbedarf (hoechstens 12) + Ersatz, gedeckelt auf 14 — in Saison 1 wie spaeter.
+  const rotationsZiel = Math.min(DEFAULT_ROSTER_MAX, kiMindestKaderFuerRotation(resolveSpitzenbedarf(input.gameState)));
+  if (weights.optTarget < rotationsZiel) weights.optTarget = rotationsZiel;
   return {
     weights,
     identityAxisWeights: buildIdentityAxisWeights(input.identity),
