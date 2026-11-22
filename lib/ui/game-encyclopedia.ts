@@ -431,11 +431,11 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
   {
     id: "formkarten",
     term: "Formkarten",
-    aliases: ["formkarte", "form-karten", "formcards", "farbregel", "pluskarte", "minuskarte", "pflicht-minuskarte"],
+    aliases: ["formkarte", "form-karten", "formcards", "farbregel", "pluskarte", "minuskarte", "pflicht-minuskarte", "gegenfarbe", "plus/minus"],
     category: "Spieltag",
     short: "Pro Disziplin-Seite legbare Karten mit Bonus oder Malus für den Spieltag.",
     meaning:
-      "Formkarten werden je Disziplin-Seite (D1/D2) gelegt. Eine Karte wirkt auf alle Spieler der Seite und zusätzlich auf die Spieler, deren Klassenfarbe der Kartenfarbe entspricht (Farbträger). Passt die Kartenfarbe zur Farbe der Disziplin, zählt sie voll, sonst nur halb. Pluskarten helfen, Minuskarten schaden.",
+      "Formkarten werden je Disziplin-Seite (D1/D2) gelegt. Eine Karte wirkt auf alle Spieler der Seite und zusätzlich auf die Spieler, deren Klassenfarbe der Kartenfarbe entspricht (Farbträger). Passt die Kartenfarbe zur Farbe der Disziplin, zählt sie voll, sonst nur halb. Pluskarten helfen, Minuskarten schaden. Seit der Plus/Minus-Regel (neue Spiele ab Saison 1, bestehende ab dem nächsten Saisonwechsel) gibt es keine 0er mehr, die Werte sind 2, 4, 6 und 8, und jede Karte hat eine Gegenfarbe (Kraft gegen Geist, Tempo gegen Sozial): bei Spielern der Gegenfarbe wird ein Viertel des Kartenwerts gegengerechnet (eine Pluskarte hilft ihnen weniger, eine Minuskarte schadet ihnen weniger).",
     factors: ["Karte passend zur Disziplinfarbe: voller Wert für alle, sonst halber Wert", "Zusatzbonus für Spieler, deren Klassenfarbe = Kartenfarbe (nicht die Rolle, nicht die Disziplinfarbe)", "Spitze: bis +12 je Karte, wenn die Farbe passt und der Spieler Träger ist", "Pflicht-Minuskarten müssen bis Saisonende gelegt sein, sonst gibt es Strafpunkte", "die gelegte Karte zählt in allen zwanzig Disziplinen; die Einsatzliste zeigt vorab, was sie bringt"],
     usage: "Lege Pluskarten dort, wo viele Farbträger spielen, und verteile Minuskarten auf Disziplinen, in denen ein Duell ohnehin entschieden ist.",
   },

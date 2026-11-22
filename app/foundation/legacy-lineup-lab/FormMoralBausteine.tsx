@@ -210,6 +210,7 @@ export function KartenLeiste({ w }: { w: KartenWirkung }) {
   const alle = summe((z) => z.alle);
   const farbe = summe((z) => z.traeger);
   const form = summe((z) => z.form);
+  const gegen = summe((z) => z.gegen ?? 0);
   return (
     <div className="fm-leiste" data-testid="fm-leiste">
       <div className="fm-leiste__kopf">
@@ -232,7 +233,7 @@ export function KartenLeiste({ w }: { w: KartenWirkung }) {
           <span className="fm-gk">Karten fürs Team</span>
           <b className="t">{vz(w.teamSumme)}</b>
           <small className="fm-leise">
-            alle {vz(alle)} · Farbe {vz(farbe)} · Form {vz(form)} (+ Tagesform ±{w.tagesformSpanne} je Spieler)
+            alle {vz(alle)} · Farbe {vz(farbe)} · Form {vz(form)}{gegen !== 0 ? ` · Gegenfarbe ${vz(gegen)}` : ""} (+ Tagesform ±{w.tagesformSpanne} je Spieler)
           </small>
           {w.farbHinweis ? <small className="fm-leise" data-testid="fm-farbhinweis">{w.farbHinweis}</small> : null}
         </div>
@@ -244,16 +245,28 @@ export function KartenLeiste({ w }: { w: KartenWirkung }) {
 }
 
 /** Dreiteilige Karten-Marke am Platz: alle / Farbe / Form. */
-export function KartenMarke({ alle, traeger, form, farbe, grund }: { alle: number; traeger: number; form: number; farbe: string | null; grund?: string | null }) {
-  const summe = alle + traeger + form;
+export function KartenMarke({ alle, traeger, form, farbe, grund, gegen = 0 }: { alle: number; traeger: number; form: number; farbe: string | null; grund?: string | null; gegen?: number }) {
+  const summe = alle + traeger + form + gegen;
   if (summe === 0) return null;
   return (
-    <span className="fm-kmarke" title={`Karten: ${vz(alle)} für alle, ${vz(traeger)} Farbbonus, ${vz(form)} Form${grund ? ` — ${grund}` : ""}`} data-testid="fm-kmarke">
+    <span className="fm-kmarke" title={`Karten: ${vz(alle)} für alle, ${vz(traeger)} Farbbonus, ${vz(form)} Form${gegen !== 0 ? `, ${vz(gegen)} Gegenfarbe` : ""}${grund ? ` — ${grund}` : ""}`} data-testid="fm-kmarke">
       <b className="fm-kmarke__sum t">{vz(summe)}</b>
       {traeger !== 0 ? <i className="fm-kmarke__tr t" style={{ color: farbe ? FORM_HEX[farbe] : undefined }}>{vz(traeger)}</i> : null}
       {form !== 0 ? <i className="fm-kmarke__fo t">{vz(form)}</i> : null}
+      {gegen !== 0 ? <i className="fm-kmarke__ge t" data-testid="fm-kmarke-gegen" title="Gegenfarbe: Abzug (Pluskarte) bzw. Entlastung (Minuskarte) fuer Spieler der Gegenfarbe">Gegenf. {vz(gegen)}</i> : null}
     </span>
   );
+}
+
+/**
+ * "Alle Karten im Vergleich": die besten fuenf UND die schlechtesten drei (22.11.). Vorher kappte `slice(0, 8)` die nach
+ * Teamsumme absteigend sortierte Liste und liess damit genau die Minuskarten weg, die ein Manager sehen muss.
+ */
+export function vergleichAuswahl<T extends { teamSumme: number }>(vergleich: T[]): T[] {
+  const plus = vergleich.filter((v) => v.teamSumme >= 0).slice(0, 5);
+  const minus = vergleich.filter((v) => v.teamSumme < 0).slice(-3);
+  const rest = vergleich.filter((v) => !plus.includes(v) && !minus.includes(v)).slice(0, Math.max(0, 8 - plus.length - minus.length));
+  return [...plus, ...rest, ...minus].sort((a, b) => b.teamSumme - a.teamSumme);
 }
 
 /** Formkarten-Wirkung: Regel in einem Satz, Tabelle "Wer bekommt", ehrlicher Buchungshinweis. */
@@ -276,6 +289,7 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
     );
   }
   const satz = w.karten.map((k) => `${vz(k.wert, 0)} ${FARB_NAME[k.farbe] ?? k.farbe}${k.passt ? " (passt)" : " (fremd, halber Wert)"}`).join(" + ");
+  const zeigeGegen = w.spieler.some((s) => s.zerlegung.gegen != null && s.zerlegung.gegen !== 0);
   return (
     <div className="fm-karten" data-testid="fm-karten">
       <p>
@@ -298,7 +312,7 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
       {w.vergleich.length > 0 ? (
         <div className="fm-vergleich" data-testid="fm-vergleich">
           <span className="fm-gk">Alle Karten im Vergleich</span>
-          {w.vergleich.slice(0, 8).map((v) => (
+          {vergleichAuswahl(w.vergleich).map((v) => (
             <div key={v.id} className={`fm-vergleich__zeile${v.gewaehlt ? " is-gelegt" : ""}`}>
               <b className="t" style={{ color: FORM_HEX[v.farbe] }}>{vz(v.wert, 0)}</b>
               <span>{FARB_NAME[v.farbe] ?? v.farbe} · {v.spielerName}</span>
@@ -310,7 +324,7 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
       ) : null}
       <table className="fm-tabelle">
         <thead>
-          <tr><th>Wer bekommt</th><th>Klasse</th><th>alle</th><th>Farbe</th><th>Form</th><th>Karte</th></tr>
+          <tr><th>Wer bekommt</th><th>Klasse</th><th>alle</th><th>Farbe</th><th>Form</th>{zeigeGegen ? <th>Gegenfarbe</th> : null}<th>Karte</th></tr>
         </thead>
         <tbody>
           {w.spieler.map((s) => (
@@ -323,12 +337,13 @@ export function KartenWirkungPanel({ w, namen }: { w: KartenWirkung; namen: (pla
               <td className="t">{vz(s.zerlegung.alle)}</td>
               <td className="t">{s.zerlegung.traeger ? vz(s.zerlegung.traeger) : "–"}</td>
               <td className="t">{s.zerlegung.form ? vz(s.zerlegung.form) : "–"}</td>
+              {zeigeGegen ? <td className="t">{s.zerlegung.gegen ? vz(s.zerlegung.gegen) : "–"}</td> : null}
               <td className="t"><b>{s.vorzeichenOffen ? "~" : ""}{vz(s.zerlegung.summe)}</b></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr><td colSpan={5}>Team (Karten)</td><td className="t"><b>{vz(w.teamSumme)}</b></td></tr>
+          <tr><td colSpan={zeigeGegen ? 6 : 5}>Team (Karten)</td><td className="t"><b>{vz(w.teamSumme)}</b></td></tr>
         </tfoot>
       </table>
     </div>

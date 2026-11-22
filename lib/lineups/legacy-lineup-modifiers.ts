@@ -18,9 +18,15 @@ import {
   type FormkartenZerlegung,
 } from "@/lib/lineups/formkarten-farbregel";
 
+import { FORMKARTEN_WERTE_PLUSMINUS, formkartenKartenwerteNeu } from "@/lib/resolve/formkarten-regel";
 import { formToStufe, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 
 const FORM_CARD_VALUES = [0, 2, 4, 8] as const;
+/**
+ * PLUS/MINUS (22.11., Saison-Stempel `formkartenRegel`): keine 0er. Die 0 war eine tote Karte (`getTeamFormCardOptions`
+ * blendet sie aus, also fehlte jedem vierten Spieler eine seiner zwei Karten); `[2, 4, 6, 8]` (Chris, 22.11.; Mittel 5 statt der sichtbaren 4,7) und liefert jedem Spieler wirklich ein Plus- UND ein Minuskartenpaar.
+ */
+const FORM_CARD_VALUES_PLUSMINUS = FORMKARTEN_WERTE_PLUSMINUS;
 
 const CLASS_COLOR_MAP: Record<string, FormCardColor> = {
   Berserker: "red",
@@ -117,7 +123,10 @@ function avalanche(hash: number) {
   return mixed >>> 0;
 }
 
-function pickDeterministicCardValue(seed: string) {
+function pickDeterministicCardValue(seed: string, plusMinus = false) {
+  if (plusMinus) {
+    return FORM_CARD_VALUES_PLUSMINUS[avalanche(hashSeed(seed)) % FORM_CARD_VALUES_PLUSMINUS.length] ?? 2;
+  }
   const index = avalanche(hashSeed(seed)) % FORM_CARD_VALUES.length;
   return FORM_CARD_VALUES[index] ?? 0;
 }
@@ -134,8 +143,8 @@ function pickDeterministicCardValue(seed: string) {
  * — unabhaengig von jeder Testreihenfolge oder geteiltem Zustand. Diese Funktion laesst einen Test
  * gezielt einen Kandidaten waehlen, dessen Karte GARANTIERT sichtbar ist.
  */
-export function computePositiveFormCardValueForTests(saveId: string, seasonId: string, teamId: string, playerId: string) {
-  return pickDeterministicCardValue(`${saveId}:${seasonId}:${teamId}:${playerId}:positive`);
+export function computePositiveFormCardValueForTests(saveId: string, seasonId: string, teamId: string, playerId: string, plusMinus = false) {
+  return pickDeterministicCardValue(`${saveId}:${seasonId}:${teamId}:${playerId}:positive`, plusMinus);
 }
 
 function createDefaultModifierSide() {
@@ -541,6 +550,8 @@ export function buildGeneratedFormCardRecordsForTeam(
     .filter((entry) => entry.teamId === teamId)
     .sort((left, right) => left.playerId.localeCompare(right.playerId));
   const generated: FormCardRecord[] = [];
+  // Kartenwerte nach der Regel DIESER Saison (Spielstand-Stempel), nie nach der Umgebung.
+  const plusMinus = formkartenKartenwerteNeu(gameState);
 
   for (const rosterEntry of seasonRosterEntries) {
     const player = playerById.get(rosterEntry.playerId);
@@ -553,8 +564,8 @@ export function buildGeneratedFormCardRecordsForTeam(
       continue;
     }
 
-    const positiveValue = pickDeterministicCardValue(`${saveId}:${seasonId}:${rosterEntry.teamId}:${player.id}:positive`);
-    const negativeValue = pickDeterministicCardValue(`${saveId}:${seasonId}:${rosterEntry.teamId}:${player.id}:negative`);
+    const positiveValue = pickDeterministicCardValue(`${saveId}:${seasonId}:${rosterEntry.teamId}:${player.id}:positive`, plusMinus);
+    const negativeValue = pickDeterministicCardValue(`${saveId}:${seasonId}:${rosterEntry.teamId}:${player.id}:negative`, plusMinus);
     const createdAt = `${seasonId}:${player.id}`;
 
     generated.push({

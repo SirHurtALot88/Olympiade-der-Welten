@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai/ai-form-card-season-plan";
 import { buildAiLegacyLineupModifiers } from "@/lib/ai/ai-legacy-lineup-batch-apply-service";
 import type { LegacyLineupLoadedContext } from "@/lib/lineups/legacy-lineup-types";
+import { resolveFormMoralRegeln } from "@/lib/morale/form-moral-regeln";
 
 function slot(
   matchdayIndex: number,
@@ -365,5 +366,40 @@ describe("Aufstellungs-KI folgt der Saisonplanung", () => {
     const modifiers = buildAiLegacyLineupModifiers(context, entriesFor(1));
 
     expect(modifiers.d1.primaryFormCardId).toBe("gruen-minus-2");
+  });
+});
+
+describe("Plus/Minus: Duellgewicht wirkt in der Kartenwahl (Review 22.11., muss 1)", () => {
+  const SCHEDULE = [{ index: 1, d1: [6, "power"] as [number, string], d2: [6, "speed"] as [number, string] }];
+  const PM = { scenarioMeta: { gameMode: "battle" }, seasonState: { seasonId: "season-1", formkartenRegel: { seasonId: "season-1", regel: "plusminus" as const } } };
+  const entries = [
+    { disciplineId: "disc-1-d1", disciplineSide: "d1" as const, slotIndex: 0, playerId: "p1", activePlayerId: "a1" },
+    { disciplineId: "disc-1-d2", disciplineSide: "d2" as const, slotIndex: 0, playerId: "p2", activePlayerId: "a2" },
+  ];
+  const knappesDuell = (mitPlusMinus: boolean) => {
+    const context = buildContextWithSchedule({
+      matchdayIndex: 1,
+      schedule: SCHEDULE,
+      formCards: [{ id: "rot-8", playerId: "p1", playerName: "P1", color: "red", value: 8, isUsed: false, usedByLineupId: null }],
+    });
+    // d1: Rang 15, Spitze 72 -> weder schwach noch stark = "neutral" (knappes Duell).
+    context.teamDisciplineRanks = {
+      "disc-1-d1": { disciplineId: "disc-1-d1", teamId: "A-A", rank: 15, score: 380 },
+      "disc-1-d2": { disciplineId: "disc-1-d2", teamId: "A-A", rank: 6, score: 420 },
+    } as unknown as typeof context.teamDisciplineRanks;
+    context.disciplineScores = [
+      { playerId: "p1", disciplineId: "disc-1-d1", score: 72 },
+      { playerId: "p2", disciplineId: "disc-1-d2", score: 84 },
+    ] as typeof context.disciplineScores;
+    if (mitPlusMinus) context.formMoralRegeln = resolveFormMoralRegeln({}, PM);
+    return buildAiLegacyLineupModifiers(context, entries);
+  };
+
+  it("Regel plusminus: die fuer das knappe Duell geplante Pluskarte wird wirklich gespielt", () => {
+    expect(knappesDuell(true).d1.primaryFormCardId).toBe("rot-8");
+  });
+
+  it("Regel alt: das Neutral-Veto bleibt wie bisher (Gegenprobe, derselbe Kontext)", () => {
+    expect(knappesDuell(false).d1.primaryFormCardId).toBeNull();
   });
 });

@@ -1,7 +1,10 @@
 import { listBookedMatchdaySides, repairFrozenAiDraftsWithBlockedPlayers } from "@/lib/ai/ai-frozen-draft-blocked-repair";
-import { kartenEffekt } from "@/lib/lineups/formkarten-wirkung";
+import { kartenEffektMitRegel } from "@/lib/lineups/formkarten-wirkung";
+import { farbregelAusRegeln } from "@/lib/morale/form-moral-regeln";
+import type { FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 import {
   buildAiFormCardSeasonPlan,
+  duellGewicht,
   getPlannedCardIdsForSlot,
   getPlannedClaimValue,
   type FormCardSeasonPlan,
@@ -36,7 +39,7 @@ import {
 import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readiness";
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
-import { isFormkartenFarbregelEnabled, resolveFormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
+import { GEGENFARBE, isFormkartenFarbregelEnabled, resolveFormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
 import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
 import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
@@ -325,7 +328,7 @@ function collectFormCardPlanSlots(input: {
   context: LegacyLineupLoadedContext;
   currentMatchdayIndex: number;
   remainingMatchdaysIncludingCurrent: number;
-  currentSides: Array<{ side: "d1" | "d2"; disciplineId: string | null; color: FormCardColor | null; playerCount: number }>;
+  currentSides: Array<{ side: "d1" | "d2"; disciplineId: string | null; color: FormCardColor | null; playerCount: number; gewicht?: number }>;
 }): { slots: FormCardSeasonPlanSlot[]; hasRealSchedule: boolean } {
   const slots: FormCardSeasonPlanSlot[] = input.currentSides.map((side) => ({
     matchdayIndex: input.currentMatchdayIndex,
@@ -334,6 +337,7 @@ function collectFormCardPlanSlots(input: {
     disciplineId: side.disciplineId,
     color: side.color,
     playerCount: side.playerCount,
+    ...(side.gewicht != null ? { gewicht: side.gewicht } : {}),
   }));
 
   // „Echter Spielplan" heißt: die Saison kennt für den aktuellen Spieltag ODER später eine
@@ -406,11 +410,14 @@ function formCardDeploymentValue(
   color: FormCardColor | null,
   playerCount: number,
   farbAnteile?: Partial<Record<FormCardColor, number>>,
+  regel: FormkartenFarbregel | null = null,
 ) {
   // Eine Wahrheit (Review-Befund 9): alte Regel x2, neue Regel alle + Farbtraeger-Zusatz (erwarteter Traegeranteil 1/4,
   // wie `formCardSlotValue`), beides aus `kartenEffekt`.
-  const e = kartenEffekt(card, color);
-  return (e.alle + e.traegerZusatz * (farbAnteile?.[card.color] ?? 0.25)) * Math.max(1, playerCount);
+  const e = kartenEffektMitRegel(card, color, regel);
+  const gegenFarbe = GEGENFARBE[card.color] as FormCardColor | undefined;
+  const gegen = e.gegenZusatz && gegenFarbe ? e.gegenZusatz * (farbAnteile?.[gegenFarbe] ?? 0.25) : 0;
+  return (e.alle + e.traegerZusatz * (farbAnteile?.[card.color] ?? 0.25) + gegen) * Math.max(1, playerCount);
 }
 
 // Team-Charakter statt Einheits-KI (Vorbild: Doktrinen in team-powers): mentale Teams
@@ -457,6 +464,11 @@ function selectPositiveFormCardForSlot(input: {
   patience: number;
   /** Ausgabedruck (Urgency/Pace/Restsaison): dann darf auch die "am wenigsten bereute" reservierte Karte fallen. */
   mustSpend: boolean;
+  /**
+   * Plus/Minus (22.11.): Duell-Gewicht DIESER Seite (`duellGewicht`). Der Plan-Anspruch der Karte auf diesen Platz enthaelt es bereits;
+   * der Jetzt-Wert muss es ebenfalls tragen, sonst hielte die Reserve-Schwelle die fuer das knappe Duell geplante Karte auf ihrem eigenen Platz zurueck.
+   */
+  gewicht?: number;
 }): LegacyFormCardOption | null {
   const candidates = input.positiveCards.filter((card) => !input.usedIds.has(card.id) && card.value > 0);
   if (candidates.length === 0) {
@@ -467,7 +479,7 @@ function selectPositiveFormCardForSlot(input: {
   // ungeduldige erst bei deutlichem. (patience 0.85..1.2 → Faktor 1.35..1.0)
   const reserveFactor = Math.max(1, 2.2 - input.patience);
   const scored = candidates.map((card) => {
-    const nowValue = formCardDeploymentValue(card, input.color, input.playerCount, input.plan.farbAnteile);
+    const nowValue = formCardDeploymentValue(card, input.color, input.playerCount, input.plan.farbAnteile, input.plan.farbregel ?? null) * (input.gewicht ?? 1);
     // Der ANSPRUCH der Karte auf ihren Planplatz, abgezinst auf heute. Drei Fälle fallen daraus
     // ohne Sonderbehandlung heraus (s. getPlannedClaimValue): Plan will sie hier → Anspruch ==
     // Jetzt-Wert, sie fällt. Plan will sie heute NEBENAN → Anspruch ist der dortige, bessere Wert,
@@ -999,10 +1011,16 @@ function takeCheapestNegativeFormCard(input: {
   cards: LegacyFormCardOption[];
   usedIds: Set<string>;
   color: FormCardColor | null;
+  regel?: FormkartenFarbregel | null;
+  /** Farbanteile des Kaders (Plan); fehlt er, gilt je Farbe ein Viertel. */
+  farbAnteile?: Partial<Record<FormCardColor, number>>;
 }) {
   const damage = (card: LegacyFormCardOption) => {
-    const e = kartenEffekt(card, input.color);
-    return Math.abs(e.alle + e.traegerZusatz * 0.25);
+    const e = kartenEffektMitRegel(card, input.color, input.regel ?? null);
+    const gegenFarbe = GEGENFARBE[card.color] as FormCardColor | undefined;
+    return Math.abs(
+      e.alle + e.traegerZusatz * (input.farbAnteile?.[card.color] ?? 0.25) + (e.gegenZusatz ?? 0) * (gegenFarbe ? input.farbAnteile?.[gegenFarbe] ?? 0.25 : 0.25),
+    );
   };
   const picked =
     input.cards
@@ -1116,6 +1134,8 @@ function pickPrimaryFormCardForSide(input: {
   planActive: boolean;
   /** Karten, die der Plan für GENAU diese Seite auf den PRIMÄRplatz gelegt hat. */
   plannedPrimaryCardIds: Set<string>;
+  /** Plus/Minus (22.11.): Duell-Gewicht dieser Seite; gesetzt nur bei Regel plusminus. */
+  gewicht?: number;
 }) {
   if (input.competitiveness === "weak") {
     const planned = takePlannedNegativeFormCard({
@@ -1140,6 +1160,8 @@ function pickPrimaryFormCardForSide(input: {
         cards: input.negativeCards,
         usedIds: input.usedIds,
         color: input.color,
+        regel: input.plan.farbregel ?? null,
+        farbAnteile: input.plan.farbAnteile,
       });
       if (cheapest) return cheapest;
     }
@@ -1215,7 +1237,9 @@ function pickPrimaryFormCardForSide(input: {
   // sonst gehören die knappen Positivkarten den Seiten, auf denen das Team wirklich mitspielt.
   // Diese Sperre bleibt AUCH mit Plan: der Plan rechnet in Formmodifier und weiß nichts über
   // Ränge — ob Punkte hier überhaupt etwas bewegen, entscheidet weiter die Wettbewerbslogik.
-  if (input.competitiveness === "neutral" && !input.mustSpendPositives) {
+  // Ausnahme Plus/Minus: ein knappes Duell (neutral) ist dort der Fall mit dem hoechsten Duell-Gewicht; hat der Plan dafuer eine
+  // Pluskarte auf den Primaerplatz gelegt, hebt das das Veto auf (sonst wirkte das Gewicht gegen seinen Zweck).
+  if (input.competitiveness === "neutral" && !input.mustSpendPositives && !(input.gewicht != null && hasPlannedPositive)) {
     return null;
   }
 
@@ -1229,6 +1253,7 @@ function pickPrimaryFormCardForSide(input: {
     plannedCardIds: input.plannedCardIds,
     patience: input.doctrine.patience,
     mustSpend: input.mustSpendPositives,
+    gewicht: input.gewicht,
   });
 }
 
@@ -1252,6 +1277,8 @@ function pickSecondaryFormCardForSide(input: {
   planActive: boolean;
   /** Karten, die der Plan für GENAU diese Seite auf den SEKUNDÄRplatz gelegt hat. */
   plannedSecondaryCardIds: Set<string>;
+  /** Plus/Minus (22.11.): Duell-Gewicht dieser Seite; gesetzt nur bei Regel plusminus. */
+  gewicht?: number;
 }) {
   // Schwache Seiten bekommen normalerweise keine zweite Karte — dieselbe Vorliebe wie beim
   // Primaerplatz, und sie faellt aus demselben Grund unter Ausgabedruck: eine ungespielte
@@ -1292,6 +1319,7 @@ function pickSecondaryFormCardForSide(input: {
       plannedCardIds: input.plannedSecondaryCardIds,
       patience: input.doctrine.patience,
       mustSpend: input.mustSpendPositives,
+      gewicht: input.gewicht,
     });
   }
 
@@ -1315,6 +1343,7 @@ function pickSecondaryFormCardForSide(input: {
     plannedCardIds: input.plannedCardIds,
     patience: input.doctrine.patience,
     mustSpend: input.mustSpendPositives,
+    gewicht: input.gewicht,
   });
 }
 
@@ -1528,9 +1557,18 @@ export function buildAiLegacyLineupModifiers(
       contractPlayerCount,
     });
 
+    // Plus/Minus (22.11.): Duell-Gewicht dieser Seite, EINMAL berechnet und fuer Plan-Slot und Kartenwahl gleich benutzt.
+    const gewicht = context.formMoralRegeln?.plusMinus
+      ? duellGewicht({
+          competitiveness,
+          rivalryCount: context.teamPowerWindows?.[side.disciplineId ?? ""]?.top8Rivals.length ?? 0,
+        })
+      : undefined;
+
     return {
       ...side,
       competitiveness,
+      gewicht,
       playerCount,
       // Klare Dominanz: Die Seite führt die Disziplin an UND bringt Top-Personal — hier reicht
       // eine Karte, die zweite wäre verschenkter Saisonvorrat (Overkill-Bremse im Secondary-Pick).
@@ -1558,13 +1596,15 @@ export function buildAiLegacyLineupModifiers(
       disciplineId: side.disciplineId,
       color: side.color,
       playerCount: side.playerCount,
+      // Plus/Minus (22.11.): knappes Duell und Rivalen zaehlen am heutigen Spieltag mehr.
+      ...(side.gewicht != null ? { gewicht: side.gewicht } : {}),
     })),
   });
   const formCardSeasonPlan = buildAiFormCardSeasonPlan({
     cards: formCards.map((card) => ({ id: card.id, value: card.value, color: card.color })),
     slots: planSlots,
     // Farbregel-Prototyp (17.11., Standard AUS): ohne OLY_FORMKARTEN_FARBREGEL bleibt der Plan der alte.
-    ...(isFormkartenFarbregelEnabled() ? { farbregel: resolveFormkartenFarbregel() } : {}),
+    ...(isFormkartenFarbregelEnabled() ? { farbregel: farbregelAusRegeln(context.formMoralRegeln) ?? resolveFormkartenFarbregel() } : {}),
   });
   const plannedCardIdsBySide: Record<"d1" | "d2", Set<string>> = {
     d1: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d1"),
@@ -1647,6 +1687,7 @@ export function buildAiLegacyLineupModifiers(
             doctrine,
             planActive: hasRealSchedule,
             plannedPrimaryCardIds: plannedPrimaryCardIdsBySide[side.side],
+            gewicht: side.gewicht,
             positiveSelected,
             desiredPositiveThisMatchday,
             mustSpendPositives,
@@ -1676,6 +1717,7 @@ export function buildAiLegacyLineupModifiers(
             dominant: side.dominant,
             planActive: hasRealSchedule,
             plannedSecondaryCardIds: plannedSecondaryCardIdsBySide[side.side],
+            gewicht: side.gewicht,
             positiveSelected,
             desiredPositiveThisMatchday,
             mustSpendPositives,
@@ -1736,6 +1778,7 @@ export function resolveNegativeFormCardSides(
       disciplineColor: getFormCardColorForDisciplineCategory(contract?.category),
       playerCount: Math.max(1, playerCount),
       formCards: context.formCards ?? [],
+      farbregel: farbregelAusRegeln(context.formMoralRegeln),
     });
     if (formModifier < 0) {
       negativeSides.add(side);

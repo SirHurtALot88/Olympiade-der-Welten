@@ -346,6 +346,28 @@ describe("pre-season workflow service", () => {
     expect(saveSingleplayerState).not.toHaveBeenCalled();
   });
 
+  it("Formkarten Plus/Minus: der echte Saisonwechsel stempelt die Folgesaison und zieht die Karten mit der NEUEN Regel (alt -> plusminus)", async () => {
+    const sourceSave = save();
+    sourceSave.gameState = {
+      ...sourceSave.gameState,
+      scenarioMeta: { gameMode: "battle" },
+      seasonState: { ...sourceSave.gameState.seasonState, formkartenRegel: { seasonId: "season-1", regel: "alt" } },
+    } as GameState;
+    const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);
+    const preview = await buildPreSeasonWorkflowPreview(sourceSave, persistence);
+    const token = preview.steps.find((step) => step.stepId === "next_season_setup")?.confirmToken;
+
+    await applyPreSeasonNextSeasonSetup(sourceSave, token, persistence);
+    const savedState = saveSingleplayerState.mock.calls.at(-1)?.[1];
+
+    if (!savedState) throw new Error("Expected next season setup to persist state.");
+    expect(savedState.seasonState.formkartenRegel).toEqual({ seasonId: "season-2", regel: "plusminus" });
+    const karten = savedState.seasonState.formCards ?? [];
+    expect(karten.length).toBeGreaterThan(0);
+    // Plus/Minus: keine 0er, Betraege nur 2/4/6/8 (die alte Regel zoege auch 0).
+    expect(karten.every((card) => [2, 4, 6, 8].includes(Math.abs(card.cardValue)))).toBe(true);
+  });
+
   it("activates the next season with a fresh schedule, fresh form cards, and reset lineups/results", async () => {
     const sourceSave = save();
     const { persistence, saveSingleplayerState } = persistenceMock(sourceSave);

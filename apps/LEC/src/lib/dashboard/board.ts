@@ -1,6 +1,6 @@
 import type { SortimentRow } from "./viewModel";
 import { RARITY_NAMES, rarityKey, rarityFromTitle } from "../market/rarity";
-import { buildCardmarketSearchUrl } from "../pricing/marketPrice";
+import { buildCardmarketSearchUrl, buildCardmarketUrl } from "../pricing/marketPrice";
 
 /**
  * Preis-Board (Sortiment, Ansicht "Kompakt"): was ist zu tun, und wie gross ist der Hebel?
@@ -245,6 +245,12 @@ export function cardmarketHint(row: Pick<SortimentRow, "nameRaw" | "market">): {
   const variants = row.market?.range?.variants ?? null;
   const multi = variants != null && variants > 1;
   return { rarity, variants, multi };
+}
+
+/** Direktlink auf die Cardmarket-Produktseite einer Version (Pfad aus market/cardmarketDirekt.ts, serverseitig bestimmt). */
+export function cardmarketDirektLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "codeName">, pfad: string, packQty = 1): string {
+  const language = isEnglishCard(row) ? "EN" : "DE";
+  return buildCardmarketUrl(`https://www.cardmarket.com/de/YuGiOh/Products/Singles/${pfad}`, packQty, language);
 }
 
 export function cardmarketLink(row: Pick<SortimentRow, "setCode" | "nameRaw" | "codeName">, packQty = 1): string | null {

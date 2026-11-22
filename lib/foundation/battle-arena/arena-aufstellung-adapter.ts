@@ -20,6 +20,7 @@ import {
   type FormkartePlay,
 } from "@/lib/lineups/formkarten-farbregel";
 import { formToStufe, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
+import { farbregelAusRegeln, resolveFormMoralRegeln } from "@/lib/morale/form-moral-regeln";
 import {
   buildStaffelWechselPaarBonusByNehmer,
   STAFFEL_DISCIPLINE_ID,
@@ -192,6 +193,8 @@ export function buildArenaAufstellung(
       playerCount: 1,
       formCards,
       players: buildFormkartenPlayers({ playerIds: seitenSpieler, gameState }),
+      // Regel dieser Saison aus dem Spielstand-Stempel (22.11.): dieselbe Zahl wie Wertung und Einsatzliste.
+      farbregel: farbregelAusRegeln(resolveFormMoralRegeln(undefined, gameState)),
     });
     const auswahl = getModifierSelectionForSide(modifiers, side);
     const karten: FormkartePlay[] = [auswahl.primaryFormCardId, auswahl.secondaryFormCardId]

@@ -1,5 +1,5 @@
 import type { FormCardColor } from "@/lib/data/olyDataTypes";
-import { kartenWertFuerSpieler, type FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
+import { GEGENFARBE, kartenWertFuerSpieler, type FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 
 /**
  * SAISONPLANUNG DER FORMKARTEN (KI)
@@ -81,7 +81,23 @@ export type FormCardSeasonPlanSlot = {
   farbregel?: FormkartenFarbregel;
   /** Anteil der Kaderspieler je Klassenfarbe (Summe 1), geschätzt aus den Karten des Teams. */
   farbAnteile?: Partial<Record<FormCardColor, number>>;
+  /**
+   * PLUS/MINUS (22.11., Schalter `OLY_FORMKARTEN_PLUSMINUS`): Gewicht dieses Slots (Standard 1 = unveraendert). >1 heisst: hier
+   * entscheidet die Karte ein knappes Duell oder gegen einen Rivalen (`duellGewicht`) - eine Pluskarte zaehlt dort mehr, eine
+   * Minuskarte kostet dort mehr und wandert auf einen billigeren Slot. Nur Slots, deren Gegner bekannt ist (heutiger Spieltag).
+   */
+  gewicht?: number;
 };
+
+/**
+ * Gewicht eines Duell-Slots aus Daten, die ein Manager am selben Tag sieht: Wettbewerbslage der eigenen Seite
+ * (`neutral` = knappes Duell, `strong` = ohnehin vorn, `weak` = ohnehin hinten) und Zahl der Top-8-Rivalen in der Disziplin
+ * (`teamPowerWindows.top8Rivals`). Knapp: 1,25 - klar vorn: 1,0 (Overkill-Bremse) - klar hinten: 0,8 - je Rivale +0,1 (hoechstens +0,2).
+ */
+export function duellGewicht(input: { competitiveness: "strong" | "neutral" | "weak"; rivalryCount: number }): number {
+  const basis = input.competitiveness === "neutral" ? 1.25 : input.competitiveness === "strong" ? 1 : 0.8;
+  return Number((basis + 0.1 * Math.min(2, Math.max(0, input.rivalryCount))).toFixed(2));
+}
 
 export type FormCardSeasonPlanEntry = {
   cardId: string;
@@ -100,6 +116,8 @@ export type FormCardSeasonPlan = {
   expectedTotalFormModifier: number;
   /** Farbanteile der Karten (nur bei Farbregel): der Einsatz-Wert der KI nimmt denselben erwarteten Traegeranteil wie der Plan. */
   farbAnteile?: Partial<Record<FormCardColor, number>>;
+  /** Die Farbregel, nach der geplant wurde (Plus/Minus: mit Gegenfarbe). Der Einsatz-Wert der KI rechnet mit derselben. */
+  farbregel?: FormkartenFarbregel;
 };
 
 /**
@@ -134,7 +152,12 @@ export function formCardSlotValue(card: FormCardSeasonPlanCard, slot: FormCardSe
     const alle = kartenWertFuerSpieler({ karte, disziplinFarbe: slot.color, spielerFarbe: null, regel: slot.farbregel });
     const traeger = kartenWertFuerSpieler({ karte, disziplinFarbe: slot.color, spielerFarbe: card.color, regel: slot.farbregel }) - alle;
     const anteil = slot.farbAnteile?.[card.color] ?? 0.25;
-    return (alle + traeger * anteil) * resolvePlanSlotPlayerCount(slot);
+    // Plus/Minus: Spieler der Gegenfarbe tragen den spiegelbildlichen Anteil (nur wenn die Regel `gegen` kennt).
+    const gegenFarbe = GEGENFARBE[card.color] as FormCardColor | undefined;
+    const gegen = slot.farbregel.gegen && gegenFarbe
+      ? (kartenWertFuerSpieler({ karte, disziplinFarbe: slot.color, spielerFarbe: gegenFarbe, regel: slot.farbregel }) - alle) * (slot.farbAnteile?.[gegenFarbe] ?? 0.25)
+      : 0;
+    return (alle + traeger * anteil + gegen) * resolvePlanSlotPlayerCount(slot) * (slot.gewicht ?? 1);
   }
   const multiplier = slot.color != null && card.color === slot.color ? 2 : 1;
   return card.value * multiplier * resolvePlanSlotPlayerCount(slot);
@@ -418,6 +441,7 @@ export function buildAiFormCardSeasonPlan(input: {
     unplacedCardIds: [...unplacedCardIds].sort((left, right) => left.localeCompare(right)),
     expectedTotalFormModifier,
     ...(farbAnteile ? { farbAnteile } : {}),
+    ...(input.farbregel ? { farbregel: input.farbregel } : {}),
   };
 }
 
