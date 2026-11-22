@@ -45164,7 +45164,7 @@
     // Anzeige in ECHTEN Sekunden, nicht in Simulationssekunden: rennT selbst bleibt die
     // unangetastete physikalische Zeitbasis (Cooldowns, Ermuedung ...); was hier steht,
     // ist rennT * Zeitdehnung — also genau das, was der Zuschauer gerade erlebt.
-    const angezeigt=rennT*zeitFaktor();
+    const angezeigt=rennT*zeitFaktor()*anzeigeBremse();
     document.getElementById("clock").textContent=
       Math.floor(angezeigt/60)+":"+String(Math.floor(angezeigt%60)).padStart(2,"0");
     // "BEREIT" VOR DEM START + "VORBEI" NACH SPIELENDE (Broadcast-Audit Runde 2, Punkt
@@ -60308,14 +60308,7 @@
   // Oval+HUD).
   const ZEIT_DEHNUNG={
     tdm:1.88, "mini-dm":2.86, fechten:1.62, battlefield:5.00,
-    spurt:11.14, staffel:14.65, "time-trial":4.38, climbing:4.38,
-    // TAKESHI 22.11. (Chris' Livebefund "zu schnell vorbei, unuebersichtlich"): 2,17 -> 4,3. Das Rennen
-    // dauerte im Vier-Team-Pod gut eine Minute (1:02) bei 24 Laeufern; mit 4,3 sind es rund zwei Minuten
-    // (siehe docs/design/takeshi-lesbarkeit-22-11.md). Reine Anzeige: die Bahn tickt seit dem Anzeige-Treue-
-    // Fix A1 mit FESTEM 1/60 (bahnSimAcc), der Faktor streckt nur, wie oft das je Wandsekunde geschieht;
-    // die Kamera und alle Laeufer werden zwischen den Takten interpoliert (viMische). Wertung und
-    // Fingerabdruck lesen den Faktor nie.
-    "takeshis-castle":4.3,
+    spurt:11.14, staffel:14.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17,
     // Chris' Fund (29.08.): die Bewegung auf dem Court wirkt zu hektisch, um ihr zu
     // folgen. tempoPx selbst anzufassen wuerde die Matrix-Balance neu aufrollen (s.
     // die ausfuehrliche Herleitung beim tempoPx-Koeffizienten, bewegeSpielerLive) — der
@@ -60389,6 +60382,13 @@
   // CLIMBING-CANYON (Bau 18.11.): eigene Zeitdehnung, weil das Format in Welt-Sekunden rechnet (s.
   // CANYON_P.tempo) -- reine Anzeige, die Wertung liest zeitFaktor() nicht.
   const CANYON_ZEIT_DEHNUNG=1.6;
+  // ANZEIGE-BREMSE (Welle 4, 22.11., Takeshi "zu schnell vorbei"): zusaetzliche, REIN ANZEIGESEITIGE Streckung der
+  // Wiedergabe. ZEIT_DEHNUNG darf hier nicht angefasst werden: sie steckt in den Zeit-Spalten der Wertungstabelle und
+  // bewegt damit den Wertungs-Fingerabdruck (nachgemessen: 4,3 statt 2,17 -> `spiele takeshis-castle` aendert sich).
+  // Die Bremse wirkt nur in loop(): weniger Sechzigstel je Wandsekunde, die Ticks selbst bleiben das feste 1/60 der
+  // Buchung. Takeshi im Pod: 1:02 -> rund 2:04 Sendedauer. Uhr im HUD zaehlt mit (updateHudBahn), Quick-Sim ungebremst.
+  const ANZEIGE_BREMSE={"takeshis-castle":2};
+  const anzeigeBremse=()=>(schnelldurchAktiv?1:(ANZEIGE_BREMSE[disc]||1));
   const zeitFaktor=()=>(SANDSACK_PAR_SZENE&&istBuehne(disc))?1:((bahnCanyonAktiv&&disc==="climbing")?CANYON_ZEIT_DEHNUNG:(ZEIT_DEHNUNG[disc]||1));
 
   // SCHWEBETEXTE FORTSCHREIBEN — ausgelagert (A0.2), damit der Sonden-Modus (s.
@@ -62326,7 +62326,7 @@
     stingerPruefen();
     if(running){
       // D7: `wirksamesTempo()` statt `speed` -- `speed` selbst bleibt der Wunschwert.
-      acc+=dt*wirksamesTempo();
+      acc+=dt*wirksamesTempo()/anzeigeBremse();
       const zf=zeitFaktor();
       // tickerSendeT: Sendezeit fuer das Ticker-Zeilenbudget (Punkt 8, s. feed()) -- eine
       // reine Anzeige-Uhr neben stepSim(), die stepSim() selbst nie liest. ANZEIGE-TREUE-
@@ -69929,7 +69929,7 @@
     const x0=(W-(breite+8)*N-uhrB)/2;
     ctx.save();
     {
-      const ux=x0+(breite+8)*Math.ceil(N/2), klSek=Math.floor(rennT*zeitFaktor());
+      const ux=x0+(breite+8)*Math.ceil(N/2), klSek=Math.floor(rennT*zeitFaktor()*anzeigeBremse());
       ctx.globalAlpha=.88; ctx.fillStyle="rgba(8,10,14,.78)"; ctx.fillRect(ux,y0,uhrB,hoehe);
       ctx.globalAlpha=1; ctx.fillStyle="#f4e6c4"; ctx.textAlign="center"; ctx.textBaseline="middle";
       ctx.font="700 13px 'RaniraSeason',Georgia,'Times New Roman',serif";
