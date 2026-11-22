@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ranks – Team- und Spieler-Ränge je Disziplin (Mockup 22.11.)</title>
+<!--
+  RANKS, STAND 22.11. Konzept: docs/design/ranks-modern-22-11.md. Kein App-Code, kein PixelLab, alles CSS/SVG.
+  Heute zeigt die Seite nur "PPs pro Bereich" je Team (app/foundation/ranks-v2). Neu: eine Rang-Matrix
+  Team x (Gesamt, 4 Bereiche, 20 Disziplinen) in zwei Lesarten (Staerke = Papierform, Punkte = Ertrag) und eine
+  Spieler-Rangliste je Disziplin.
+  ECHT (Live-Abbild, Spielstand new-game-1795114260527-nzr0z9, Saison 1, 11 gebuchte Spieltage): alle 32 Teams,
+        376 Kaderspieler mit Klasse, Rasse, Gesamtwert, Bereichswerten, 20 Disziplin-Eignungen, PP; Duellpunkte und
+        E1-Ergebnispunkte je Team und Disziplin. Kaderstaerke = Mittel der besten sechs (Regel CLAUDE.md).
+  NEBEL: fremde Teams zeigen Werte in festen Stufen (Team 5er, Spieler 10er), der Rang der Teams ist oeffentlich.
+        Im Spielstand ist kein fremder Spieler gescoutet. Schalter "Nebel aus" = Einstellung der App.
+  URL: ?sicht=teams|spieler  &mass=staerke|punkte  &zeige=rang|wert  &liga=eigene|andere|alle  &d=<disziplin-id>
+       &sel=<team>  &nebel=0  &kader=1  &still=1
+-->
+<link rel="stylesheet" href="kredite-ranks-leaders-22-11/basis.css">
+<style>
+.work{grid-template-columns:minmax(0,1fr) minmax(21em,24em)}
+.hero .kul{background-image:url("../szenen/i-spy/aztec.jpg")}
+/* Matrix */
+.mx .th,.mx .tz{grid-template-columns:2.5em minmax(8.5em,1.5fr) repeat(5,minmax(2.5em,1fr)) repeat(20,minmax(1.9em,1fr));gap:.22em;padding:0 .6em}
+.mx .th{height:3.5em;align-items:end;padding-bottom:.3em;font-size:.72em}
+.mx .th button{flex-direction:column;gap:.1em;justify-content:flex-end;width:100%;height:auto;border-top:3px solid var(--kc,transparent);padding-top:.25em;border-radius:2px}
+.mx .th button img{width:2em;height:2em;object-fit:contain}
+.mx .th button .pf{line-height:.6}
+.mx .th button.tm{flex-direction:row;justify-content:flex-start;border:0}
+.mx .th .gr{border-left:1px solid var(--linie-2)}
+.mx .tz{cursor:pointer}
+.zelle{height:1.72em;border-radius:4px;display:grid;place-items:center;font-weight:700;font-size:.98em;background:rgba(255,255,255,.04);color:var(--leise);min-width:0;white-space:nowrap;overflow:hidden}
+.zelle.w{font-size:.82em;font-weight:600}
+.zelle.r1{background:linear-gradient(180deg,#f7d57f,#d9a633);color:#17120a}
+.zelle.o{background:rgba(98,211,148,.26);color:#b9f2d2}
+.zelle.u{background:rgba(255,96,88,.2);color:#ffb1ac}
+.zelle.leer{background:none;color:var(--stumm);font-weight:500}
+.zelle.neb{background:repeating-linear-gradient(135deg,rgba(154,167,186,.12) 0 4px,rgba(154,167,186,.04) 4px 8px);color:var(--leise)}
+.mx .tz .spalt{box-shadow:0 0 0 1px var(--gold)}
+/* Spielerliste */
+.sl .th,.sl .tz{grid-template-columns:3em minmax(10em,1.2fr) minmax(7em,.7fr) 5.5em 4.6em 4.2em repeat(4,3.6em) minmax(11em,1.7fr) 3.6em;gap:.55em}
+.sl .tz{flex:none;height:2.3em;max-height:none;cursor:pointer}
+.sl .eig{display:grid;grid-template-columns:3.6em minmax(0,1fr);gap:.5em;align-items:center}
+.sl .eig b{text-align:right;font-size:1.08em}
+.bereich{color:var(--leise);font-weight:600;white-space:nowrap}
+.dzw{flex:none;display:flex;gap:.25em;padding:.45em .6em;border-bottom:1px solid var(--linie);overflow:hidden}
+.dzw button{flex:1 1 0;min-width:0;height:2.6em;border-radius:6px;border:1px solid var(--linie);display:grid;place-items:center;background:var(--flaeche-2);border-top:3px solid var(--kc,var(--linie-2))}
+.dzw button img{width:1.7em;height:1.7em;object-fit:contain}
+.dzw button.ges{flex:1.6 1 0;font-weight:700;font-size:.82em;letter-spacing:.08em;text-transform:uppercase;color:var(--leise)}
+.dzw button:hover{background:var(--flaeche-3)}
+.dzw button[aria-pressed=true]{border-color:var(--gold);background:rgba(240,195,90,.16);color:var(--gold)}
+.fchip{display:inline-flex;gap:.25em}
+.fchip button{height:1.9em;padding:0 .55em;border-radius:6px;border:1px solid color-mix(in srgb,var(--kf) 50%,transparent);color:var(--kf);font-weight:700;font-size:.82em;letter-spacing:.06em}
+.fchip button[aria-pressed=true]{background:var(--kf);color:#0b0d12}
+/* Kontext */
+.kx{flex:1;min-height:0;display:flex;flex-direction:column;gap:.5em;padding:.75em;overflow:hidden}
+.kx .kopf{flex:none;display:flex;gap:.7em;align-items:center}
+.kx .kopf img.gr{width:3.6em;height:3.6em;border-radius:.5em;object-fit:cover;border:1px solid var(--linie-2);flex:none}
+.kx .kopf h3{margin:0;font:400 1.45em/1.05 var(--haus);color:#fff}
+.kx .kopf p{margin:.2em 0 0;font-size:.88em;color:var(--leise)}
+.kx h4{margin:0;font-size:.74em;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600;display:flex;gap:.5em;align-items:center}
+.kx h4 span{flex:1;height:1px;background:var(--linie)}
+.pap{flex:none;display:grid;gap:.3em}
+.pap .pz{display:grid;grid-template-columns:3.2em minmax(0,1fr) 3.3em 1.3em 3.3em 3.4em;gap:.45em;align-items:center}
+.pap .pz.kp{font-size:.72em;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600}
+.pap .ax{font-weight:700;letter-spacing:.06em}
+.dli{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:.22em;overflow:hidden}
+.dli .dz{flex:1 1 0;min-height:1.2em;max-height:2.3em;font-size:.94em;display:grid;grid-template-columns:1.6em minmax(0,1fr) 3.2em 3.2em 3.4em;gap:.45em;align-items:center}
+.dli .rgc{height:1.4em}
+.dli .dz-ic{width:1.3em;height:1.3em}
+.dli .dz b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dli .dz.kp{flex:none;min-height:0;font-size:.72em;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600}
+.diff{font-weight:700;text-align:right;white-space:nowrap}
+.kx .po-g{width:4.6em;height:4.6em;border-radius:.5em;object-fit:cover;border:2px solid var(--kf,var(--linie-2));flex:none}
+</style>
+</head>
+<body>
+<div class="demo" id="demo"></div>
+<div class="app">
+  <nav class="rail" id="rail" aria-label="Hauptnavigation"></nav>
+  <main>
+    <header class="hero">
+      <div class="kul"></div>
+      <div class="hk" id="hk"></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Sicht"></div>
+      <div class="hr" id="hr"></div>
+    </header>
+    <div class="work">
+      <section class="pan" id="p1" aria-label="Rangliste"></section>
+      <aside class="pan" id="p2" aria-label="Profil"></aside>
+    </div>
+  </main>
+</div>
+<script src="kredite-ranks-leaders-22-11/daten.js"></script>
+<script src="kredite-ranks-leaders-22-11/basis.js"></script>
+<script>
+var KATI={pow:0,spe:1,men:2,soc:3};
+/* Disziplinen nach Bereich geordnet (POW, SPE, MEN, SOC), darin wie im Spiel */
+var DO=DZ.map(function(d,i){return i}).sort(function(a,b){return KATI[DZ[a].kat]-KATI[DZ[b].kat]||a-b});
+var GESPIELT=DZ.map(function(){return 0});O.plan.slice(0,O.stand.gebucht).forEach(function(p){GESPIELT[p[0]]++;GESPIELT[p[1]]++});
+var dStart=DZ.findIndex(function(d){return d.id===Q.get("d")});
+var Z={sicht:Q.get("sicht")==="spieler"?"spieler":"teams",mass:Q.get("mass")==="punkte"?"punkte":"staerke",zeige:Q.get("zeige")==="wert"?"wert":"rang",
+       liga:Q.get("liga")||"eigene",d:dStart,sel:TB[Q.get("sel")]?Q.get("sel"):ICH,selSp:-1,nebel:Q.get("nebel")!=="0",kader:Q.get("kader")==="1",kf:null,
+       soT:{k:"ges",d:1},soS:{k:"eig",d:-1}};
+function inLiga(l){return Z.liga==="alle"||(Z.liga==="eigene"?l===WIR.liga:l!==WIR.liga)}
+function ligaName(){return Z.liga==="alle"?"alle 32":"Liga "+(Z.liga==="eigene"?WIR.liga:3-WIR.liga)}
+/* ---------- Werte ---------- */
+function wertT(t,k,mass){
+  if(mass==="staerke")return k==="ges"?t.st6:k[0]==="a"?t.ax[+k.slice(1)]:t.ds[+k.slice(1)];
+  if(k==="ges")return t.pkt; if(k[0]==="a")return t.dpa[+k.slice(1)];
+  var i=+k.slice(1);return GESPIELT[i]?t.e1[i]:null;
+}
+var KEYS=["ges","a0","a1","a2","a3"].concat(DO.map(function(i){return "d"+i}));
+/* Raenge je Spalte: in der gewaehlten Liga und unter allen 32. Hoeher ist besser, Rang 1 = bester. */
+function rangTabelle(liste,mass){var o={};KEYS.forEach(function(k){var l=liste.filter(function(t){return wertT(t,k,mass)!=null});var m=raenge(l,function(t){return wertT(t,k,mass)},true);o[k]={};l.forEach(function(t){o[k][t.id]=m.get(t)})});return o}
+var RA={staerke:rangTabelle(TEAMS,"staerke"),punkte:rangTabelle(TEAMS,"punkte")}, RL={};
+function rl(mass){var key=mass+Z.liga;if(!RL[key])RL[key]=rangTabelle(TEAMS.filter(function(t){return inLiga(t.liga)}),mass);return RL[key]}
+function stufe(v,s){var f=Math.floor(v/s)*s;return f+"–"+(f+s)}
+function zelle(r,n,extra){if(r==null)return '<span class="zelle leer">–</span>';var q=n>1?(r-1)/(n-1):0;return '<span class="zelle t '+(r===1?'r1':q<=.25?'o':q>=.75?'u':'')+(extra||'')+'">'+r+'</span>'}
+function spTitel(k){return k==="ges"?"Gesamt":k[0]==="a"?AXL[+k.slice(1)]:DZ[+k.slice(1)].name}
+
+/* ---------- Kopf ---------- */
+function baueKopf(){
+  document.getElementById("rail").innerHTML=rail("rang");
+  var rs=RA.staerke.ges[ICH],rp=RA.punkte.ges[ICH],ligaT=TEAMS.filter(function(t){return t.liga===WIR.liga});
+  var rsl=raenge(ligaT,function(t){return t.st6},true).get(WIR);
+  document.getElementById("hk").innerHTML='<div class="crest"><img src="../'+logo(ICH)+'" alt=""></div><div><h1>Ranks</h1><div class="sub"><b>'+esc(WIR.name)+'</b> · Liga '+WIR.liga+' · Saison '+O.stand.saison+' · nach Spieltag '+O.stand.gebucht+'</div></div>';
+  var tabs=[["teams","team","Stärke und Ertrag","Teams","32","Teams"],["spieler","spieler","Eignung je Disziplin","Spieler",String(SP.length),"im Kader"]];
+  document.getElementById("tabs").innerHTML=tabs.map(function(t){return '<button type="button" class="dtab'+(Z.sicht===t[0]?' an':'')+'" role="tab" aria-selected="'+(Z.sicht===t[0])+'" data-sicht="'+t[0]+'"><span class="ic">'+ic(t[1])+'</span><span><em>'+t[2]+'</em><b>'+t[3]+'</b></span><span class="erw"><strong class="t">'+t[4]+'</strong><span>'+t[5]+'</span></span></button>'}).join("");
+  document.getElementById("hr").innerHTML='<div class="frist"><span class="gk">Kaderstärke · beste 6</span><strong class="t">Rang '+rsl+' <small style="display:inline">von 16 · '+rs+'/32</small></strong><small>Tabelle: Platz '+WIR.rang+' · '+rp+'/32 nach Punkten</small></div>';
+}
+
+/* ---------- Teams: Matrix ---------- */
+function baueTeams(){
+  var liste=TEAMS.filter(function(t){return inLiga(t.liga)}),R=rl(Z.mass),n=liste.length,so=Z.soT;
+  /* sortiert wird nach dem Rang der Spalte; fehlender Wert ans Ende */
+  var sort=so.k==="team"?sortiere(liste,function(t){return t.name},so.d):sortiere(liste,function(t){return R[so.k][t.id]==null?null:R[so.k][t.id]},so.d,function(t){return t.name});
+  var h='<div class="pk"><h2>Team-Ränge</h2><div class="seg" role="group" aria-label="Lesart"><button type="button" data-mass="staerke" aria-pressed="'+(Z.mass==="staerke")+'" data-tip="Papierform: Mittel der besten sechs Spieler des Kaders, je Disziplin deren Eignung">Stärke</button><button type="button" data-mass="punkte" aria-pressed="'+(Z.mass==="punkte")+'" data-tip="Ertrag: Tabellenpunkte gesamt und je Bereich, je Disziplin die Ergebnispunkte (0 bis 10 je Begegnung)">Punkte</button></div>'+
+    '<div class="seg" role="group" aria-label="Anzeige"><button type="button" data-zeige="rang" aria-pressed="'+(Z.zeige==="rang")+'">Rang</button><button type="button" data-zeige="wert" aria-pressed="'+(Z.zeige==="wert")+'">Wert</button></div><span class="sp"></span>'+
+    '<div class="seg" role="group" aria-label="Liga"><button type="button" data-liga="eigene" aria-pressed="'+(Z.liga==="eigene")+'">Liga '+WIR.liga+'</button><button type="button" data-liga="andere" aria-pressed="'+(Z.liga==="andere")+'">Liga '+(3-WIR.liga)+'</button><button type="button" data-liga="alle" aria-pressed="'+(Z.liga==="alle")+'">Alle 32</button></div></div>';
+  h+='<div class="tl mx"><div class="th"><span class="m">#</span>'+kopf("team","Team",so,"tm");
+  KEYS.forEach(function(k,j){var kc=k==="ges"?"var(--gold)":k[0]==="a"?"var(--"+AX[+k.slice(1)]+")":"var(--"+DZ[+k.slice(1)].kat+")";
+    var inhalt=k==="ges"?"Ges.":k[0]==="a"?AXN[+k.slice(1)]:dzIcon(+k.slice(1));
+    h+='<button type="button" class="m'+(so.k===k?' so':'')+(j===5?' gr':'')+(j>17?' tipl':j<3?' tipll':'')+'" style="--kc:'+kc+'" data-so="'+k+'" data-tip="'+esc(spTitel(k))+(k[0]==="d"&&Z.mass==="punkte"?' · '+GESPIELT[+k.slice(1)]+' von 2 gespielt':'')+'">'+inhalt+'<span class="pf">'+(so.k===k&&so.d<0?"▲":"▼")+'</span></button>'});
+  h+='</div>';
+  sort.forEach(function(t){
+    var fremd=t.id!==ICH&&Z.nebel&&Z.mass==="staerke",rSort=so.k==="team"?R.ges[t.id]:R[so.k][t.id],rkAll=RA[Z.mass][so.k==="team"?"ges":so.k][t.id];
+    h+='<div class="tz'+(t.id===ICH?' wir':'')+(t.id===Z.sel?' sel':'')+'" data-sel="'+t.id+'" tabindex="0"><span class="rg m t">'+(rSort==null?'–':rSort)+(Z.liga!=="alle"&&rkAll!=null?'<small>'+rkAll+'/32</small>':'')+'</span>'+teamZ(t.id);
+    KEYS.forEach(function(k){var r=R[k][t.id],v=wertT(t,k,Z.mass),sp=so.k===k?' spalt':'';
+      if(Z.zeige==="rang"){h+=zelle(r,n,sp).replace('<span class="zelle','<span data-tip="'+esc(spTitel(k))+': '+(v==null?'noch nicht gespielt':(fremd?'Stufe '+stufe(v,5):(Z.mass==="staerke"?z1(v):v+(k[0]==="d"?' Ergebnispunkte':' Punkte')))+' · '+RA[Z.mass][k][t.id]+'/32')+'" class="zelle')}
+      else{var q=r==null?null:n>1?(r-1)/(n-1):0;h+=v==null?'<span class="zelle leer">–</span>':'<span class="zelle w t '+(fremd?'neb':r===1?'r1':q<=.25?'o':q>=.75?'u':'')+sp+'">'+(fremd?stufe(v,5):Z.mass==="staerke"?z1(v):v)+'</span>'}
+    });
+    h+='</div>'});
+  h+='</div><div class="kf"><span><b>'+(Z.mass==="staerke"?'Stärke':'Punkte')+'</b> · Rang in '+ligaName()+', klein unter allen 32</span><span>Gold = Rang 1 · grün = bestes Viertel · rot = letztes Viertel</span><span class="sp"></span><span>'+(Z.mass==="staerke"?(Z.nebel?'Fremde Werte nur als 5er-Stufe, der Rang ist öffentlich':'Nebel aus: alle Werte exakt'):'Spalte je Disziplin = Medaillenwertung (Ergebnispunkte)')+'</span></div>';
+  document.getElementById("p1").innerHTML=h;
+}
+function baueTeamProfil(){
+  var t=TB[Z.sel],fremd=t.id!==ICH&&Z.nebel,ligaT=TEAMS.filter(function(x){return x.liga===t.liga});
+  var RS=rangTabelle(ligaT,"staerke"),RP=rangTabelle(ligaT,"punkte");
+  function chip(r){if(r==null)return '<span class="rgc null">–</span>';var q=(r-1)/15;return '<span class="rgc t" style="'+(r===1?'background:var(--gold);color:#17120a':q<=.25?'background:rgba(98,211,148,.26);color:#b9f2d2':q>=.75?'background:rgba(255,96,88,.2);color:#ffb1ac':'')+'">'+r+'</span>'}
+  function diff(s,p){if(s==null||p==null)return '<span class="diff null">–</span>';var d=s-p;return '<span class="diff t '+(d>0?'plus':d<0?'minus':'null')+'">'+(d>0?'+'+d:d<0?'−'+(-d):'±0')+'</span>'}
+  var h='<div class="pk"><h2>Profil</h2><span class="sp"></span><span class="hin">Zeile anklicken</span></div><div class="kx">';
+  h+='<div class="kopf"><img class="gr" src="../'+logo(t.id)+'" alt=""><div><h3>'+esc(t.name)+'</h3><p>Liga '+t.liga+' · Platz '+t.rang+' · '+t.pkt+' Punkte · Kader '+t.kn+(t.mensch?' · <b class="gold">'+esc(t.eigner)+'</b>':'')+'</p></div></div>';
+  h+='<h4>Papierform gegen Ertrag<span></span></h4><div class="pap"><div class="pz kp"><span></span><span>Stärke beste 6</span><span class="m">Stärke</span><span></span><span class="m">Punkte</span><span class="r">Ertrag</span></div>';
+  [["ges","Ges.","var(--gold)",t.st6]].concat(AX.map(function(a,i){return ["a"+i,AXN[i],"var(--"+a+")",t.ax[i]]})).forEach(function(x){
+    h+='<div class="pz"><span class="ax" style="color:'+x[2]+'">'+x[1]+'</span><span style="display:grid;grid-template-columns:minmax(0,1fr) 3.4em;gap:.4em;align-items:center"><span class="bk"><i style="width:'+Math.min(100,x[3]/70*100)+'%;--bf:'+x[2]+'"></i></span><span class="t r leise" style="font-size:.9em">'+(fremd?stufe(x[3],5):z1(x[3]))+'</span></span>'+chip(RS[x[0]][t.id])+'<span class="m stumm">→</span>'+chip(RP[x[0]][t.id])+diff(RS[x[0]][t.id],RP[x[0]][t.id])+'</div>'});
+  h+='</div>';
+  /* Disziplinen: nach Staerke-Rang, mit Punkte-Rang und Differenz */
+  var dl=DO.map(function(i){return {i:i,s:RS["d"+i][t.id],p:RP["d"+i][t.id]}}).sort(function(a,b){return a.s-b.s||a.i-b.i});
+  h+='<h4>Alle 20 Disziplinen · Rang in Liga '+t.liga+'<span></span></h4><div class="dli"><div class="dz kp"><span></span><span>Disziplin</span><span class="m">Stärke</span><span class="m">Punkte</span><span class="r">Ertrag</span></div>';
+  dl.forEach(function(x){h+='<div class="dz"><span>'+dzIcon(x.i)+'</span><b style="color:var(--'+DZ[x.i].kat+')">'+esc(DZ[x.i].name)+'</b>'+chip(x.s)+chip(x.p)+diff(x.s,x.p)+'</div>'});
+  h+='</div>';
+  h+=fremd?'<div class="nebel">'+ic("scout")+'<span><b>Fremdes Team:</b> Ränge sind öffentlich, Werte nur als 5er-Stufe. Exakt erst bei vollem Scouting.</span></div>':'<div class="nebel" style="border-style:solid">'+ic("info")+'<span><b>Ertrag</b> = Stärke-Rang minus Punkte-Rang. Grün: das Team holt mehr, als die Papierform verspricht.</span></div>';
+  document.getElementById("p2").innerHTML=h+'</div>';
+}
+
+/* ---------- Spieler ---------- */
+function fog(p){return Z.nebel&&p.t!==ICH}
+function wS(p,k){var v=k==="ges"?p.ov:k[0]==="a"?p.cs[+k.slice(1)]:p.dr[+k.slice(1)];return fog(p)?Math.floor(v/10)*10:v}
+function zS(p,k){var v=k==="ges"?p.ov:k[0]==="a"?p.cs[+k.slice(1)]:p.dr[+k.slice(1)];return fog(p)?stufe(v,10):(k==="ges"?z1(v):String(v))}
+function baueSpieler(){
+  var ek=Z.d<0?"ges":"d"+Z.d,pool=SP.filter(function(p){return inLiga(TB[p.t].liga)}),so=Z.soS;
+  var rg=raenge(pool,function(p){return wS(p,ek)},true),rgA=raenge(SP,function(p){return wS(p,ek)},true);
+  var liste=pool.filter(function(p){return (!Z.kader||p.t===ICH)&&(!Z.kf||KLF[p.k]===Z.kf)});
+  var W={name:function(p){return p.n},kl:function(p){return p.k},ra:function(p){return p.r},team:function(p){return p.t},ges:function(p){return wS(p,"ges")},a0:function(p){return wS(p,"a0")},a1:function(p){return wS(p,"a1")},a2:function(p){return wS(p,"a2")},a3:function(p){return wS(p,"a3")},eig:function(p){return wS(p,ek)},pp:function(p){return p.pp}};
+  var sort=sortiere(liste,W[so.k],so.d,function(p){return p.n});
+  if(Z.selSp<0||liste.indexOf(SP[Z.selSp])<0)Z.selSp=SP.indexOf(sort[0]);
+  var dn=Z.d<0?"Gesamt":DZ[Z.d].name;
+  var h='<div class="pk"><h2>Spieler-Ränge</h2><span class="bereich">'+esc(dn)+'</span><span class="sp"></span><span class="fchip" role="group" aria-label="Klassenfarbe">'+AX.map(function(a,i){return '<button type="button" style="--kf:var(--'+a+')" data-kf="'+a+'" aria-pressed="'+(Z.kf===a)+'" data-tip="Nur Klassen der Farbe '+AXN[i]+'">'+AXN[i]+'</button>'}).join("")+'</span>'+
+    '<div class="seg"><button type="button" data-kader="0" aria-pressed="'+(!Z.kader)+'">Alle</button><button type="button" data-kader="1" aria-pressed="'+Z.kader+'">Mein Kader</button></div>'+
+    '<div class="seg" role="group" aria-label="Liga"><button type="button" data-liga="eigene" aria-pressed="'+(Z.liga==="eigene")+'">Liga '+WIR.liga+'</button><button type="button" data-liga="andere" aria-pressed="'+(Z.liga==="andere")+'">Liga '+(3-WIR.liga)+'</button><button type="button" data-liga="alle" aria-pressed="'+(Z.liga==="alle")+'">Alle 32</button></div></div>';
+  h+='<div class="dzw" role="group" aria-label="Disziplin"><button type="button" class="ges" data-d="-1" aria-pressed="'+(Z.d<0)+'" style="--kc:var(--gold)">Gesamt</button>'+DO.map(function(i,j){return '<button type="button" class="'+(j>15?'tipl':j<3?'tipll':'')+'" data-d="'+i+'" aria-pressed="'+(Z.d===i)+'" style="--kc:var(--'+DZ[i].kat+')" data-tip="'+esc(DZ[i].name)+' · '+DZ[i].n+' Spieler je Team">'+dzIcon(i)+'</button>'}).join("")+'</div>';
+  h+='<div class="tl sl"><div class="th">'+kopf("eig","#",so,"m tipll","Rang nach Eignung "+dn+" in "+ligaName()+", klein unter allen 32")+kopf("name","Spieler",so)+kopf("kl","Klasse",so)+kopf("ra","Rasse",so)+kopf("team","Team",so)+kopf("ges","Ges.",so,"r")+AX.map(function(a,i){return kopf("a"+i,'<span style="color:var(--'+a+')">'+AXN[i]+'</span>',so,"r")}).join("")+kopf("eig","Eignung "+esc(dn),so)+kopf("pp","PP",so,"r tipl","Player Points der Saison (öffentlich)")+'</div>';
+  sort.slice(0,120).forEach(function(p){var f=fog(p),r=rg.get(p),v=Z.d<0?p.ov:p.dr[Z.d],idx=SP.indexOf(p);
+    h+='<div class="tz'+(p.t===ICH?' wir':'')+(idx===Z.selSp?' sel':'')+'" data-sp="'+idx+'" tabindex="0"><span class="rg m t">'+r+(Z.liga!=="alle"?'<small>'+rgA.get(p)+'/'+SP.length+'</small>':'')+'</span><span class="sp-z">'+portrait(p)+'<b>'+esc(p.n)+'</b>'+(p.v?'<span class="marke rot" data-tip="Verletzt: nicht einsetzbar">verl.</span>':'')+'</span>'+klasse(p.k)+'<span class="leise" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.r)+'</span>'+teamZ(p.t,false)+
+      '<span class="r z t">'+zS(p,"ges")+'</span>'+[0,1,2,3].map(function(i){return '<span class="r t'+(f?' stumm':'')+'" style="'+(f?'font-size:.86em':'')+'">'+zS(p,"a"+i)+'</span>'}).join("")+
+      '<span class="eig"><b class="t'+(f?' leise':'')+'" style="'+(f?'font-size:.92em':'')+'">'+zS(p,ek)+'</b>'+(f?'<span class="bk" style="height:.6em"><i style="left:'+Math.floor(v/10)*10+'%;width:10%;--bf:repeating-linear-gradient(135deg,#9aa7ba 0 3px,#66738a 3px 6px)"></i></span>':'<span class="bk" style="height:.6em"><i style="width:'+v+'%;--bf:var(--'+(Z.d<0?'gold':DZ[Z.d].kat)+')"></i></span>')+'</span><span class="r t leise">'+z1(p.pp)+'</span></div>'});
+  h+='</div><div class="kf"><span><b>'+liste.length+' Spieler</b> · '+ligaName()+(sort.length>120?' · die ersten 120':'')+'</span><span class="sp"></span><span>'+(Z.nebel?'Nebel: fremde Werte in festen 10er-Stufen, Sortierung nach Stufe, dann Name. Eigene exakt.':'Nebel aus (Einstellung): alle Werte exakt')+'</span></div>';
+  document.getElementById("p1").innerHTML=h;
+}
+function baueSpielerProfil(){
+  var p=SP[Z.selSp],f=fog(p),pool=SP.filter(function(x){return TB[x.t].liga===TB[p.t].liga}),kf=KLF[p.k];
+  var h='<div class="pk"><h2>Profil</h2><span class="sp"></span><span class="hin">Zeile anklicken</span></div><div class="kx">';
+  h+='<div class="kopf" style="--kf:var(--'+kf+')">'+(p.s?'<img class="po-g" src="../portraits/'+p.s+'.jpg" alt="">':'<span class="po-g"></span>')+'<div><h3>'+esc(p.n)+'</h3><p style="display:flex;gap:.6em;align-items:center;flex-wrap:wrap">'+klasse(p.k)+'<span><img src="../race-icons/'+p.r+'.png" alt="" style="display:inline-block;width:1.2em;height:1.2em;vertical-align:-.2em;object-fit:contain"> '+esc(p.r)+'</span></p><p>'+teamZ(p.t)+'</p></div></div>';
+  h+='<h4>Bereiche · Rang in Liga '+TB[p.t].liga+'<span></span></h4><div class="pap">';
+  [["ges","Ges.","var(--gold)",p.ov]].concat(AX.map(function(a,i){return ["a"+i,AXN[i],"var(--"+a+")",p.cs[i]]})).forEach(function(x){var r=raenge(pool,function(q){return wS(q,x[0])},true).get(p);
+    h+='<div class="pz" style="grid-template-columns:3.2em minmax(0,1fr) 4.2em 3.6em"><span class="ax" style="color:'+x[2]+'">'+x[1]+'</span><span class="bk">'+(f?'<i style="left:'+Math.floor(x[3]/10)*10+'%;width:10%;--bf:#9aa7ba"></i>':'<i style="width:'+x[3]+'%;--bf:'+x[2]+'"></i>')+'</span><span class="r t"><b>'+zS(p,x[0])+'</b></span><span class="rgc t">'+r+'</span></div>'});
+  h+='</div>';
+  var dl=DO.map(function(i){return {i:i,v:p.dr[i],r:raenge(pool,function(q){return wS(q,"d"+i)},true).get(p)}}).sort(function(a,b){return wS(p,"d"+b.i)-wS(p,"d"+a.i)||a.i-b.i});
+  h+='<h4>Disziplinen nach Eignung<span></span></h4><div class="dli"><div class="dz kp" style="grid-template-columns:1.6em minmax(0,1fr) 4.2em 3.4em 3em"><span></span><span>Disziplin</span><span class="r">Eignung</span><span class="m">Rang</span><span class="r">PP</span></div>';
+  dl.forEach(function(x){h+='<div class="dz" style="grid-template-columns:1.6em minmax(0,1fr) 4.2em 3.4em 3em"><span>'+dzIcon(x.i)+'</span><b style="color:var(--'+DZ[x.i].kat+')">'+esc(DZ[x.i].name)+'</b><span class="r t">'+zS(p,"d"+x.i)+'</span><span class="rgc t">'+x.r+'</span><span class="r t leise">'+(p.pd[x.i]?z1(p.pd[x.i]):'–')+'</span></div>'});
+  h+='</div>';
+  h+=f?'<div class="nebel">'+ic("scout")+'<span><b>Unbekannt:</b> feste 10er-Stufen. Sie verraten nicht, wo im Bereich der Wert liegt. Der Rang ist der Rang der Stufe. PP sind öffentlich.</span></div>':'<div class="nebel" style="border-style:solid">'+ic("info")+'<span><b>Eigener Spieler:</b> alle Werte exakt. Rang gegen die Stufen der fremden Spieler.</span></div>';
+  document.getElementById("p2").innerHTML=h+'</div>';
+}
+function baueDemo(){
+  document.getElementById("demo").innerHTML='<b>Mockup Ranks</b>'+demoKnopf("nebel","1","Nebel an",Z.nebel)+demoKnopf("nebel","0","Nebel aus (Einstellung)",!Z.nebel)+'<span class="sp"></span><a href="kredite-modern-22-11.html">Kredite</a><a href="leaders-modern-22-11.html">Leaders</a>';
+}
+function alles(){baueDemo();baueKopf();if(Z.sicht==="teams"){baueTeams();baueTeamProfil()}else{baueSpieler();baueSpielerProfil()}}
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-dk]");if(b){Z.nebel=b.dataset.dv==="1";setzeUrl("nebel",Z.nebel?null:"0");alles();return}
+  b=e.target.closest("[data-sicht]");if(b){Z.sicht=b.dataset.sicht;setzeUrl("sicht",Z.sicht);alles();return}
+  b=e.target.closest("[data-mass]");if(b){Z.mass=b.dataset.mass;alles();return}
+  b=e.target.closest("[data-zeige]");if(b){Z.zeige=b.dataset.zeige;alles();return}
+  b=e.target.closest("[data-liga]");if(b){Z.liga=b.dataset.liga;if(Z.sicht==="teams"&&Z.liga!=="alle"&&!inLiga(TB[Z.sel].liga))Z.sel=TEAMS.filter(function(t){return inLiga(t.liga)})[0].id;alles();return}
+  b=e.target.closest("[data-kader]");if(b){Z.kader=b.dataset.kader==="1";alles();return}
+  b=e.target.closest("[data-kf]");if(b){Z.kf=Z.kf===b.dataset.kf?null:b.dataset.kf;alles();return}
+  b=e.target.closest("[data-d]");if(b){Z.d=+b.dataset.d;Z.soS={k:"eig",d:-1};alles();return}
+  b=e.target.closest("[data-so]");if(b){var k=b.dataset.so;
+    if(Z.sicht==="teams")Z.soT=Z.soT.k===k?{k:k,d:-Z.soT.d}:{k:k,d:1};
+    else Z.soS=Z.soS.k===k?{k:k,d:-Z.soS.d}:{k:k,d:(k==="name"||k==="kl"||k==="ra"||k==="team")?1:-1};
+    alles();return}
+  b=e.target.closest("[data-sel]");if(b){Z.sel=b.dataset.sel;alles();return}
+  b=e.target.closest("[data-sp]");if(b){Z.selSp=+b.dataset.sp;alles();return}
+});
+alles();
+</script>
+</body>
+</html>

@@ -81,7 +81,7 @@ Office als Blatt, Arena ohne Schiene, Sendewisch, Meldungen in der Arena, Slot a
 | 24 | Dialoge Kauf, Verkauf, Vertragsangebot, Vertragsverlängerung | `FoundationMarketBuyShellHost` (CSS „F1 Kauf-Modal Velo-Layer“), `FoundationMarketSellShellHost`, `ContractRenewalNegotiationModal.tsx` (807 Zeilen), `contract-offer/ContractOfferClient.tsx` | **alt.** nl 41 / 76 (Modal), `contract-` 13 / 25 | ◐ `docs/design/kauf-modal-mockup.html`, `verkauf-popup-mockup.html` (14.11., alter Stil, vor dem Designsystem) | nichts | Kassenprüfung gegen Budgetfreigabe, Pflichtkredit-Hinweis, Abschlag beim Verkauf | 2 (mit 22) | M |
 | 25 | Scouting (Übersicht, Scouting-Report) | `scoutingCenterV2`, `scouting-center-v2/` (8 Dateien, 1960 Zeilen) | **alt.** nl 58 / 81 im Hauptfile, `velo` 23 Treffer; Block `.nl-scout` (52874–53156) | ✘ | nichts | Berichte zu Form/Moral/Verletzung, Wunschliste für Draft | 3 | M |
 | 26 | Transferhistorie | `historyV2`, `transfer-history-v2/TransferHistoryV2NewLook.tsx` (1206 Zeilen) | **alt.** nl 134 / 162, Block `.nl-thist` (53157–54020) | ✘ (Tabellen-Muster) | nichts | Verkaufsabschlag, Liga-Topf-Ausschüttung als Buchungszeile | 3 | S |
-| 27 | Kredite | `credits`, `credits/FoundationCreditsNewLook.tsx` (1447 Zeilen) | **alt.** nl 174 / 207 | ✘ (im Finanz-Mockup nur angerissen) | nichts | Pflichtkredit (2 Saisonen, 12 %, Schuldendienst ≤ 20 %), Rate je Spieltag, Zwangsverkauf durch den Vorstand | 2 (mit Finanzen) | M |
+| 27 | Kredite | `credits`, `credits/FoundationCreditsNewLook.tsx` (1447 Zeilen) | **alt.** nl 174 / 207 | ✔ `kredite-modern-22-11.html` + `docs/design/kredite-modern-22-11.md` (22.11., Vorschlag: Reiter der Finanzseite) | Mockup wartet auf „bau das“ | Pflichtkredit (2 Saisonen, 12 %, Schuldendienst ≤ 20 %), Rate je Spieltag, Zwangsverkauf durch den Vorstand | 2 (mit Finanzen) | M |
 | 28 | Finanzen | `finances`, `finances/FoundationFinancesNewLook.tsx` (1535 Zeilen) | **alt.** nl 145 / 190 | ✔ `finanzen-modern-18-11.html` und `finanzen-daten-modern-18-11.html` (Branch `claude/finanzkonzept-v2-18-11`), älter `finanzen-modern-17-11.html` | **#1582** (Draft, nur Konzept und Mockups, „gebaut wird erst nach Chris’ OK“); Bau-Reihenfolge Abschnitt 8 des Konzepts: Mechanik-Stufen 0–9, Seite ist Stufe 10 | Kasse je Spieltag (20 Raten), Tickets an Heimspielen, Rangbonus am Saisonende, Fan-Stimmung, Vorstand-Budgetfreigabe statt Geldstrafen, Apron-Neueichung, Kassensturz | 2 (Seite nach Mechanik-Stufen 4–5) | L |
 | 29 | Sponsoren | `prize`, `prize-v2/` + `sponsors-v2/FoundationSponsorsNewLook.tsx` (1804 Zeilen), `components/foundation/sponsor/` | **alt.** nl 138 / 180 und 91 / 111; Block `.nl-sponsor` (55709–56745, 261 Treffer) | ◐ Ärmel-/Disziplin-Sponsoren nur im Mockup vom 17.11. (im Konzept als „später“) | nichts | Sponsor zweigeteilt (Sockel in 20 Raten, Rangbonus am Ende), Gehaltsdeckel am Sponsor-Anker | 2 (mit Finanzen) | M |
 
@@ -89,9 +89,9 @@ Office als Blatt, Arena ohne Schiene, Sendewisch, Meldungen in der Arena, Slot a
 
 | # | Name | Route / View | Stil-Status und Beleg | Mockup | Bau | Neue Mechaniken | Welle | Aufwand |
 |---|---|---|---|---|---|---|---|---|
-| 30 | Ranks | `ranks`, `ranks-v2/FoundationRanksNewLook.tsx` (523 Zeilen) | **alt.** nl 44 / 62; Block `.nl-ranks` (81 Treffer) | ✘ (Tabellen-Muster aus Saisonstand) | nichts | Kaderstärke-Rang, Duellpunkte, Liga-Split 2×16 | 3 | S |
+| 30 | Ranks | `ranks`, `ranks-v2/FoundationRanksNewLook.tsx` (523 Zeilen) | **alt.** nl 44 / 62; Block `.nl-ranks` (81 Treffer) | ✔ `ranks-modern-22-11.html` + `docs/design/ranks-modern-22-11.md` (22.11., Rang-Matrix Stärke/Punkte, Spieler je Disziplin) | Mockup wartet auf „bau das“ | Kaderstärke-Rang, Duellpunkte, Liga-Split 2×16 | 3 | S |
 | 31 | Spielplan (View `diszis`) | `diszis`, `ranks-v2/FoundationDiszisNewLook.tsx` (510 Zeilen) | **alt.** nl 40 / 53 | ✘ | nichts | 20 Spieltage je Saison, Heim/Auswärts (Finanzen V2), Duell-Paarungen | 3 | S |
-| 32 | Leaders (Bestenlisten, Rekorde, Trophäenschrank, legendäre Spieler) | `leagueLeaders`, `league-leaders-v2/LeagueLeadersNewLook.tsx` (2470 Zeilen) | **alt.** nl 221 / 278; Block `.nl-leaders` (70 Treffer) | ✘ | nichts | PP-Skala (Bestenliste, MVP), Matchwinner | 3 | M |
+| 32 | Leaders (Bestenlisten, Rekorde, Trophäenschrank, legendäre Spieler) | `leagueLeaders`, `league-leaders-v2/LeagueLeadersNewLook.tsx` (2470 Zeilen) | **alt.** nl 221 / 278; Block `.nl-leaders` (70 Treffer) | ✔ `leaders-modern-22-11.html` + `docs/design/leaders-modern-22-11.md` (22.11., Spieler, Teams, Medaillen) | Mockup wartet auf „bau das“ | PP-Skala (Bestenliste, MVP), Matchwinner | 3 | M |
 | 33 | Lexikon | `encyclopedia`, **inline** in `FoundationShellRouterBody.tsx` (Zeilen 1754 ff.), `foundation-encyclopedia-*` | **alt.** eigene Altklassen, nicht ausgelagert | ✘ | nichts | alle neuen Begriffe (Duell 2/1/0, Kaderstärke, Papierform, Moral, Apron neu) | 3 | S |
 | 34 | Player Generator | `generator`, `PlayerGeneratorPanelNewLook.tsx` (1605 Zeilen) | **alt.** nl 164 / 189; Block `.nl-gen` (ab Zeile 76288) | ✘ (Werkzeug) | nichts | – | 4 | S (Tokens) |
 | 35 | Team-Einstellungen / Spielstände | `teamSettings`, `team-settings/FoundationTeamSettingsNewLook.tsx` (2895 Zeilen) | **alt.** nl 317 / 420 | ✘ | nichts | Steuerung (Mensch/KI), Identität inkl. Finanzwert 1–10 | 3 | M |
@@ -201,6 +201,21 @@ Nach dem Spieltag, Saisonstand, Finanzen, Rahmen, Basketball-HUD. Es fehlen, in 
 
 Danach ein einziges **Sammel-Mockup „Tabellen und Nachschlagen“** (Ranks, Spielplan, Leaders, Ewige Tabelle, Historie,
 Merkliste, Scouting): zeigt, dass der Saisonstand-Tabellenbaukasten fünf Seiten trägt, spart fünf Einzelmockups.
+
+## 4a. Nachtrag 22.11.: Mockups für Kredite, Ranks, Leaders
+
+Chris, 22.11.: „Bitte auch priorisiert noch anstoßen die noch offenen Seiten Kredite / Ranks / Leaders zu reworken“. Die drei
+Mockups liegen vor (Zeilen 27, 30, 32 oben), mit echten Daten aus dem Live-Abbild und je einer Erklärung. Sie teilen sich
+Stil und Daten unter `public/mockups/kredite-ranks-leaders-22-11/`. Gebaut wird nach „bau das“.
+
+| Seite | Kern des Vorschlags | Vor dem Bau zu klären |
+|---|---|---|
+| Kredite (27) | Reiter der Finanzseite statt eigener Navigationspunkt; Tilgungsplan, Rechner mit Wirkung auf Töpfe, GuV und Vorstand, Liga-Vergleich | Raten je Spieltag als eigene Mechanik; Zinsspanne (Code 7–20 %, Doku 5–12 %) |
+| Ranks (30) | Rang-Matrix Team × (Gesamt, 4 Bereiche, 20 Disziplinen), umschaltbar Stärke/Punkte; Spieler-Ränge je Disziplin mit Scouting-Nebel | eine Quelle für die Kaderstärke |
+| Leaders (32) | Spieler, Teams, Medaillen mit Saison-/Spieltagsfilter; rechts immer 20 Disziplin-Karten | Medaillen-Wertung in Pod-Disziplinen; Mehrsaison-Inhalte auf die Historie-Seite |
+
+Ranks und Leaders rücken damit aus dem Sammel-Mockup „Tabellen und Nachschlagen“ (Abschnitt 4) heraus; offen bleiben dort
+Spielplan, Ewige Tabelle, Merkliste und Scouting.
 
 ## 5. Altlasten: was nach dem Umbau je Seite gelöscht werden kann
 
