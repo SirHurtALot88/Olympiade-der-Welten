@@ -33,7 +33,7 @@ export {
 /**
  * Wie viele Teams dieselbe Dachmarke gleichzeitig im Angebots-Slate haben duerfen.
  *
- * Frueher 4 — daher tauchte z. B. "Webasto Comfort" bei vier Teams gleichzeitig auf und mehrere
+ * Frueher 4 — daher tauchte z. B. "Webasco Comfort" bei vier Teams gleichzeitig auf und mehrere
  * Teams hatten am Ende denselben Sponsor unter Vertrag. Bei 100 Marken war das auch noetig:
  * 32 Teams x 5 Angebote = 160 Angebote passen nicht in 100 Marken.
  *

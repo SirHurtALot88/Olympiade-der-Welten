@@ -34,6 +34,7 @@ import { stempleBasketballPuste } from "@/lib/resolve/basketball-puste";
 import { stempleBreakingFormat } from "@/lib/resolve/breaking-format";
 import { stempleBattlefieldFormat } from "@/lib/resolve/battlefield-format";
 import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
+import { migriereSponsorNamen } from "@/lib/sponsor/sponsor-namen-migration";
 import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
 import { withNegotiatedSalaryBenchmark } from "@/lib/contracts/negotiated-salary-benchmark";
 import { createGameStateFromSeed } from "@/lib/data/dataAdapter";
@@ -1442,7 +1443,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): gleiches Muster.
   // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): ohne Stempel rechnet die laufende Saison "alt" zu Ende.
   // BREAKING-FORMAT (22.11., lib/resolve/breaking-format.ts): gleiches Muster.
-  const gameStateWithoutBaseline = stempleFormkartenRegelNachLaden(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+  const gameStateWithoutBaseline = migriereSponsorNamen(stempleFormkartenRegelNachLaden(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
@@ -1466,7 +1467,8 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  )))))))));
+  ))))))))));
+  // SPONSOR-NAMEN (22.11.): gespeicherte Angebots-/Vertrags-/Ereignis-Namen auf die Parodienamen setzen (nur Anzeige, id bleibt).
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),

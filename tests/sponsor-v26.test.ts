@@ -83,17 +83,17 @@ describe("sponsor catalog v2.6", () => {
     expect(listSponsorBrandTemplates().length).toBe(SPONSOR_BRAND_VARIANTS.length);
   });
 
-  it("splits the catalog into 100 German and 100 international recognizable brands", () => {
+  it("splits the catalog into 100 German and 100 international brands with their own parody names", () => {
     const names = SPONSOR_BRAND_PARENTS.map((entry) => entry.name);
-    // Wiedererkennungswert vor Wortspiel: stark verfremdete Namen (frueher z. B. "Teslara Motors",
-    // "AlphaSearch Global", "Golden Arches Fast") sind durch erkennbare ersetzt.
-    expect(names).toContain("O.B.I. Baumarkt");
-    expect(names).toContain("Siemenswerk AG");
-    expect(names).toContain("Tesla Motors");
-    expect(names).toContain("Chrysler Motors");
-    expect(names).toContain("Samsung Electronics");
-    expect(names).toContain("LG Electronics");
-    expect(names).not.toContain("Teslara Motors");
+    // Seit 22.11. (Chris): eigene, an die Vorbilder angelehnte Namen; die echten stehen nur in
+    // sponsor-brand-alte-namen.ts (Sperrliste: tests/sponsor-namen.test.ts).
+    expect(names).toContain("Oberbau Baumarkt");
+    expect(names).toContain("Simmenswerk AG");
+    expect(names).toContain("Teslara Motors");
+    expect(names).toContain("Kreisler Motors");
+    expect(names).toContain("Samsang Electronics");
+    expect(names).toContain("LJ Electronics");
+    expect(names).not.toContain("Tesla Motors");
 
     const byRegion = SPONSOR_BRAND_PARENTS.reduce<Record<string, number>>((acc, entry) => {
       acc[entry.region] = (acc[entry.region] ?? 0) + 1;

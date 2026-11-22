@@ -151,9 +151,9 @@ Save eingefrorenen Verträge).
 
 | Slot | Marke | Karte | Achse | Kurve | Laufzeit | Vorschuss | Platz 1 | Platz 16 | Platz 32 | EV |
 |---|---|---|---|---|---|---|---:|---:|---:|---:|
-| 0 | WDR Sportpartner | Basis | — | meisterschale | 1 | — | 87,7 | 66,6 | 59,0 | 63,8 |
-| 1 | Leica Kamera | Achse | Solidität | koenigsklasse | 1 | 20,6 C | 88,8 | 66,7 | 58,8 | 63,8 |
-| 2 | RTL Deutschland | Achse | Entwicklung | conference | 3 | — | 76,6 | 70,4 | 54,3 | 63,8 |
+| 0 | WRD Sportpartner | Basis | — | meisterschale | 1 | — | 87,7 | 66,6 | 59,0 | 63,8 |
+| 1 | Leiko Kamera | Achse | Solidität | koenigsklasse | 1 | 20,6 C | 88,8 | 66,7 | 58,8 | 63,8 |
+| 2 | RTK Deutschland | Achse | Entwicklung | conference | 3 | — | 76,6 | 70,4 | 54,3 | 63,8 |
 | 3 | Axel Springer | Achse | Frische | sicherheit | 3 | — | 68,6 | 65,5 | 58,9 | 63,8 |
 | 4 | ProSiebenSat.1 | Achse | Kaderwert | aufsteiger | 1 | 18,7 C | 70,8 | 68,2 | 53,5 | 63,8 |
 
@@ -357,7 +357,7 @@ Wahl.
 
 ```
 ┌─ STARTKAPITAL ──────────────┐  ┌─ KONSTANTE ─────────────────┐  ┌─ ERFOLGSPRÄMIE ─────────────┐
-│  Volksbank Arena            │  │  WDR Sportpartner           │  │  Lidl Plus                  │
+│  Volksbank Arena            │  │  WRD Sportpartner           │  │  Liedl Plus                 │
 │                             │  │                             │  │                             │
 │         30 C                │  │        6,5 C                │  │       42–89 C               │
 │    sofort bei Unterschrift  │  │      je Spieltag            │  │      am Saisonende          │
@@ -407,7 +407,7 @@ Was bleibt: Marke, Wappen, drei bis vier Zahlen, ein Satz.
 
 ```
 ┌─ AKTIVER VERTRAG ───────────────────────────────────────────────────────────┐
-│  WDR Sportpartner · Konstante · 6,5 C je Spieltag                           │
+│  WRD Sportpartner · Konstante · 6,5 C je Spieltag                           │
 │                                                                             │
 │  Bisher erhalten   26 von 65 C     ▓▓▓▓▓▓▓▓░░░░░░░░░░░░  (4/10 Spieltage)   │
 │  Nächste Zahlung   6,5 C am 5. Spieltag                                     │

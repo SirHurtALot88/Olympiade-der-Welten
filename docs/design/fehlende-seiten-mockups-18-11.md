@@ -216,7 +216,7 @@ Jede Datei nennt im Kommentar am Anfang, was aus dem Spiel stammt und was erfund
   Karten. Elf davon wurden einzeln angesehen (zehn bei 1920×1080, eine bei 2560×1440); nachgebessert wurden abgeschnittene
   Kartentitel, die Spaltenbreiten der Wunschliste, die Zahl im Ring der Kurzliste und die Beschriftung des Vertrauensbogens.
 - Ein Bild ist einen Schritt älter als die Datei: `office-04-sponsor-angebote` zeigt die Marke „Empfohlen“ noch am mittleren
-  Angebot, im Mockup steht sie jetzt am ersten (Siemenswerk AG), passend zum Text darunter.
+  Angebot, im Mockup steht sie jetzt am ersten (Simmenswerk AG), passend zum Text darunter.
 - Nicht geprüft: Verhalten unter 1700 px Breite und auf dem Handy. Die Mockups sind wie die anderen auf 16:9 ab Full HD ausgelegt.
 
 ---
