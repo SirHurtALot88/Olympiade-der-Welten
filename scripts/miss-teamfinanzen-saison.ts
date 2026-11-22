@@ -507,6 +507,8 @@ async function main() {
     // Spieltage
     const md = get().gameState.season.matchdayIds.length;
     const kasseJeSpieltag: Record<string, number[]> = {};
+    // Chris 22.11.: gleichzeitig verletzte Spieler je Team und Spieltag (Verletzt/Genesend laut Verfuegbarkeitsstand) - Entscheidung, ob 14 als Kadergrenze reicht.
+    const verletztJeSpieltag: Record<string, number[]> = {};
     const ts = Date.now();
     for (let i = ersterIdx; i < md; i += 1) {
       const cur = get();
@@ -520,11 +522,20 @@ async function main() {
       const adv = await executeMatchdayAdvance({ saveId, seasonId: sid, source: "sqlite", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN }, persistence);
       if (!adv.ok || !adv.applied) { log(`Wechsel blockiert: ${adv.blockingReasons.join(" | ")}`); break; }
       for (const t of get().gameState.teams) (kasseJeSpieltag[t.teamId] ??= []).push(r2(t.cash));
+      {
+        const g = get().gameState;
+        const roster = new Set(g.rosters.map((r) => `${r.teamId}|${r.playerId}`));
+        const je: Record<string, number> = {};
+        for (const a of g.seasonState.playerAvailabilityState ?? []) {
+          if ((a.injuryStatus === "injured" || a.injuryStatus === "recovering") && roster.has(`${a.teamId}|${a.playerId}`)) je[a.teamId] = (je[a.teamId] ?? 0) + 1;
+        }
+        for (const t of g.teams) (verletztJeSpieltag[t.teamId] ??= []).push(je[t.teamId] ?? 0);
+      }
       if ((i + 1) % 5 === 0) log(`${praefix} Spieltag ${i + 1}/${md} (${((Date.now() - ts) / 1000).toFixed(0)}s)`);
     }
     const vorAbschluss = get().gameState;
     phasen[`${praefix}_03_nach_spieltagen`] = {
-      snap: snap(vorAbschluss), kasseJeSpieltag,
+      snap: snap(vorAbschluss), kasseJeSpieltag, verletztJeSpieltag,
       sponsorEvents: (vorAbschluss.seasonState.sponsorEvents ?? []).filter((e) => (e as { seasonId?: string }).seasonId === sid || true).length,
     };
     schreibe();
