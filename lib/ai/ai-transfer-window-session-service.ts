@@ -40,6 +40,7 @@ import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/ty
 import type { ContractStatus, GameState, Player } from "@/lib/data/olyDataTypes";
 import { isRecentlySoldBySameTeam } from "@/lib/market/anti-rebuy-guard";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { getTransferControlSettings } from "@/lib/ai/ki-delegierte-transfers";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
@@ -133,7 +134,7 @@ export function resolvePreseasonNachzueglerTeamIds(gameState: GameState): string
   return gameState.teams
     .filter((team) => {
       const controlMode =
-        getTeamControlSettings(gameState, team.teamId)?.controlMode ??
+        getTransferControlSettings(gameState, team.teamId)?.controlMode ??
         (team.humanControlled ? "manual" : "ai");
       if (controlMode !== "ai") {
         return false;
@@ -753,7 +754,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
       gameState.teams
         .filter((team) => {
           const controlMode =
-            getTeamControlSettings(gameState, team.teamId)?.controlMode ?? (team.humanControlled ? "manual" : "ai");
+            getTransferControlSettings(gameState, team.teamId)?.controlMode ?? (team.humanControlled ? "manual" : "ai");
           return controlMode !== "ai";
         })
         .map((team) => team.teamId),

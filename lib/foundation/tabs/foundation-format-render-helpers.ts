@@ -461,7 +461,7 @@ const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
   preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
   previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
   prisma_sell_buyout_schedule_approximated: "Buyout-Staffel ist näherungsweise berechnet.",
-  recently_sold_same_preseason: "Gerade erst verkauft — Rückkauf in derselben Preseason gesperrt.",
+  recently_sold_same_preseason: "Verkauft (auch durch Vertragsende) — Rückkauf in diesem Transferfenster gesperrt.",
   recently_sold_same_preseason_override: "Rückkauf-Sperre der Preseason per Admin-Freigabe umgangen.",
   retreat_after_counter_affront: "Nach dem Affront zieht sich der Spieler aus der Verhandlung zurück.",
   roster_limit_reached: "Kader ist bereits voll.",

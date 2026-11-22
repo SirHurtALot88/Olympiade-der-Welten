@@ -326,11 +326,11 @@ describe("ai market plan convergence service", () => {
     expect(secondCall?.options?.excludeBuyPlayerIds).toContain("fa-blocked");
   });
 
-  it("skips convergence for team already at identity opt even when below slot depth", async () => {
+  it("skips convergence for team already at its planner target (Review 22.11.: Spitzenbedarf 12 + 1 Ersatz = 13, nicht mehr das Blatt-Opt 10)", async () => {
     const gameState = buildGameState({
       teams: [makeTeam({ teamId: "team-bp", name: "BP", shortCode: "B-P", cash: 5 })],
       teamIdentities: [makeTeamIdentity({ teamId: "team-bp", playerMin: 8, playerOpt: 10 })],
-      rosters: buildRoster("team-bp", 10, "bp"),
+      rosters: buildRoster("team-bp", 13, "bp"),
       seasonState: {
         seasonId: "season-2",
         schedule: [],
@@ -366,7 +366,7 @@ describe("ai market plan convergence service", () => {
     expect(applyAiMarketPlanLocally).not.toHaveBeenCalled();
     expect(result.emergencyRepairTeams).not.toContain("team-bp");
     expect(result.rounds).toBe(0);
-    expect(getTeamOptTarget(gameState, "team-bp")).toBe(10);
+    expect(getTeamOptTarget(gameState, "team-bp")).toBe(13);
   });
   it("tags exhausted teams for repair engine logging", async () => {
     process.env.OLY_UNIFIED_PICK = "1";

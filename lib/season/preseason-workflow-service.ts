@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
+import { vorjahrAnteileFuerSaisonwechsel, wirtschaftsRegelnFuerNeueSaison } from "@/lib/resolve/wirtschafts-regeln";
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
@@ -671,6 +672,9 @@ function buildNextSeasonGameState(
     // einer laufenden Saison nie verrutscht. Bestehende Saves bekommen hier die neuen Skalen.
     // Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel (und verliert einen alten).
     wertungsSkalen: wertungsSkalenFuerSpielmodus(save.gameState, nextSeasonId),
+    // WIRTSCHAFTS-REGELN (22.11., lib/resolve/wirtschafts-regeln.ts): gelten ab der FOLGENDEN Saison; mit dem Vorjahres-Anteil je Team
+    // (ligagerecht, Auf-/Absteiger abgebildet) fuer den Erwartungsanker des Vorstands.
+    wirtschaftsRegeln: wirtschaftsRegelnFuerNeueSaison(nextSeasonId, vorjahrAnteileFuerSaisonwechsel(save.gameState, save.gameState.season.id)),
     // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
     // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
     formkartenRegel: nextFormkartenRegel,

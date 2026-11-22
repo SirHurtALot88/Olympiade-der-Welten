@@ -51,6 +51,7 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
+import { KERN_VERKAUF_LOG } from "@/lib/ai/organic-squad/draft-adapter";
 import { fuehreKiPreseasonLaufAus } from "@/lib/ai/ai-preseason-background-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamFacilityUpkeepTotal, getTeamActualSalaryTotal, getTeamNegotiatedSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
@@ -380,6 +381,7 @@ async function main() {
   }
   const phasen = run.phasen as Record<string, unknown>;
   const schreibe = () => {
+    run.kernVerkaeufe = [...KERN_VERKAUF_LOG];
     if (OUT) fs.writeFileSync(OUT, JSON.stringify(run));
   };
   const finish = () => {

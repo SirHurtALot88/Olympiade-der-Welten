@@ -12,6 +12,7 @@ import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-pot
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { stempleWirtschaftsRegelnBeimAnlegen } from "@/lib/resolve/wirtschafts-regeln";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
 import { stempleFormkartenRegelBeimAnlegen } from "@/lib/resolve/formkarten-regel";
 import { stempleBelastungsRegelBeimAnlegen } from "@/lib/fatigue/belastung-regel-stempel";
@@ -658,10 +659,12 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     // Platz, Resistenz, Pause nach Spieltag 10 und aktiver Erholung 4,0.
     // FINANZEN JE SPIELTAG (22.11.): Gehalt, Sponsor-Basis und Gebaeude werden ab Saison 1 je Spieltag gebucht
     // (Rueckweg: OLY_FINANZEN_JE_SPIELTAG=aus).
+    stempleWirtschaftsRegelnBeimAnlegen(
     stempleFinanzenJeSpieltagBeimAnlegen(
       stempleBelastungsRegelBeimAnlegen(
         stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers))),
       ),
+    ),
     ),
     input.saveId,
   );

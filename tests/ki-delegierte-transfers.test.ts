@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import { ermittleDelegierteTransferTeamIds, mitDelegiertenAlsKi } from "@/lib/ai/ki-delegierte-transfers";
+import { ermittleDelegierteTransferTeamIds, getTransferControlSettings, istTransferAnKiDelegiert } from "@/lib/ai/ki-delegierte-transfers";
 import type { GameState } from "@/lib/data/olyDataTypes";
-import type { PersistenceService } from "@/lib/persistence/types";
 
-function stand(): GameState {
-  const e = (teamId: string, controlMode: string, ownerId: string, delegation?: unknown) => ({ teamId, controlMode, ownerId, ...(delegation ? { delegation } : {}) });
+function stand(seasonId = "season-2"): GameState {
+  const e = (teamId: string, controlMode: string, ownerId: string, delegation?: unknown) => ({
+    teamId,
+    controlMode,
+    ownerId,
+    ownerSlot: ownerId === "ai" ? null : `slot-${ownerId}`,
+    humanControlled: controlMode === "manual",
+    ...(delegation ? { delegation } : {}),
+  });
   return {
+    season: { id: seasonId },
     teams: ["A", "B", "C", "D"].map((teamId) => ({ teamId })),
     seasonState: {
       teamControlSettings: {
@@ -19,27 +26,25 @@ function stand(): GameState {
   } as unknown as GameState;
 }
 
-describe("Review 22.11. Befund 10: Voll-KI-Menschenteams nehmen am Kauffenster teil", () => {
-  it("nur manuelle Teams mit transfers=ki: Voll KI ja, Voll selbst und Halbautomatik (Kaeufe selbst) nein, echte KI nicht doppelt", () => {
-    expect(ermittleDelegierteTransferTeamIds(stand(), null)).toEqual(["B"]);
-    expect(ermittleDelegierteTransferTeamIds(stand(), new Set(["A", "C"]))).toEqual([]);
+describe("Review 22.11. Befund 10 / Runde 2: Voll-KI-Menschenteams im Kauffenster, ohne den Spielstand-Modus zu aendern", () => {
+  it("nur manuelle Teams mit transfers=ki, unabhaengig vom Ausloeser; Saison 1 nie", () => {
+    expect(ermittleDelegierteTransferTeamIds(stand())).toEqual(["B"]);
+    expect(ermittleDelegierteTransferTeamIds(stand("season-1"))).toEqual([]);
   });
 
-  it("der Modus gilt nur fuer die Dauer des Laufs und wird danach zurueckgesetzt, auch bei Fehler", async () => {
-    let gs = stand();
-    const persistence = {
-      getSaveById: () => ({ saveId: "s", status: "active", gameState: gs }),
-      saveSingleplayerState: (_id: string, next: GameState) => {
-        gs = next;
-        return { saveId: "s", gameState: gs };
-      },
-    } as unknown as PersistenceService;
-    const waehrend = await mitDelegiertenAlsKi(persistence, "s", ["B"], async () => gs.seasonState.teamControlSettings!.B!.controlMode);
-    expect(waehrend).toBe("ai");
-    expect(gs.seasonState.teamControlSettings!.B!.controlMode).toBe("manual");
-    expect(gs.seasonState.teamControlSettings!.B!.ownerId).toBe("franky");
-    await expect(mitDelegiertenAlsKi(persistence, "s", ["B"], async () => { throw new Error("boom"); })).rejects.toThrow("boom");
-    expect(gs.seasonState.teamControlSettings!.B!.controlMode).toBe("manual");
-    expect(gs.seasonState.teamControlSettings!.A!.controlMode).toBe("manual");
+  it("die Lesesicht hebt den Modus nur im Speicher: Spielstand, Besitzer und humanControlled bleiben unveraendert", () => {
+    const gs = stand();
+    const vorher = JSON.stringify(gs);
+    expect(getTransferControlSettings(gs, "B")?.controlMode).toBe("ai");
+    expect(getTransferControlSettings(gs, "B")?.aiTransferPreviewEnabled).toBe(true);
+    expect(getTransferControlSettings(gs, "A")?.controlMode).toBe("manual");
+    expect(getTransferControlSettings(gs, "C")?.controlMode).toBe("manual");
+    expect(getTransferControlSettings(gs, "D")?.controlMode).toBe("ai");
+    expect(JSON.stringify(gs)).toBe(vorher);
+    const b = gs.seasonState.teamControlSettings!.B!;
+    expect(b.ownerId).toBe("franky");
+    expect(b.controlMode).toBe("manual");
+    expect(istTransferAnKiDelegiert(gs, "B")).toBe(true);
+    expect(istTransferAnKiDelegiert(gs, "C")).toBe(false);
   });
 });

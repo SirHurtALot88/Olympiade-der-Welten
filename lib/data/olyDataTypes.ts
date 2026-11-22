@@ -4209,6 +4209,19 @@ export type SeasonState = {
    */
   wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string };
   /**
+   * WIRTSCHAFTS-REGELN DIESER SAISON (22.11., lib/resolve/wirtschafts-regeln.ts): Kaderpflicht-Quote, Erwartungsanker, Kernschutz und
+   * Rueckkauf-Sperre. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der Stempel oder gehoert er zu einer
+   * anderen Saison, gilt "alt". `vorjahr`: Platzierung der Vorsaison je Team als Anteil 0..1 in der heutigen Liga.
+   */
+  wirtschaftsRegeln?: {
+    seasonId: string;
+    quote: "alt" | "neu";
+    anker: "alt" | "neu";
+    kernschutz: "alt" | "neu";
+    rueckkauf: "alt" | "neu";
+    vorjahr?: Record<string, number>;
+  } | null;
+  /**
    * FINANZEN JE SPIELTAG (22.11., lib/finance/finanzen-je-spieltag.ts): "v1" = Gehalt, Sponsor-Basis, Gebaeude-Einnahme
    * und -Unterhalt werden je Spieltag zu 1/N gebucht (`spieltagFinanzen`), nur Rang-/Sonderziel-Sponsor, Apron, Ziele
    * und Kredit bleiben am Saisonende. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der

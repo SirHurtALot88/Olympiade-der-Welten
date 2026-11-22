@@ -1,53 +1,34 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
-import type { PersistenceService } from "@/lib/persistence/types";
 import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
+import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { getCurrentSeasonNumber } from "@/lib/foundation/season-history-clamp";
 
 /**
- * Review 22.11. Befund 10: „Voll KI“ (Bereich `transfers` an die KI delegiert) bekam ab Saison 2 weder Kauf- noch Verkaufsrunde, weil
- * `getAiTeamIds` nur `controlMode === "ai"` kennt. Diese Teams nehmen jetzt am Kauffenster teil — mit denselben Regeln und Funktionen
- * wie KI-Teams (Vorstandsquote, Rahmen, Kassensturz); gesetzt ist, was der Mensch selbst gesetzt hat, bleibt unberuehrt (die
- * Kaufplaner fuellen nur Luecken). Teams mit `transfers: "selbst"` (Franky, Ramona in der Halbautomatik) bleiben geschuetzt.
+ * Review 22.11. Befund 10 / Runde 2: „Voll KI“ (Bereich `transfers` an die KI delegiert) nimmt ab Saison 2 am Kauffenster teil,
+ * mit denselben Regeln und Funktionen wie KI-Teams. Der Modus im Spielstand wird dabei NIE veraendert (frueher: `controlMode` fuer die
+ * Laufzeit auf "ai" -> parallele Schreibwege normalisierten Besitzer und `humanControlled`): die Transferdienste lesen stattdessen
+ * diese Sicht, die den Modus nur im Speicher auf "ai" hebt. Teams mit `transfers: "selbst"` bleiben unberuehrt.
  */
-export function ermittleDelegierteTransferTeamIds(gameState: GameState, callerWritableTeamIds: Set<string> | null): string[] {
-  const einstellungen = gameState.seasonState.teamControlSettings ?? {};
-  return gameState.teams
-    .filter((team) => {
-      const e = einstellungen[team.teamId];
-      return e != null && e.controlMode === "manual" && isBereichDelegiert(e, "transfers") && (!callerWritableTeamIds || callerWritableTeamIds.has(team.teamId));
-    })
-    .map((team) => team.teamId);
+export function istTransferAnKiDelegiert(gameState: GameState, teamId: string): boolean {
+  const e = gameState.seasonState?.teamControlSettings?.[teamId];
+  return e != null && e.controlMode === "manual" && isBereichDelegiert(e, "transfers");
+}
+
+/** Kontrolleinstellung fuer Transferdienste: delegierte Menschenteams erscheinen als KI (nur gelesen, nie gespeichert). */
+export function getTransferControlSettings(gameState: GameState, teamId: string) {
+  const settings = getTeamControlSettings(gameState, teamId);
+  if (settings && istTransferAnKiDelegiert(gameState, teamId)) {
+    return { ...settings, controlMode: "ai" as const, aiTransferPreviewEnabled: true, aiSellPreviewEnabled: true };
+  }
+  return settings;
 }
 
 /**
- * Fuehrt `arbeit` aus, waehrend die delegierten Teams im Spielstand als "ai" stehen (die Kaufdienste lesen alle `controlMode`
- * aus `teamControlSettings`), und stellt ihren Modus danach aus dem frischen Stand wieder her.
+ * Delegierte Menschenteams, die im Kauf- und Verkaufsfenster mitlaufen — unabhaengig davon, wer den Lauf ausloest (Chris, Franky,
+ * Ramona): der Bereich gehoert dem Team, nicht dem Ausloeser. Nicht in Saison 1 (dort laeuft der Draft), erst ab Saison 2.
  */
-export async function mitDelegiertenAlsKi<T>(
-  persistence: PersistenceService,
-  saveId: string,
-  teamIds: string[],
-  arbeit: () => Promise<T>,
-): Promise<T> {
-  if (teamIds.length === 0) return arbeit();
-  const setze = (modusVon: "manual" | "ai", modusNach: "manual" | "ai") => {
-    const save = persistence.getSaveById(saveId);
-    if (!save) return;
-    const settings = { ...(save.gameState.seasonState.teamControlSettings ?? {}) };
-    let geaendert = false;
-    for (const teamId of teamIds) {
-      const e = settings[teamId];
-      if (e && e.controlMode === modusVon) {
-        settings[teamId] = { ...e, controlMode: modusNach };
-        geaendert = true;
-      }
-    }
-    if (!geaendert) return;
-    persistence.saveSingleplayerState(saveId, { ...save.gameState, seasonState: { ...save.gameState.seasonState, teamControlSettings: settings } }, { status: save.status });
-  };
-  setze("manual", "ai");
-  try {
-    return await arbeit();
-  } finally {
-    setze("ai", "manual");
-  }
+export function ermittleDelegierteTransferTeamIds(gameState: GameState): string[] {
+  const nummer = getCurrentSeasonNumber(gameState);
+  if (nummer == null || nummer < 2) return [];
+  return gameState.teams.map((t) => t.teamId).filter((teamId) => istTransferAnKiDelegiert(gameState, teamId));
 }

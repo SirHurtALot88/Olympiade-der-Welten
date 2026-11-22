@@ -29,6 +29,10 @@ services:
         # Basketball-Puste (22.11., lib/resolve/basketball-puste.ts): derselbe Weg, ohne eigenen Wert gilt der
         # Server-Schalter OLY_BASKETBALL_PUSTE. Leer = neue Regel.
         NEXT_PUBLIC_OLY_BASKETBALL_PUSTE: ${NEXT_PUBLIC_OLY_BASKETBALL_PUSTE:-${OLY_BASKETBALL_PUSTE:-}}
+        NEXT_PUBLIC_OLY_QUOTE_UEBER_PFLICHTKADER: ${NEXT_PUBLIC_OLY_QUOTE_UEBER_PFLICHTKADER:-${OLY_QUOTE_UEBER_PFLICHTKADER:-}}
+        NEXT_PUBLIC_OLY_BOARD_ERWARTUNG_ANKER: ${NEXT_PUBLIC_OLY_BOARD_ERWARTUNG_ANKER:-${OLY_BOARD_ERWARTUNG_ANKER:-}}
+        NEXT_PUBLIC_OLY_KI_KERNSCHUTZ: ${NEXT_PUBLIC_OLY_KI_KERNSCHUTZ:-${OLY_KI_KERNSCHUTZ:-}}
+        NEXT_PUBLIC_OLY_RUECKKAUF_SPERRE: ${NEXT_PUBLIC_OLY_RUECKKAUF_SPERRE:-${OLY_RUECKKAUF_SPERRE:-}}
         # Breaking-Format (22.11., lib/resolve/breaking-format.ts): derselbe Weg, ohne eigenen Wert gilt der
         # Server-Schalter OLY_BREAKING_FORMAT. Leer = Tag-Team.
         NEXT_PUBLIC_OLY_BREAKING_FORMAT: ${NEXT_PUBLIC_OLY_BREAKING_FORMAT:-${OLY_BREAKING_FORMAT:-}}
@@ -115,6 +119,10 @@ services:
       # Beteiligungsboden in der Pass-Lotterie), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten Spieltag wieder die
       # alte Regel; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.
       OLY_BASKETBALL_PUSTE: ${OLY_BASKETBALL_PUSTE:-}
+      OLY_QUOTE_UEBER_PFLICHTKADER: ${OLY_QUOTE_UEBER_PFLICHTKADER:-}
+      OLY_BOARD_ERWARTUNG_ANKER: ${OLY_BOARD_ERWARTUNG_ANKER:-}
+      OLY_KI_KERNSCHUTZ: ${OLY_KI_KERNSCHUTZ:-}
+      OLY_RUECKKAUF_SPERRE: ${OLY_RUECKKAUF_SPERRE:-}
       # Formkarten Plus/Minus (22.11., docs/design/formkarten-plusminus-22-11.md): leer = Standard (neue Saisons bekommen die Regel
       # plusminus), "aus" = Rueckweg (neue Saisons alt), "aus-sofort" = Notbremse (Gegenfarbe und Duellgewicht aus, auch mitten in
       # der Saison). Nur Server: der Browser loest die Regel nie selbst auf, sie steht im Spielstand. Siehe deploy/hetzner/.env.example.

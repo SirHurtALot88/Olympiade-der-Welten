@@ -1,3 +1,4 @@
+import { gueltigeWirtschaftsRegeln, wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 import type {
   GamePhase,
   GameState,
@@ -520,14 +521,12 @@ function resolveLeagueScopedRows(input: {
  * gameState bleibt der Rang unveraendert. Abschalten: OLY_BOARD_ERWARTUNG_ANKER=0.
  */
 function vorjahresRangMischung(gameState: GameState | null | undefined, teamId: string, aktuellerRang: number, teamCount: number): number {
-  if (!gameState || process.env.OLY_BOARD_ERWARTUNG_ANKER === "0") return aktuellerRang;
-  const aktuelleSaison = gameState.season?.id;
-  const snaps = (gameState.seasonState?.seasonSnapshots ?? []).filter((snap) => snap.seasonId !== aktuelleSaison && snap.status !== "dry_run");
-  const letzte = snaps[snaps.length - 1];
-  const vorjahr = letzte?.finalStandings?.find((zeile) => zeile.teamId === teamId)?.rank ?? null;
-  if (vorjahr == null || !Number.isFinite(vorjahr) || vorjahr < 1) return aktuellerRang;
-  const gedeckelt = Math.min(Math.max(1, teamCount), vorjahr);
-  return clamp(Math.round((aktuellerRang + gedeckelt) / 2), 1, Math.max(1, teamCount));
+  if (!gameState || wirtschaftsRegel(gameState, "anker") !== "neu") return aktuellerRang;
+  // Der Vorjahres-Anteil steht klein im Stempel (Browser und Server lesen dieselbe Zahl; das Archiv `seasonSnapshots` fehlt im Browser).
+  const anteil = gueltigeWirtschaftsRegeln(gameState)?.vorjahr?.[teamId];
+  if (anteil == null || !Number.isFinite(anteil)) return aktuellerRang;
+  const vorjahr = 1 + Math.min(1, Math.max(0, anteil)) * Math.max(0, teamCount - 1);
+  return clamp(Math.round((aktuellerRang + vorjahr) / 2), 1, Math.max(1, teamCount));
 }
 
 /**

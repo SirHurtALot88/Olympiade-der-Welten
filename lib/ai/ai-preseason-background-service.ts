@@ -24,7 +24,8 @@ import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
 import { resolveAiBulkTeamWriteScope, type AiBulkTeamWriteScopeInput } from "@/lib/room/ai-bulk-team-write-scope";
-import { ermittleDelegierteTransferTeamIds, mitDelegiertenAlsKi } from "@/lib/ai/ki-delegierte-transfers";
+import { stempleDraftPicksS1 } from "@/lib/contracts/draft-pick-markierung";
+import { ermittleDelegierteTransferTeamIds } from "@/lib/ai/ki-delegierte-transfers";
 import { istEinzelschrittDraftAktiv, ligaDraftDieserSaison, ligaDraftLaeuft } from "@/lib/draft/liga-draft-modell";
 
 /**
@@ -264,6 +265,15 @@ async function executeAiPreseasonBackgroundWork(input: {
         });
       }
 
+      // Befund 9: auch der dritte Draft-Weg (Setup-Draft des Preseason-Laufs) stempelt die Saison-1-Picks.
+      {
+        const nachDraft = persistence.getSaveById(saveId);
+        if (nachDraft) {
+          const gestempelt = stempleDraftPicksS1(nachDraft.gameState);
+          if (gestempelt !== nachDraft.gameState) persistence.saveSingleplayerState(saveId, gestempelt, { status: nachDraft.status });
+        }
+      }
+
       // 3) Training/Einsatzlisten-Setup ERST, wenn ALLE AI-Teams einen gefüllten Kader haben (Owner-Wunsch).
       //    Ist der Draft unvollständig (Bug/Kadertiefe), wird das Training NICHT gefeuert — es würde nur mit
       //    `team_roster_empty` blockieren. Stattdessen bleibt es aufgeschoben: der Owner kann nachpicken und
@@ -382,7 +392,7 @@ async function executeAiPreseasonBackgroundWork(input: {
 
     const kreditNotizen: string[] = [];
     const kreditPass = () => {
-      for (const teamId of kaufTeamIds) {
+      for (const teamId of aiTeamIds) {
         const aktuell = persistence.getSaveById(saveId);
         if (!aktuell) break;
         const entscheidung = resolveAiLoanDecision(aktuell.gameState, teamId);
@@ -584,7 +594,7 @@ async function executeAiPreseasonBackgroundWork(input: {
     let notkredite: Array<{ teamId: string; principal: number }> = [];
     if (gemeinsamesFenster) {
       // KASSENSTURZ (gemeinsames Fenster): Ruecklage → Kredit → Notkredit → Notverkauf als letztes Mittel.
-      const kassensturz = fuehreKiKassensturzAus({ saveId, seasonId, aiTeamIds: kaufTeamIds, persistence });
+      const kassensturz = fuehreKiKassensturzAus({ saveId, seasonId, aiTeamIds, persistence });
       notkredite = kassensturz.notkredite.map((k) => ({ teamId: k.teamId, principal: k.betrag }));
       kreditNotizen.push(
         `kassensturz:minus=${kassensturz.imMinus.length}:kredite=${kassensturz.kredite.length}:notkredite=${kassensturz.notkredite.length}:notverkaeufe=${kassensturz.notverkaeufe.length}:offen=${kassensturz.nochImMinus.length}`,
@@ -778,7 +788,7 @@ export async function fuehreKiPreseasonLaufAus(input: {
     // Befund 10: delegierte Menschenteams (Bereich Transfers = KI) nehmen ab Saison 2 am Kauffenster teil.
     const delegierteTeamIds = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds)
       ? []
-      : ermittleDelegierteTransferTeamIds(protectedSave.gameState, callerWritableTeamIds);
+      : ermittleDelegierteTransferTeamIds(protectedSave.gameState);
     const startedAt = nowIso();
     const setupDraftMode = shouldRunSetupDraft(protectedSave.gameState, aiTeamIds);
 
@@ -844,19 +854,17 @@ export async function fuehreKiPreseasonLaufAus(input: {
 
     writeRunRecord(saveId, baseRecord);
     handedToExecute = true;
-    // Die delegierten Teams laufen im Kauffenster als KI-Teams (`controlMode` "ai" nur fuer die Dauer des Laufs) und bekommen ihren
-    // Modus danach zurueck; stirbt der Lauf, setzt `protectManualPlayerTeams` ihn beim naechsten Lauf wieder auf "manual".
-    const finalRun = await mitDelegiertenAlsKi(persistence, saveId, delegierteTeamIds, () =>
-      executeAiPreseasonBackgroundWork({
-        saveId,
-        seasonId,
-        baseRecord,
-        aiTeamIds,
-        delegierteTeamIds,
-        setupDraftMode,
-        protectedSave,
-      }),
-    );
+    // Delegierte Teams (Bereich Transfers = KI) werden ueber die Lesesicht `getTransferControlSettings` bedient; der Modus im
+    // Spielstand bleibt unveraendert.
+    const finalRun = await executeAiPreseasonBackgroundWork({
+      saveId,
+      seasonId,
+      baseRecord,
+      aiTeamIds,
+      delegierteTeamIds,
+      setupDraftMode,
+      protectedSave,
+    });
 
     const succeeded = finalRun.status === "completed";
     return antwort(

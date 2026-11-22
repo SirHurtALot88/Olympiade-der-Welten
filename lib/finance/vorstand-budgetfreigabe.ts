@@ -36,6 +36,7 @@
  *    `seasonState.vorstandBudget`, geschrieben ueber `lib/finance/vorstand-budget-aktionen.ts`.
  */
 
+import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 import type { GameState, VorstandBudgetZustand } from "@/lib/data/olyDataTypes";
 import { spieltagBuchungenNochOffen, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
@@ -274,6 +275,8 @@ export type KaderpflichtStand = {
   basisFreiGehalt: number;
   /** Notruecklage: das Ruecklage-Ziel; darueber wirkt die Annaeherung an Opt. */
   notruecklage: number;
+  /** Alte Regel (Stempel `quote: alt`): Zuschlag bis Opt ohne Quote. Neu: nur der Pflichtkader 8 ist quotenfrei. */
+  bisOpt?: boolean;
   text: string | null;
 };
 
@@ -315,8 +318,17 @@ export function kaderpflichtZuschlag(input: {
   platzGehalt: number;
   cash: number;
   notruecklage: number;
+  /** Stempel `quote: alt` (Spielstaende vor dem 22.11.): Plaetze bis Opt aus der Kasse ueber der Notruecklage, ohne Quote. */
+  bisOpt?: boolean;
 }): { abloese: number; gehalt: number } {
   const fehltMin = Math.max(0, input.kaderMin - input.kaderIst);
+  const fehltOpt = Math.max(0, input.kaderOpt - input.kaderIst);
+  if (fehltMin <= 0 && input.bisOpt && fehltOpt > 0) {
+    return {
+      abloese: Math.max(0, Math.min(fehltOpt * input.platzAbloese, input.cash - input.notruecklage)),
+      gehalt: fehltOpt * input.platzGehalt,
+    };
+  }
   if (fehltMin > 0) {
     return {
       abloese: Math.max(0, Math.min(Math.max(0, input.cash), fehltMin * input.platzAbloese)),
@@ -324,6 +336,64 @@ export function kaderpflichtZuschlag(input: {
     };
   }
   return { abloese: 0, gehalt: 0 };
+}
+
+export type FreigabeVorausschau = {
+  /** Die Saison, fuer die geschaetzt wird (laufende + 1). */
+  saisonNummer: number;
+  /** Das fuer die Schaetzung angenommene Vertrauen (Standard: das gespeicherte; null = keins, dann 100 %). */
+  vertrauen: number | null;
+  stufe: VorstandStufe;
+  anteil: number;
+  /** Rücklage-Ziel und Gehaltspuffer der naechsten Saison (C). */
+  ruecklage: number;
+  gehaltspuffer: number;
+  /** Annahme fuer die Kasse zu Beginn des naechsten Fensters. */
+  kasse: number;
+  /** Was die Quote der naechsten Saison fuer Ablosen freigibt: anteil x (Kasse − Ruecklage − Gehaltspuffer). Verkaufserloese kommen im Fenster dazu. */
+  ausgebbarTransfer: number;
+  /** Gehaltstopf der naechsten Saison. */
+  gehaltBudget: number;
+};
+
+/**
+ * VORAUSSCHAU AUF DIE FREIGABE DER NAECHSTEN SAISON (Chris 22.11.: „wenn die Quoten ab Saison 2 greifen, muss die KI sich darauf
+ * vorbereiten“). Dieselbe Vorstandsformel wie `berechneVorstandBudgetStand` (Stufe nach Vertrauen, Ruecklage nach Finanzwert und
+ * Gehaltskosten, Gehaltspuffer), nur fuer die FOLGESAISON und ohne Ausgaben/Verkaeufe des Fensters. Fuer KI und Mensch dieselbe
+ * Funktion; die Finanzseite kann daraus „voraussichtliche Freigabe naechste Saison“ zeigen (keine UI hier).
+ *
+ * `optionen.vertrauen`/`kasse` erlauben Was-waere-wenn (z. B. Kasse nach geplanten Verkaeufen). Rein, schreibt nichts.
+ */
+export function schaetzeFreigabeNaechsteSaison(
+  gameState: GameState,
+  teamId: string,
+  optionen: { vertrauen?: number | null; kasse?: number } = {},
+): FreigabeVorausschau {
+  const naechste = (saisonNummer(gameState) ?? 1) + 1;
+  const gespeichert = gameState.seasonState.boardConfidence?.[teamId]?.value;
+  const vertrauenRoh = optionen.vertrauen !== undefined ? optionen.vertrauen : typeof gespeichert === "number" && Number.isFinite(gespeichert) ? gespeichert : null;
+  const { stufe, anteil } = vertrauenRoh == null || !istVorstandBudgetfreigabeAktiv() ? { stufe: "hoch" as VorstandStufe, anteil: 1 } : stufeFuerVertrauen(vertrauenRoh);
+  const team = gameState.teams.find((t) => t.teamId === teamId);
+  const kasse = optionen.kasse ?? team?.cash ?? 0;
+  const identity = gameState.teamIdentities?.find((i) => i.teamId === teamId);
+  const byId = new Map((gameState.players ?? []).map((p) => [p.id, p] as const));
+  let kaderWert = 0;
+  let gehaltsSumme0 = 0;
+  for (const r of gameState.rosters) {
+    if (r.teamId !== teamId) continue;
+    const pl = byId.get(r.playerId);
+    kaderWert += Math.max(0, pl?.marketValue ?? pl?.displayMarketValue ?? 0);
+    gehaltsSumme0 += r.salary ?? 0;
+  }
+  const zielgehalt = projectSalaryAtPlannerTarget({ gameState, teamId, currentSalary: gehaltsSumme0 });
+  const basis = Math.max(erwarteterSponsorFuerPlanung(gameState, teamId), zielgehalt);
+  const gehaltsQuote = anteil >= 1 ? 1 : Math.max(GEHALTS_QUOTE_UNTERGRENZE, anteil);
+  const gehaltBudget = gehaltsQuote * basis;
+  const erg = berechneKiRuecklage({ finances: identity?.finances, budget: Math.max(0, kasse) + kaderWert, zielgehalt, saison: naechste });
+  const ruecklage = erg.ruecklage * (naechste === 2 ? RUECKLAGE_ERSTES_FENSTER : 1);
+  const gehaltspuffer = Math.max(0, KI_RUECKLAGE_GEHALTS_FAKTOR * gehaltBudget - ruecklage);
+  const ausgebbarTransfer = anteil * Math.max(0, Math.max(0, kasse) - ruecklage - gehaltspuffer);
+  return { saisonNummer: naechste, vertrauen: vertrauenRoh, stufe, anteil, ruecklage: r2(ruecklage), gehaltspuffer: r2(gehaltspuffer), kasse: r2(kasse), ausgebbarTransfer: r2(ausgebbarTransfer), gehaltBudget: r2(gehaltBudget) };
 }
 
 /** Die Zahlen fuer Finanzseite, Transfermarkt und Spielerprofil. Fuer KI und Mensch dieselbe Funktion. */
@@ -469,11 +539,12 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   // Kaderpflicht-Freigabe (Chris 18.11.): Geld da, aber nicht freigegeben, waehrend das Team das Minimum nicht erreicht oder sich dem Opt
   // nicht naehern kann, ist ein Notfall: der Rahmen ist dann nie kleiner als die Kosten dieser Plaetze (Platzpreis, Ablose UND Gehalt).
   const kaderIst = gameState.rosters.filter((r) => r.teamId === teamId).length;
-  const kaderMin = VORSTAND_PFLICHT_KADER;
+  const quoteAlt = wirtschaftsRegel(gameState, "quote") === "alt";
+  const kaderMin = quoteAlt ? Math.max(VORSTAND_PFLICHT_KADER, identity?.playerMin ?? 0) : VORSTAND_PFLICHT_KADER;
   const kaderOpt = Math.max(kaderMin, identity?.playerOpt ?? kaderMin);
   const platz = gedeckelt ? platzPreisAusMarkt(gameState) : { fee: 0, salary: 0 };
   const zuschlag = gedeckelt
-    ? kaderpflichtZuschlag({ kaderIst, kaderMin, kaderOpt, platzAbloese: platz.fee, platzGehalt: platz.salary, cash, notruecklage: ruecklageErg.ruecklage })
+    ? kaderpflichtZuschlag({ kaderIst, kaderMin, kaderOpt, platzAbloese: platz.fee, platzGehalt: platz.salary, cash, notruecklage: ruecklageErg.ruecklage, bisOpt: quoteAlt })
     : { abloese: 0, gehalt: 0 };
   const basisFreiAbloese = transferFrei;
   const basisFreiGehalt = gehaltFrei;
@@ -486,7 +557,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
   if (kpGehalt > 0.004) gehaltFrei += kpGehalt;
   const kaderpflichtAktiv = kpAbloese > 0.004 || kpGehalt > 0.004;
   const kaderpflichtText = kaderpflichtAktiv
-    ? `Kaderpflicht: Vorstand gibt ${zahlText(kpAbloese)} C frei (Kader ${kaderIst}/${kaderMin}, nur der Pflichtkader ist quotenfrei)`
+    ? `Kaderpflicht: Vorstand gibt ${zahlText(kpAbloese)} C frei (Kader ${kaderIst}/${quoteAlt ? kaderOpt : kaderMin}${quoteAlt ? "" : ", nur der Pflichtkader ist quotenfrei"})`
     : null;
 
   return {
@@ -504,6 +575,7 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
       basisFreiAbloese: r2(basisFreiAbloese),
       basisFreiGehalt: r2(basisFreiGehalt),
       notruecklage: r2(ruecklageErg.ruecklage),
+      bisOpt: quoteAlt,
       text: kaderpflichtText,
     },
     investition: {
@@ -633,6 +705,7 @@ export function kaufRahmen(gameState: GameState, teamId: string): KaufRahmen {
         platzGehalt: kp.platzGehalt,
         cash: cash - spentFee,
         notruecklage: kp.notruecklage,
+        bisOpt: kp.bisOpt,
       });
       return {
         fee: Math.max(kp.basisFreiAbloese - spentFee, z.abloese),
