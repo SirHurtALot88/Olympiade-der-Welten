@@ -79,6 +79,13 @@ const PFADE: Partial<Record<FoundationViewId, ReactNode>> = {
       <path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12" />
     </>
   ),
+  // Ausruestung (22.11.): ein Schild mit Kreuzband, im Strich der uebrigen Symbole.
+  ausruestung: (
+    <>
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
+      <path d="M12 8v8M8.5 11.5h7" />
+    </>
+  ),
   ranks: <path d="M5 21V12h4v9M10 21V5h4v16M15 21v-7h4v7M3 21h18" />,
   diszis: (
     <>

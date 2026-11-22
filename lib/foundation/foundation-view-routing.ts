@@ -40,6 +40,7 @@ export const FOUNDATION_VIEW_IDS = [
   "admin",
   "credits",
   "finances",
+  "ausruestung",
   "changelog",
   "battleArena",
 ] as const;
@@ -122,6 +123,9 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   }
   if (view === "finanzen" || view === "finance" || view === "finances-v2") {
     return "finances";
+  }
+  if (view === "ausruestung" || view === "ausrüstung" || view === "equipment" || view === "lager" || view === "kiste") {
+    return "ausruestung";
   }
   if (view === "was-ist-neu" || view === "patchnotes" || view === "patch-notes") {
     return "changelog";

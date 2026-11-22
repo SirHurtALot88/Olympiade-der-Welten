@@ -64,6 +64,8 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "players", label: "Spieler", tooltip: "Spieler suchen und Profil öffnen.", icon: "◎" },
       { id: "trainingCompact", label: "Training", tooltip: "Trainingssteuerung pro Spieler.", icon: "↑" },
       { id: "trainingV2", label: "Gebäude", tooltip: "Facilities, Upgrade und Wirkung.", icon: "▦" },
+      // Ausrüstung (22.11., Phase 1a): Lager, Truhen, Ruhm. Eigene Seite im neuen Stil, Mockup zwischen-den-spieltagen-22-11.html.
+      { id: "ausruestung", label: "Ausrüstung", tooltip: "Lager, Truhen und Ruhm: Beute aus Punkten, Gegenstände mit Affixen.", icon: "⚒" },
     ],
   },
   {
