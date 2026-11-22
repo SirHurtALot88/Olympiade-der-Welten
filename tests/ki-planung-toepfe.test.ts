@@ -165,7 +165,12 @@ describe("Kaderpflicht-Freigabe (Chris 18.11.): Geld da, nicht freigegeben, Kade
       rosters,
       players,
       transferHistory: [],
-      seasonState: { boardConfidence: { A: { teamId: "A", value: opts.vertrauen ?? 8, pressure: 5, warnings: [] } }, facilityEvents: [] },
+      seasonState: {
+        seasonId: "season-2",
+        wirtschaftsRegeln: { seasonId: "season-2", quote: "neu", anker: "neu", kernschutz: "neu", rueckkauf: "neu" },
+        boardConfidence: { A: { teamId: "A", value: opts.vertrauen ?? 8, pressure: 5, warnings: [] } },
+        facilityEvents: [],
+      },
     } as unknown as GameState;
   }
 

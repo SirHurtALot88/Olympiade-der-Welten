@@ -135,7 +135,8 @@ describe("Runde 2, Punkt 1/5: Kaderpflicht-Quote hinter dem Stempel", () => {
     expect(neu.stand.kaderpflicht.kaderMin).toBe(8);
     expect(neu.stand.kaderpflicht.aktiv).toBe(false);
     expect(alt.grenzeFuer(9, 0, 0).fee).toBeGreaterThanOrEqual(neu.grenzeFuer(9, 0, 0).fee);
-    expect(kaufRahmen(team(7, "neu"), "A").stand.kaderpflicht.aktiv).toBe(true);
+    const unter = kaufRahmen(team(7, "neu"), "A");
+    expect(unter.grenzeFuer(7, 0, 0).fee).toBeGreaterThanOrEqual(unter.stand.kaderpflicht.platzAbloese - 1e-9); // unter dem Pflichtkader immer frei
   });
 });
 

@@ -2288,7 +2288,7 @@ describe("Achsen-Rangziel bleibt in Reichweite", () => {
   });
 });
 
-describe("Review 22.11. Befund 2: Erwartung ist am Vorjahresrang verankert, Abbau senkt die Latte nicht voll", () => {
+describe("Review 22.11. Befund 2: Erwartung ist am Vorjahresrang verankert (Stempel), Abbau senkt die Latte nicht voll", () => {
   const rows = () =>
     new Map([
       ["a", createRow("a", { ppsTotal: 90, marketValueTotal: 200, rank: 1 })],
@@ -2296,38 +2296,32 @@ describe("Review 22.11. Befund 2: Erwartung ist am Vorjahresrang verankert, Abba
       ["c", createRow("c", { ppsTotal: 30, marketValueTotal: 90, rank: 3 })],
       ["d", createRow("d", { ppsTotal: 10, marketValueTotal: 40, rank: 4 })],
     ]);
-  const mitVorjahr = () => {
+  const mitVorjahr = (vorjahr: Record<string, number> | null) => {
     const gs = createGameState({ teams: ["a", "b", "c", "d"].map((id) => createTeam({ teamId: id, shortCode: id })) });
-    gs.seasonState.seasonSnapshots = [
-      {
-        seasonId: "vorjahr",
-        seasonName: "Vorjahr",
-        archivedAt: "2026-01-01",
-        finalStandings: [
-          { teamId: "d", rank: 1 },
-          { teamId: "a", rank: 2 },
-          { teamId: "b", rank: 3 },
-          { teamId: "c", rank: 4 },
-        ],
-      },
-    ] as never;
+    if (vorjahr) {
+      (gs.seasonState as unknown as Record<string, unknown>).wirtschaftsRegeln = {
+        seasonId: gs.season.id,
+        quote: "neu",
+        anker: "neu",
+        kernschutz: "neu",
+        rueckkauf: "neu",
+        vorjahr,
+      };
+    }
     return gs;
   };
 
-  it("Team d, schwaechste Staerke, im Vorjahr Erster: erwartet Rang 3 statt 4; ohne Vorjahr unveraendert 4", () => {
+  it("Team d, schwaechste Staerke, im Vorjahr Erster: erwartet Rang 3 statt 4; ohne Stempel unveraendert 4", () => {
     const r = rows();
-    const gs = mitVorjahr();
-    expect(computeTeamExpectation({ row: r.get("d")!, rowsByTeamId: r, identity: null, gameState: gs }).expectedRank).toBe(3);
+    expect(computeTeamExpectation({ row: r.get("d")!, rowsByTeamId: r, identity: null, gameState: mitVorjahr({ d: 0 }) }).expectedRank).toBe(3);
     expect(computeTeamExpectation({ row: r.get("d")!, rowsByTeamId: r, identity: null }).expectedRank).toBe(4);
-    gs.seasonState.seasonSnapshots = [];
-    expect(computeTeamExpectation({ row: r.get("d")!, rowsByTeamId: r, identity: null, gameState: gs }).expectedRank).toBe(4);
+    expect(computeTeamExpectation({ row: r.get("d")!, rowsByTeamId: r, identity: null, gameState: mitVorjahr(null) }).expectedRank).toBe(4);
   });
 
   it("Kaderabbau wird nicht belohnt: ein Team, das auf Platz 4 faellt, hat rankDelta < 0", () => {
     const r = rows();
-    const gs = mitVorjahr();
     const d = createTeam({ teamId: "d", shortCode: "d" });
-    const ziel = getExpectationRankObjective({ team: d, identity: createIdentity("d", { ambition: 5 }), profile: null, row: r.get("d")!, rowsByTeamId: r, gameState: gs });
+    const ziel = getExpectationRankObjective({ team: d, identity: createIdentity("d", { ambition: 5 }), profile: null, row: r.get("d")!, rowsByTeamId: r, gameState: mitVorjahr({ d: 0 }) });
     expect(ziel.boardConfidenceDelta ?? 0).toBeLessThan(0.1);
   });
 });
