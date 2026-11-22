@@ -1,0 +1,36 @@
+{
+ "_hinweis": "Icon-Probe Essen/Trinken (22.11.): eigene Objekte in Markenfarben, kein fremdes Logo. PixelLab /create-image-pixflux, no_background, je ein POST ohne Wiederholung unter flock, je 1,0 Generation. Bisher nur in public/mockups/gm-galerie-22-11.html genutzt.",
+ "energydrink-dose.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "64x64",
+  "bezug": "Energy-Drink (blau-silberne Dose, Hirschkopf; Partner-Linie Red Stag Energy, Dachmarke red-stag-energy)",
+  "saat": 41,
+  "generationen": 1.0,
+  "guthaben_vorher": 268.54,
+  "guthaben_nachher": 267.54,
+  "prompt": "slim tall energy drink can, blue and silver diagonal checker pattern with a small red stag head emblem, single item icon, pixel art game item, 16-bit RPG style, clean dark outline"
+ },
+ "cola-dose.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "64x64",
+  "bezug": "Cola (rote Dose, neutral; Partner-Linie Koka-Kolla, Dachmarke cola-classic)",
+  "saat": 42,
+  "generationen": 1.0,
+  "guthaben_vorher": 267.54,
+  "guthaben_nachher": 266.54,
+  "prompt": "soda can, plain bright red with one white horizontal band, plain without logo, water drops on it, single item icon, pixel art game item, 16-bit RPG style, clean dark outline"
+ },
+ "doener.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "64x64",
+  "bezug": "Döner",
+  "saat": 43,
+  "generationen": 1.0,
+  "guthaben_vorher": 266.54,
+  "guthaben_nachher": 265.54,
+  "prompt": "doner kebab in flatbread with sliced meat, lettuce, tomato, onion and white sauce, wrapped in paper at the bottom, single item icon, pixel art game item, 16-bit RPG style, clean dark outline"
+ }
+}

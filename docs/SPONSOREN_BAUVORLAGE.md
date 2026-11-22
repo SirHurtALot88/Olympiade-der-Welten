@@ -333,12 +333,12 @@ Geldgeber-Marken und lösen #490s Geldgeber-Engpass (nur 19 Finanzmarken) gleich
 
 | Branche | Gebäude | Bonus-Ziel |
 |---|---|---|
-| Sport (Adidas, Nike, Puma …) | Trainingszentrum | POW-Rang |
+| Sport (Adivas, Nyke, Pumao …) | Trainingszentrum | POW-Rang |
 | Auto (BMW, Ferrari, Continental …) | Specialist Wing | Achse der Marken-Variante (Power Gym → POW, Agility Track → SPE, Mind Lab → MEN, Social Studio → SOC) |
-| Technik (SAP, Apple, Zeiss …) | Analytics Room | MEN-Rang |
+| Technik (SOP, Apfelkern, Zeuss …) | Analytics Room | MEN-Rang |
 | Pharma (Bayer, Pfizer, J&J) | Recovery Center | Frische |
-| Lebensmittel (Coca-Cola, Ferrero …) | Academy | Frische |
-| Logistik + Luftfahrt (DHL, Emirates …) | Scouting Office | SPE-Rang |
+| Lebensmittel (Koka-Kolla, Ferrara …) | Academy | Frische |
+| Logistik + Luftfahrt (DXL, Emiratos …) | Scouting Office | SPE-Rang |
 | Finanz + Handel + Medien/Telekom/Energie (80 Marken) | **kein Gebäude — Geldgeber** | kein Ziel |
 
 Regel wie in #490: gewürfelt wird erst Archetyp und Gebäude, dann eine passende Marke — die

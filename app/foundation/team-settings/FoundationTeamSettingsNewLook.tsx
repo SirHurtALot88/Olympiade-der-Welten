@@ -910,7 +910,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                     <span className="nl-newgame-club-body">
                       <span className="nl-newgame-club-code">{team.shortCode}</span>
                       <span className="nl-newgame-club-name">{team.name}</span>
-                      <span className="nl-newgame-club-budget nl-tnum">Budget {formatNlMoney(team.budget)}</span>
+                      <span className="nl-newgame-club-budget nl-tnum">Budget {formatNlMoney(team.startkasse ?? team.budget)}</span>
                     </span>
                     {isChris ? (
                       <span className="nl-newgame-club-badge">DEIN TEAM ✓</span>
@@ -1141,7 +1141,7 @@ export default function FoundationTeamSettingsNewLook(props: FoundationTeamSetti
                         <td>
                           {team.shortCode} · {team.name}
                         </td>
-                        <td>{formatNlMoney(team.budget)}</td>
+                        <td>{formatNlMoney(team.startkasse ?? team.budget)}</td>
                         <td>{team.ownerLabel}</td>
                         <td>{formatTeamControlModeLabel(team.controlMode)}</td>
                       </tr>

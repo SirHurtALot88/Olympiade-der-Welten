@@ -114,6 +114,12 @@ const DRAFT_ART = arg("draft", "einzelschritt") as "block" | "einzelschritt";
  */
 const VARIANTE = arg("variante", "A") as "A" | "C" | "C2";
 const MISCHEN = arg("mischen", "");
+/**
+ * BUDGET-VARIANTE (Messung 22.11., docs/design/guv-saisonfaktor-messung-22-11.md): `--budget-variante plus20plus2` hebt NACH der
+ * Anlage (vor Sponsor-Pruefung und Draft) jedes Startbudget um 20 (Rang 32) und je Platz besser um weitere 2 an (Chris 22.11.)
+ * (Rang 32 +20, Rang 31 +22 ... Rang 1 +82). Rein im Messskript, kein Produktcode. Rangfolge bleibt erhalten (monoton).
+ */
+const BUDGET_VARIANTE = arg("budget-variante", "");
 
 const t0 = Date.now();
 const log = (msg: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ${msg}`);
@@ -358,6 +364,17 @@ async function main() {
       applyGameModeOwnership(persistence.getSaveById(saveId)!.gameState, { saveMode: "solo_1", chrisTeamIds: [], frankyTeamIds: [] }),
     );
     persistence.saveSingleplayerState(saveId, kiState);
+    if (BUDGET_VARIANTE === "plus20plus2") {
+      const rangListe = [...kiState.teams].sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.teamId.localeCompare(b.teamId));
+      const zuschlag = new Map(rangListe.map((t, i) => [t.teamId, 20 + 2 * (32 - (i + 1))] as const));
+      const angehoben: GameState = {
+        ...kiState,
+        teams: kiState.teams.map((t) => ({ ...t, budget: r2(t.budget + (zuschlag.get(t.teamId) ?? 0)), cash: r2(t.cash + (zuschlag.get(t.teamId) ?? 0)) })),
+      };
+      persistence.saveSingleplayerState(saveId, angehoben);
+      Object.assign(kiState, angehoben);
+      log(`Budget-Variante plus20plus2: Summe +${r2([...zuschlag.values()].reduce((a, b) => a + b, 0))}`);
+    } else if (BUDGET_VARIANTE) throw new Error(`Unbekannte --budget-variante ${BUDGET_VARIANTE}`);
     const ohneSponsor = kiState.teams.filter((t) => getTeamSponsorContract(kiState, t.teamId) == null).map((t) => t.teamId);
     if (ohneSponsor.length > 0) throw new Error(`Teams ohne Sponsor vor dem Draft: ${ohneSponsor.join(",")}`);
     log(`32 KI-Teams, alle mit Sponsor`);

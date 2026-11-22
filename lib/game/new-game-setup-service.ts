@@ -13,6 +13,7 @@ import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/s
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { stempleWirtschaftsRegelnBeimAnlegen } from "@/lib/resolve/wirtschafts-regeln";
+import { startbudgetStaffelFuerNeuesSpiel } from "@/lib/resolve/startbudget-staffel";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
 import { stempleFormkartenRegelBeimAnlegen } from "@/lib/resolve/formkarten-regel";
 import { stempleBelastungsRegelBeimAnlegen } from "@/lib/fatigue/belastung-regel-stempel";
@@ -76,6 +77,8 @@ export type NewGameTeamPreview = {
   shortCode: string;
   name: string;
   budget: number;
+  /** Startkasse inkl. Startbudget-Staffel (= budget bei Schalter aus). `budget` bleibt die Basis fuer Rang und Stufen. */
+  startkasse?: number;
   startRank: number;
   controlMode: TeamControlMode;
   ownerId: string;
@@ -446,6 +449,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   );
 
   const resetGameState = baselineReset.ok ? baselineReset.gameState : baseGameState;
+  const startbudgetStaffel = startbudgetStaffelFuerNeuesSpiel(resetGameState.teams);
 
   /**
    * LIGA-SPLIT AKTIVIERUNG NUR FUER BATTLE-MODE-SAVES (docs/design/battle-mode-spielmodus-plan.md,
@@ -571,7 +575,8 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     },
     teams: resetGameState.teams.map((team) => ({
       ...team,
-      cash: team.budget,
+      // Startkasse = Basis-Budget + Startbudget-Staffel (lib/resolve/startbudget-staffel.ts); `budget` bleibt die Basis fuer Rang und Stufen.
+      cash: team.budget + (startbudgetStaffel.aufschlag[team.teamId] ?? 0),
       humanControlled: humanTeamIds.has(team.teamId),
     })),
     rosters: [],
@@ -586,6 +591,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     seasonState: {
       ...resetGameState.seasonState,
       seasonId: "season-1",
+      startbudgetStaffel,
       standings,
       // Liga-Split-Aktivierung (siehe Kommentar oben) NUR fuer Battle-Mode-Saves. Manager Mode:
       // leagueByTeamId explizit leer, `schedule` bleibt unangetastet (ererbter Baseline-Spielplan).
@@ -704,6 +710,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
         shortCode: team.shortCode,
         name: team.name,
         budget: team.budget,
+        startkasse: team.budget + (startbudgetStaffel.aufschlag[team.teamId] ?? 0),
         startRank: startRankByTeamId.get(team.teamId) ?? 0,
         controlMode: setting.controlMode,
         ownerId: setting.ownerId ?? AI_OWNER_ID,

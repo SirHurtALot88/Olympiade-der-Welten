@@ -89,14 +89,14 @@ Sponsor misst:
 
 | Branche(n) | Marken | Gebäude | Bonus-Ziel | Warum das einleuchtet |
 |---|---:|---|---|---|
-| Sport (Adidas, Nike, Puma, Asics …) | 12 | **Trainingszentrum** | POW-Rang | Ausrüster statten das Training aus und wollen Kraftleistung sehen. |
+| Sport (Adivas, Nyke, Pumao, Asyx …) | 12 | **Trainingszentrum** | POW-Rang | Ausrüster statten das Training aus und wollen Kraftleistung sehen. |
 | Auto (BMW, Audi, Ferrari*, Continental …) | 38 | **Specialist Wing** | Achse der Marken-Variante | Ingenieurskunst = Spezialisierung; die Marke bestimmt die Variante und damit das Ziel (Ferrari → Agility Track → SPE, MAN → Power Gym → POW …). |
-| Technik (SAP, Apple, IBM, Zeiss …) | 36 | **Analytics Room** | MEN-Rang | Daten, Software, Denksport. |
+| Technik (SOP, Apfelkern, IBN, Zeuss …) | 36 | **Analytics Room** | MEN-Rang | Daten, Software, Denksport. |
 | Pharma (Bayer, Pfizer, J&J) | 3 | **Recovery Center** | Frische | Medizin = Regeneration. |
-| Lebensmittel (Coca-Cola, Ferrero, McDonald's …) | 19 | **Academy** | Frische | Nachwuchsförderung ist real das Sponsoring-Feld der Branche; das Ziel läuft über Ernährung → Frische. |
+| Lebensmittel (Koka-Kolla, Ferrara, Mac Dougall's …) | 19 | **Academy** | Frische | Nachwuchsförderung ist real das Sponsoring-Feld der Branche; das Ziel läuft über Ernährung → Frische. |
 | Handel (Aldi, Edeka, Zalando, IKEA …) | 41 | **Fan Shop** | SOC-Rang | Der Händler betreibt den Shop und will Publikum. |
 | Medien + Telekom + Energie (RTL, Sky, Vodafone, E.ON …) | 20 | **Arena Upgrade** | SOC-Rang | Übertragung, Stadionpräsenz, Show. |
-| Logistik + Luftfahrt (DHL, FedEx, Emirates …) | 12 | **Scouting Office** | SPE-Rang | Wer weltweit unterwegs ist, findet Talente — und lebt vom Tempo. |
+| Logistik + Luftfahrt (DXL, Fedox, Emiratos …) | 12 | **Scouting Office** | SPE-Rang | Wer weltweit unterwegs ist, findet Talente — und lebt vom Tempo. |
 | Finanz (Allianz, Deutsche Bank, Visa …) | 19 | **kein Gebäude — nur Geld** | kein Ziel | Die Bank bringt kein Haus, die Bank bringt Geld. |
 
 \* Ferrari steht im Katalog als `sport`; die Regel greift über die Branche, nicht den Namen.
@@ -231,7 +231,7 @@ Ein Spitzenteam bekommt Puffer, ein Kellerteam eine erreichbare Aufgabe — kein
 einen Sprung, den die Messung nie beobachtet hat (±2 Achsen-Ränge sind normale
 Saisonbewegung; „Top 5 in POW" für ein Team auf Achsen-Rang 19 wäre die alte Falle).
 
-**Die Kette als Charakter.** Adidas bringt das Trainingszentrum und misst POW; SAP bringt den
+**Die Kette als Charakter.** Adivas bringt das Trainingszentrum und misst POW; SOP bringt den
 Analytics Room und misst MEN; Bayer bringt das Recovery Center und misst Frische. Damit ist die
 Karte in einem Satz erzählbar („Ausrüster: Training + Kraft") statt eine Zufallskombination.
 Der Geldgeber trägt bewusst **kein** Ziel — er ist die Karte für Spieler, die schlicht Geld und
@@ -288,7 +288,7 @@ Effekte erzeugen, die der Gebäude-Report gerade erst ausgebaut hat (Analytics R
 Wing — siehe `docs/GEBAEUDE_REWORK_KONZEPT.md`).
 
 **Empfehlung: die billige Variante.** Der seltene Sponsor („Mäzen", ~5 % der Angebote, Marken
-aus dem Global-Pool: Emirates, Rolex, Red Bull …) leiht ein **vorhandenes** Gebäude auf
+aus dem Global-Pool: Emiratos, Rolux, Red Stag …) leiht ein **vorhandenes** Gebäude auf
 **Stufe 5** — eine Stufe, die sich im normalen Spielverlauf niemand leisten kann
 (Trainingszentrum Stufe 5: 150 C kumuliert) — und zwar **ohne Geldabzug** (Kartenfaktor 1,0).
 Seine Rangmarke ist hart (Startblock), sein Übernahmerecht ausgeschlossen — der Mäzen geht,

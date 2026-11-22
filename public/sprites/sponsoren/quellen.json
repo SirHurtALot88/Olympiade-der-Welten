@@ -1,0 +1,36 @@
+{
+ "_hinweis": "Icon-Probe Sponsoren (22.11.): eigener Wappen-Stil, Farben an die Vorbild-Marke angelehnt, kein kopiertes Logo. Die Schrift RED STAG im ersten Bild hat PixelLab selbst gesetzt; die anderen zwei tragen ein leeres Banner, der Name kommt in der App als Text. PixelLab /create-image-pixflux, no_background, je ein POST ohne Wiederholung unter flock, je 1,0 Generation. Bisher nur in public/mockups/gm-galerie-22-11.html genutzt.",
+ "red-stag-energy.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor red-stag-energy (Red Stag Energy), Versuch mit Schrift im Banner",
+  "saat": 51,
+  "generationen": 1.0,
+  "guthaben_vorher": 265.54,
+  "guthaben_nachher": 264.54,
+  "prompt": "red stag head with big antlers in front of a yellow sun disc on a dark blue and silver field, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, ribbon banner below the shield with the words RED STAG, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline"
+ },
+ "rainforest-commerce.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor rainforest-commerce (Rainforest Commerce), Banner leer",
+  "saat": 52,
+  "generationen": 1.0,
+  "guthaben_vorher": 264.54,
+  "guthaben_nachher": 263.54,
+  "prompt": "green jungle tree growing out of an open brown shipping box on a black field with an orange curved stripe, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text"
+ },
+ "alphasearch-global.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sponsor alphasearch-global (Alphasearch Global), Banner leer",
+  "saat": 53,
+  "generationen": 1.0,
+  "guthaben_vorher": 263.54,
+  "guthaben_nachher": 262.54,
+  "prompt": "golden magnifying glass over a globe on a white field divided into blue, red, yellow and green quarters, heraldic sponsor crest, pointed shield shape with a thick riveted steel border, empty ribbon banner below the shield, flat bold shapes, centered, pixel art badge, 16-bit RPG style, clean dark outline, no text"
+ }
+}

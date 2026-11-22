@@ -123,6 +123,8 @@ services:
       OLY_QUOTE_UEBER_PFLICHTKADER: ${OLY_QUOTE_UEBER_PFLICHTKADER:-}
       OLY_BOARD_ERWARTUNG_ANKER: ${OLY_BOARD_ERWARTUNG_ANKER:-}
       OLY_KI_KERNSCHUTZ: ${OLY_KI_KERNSCHUTZ:-}
+      # Startbudget-Staffel (22.11., docs/design/startbudget-staffel-22-11.md): leer = neue Spiele bekommen den Aufschlag auf die Startkasse, "aus" = Rueckweg (neue Spiele ohne). Nur Server; die Regel steht im Spielstand (seasonState.startbudgetStaffel).
+      OLY_STARTBUDGET_STAFFEL: ${OLY_STARTBUDGET_STAFFEL:-}
       # Formkarten Plus/Minus (22.11., docs/design/formkarten-plusminus-22-11.md): leer = Standard (neue Saisons bekommen die Regel
       # plusminus), "aus" = Rueckweg (neue Saisons alt), "aus-sofort" = Notbremse (Gegenfarbe und Duellgewicht aus, auch mitten in
       # der Saison). Nur Server: der Browser loest die Regel nie selbst auf, sie steht im Spielstand. Siehe deploy/hetzner/.env.example.

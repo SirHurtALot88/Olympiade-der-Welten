@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GM-Galerie und Icon-Probe (22.11.)</title>
+<!--
+  Übersicht zum Zeigen (Chris, 22.11.): die 32 General Manager der aktiven Teams im Live-Spielstand
+  (Saison 1, Spieltag 12) als PixelLab-Porträts, dazu je drei Probe-Icons für Ausrüstung, Essen/Trinken und
+  Sponsoren. Rasse und Aussehen kommen aus data/gm-aussehen.json (fest je GM, unabhängig vom Team).
+  Bilder: public/portraits/gm, public/sprites/ausruestung, public/sprites/verpflegung, public/sprites/sponsoren.
+  Doku: docs/design/gm-portraets-22-11.md. Stil und Tokens wie die Mockups vom 17./18.11.
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{--grund:#06080c;--f1:#0c1017;--f2:#121824;--f3:#1a2231;--li:rgba(244,230,196,.14);--li2:rgba(244,230,196,.32);--creme:#f4e6c4;--gold:#f0c35a;--tinte:#eef2f8;--leise:#9aa7ba;--stumm:#66738a;--gut:#62d394;--warn:#ff6058;
+ --s0:#8f9bb0;--s1:#5aa2f0;--s3:#f0c35a;--haus:"RaniraSeason",Georgia,serif;--zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow",Arial,sans-serif}
+*{box-sizing:border-box}
+html{font-size:clamp(11px,min(1.05vw,1.85vh),28px)}
+body{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--grund);color:var(--tinte);font:600 1rem/1.2 var(--zahl);overflow:hidden}
+h1,h2,h3{font-family:var(--haus);font-weight:400;font-style:italic;margin:0;color:#fff}
+.kopf{display:flex;align-items:baseline;gap:1.2rem;padding:.55rem 1.2rem;border-bottom:1px solid var(--li)}
+.kopf h1{font-size:1.7rem}.kopf p{margin:0;color:var(--leise);font-size:.95rem}.kopf p b{color:var(--creme)}
+.wert{margin-left:auto;display:flex;gap:.5rem}.wert span{padding:.2rem .7rem;background:var(--f2);border:1px solid var(--li);border-radius:.4rem;color:var(--leise);font-size:.9rem}.wert b{color:var(--creme);font-size:1.1rem;margin-left:.3rem}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 23rem;gap:.7rem;padding:.7rem 1.2rem}
+.gal{min-height:0;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:.5rem}
+.gm{min-height:0;background:var(--f1);border:1px solid var(--li);border-radius:.5rem;overflow:hidden;position:relative}
+.gm img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%;image-rendering:pixelated}
+.gm div{position:absolute;left:0;right:0;bottom:0;padding:1.6rem .5rem .35rem;display:flex;flex-direction:column;background:linear-gradient(180deg,transparent,rgba(6,8,12,.88) 38%,rgba(6,8,12,.96))}
+.gm h3{font-size:1.05rem;line-height:1.02;color:#fff}
+.gm em{font-style:normal;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);line-height:1.15}
+.gm strong{font-size:.84rem;color:var(--creme);line-height:1.05}
+.gm strong small{font-size:.72rem;color:var(--stumm);letter-spacing:.1em;margin-left:.3rem}
+.gm u{position:absolute;right:.3rem;top:.3rem;text-decoration:none;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;padding:0 .3rem;border:1px solid var(--warn);color:var(--warn);border-radius:.2rem;background:var(--f1)}
+aside{min-height:0;display:flex;flex-direction:column;gap:.6rem}
+.pan{flex:1;min-height:0;background:var(--f1);border:1px solid var(--li);border-radius:.6rem;padding:.5rem .7rem;display:flex;flex-direction:column}
+.pan h2{font-size:1.1rem;color:var(--creme)}.pan p{margin:.1rem 0 .3rem;font-size:.78rem;color:var(--leise);line-height:1.15}
+.drei{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.ic{min-height:0;display:flex;flex-direction:column;align-items:center;text-align:center;border:1px solid var(--li);border-radius:.4rem;padding:.35rem .2rem;background:radial-gradient(circle at 50% 35%,color-mix(in srgb,var(--sf,#3a4660) 30%,#0c1017),#0c1017 75%)}
+.ic img{flex:1;min-height:0;max-width:100%;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 .3rem .3rem rgba(0,0,0,.6))}
+.ic b{font-size:.84rem;color:#fff;line-height:1.05;margin-top:.2rem}.ic small{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--sf,var(--leise))}
+.ic.logo b{font:italic 400 .82rem/1.05 var(--haus);color:#17120a;background:var(--creme);padding:.12rem .45rem;border-radius:.15rem;box-shadow:0 0 0 1px #17120a,0 0 0 2px var(--gold)}
+</style>
+</head>
+<body>
+<header class="kopf">
+ <h1>General Manager</h1>
+ <p>Die <b>32 GMs der aktiven Teams</b> im Live-Spielstand (Saison 1, Spieltag 12). Rasse und Aussehen fest je GM, nicht nach Team.</p>
+ <div class="wert"><span>Porträts<b>32</b></span><span>Rassen<b id="nr"></b></span><span>Menschen<b id="nm"></b></span><span>GMs gesamt<b>100</b></span></div>
+</header>
+<main>
+ <section class="gal" id="gal"></section>
+ <aside>
+  <div class="pan"><h2>Ausrüstung</h2><p>Drei der acht Familien, je eine Stufe. Stil wie die Beute-Icons.</p>
+   <div class="drei">
+    <div class="ic" style="--sf:var(--s0)"><img src="../sprites/ausruestung/helm-standard.png" alt=""><b>Einfacher Helm</b><small>Standard</small></div>
+    <div class="ic" style="--sf:var(--s1)"><img src="../sprites/ausruestung/plattenpanzer-selten.png" alt=""><b>Verstärkter Plattenpanzer</b><small>Selten</small></div>
+    <div class="ic" style="--sf:var(--s3)"><img src="../sprites/ausruestung/amulett-legendaer.png" alt=""><b>Herz der Qual</b><small>Legendär</small></div>
+   </div></div>
+  <div class="pan"><h2>Essen und Trinken</h2><p>Eigene Objekte in Markenfarben, ohne fremdes Logo. Der Name steht als Text dabei.</p>
+   <div class="drei">
+    <div class="ic"><img src="../sprites/verpflegung/energydrink-dose.png" alt=""><b>Red Stag Energy</b><small>Energy-Drink</small></div>
+    <div class="ic"><img src="../sprites/verpflegung/cola-dose.png" alt=""><b>Koka-Kolla</b><small>Limo</small></div>
+    <div class="ic"><img src="../sprites/verpflegung/doener.png" alt=""><b>Döner</b><small>Essen</small></div>
+   </div></div>
+  <div class="pan"><h2>Sponsoren</h2><p>Eigener Wappen-Stil, Farben an die Vorbild-Marke angelehnt. Name als Schild in Hausschrift.</p>
+   <div class="drei">
+    <div class="ic logo"><img src="../sprites/sponsoren/red-stag-energy.png" alt=""><b>Red Stag Energy</b></div>
+    <div class="ic logo"><img src="../sprites/sponsoren/rainforest-commerce.png" alt=""><b>Rainforest Commerce</b></div>
+    <div class="ic logo"><img src="../sprites/sponsoren/alphasearch-global.png" alt=""><b>Alphasearch Global</b></div>
+   </div></div>
+ </aside>
+</main>
+<script>
+const GMS=[{"id": "gm-star-chaser-02", "vor": "Fizzwick Brightcap", "arch": "Star Chaser", "profil": "Wild", "rasse": "Gnom", "team": "Armageddon Aftermath", "kurz": "A-A", "p": false}, {"id": "gm-risk-gambler-07", "vor": "Rosalind Fairweather", "arch": "Risk Gambler", "profil": "Agile", "rasse": "Human", "team": "Blazing Beasts", "kurz": "B-B", "p": false}, {"id": "gm-elite-curator-08", "vor": "Vorax Nihil", "arch": "Elite Curator", "profil": "Builder", "rasse": "Voidborn", "team": "Black Panthers", "kurz": "B-P", "p": true}, {"id": "gm-bargain-hunter-09", "vor": "Brasilda Tickwell", "arch": "Bargain Hunter", "profil": "Showcase", "rasse": "Construct", "team": "Cash Creators", "kurz": "C-C", "p": false}, {"id": "gm-facility-architect-09", "vor": "Brunhild Anvilhelm", "arch": "Facility Architect", "profil": "Showcase", "rasse": "Dwarf", "team": "Cold Steel", "kurz": "C-S", "p": true}, {"id": "gm-culture-keeper-01", "vor": "Hazel Hearthbottom", "arch": "Culture Keeper", "profil": "Prime", "rasse": "Gnom", "team": "Dire Legion", "kurz": "D-L", "p": false}, {"id": "gm-culture-keeper-02", "vor": "Ooru Kell", "arch": "Culture Keeper", "profil": "Wild", "rasse": "Alien", "team": "Death Peaches", "kurz": "D-P", "p": false}, {"id": "gm-talent-builder-03", "vor": "Morvessa Cinder", "arch": "Talent Builder", "profil": "Patient", "rasse": "Demon", "team": "Golden Gladiators", "kurz": "G-G", "p": false}, {"id": "gm-star-chaser-06", "vor": "Thrain Gildhammer", "arch": "Star Chaser", "profil": "Hardline", "rasse": "Dwarf", "team": "Hell Raisers", "kurz": "H-R", "p": true}, {"id": "gm-talent-builder-06", "vor": "Fenris Greymantle", "arch": "Talent Builder", "profil": "Hardline", "rasse": "Animal", "team": "Lost Kingdom", "kurz": "L-K", "p": false}, {"id": "gm-rivalry-hawk-01", "vor": "Aquila Sharpwing", "arch": "Rivalry Hawk", "profil": "Prime", "rasse": "Animal", "team": "Last Ride", "kurz": "L-R", "p": false}, {"id": "gm-risk-gambler-05", "vor": "Corvina Blackwing", "arch": "Risk Gambler", "profil": "Popular", "rasse": "Animal", "team": "Mayhem Mavericks", "kurz": "M-M", "p": false}, {"id": "gm-culture-keeper-05", "vor": "Hilda Longhall", "arch": "Culture Keeper", "profil": "Popular", "rasse": "Dwarf", "team": "Mortal Sin", "kurz": "M-S", "p": true}, {"id": "gm-risk-gambler-08", "vor": "Mogrul Redtusk", "arch": "Risk Gambler", "profil": "Builder", "rasse": "Orc", "team": "Nunchuck Ninjas", "kurz": "N-N", "p": false}, {"id": "gm-depth-spammer-01", "vor": "Umbrielle Vael", "arch": "Depth Spammer", "profil": "Prime", "rasse": "Voidborn", "team": "Natures Wrath", "kurz": "N-W", "p": false}, {"id": "gm-bargain-hunter-07", "vor": "Zhaela Quor", "arch": "Bargain Hunter", "profil": "Agile", "rasse": "Alien", "team": "Pirate Crew", "kurz": "P-C", "p": false}, {"id": "gm-star-chaser-08", "vor": "Solarion Dawnbringer", "arch": "Star Chaser", "profil": "Builder", "rasse": "Divine", "team": "Project Suicide", "kurz": "P-S", "p": false}, {"id": "gm-rivalry-hawk-03", "vor": "Isolde Grimshaw", "arch": "Rivalry Hawk", "profil": "Patient", "rasse": "Human", "team": "Royal Court", "kurz": "R-C", "p": false}, {"id": "gm-star-chaser-09", "vor": "Hyrra Redhorn", "arch": "Star Chaser", "profil": "Showcase", "rasse": "Tauren", "team": "Raging Lunatics", "kurz": "R-L", "p": false}, {"id": "gm-systems-tinkerer-07", "vor": "Vesperia Nox", "arch": "Systems Tinkerer", "profil": "Agile", "rasse": "Voidborn", "team": "Riptide Rivers", "kurz": "R-R", "p": true}, {"id": "gm-rivalry-hawk-04", "vor": "Drogash Skullsplitter", "arch": "Rivalry Hawk", "profil": "Clinical", "rasse": "Orc", "team": "Stronghold Crusaders", "kurz": "S-C", "p": false}, {"id": "gm-talent-builder-10", "vor": "Gorlub Twistmaw", "arch": "Talent Builder", "profil": "Lean", "rasse": "Mutant", "team": "Silver Soldiers", "kurz": "S-S", "p": true}, {"id": "gm-depth-spammer-03", "vor": "Ignatha Scalecrest", "arch": "Depth Spammer", "profil": "Patient", "rasse": "Dragon", "team": "The Chantry", "kurz": "T-C", "p": false}, {"id": "gm-rivalry-hawk-06", "vor": "Caladrel Nightbloom", "arch": "Rivalry Hawk", "profil": "Hardline", "rasse": "Elf", "team": "The Giants", "kurz": "T-G", "p": false}, {"id": "gm-bargain-hunter-01", "vor": "Odile Marwick", "arch": "Bargain Hunter", "profil": "Prime", "rasse": "Human", "team": "Terrible Teachers", "kurz": "T-T", "p": false}, {"id": "gm-depth-spammer-05", "vor": "Brogha Ironhide", "arch": "Depth Spammer", "profil": "Popular", "rasse": "Orc", "team": "Undercover Agents", "kurz": "U-A", "p": false}, {"id": "gm-risk-gambler-03", "vor": "Lorelei Undertow", "arch": "Risk Gambler", "profil": "Patient", "rasse": "Aqua", "team": "Vicious & Delicious", "kurz": "V-D", "p": false}, {"id": "gm-star-chaser-07", "vor": "Snikka Glitterfingers", "arch": "Star Chaser", "profil": "Agile", "rasse": "Goblin", "team": "Vigorous Vikings", "kurz": "V-V", "p": false}, {"id": "gm-culture-keeper-09", "vor": "Lilitha Embergrace", "arch": "Culture Keeper", "profil": "Showcase", "rasse": "Demon", "team": "Vigilante Wranglers", "kurz": "V-W", "p": false}, {"id": "gm-bargain-hunter-06", "vor": "Pip Ratchetwick", "arch": "Bargain Hunter", "profil": "Hardline", "rasse": "Gnom", "team": "Wrecking Legionnaires", "kurz": "W-L", "p": false}, {"id": "gm-systems-tinkerer-04", "vor": "Bovar Tallyhorn", "arch": "Systems Tinkerer", "profil": "Clinical", "rasse": "Tauren", "team": "Wicked Wizards", "kurz": "W-W", "p": false}, {"id": "gm-risk-gambler-09", "vor": "Mawra Threefold", "arch": "Risk Gambler", "profil": "Showcase", "rasse": "Mutant", "team": "Zero Heroes", "kurz": "Z-H", "p": true}];
+document.getElementById("gal").innerHTML=GMS.map(g=>`<article class="gm"><img src="../portraits/gm/${g.id}.png" alt="${g.vor}">${g.p?"<u>zu menschlich?</u>":""}<div><h3>${g.vor}</h3><em>${g.arch} · ${g.rasse}</em><strong>${g.team}</strong></div></article>`).join("");
+document.getElementById("nr").textContent=new Set(GMS.map(g=>g.rasse)).size;
+document.getElementById("nm").textContent=GMS.filter(g=>g.rasse==="Human").length;
+</script>
+</body>
+</html>

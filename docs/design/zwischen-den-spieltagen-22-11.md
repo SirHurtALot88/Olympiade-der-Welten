@@ -2092,32 +2092,32 @@ Attribut. Moral-Boni +1 bis +2. Gesundes liegt etwas darunter und hat keinen Hak
 
 | Kategorie | Artikel | Wirkung für einen Einsatz | Nebenwirkung | Preis | Zähler |
 |---|---|---|---|---:|---|
-| **Energy und Süßes** | Red Bull | +3 Speed, +2 Stamina | nächster Einsatz −2 Stamina | 0,06 C | Zucker +1 |
-| | Monster Energy | +4 Stamina | nächster Einsatz −3 Awareness | 0,06 C | Zucker +2 |
-| | Coca-Cola | +3 Speed, Moral +1 | – | 0,05 C | Zucker +1 |
-| | Pepsi | +3 Dexterity, Moral +1 | – | 0,05 C | Zucker +1 |
-| | Gatorade | +4 Stamina | – | 0,06 C | Zucker +1 |
-| | Club-Mate | +3 Awareness, +2 Stamina | – | 0,06 C | Zucker +1 |
-| | Haribo Goldbären | +3 Speed, Moral +2 | 30 %: −2 Awareness | 0,05 C | Zucker +2 |
-| | Snickers | +3 Stamina, Moral +1 | – | 0,05 C | Zucker +1 |
-| **Cocktails und Bier** | Aperol Spritz | +4 Charisma, Moral +2 | −2 Awareness | 0,07 C | Alkohol +1 |
-| | Mojito (Bacardí) | +4 Spirit | −2 Dexterity | 0,07 C | Alkohol +1 |
-| | Caipirinha (Pitú) | +3 Charisma, +2 Spirit | −3 Intelligence | 0,08 C | Alkohol +2 |
-| | Espresso Martini (Kahlúa) | +3 Charisma, +2 Awareness | −2 Stamina | 0,08 C | Alkohol +1 |
-| | Jägermeister | +4 Will, Moral +2 | −4 Awareness | 0,07 C | Alkohol +2 |
-| | Carlsberg | +2 Spirit, Moral +2 | −1 Speed | 0,06 C | Alkohol +1 |
+| **Energy und Süßes** | Red Stag Energy | +3 Speed, +2 Stamina | nächster Einsatz −2 Stamina | 0,06 C | Zucker +1 |
+| | Monstrum Energy | +4 Stamina | nächster Einsatz −3 Awareness | 0,06 C | Zucker +2 |
+| | Koka-Kolla | +3 Speed, Moral +1 | – | 0,05 C | Zucker +1 |
+| | Papsi | +3 Dexterity, Moral +1 | – | 0,05 C | Zucker +1 |
+| | Gatorlade | +4 Stamina | – | 0,06 C | Zucker +1 |
+| | Klub-Matte | +3 Awareness, +2 Stamina | – | 0,06 C | Zucker +1 |
+| | Harimbo Goldbären | +3 Speed, Moral +2 | 30 %: −2 Awareness | 0,05 C | Zucker +2 |
+| | Snackers | +3 Stamina, Moral +1 | – | 0,05 C | Zucker +1 |
+| **Cocktails und Bier** | Aperoll Spritz | +4 Charisma, Moral +2 | −2 Awareness | 0,07 C | Alkohol +1 |
+| | Mojito (Bakardi) | +4 Spirit | −2 Dexterity | 0,07 C | Alkohol +1 |
+| | Caipirinha (Pituh) | +3 Charisma, +2 Spirit | −3 Intelligence | 0,08 C | Alkohol +2 |
+| | Espresso Martini (Kahluna) | +3 Charisma, +2 Awareness | −2 Stamina | 0,08 C | Alkohol +1 |
+| | Jagdmeister | +4 Will, Moral +2 | −4 Awareness | 0,07 C | Alkohol +2 |
+| | Karlsbrau | +2 Spirit, Moral +2 | −1 Speed | 0,06 C | Alkohol +1 |
 | **Gesund** | Poke Bowl | +3 Stamina, +2 Health | – | 0,07 C | Gesund +1 |
-| | Proteinriegel (PowerBar) | +3 Power | – | 0,07 C | Gesund +1 |
-| | Smoothie (innocent) | +3 Awareness | – | 0,07 C | Gesund +1 |
-| | Banane (Chiquita) | +3 Stamina | – | 0,06 C | Gesund +1 |
-| | Haferflocken (Kölln) | +2 Stamina, +2 Determination | – | 0,06 C | Gesund +1 |
-| | Wasser (Volvic) | +1 Stamina, Erschöpfung nach dem Einsatz −5 % | – | 0,06 C | Gesund +1 |
+| | Proteinriegel (KraftBarr) | +3 Power | – | 0,07 C | Gesund +1 |
+| | Smoothie (Unschuld) | +3 Awareness | – | 0,07 C | Gesund +1 |
+| | Banane (Chiquito) | +3 Stamina | – | 0,06 C | Gesund +1 |
+| | Haferflocken (Köllner) | +2 Stamina, +2 Determination | – | 0,06 C | Gesund +1 |
+| | Wasser (Volvix) | +1 Stamina, Erschöpfung nach dem Einsatz −5 % | – | 0,06 C | Gesund +1 |
 | **Fast Food** | Döner | +3 Power, +2 Health, Moral +2 | 20 %: Magen, −4 Stamina in diesem Einsatz | 0,05 C | Fast Food +2 |
-| | Big Mac (McDonald's) | +5 Power, Moral +2 | 20 %: Magen, −4 Stamina | 0,05 C | Fast Food +2 |
-| | Whopper (Burger King) | +3 Health, +2 Power | 15 %: träge, −3 Speed | 0,05 C | Fast Food +2 |
-| | Pizza (Domino's) | +5 Determination, Moral +2 | 15 %: träge, −3 Speed | 0,04 C | Fast Food +2 |
+| | Big Mäc (Mac Dougall's) | +5 Power, Moral +2 | 20 %: Magen, −4 Stamina | 0,05 C | Fast Food +2 |
+| | Woppa (Burger Kaiser) | +3 Health, +2 Power | 15 %: träge, −3 Speed | 0,05 C | Fast Food +2 |
+| | Pizza (Dominik's) | +5 Determination, Moral +2 | 15 %: träge, −3 Speed | 0,04 C | Fast Food +2 |
 | | Currywurst | +3 Torment, +2 Power | 25 %: Magen, −4 Stamina | 0,04 C | Fast Food +2 |
-| | Bucket (KFC) | +5 Health, Moral +2 | 20 %: Magen, −4 Stamina | 0,05 C | Fast Food +2 |
+| | Bucket (KFK) | +5 Health, Moral +2 | 20 %: Magen, −4 Stamina | 0,05 C | Fast Food +2 |
 
 **Warum diese Preise.** Der reine Gegenwert eines solchen Einsatzes (+3 für einen Einsatz) wäre nach §48 rund 0,01 C. Der
 Kiosk verlangt das Fünf- bis Sechsfache (0,04 bis 0,08 C), weil man den Moment wählt (genau das enge Duell), weil nichts verschleißt und kein Ausrüstungsplatz
@@ -2188,9 +2188,9 @@ Artikel dieser Art):
 | Dauer-Einsatz | Ereignis nach |
 |---|---|
 | jeden Spieltag Fast Food (+2) | 2 Spieltagen: verstimmter Magen, danach jeden zweiten Spieltag wieder |
-| jeden Spieltag Cola oder Gatorade (+1) | 4 Spieltagen: Zuckerabsturz |
-| jeden Spieltag Monster oder Haribo (+2) | 2 Spieltagen |
-| jeden Spieltag ein Cocktail (+1) | 3 Spieltagen: Kater; mit Caipirinha oder Jägermeister (+2) nach 2 |
+| jeden Spieltag Cola oder Gatorlade (+1) | 4 Spieltagen: Zuckerabsturz |
+| jeden Spieltag Monstrum oder Harimbo (+2) | 2 Spieltagen |
+| jeden Spieltag ein Cocktail (+1) | 3 Spieltagen: Kater; mit Caipirinha oder Jagdmeister (+2) nach 2 |
 | jeden Spieltag Gesundes (+1) | 5 Spieltagen: „Gut im Saft“ (gewollt) |
 
 Dauer-Einsatz wird also in jeder ungesunden Kategorie bestraft. Mit der alten Regel (jeder Zähler sinkt je Spieltag um 1)
@@ -2240,22 +2240,24 @@ Seitenscroll, keine Überlappung, keine JS-Fehler.)
 
 Werte im Rahmen der Runde 15, in Runde 18 (§78.1) um den Haken-Spielraum erweitert.
 
+*Namen seit 22.11. (Chris: ingame alle so wie auf den Logos): keine echten Marken mehr, sondern Parodien; Liste in `docs/design/sponsor-namen-22-11.md`. Die Partner-Linien nutzen dieselbe Dachmarke wie der Sponsor-Katalog, wo es sie gibt (Red Stag Energy, Koka-Kolla, Karlsbrau); Monstrum, Gatorlade, Klub-Matte, Jagdmeister und Lavazzo sind eigene Partner-Namen ohne Katalog-Dachmarke.*
+
 *Seit Runde 18 (§78) haben alle Linien einen Charakter mit Plus und meist einem Haken; die Tabelle unten ersetzt die der Runde 16.
-Acht Partner statt sechs: Jägermeister und Lavazza sind neu.*
+Acht Partner statt sechs: Jagdmeister und Lavazzo sind neu.*
 
 | Partner | Charakter | Artikel (Wirkung für einen Einsatz, Haken fett) | Passt zu (höchster Netto-Wert, §78.4) |
 |---|---|---|---|
-| Red Bull | Tempo, zittrig: Speed, Dexterity; Haken Will | Original +4 Speed, +2 Dexterity, **−2 Will**; Sugarfree +2 Speed, +2 Dexterity; Summer +3 Speed, Moral +1 | Time Trial, Fechten, Staffel, Spurt |
-| Monster | Wumms, unbedacht: Stamina, Power; Haken Awareness | Original +4 Stamina, +2 Power, **−2 Awareness**; Ultra +3 Stamina | TDM, Climbing, Mini DM, Wettessen |
-| Coca-Cola | Stimmung: Moral, Charisma, Speed | Classic Moral +2, +2 Charisma, **−1 Stamina**; Cherry Moral +1, +2 Speed | Eiskunst, Showcase, Staffel; Teams mit Moral unter 60 |
-| Gatorade | Erholung: Stamina, Health, Determination; ohne Haken | Cool Blue +3 Stamina, Erholung +5 %; Lemon +2 Stamina, +2 Health, Erholung +5 %; Orange +3 Stamina, +2 Determination | Climbing, Wettessen, Mini DM, Doppelspieltage |
-| Club-Mate | Wachsam, nervös: Awareness, Dexterity; Haken Health, Will, Power | Original +3 Awareness, +2 Dexterity, **−1 Health**; Granat +2 Awareness, +2 Dexterity, **−1 Will**; Winter +4 Awareness, +2 Dexterity, **−2 Power** | Time Trial, Fechten, Tennis, Eiskunst |
-| Carlsberg | Mut antrinken: Power, Will; Haken Dexterity, Intelligence | Pilsner +2 Power, +2 Will, Moral +2, **−1 Dexterity** (Alkohol +1); Elephant +4 Power, +2 Will, Moral +1, **−2 Intelligence, −1 Dexterity** (Alkohol +2); 0,0 % +2 Charisma, +1 Spirit, Moral +1 | Gewichtheben, TDM, Breaking, Mini DM |
-| Jägermeister (neu) | Skrupellos, kopflos: Torment, Spirit, Will; Haken Awareness, Intelligence | Eiskalt +3 Torment, +3 Spirit, **−2 Awareness, −2 Intelligence** (Alkohol +2); Mut +3 Will, +2 Determination, Moral +1, **−2 Awareness** (Alkohol +1); Orange +2 Spirit, +2 Charisma, Moral +1, **−1 Dexterity** (Alkohol +1) | Football, Mini DM, Breaking, Wettessen |
-| Lavazza (neu) | Denker, überdreht: Intelligence, Awareness; Haken Will, Health | Espresso +3 Intelligence, +2 Awareness, **−1 Will**; Ristretto +4 Intelligence, +2 Determination, **−2 Health**; Decaf +3 Intelligence, Moral +1 | Schach, Tennis, Time Trial, I Spy |
+| Red Stag Energy | Tempo, zittrig: Speed, Dexterity; Haken Will | Original +4 Speed, +2 Dexterity, **−2 Will**; Sugarfree +2 Speed, +2 Dexterity; Summer +3 Speed, Moral +1 | Time Trial, Fechten, Staffel, Spurt |
+| Monstrum | Wumms, unbedacht: Stamina, Power; Haken Awareness | Original +4 Stamina, +2 Power, **−2 Awareness**; Ultra +3 Stamina | TDM, Climbing, Mini DM, Wettessen |
+| Koka-Kolla | Stimmung: Moral, Charisma, Speed | Classic Moral +2, +2 Charisma, **−1 Stamina**; Cherry Moral +1, +2 Speed | Eiskunst, Showcase, Staffel; Teams mit Moral unter 60 |
+| Gatorlade | Erholung: Stamina, Health, Determination; ohne Haken | Cool Blue +3 Stamina, Erholung +5 %; Lemon +2 Stamina, +2 Health, Erholung +5 %; Orange +3 Stamina, +2 Determination | Climbing, Wettessen, Mini DM, Doppelspieltage |
+| Klub-Matte | Wachsam, nervös: Awareness, Dexterity; Haken Health, Will, Power | Original +3 Awareness, +2 Dexterity, **−1 Health**; Granat +2 Awareness, +2 Dexterity, **−1 Will**; Winter +4 Awareness, +2 Dexterity, **−2 Power** | Time Trial, Fechten, Tennis, Eiskunst |
+| Karlsbrau | Mut antrinken: Power, Will; Haken Dexterity, Intelligence | Pilsner +2 Power, +2 Will, Moral +2, **−1 Dexterity** (Alkohol +1); Elephant +4 Power, +2 Will, Moral +1, **−2 Intelligence, −1 Dexterity** (Alkohol +2); 0,0 % +2 Charisma, +1 Spirit, Moral +1 | Gewichtheben, TDM, Breaking, Mini DM |
+| Jagdmeister (neu) | Skrupellos, kopflos: Torment, Spirit, Will; Haken Awareness, Intelligence | Eiskalt +3 Torment, +3 Spirit, **−2 Awareness, −2 Intelligence** (Alkohol +2); Mut +3 Will, +2 Determination, Moral +1, **−2 Awareness** (Alkohol +1); Orange +2 Spirit, +2 Charisma, Moral +1, **−1 Dexterity** (Alkohol +1) | Football, Mini DM, Breaking, Wettessen |
+| Lavazzo (neu) | Denker, überdreht: Intelligence, Awareness; Haken Will, Health | Espresso +3 Intelligence, +2 Awareness, **−1 Will**; Ristretto +4 Intelligence, +2 Determination, **−2 Health**; Decaf +3 Intelligence, Moral +1 | Schach, Tennis, Time Trial, I Spy |
 
 **KI-Wahl des Partners:** Disziplin-Profil des Kaders (welche Attribute in den kommenden Disziplinen am schwersten zählen)
-gegen das Profil der Marke; bei Gleichstand der mit dem geringsten Alkohol-Risiko. Alkohol-Partner (Carlsberg, Jägermeister) nur, wenn ihr mittlerer Netto-Wert mindestens 15 % über dem besten alkoholfreien liegt (das Kater-Risiko zählt mit).
+gegen das Profil der Marke; bei Gleichstand der mit dem geringsten Alkohol-Risiko. Alkohol-Partner (Karlsbrau, Jagdmeister) nur, wenn ihr mittlerer Netto-Wert mindestens 15 % über dem besten alkoholfreien liegt (das Kater-Risiko zählt mit).
 
 ### 76.2 Essens-Abo (ersetzt Einzel-Essen und den Großteil der Ernährungs-Zähler)
 
@@ -2279,7 +2281,7 @@ der Runde 16 gelten nicht mehr.
 **Zähler (nur noch zwei sichtbar, je Spieler):**
 - **Magen:** +1 je verstimmtem Magen (aus Abo 1 und 2) und je Fast-Food-Fund, −1 je Spieltag ohne Auslöser. Bei 4 das Ereignis
   **Verstimmter Magen** (drei Einsätze −3 % Eignung, im Wettessen nicht einsetzbar, Zähler −2).
-- **Alkohol:** +1 oder +2 je Carlsberg oder Cocktail-Fund, −1 je Spieltag ohne. Bei 3 das Ereignis **Kater** (nächster Spieltag
+- **Alkohol:** +1 oder +2 je Karlsbrau oder Cocktail-Fund, −1 je Spieltag ohne. Bei 3 das Ereignis **Kater** (nächster Spieltag
   −3 % Eignung, Erschöpfung +5; ab Alkohol 5 sinkt das Vertrauen des Vorstands um 0,25).
 - **Saisonschwelle:** ab 12 Magen-Punkten in einer Saison sinkt das Stamina-Potential um 1 (höchstens −1, umkehrbar nach fünf
   Spieltagen ohne Magen-Auslöser). **Festlegung der Projektleitung:** Abo 1 zählt zusätzlich 0,5 Punkte je Spieltag (20 Spieltage
@@ -2420,30 +2422,30 @@ Preise und Zähler wie in §72. Plus-Summe, Minus-Summe in Klammern.
 
 | Artikel | Plus | Haken | Zähler und Hinweis |
 |---|---|---|---|
-| Aperol Spritz | +4 Charisma, +2 Spirit, Moral +2 (+6) | −2 Awareness (−2) | Alkohol +1 |
-| Mojito (Bacardí) | +4 Spirit, +1 Charisma (+5) | −2 Dexterity (−2) | Alkohol +1 |
-| Caipirinha (Pitú) | +3 Torment, +2 Spirit (+5) | −3 Intelligence (−3) | Alkohol +2 |
-| Espresso Martini (Kahlúa) | +3 Awareness, +2 Charisma (+5) | −2 Stamina (−2) | Alkohol +1 |
-| Tequila Shot (José Cuervo) | +3 Will, +2 Torment (+5) | −2 Awareness (−2) | Alkohol +2 |
-| Guinness | +3 Health, +2 Determination (+5) | −2 Speed (−2) | Alkohol +1 |
+| Aperoll Spritz | +4 Charisma, +2 Spirit, Moral +2 (+6) | −2 Awareness (−2) | Alkohol +1 |
+| Mojito (Bakardi) | +4 Spirit, +1 Charisma (+5) | −2 Dexterity (−2) | Alkohol +1 |
+| Caipirinha (Pituh) | +3 Torment, +2 Spirit (+5) | −3 Intelligence (−3) | Alkohol +2 |
+| Espresso Martini (Kahluna) | +3 Awareness, +2 Charisma (+5) | −2 Stamina (−2) | Alkohol +1 |
+| Tequila Shot (José Cuervero) | +3 Will, +2 Torment (+5) | −2 Awareness (−2) | Alkohol +2 |
+| Guinnis | +3 Health, +2 Determination (+5) | −2 Speed (−2) | Alkohol +1 |
 | Döner | +3 Power, +2 Health, Moral +2 (+5) | −2 Speed (−2) | 20 % Magen, Magen +2 |
-| Big Mac (McDonald's) | +4 Power, +2 Health, Moral +2 (+6) | −2 Stamina (−2) | 20 % Magen, Magen +2 |
-| Whopper (Burger King) | +3 Health, +2 Power (+5) | −2 Speed (−2) | 15 % Magen, Magen +2 |
-| Pizza (Domino's) | +4 Determination, Moral +2 (+4) | −2 Speed (−2) | 15 % Magen, Magen +2 |
+| Big Mäc (Mac Dougall's) | +4 Power, +2 Health, Moral +2 (+6) | −2 Stamina (−2) | 20 % Magen, Magen +2 |
+| Woppa (Burger Kaiser) | +3 Health, +2 Power (+5) | −2 Speed (−2) | 15 % Magen, Magen +2 |
+| Pizza (Dominik's) | +4 Determination, Moral +2 (+4) | −2 Speed (−2) | 15 % Magen, Magen +2 |
 | Currywurst | +3 Torment, +2 Power (+5) | −2 Stamina (−2) | 25 % Magen, Magen +2 |
-| Bucket (KFC) | +4 Health, +2 Power, Moral +2 (+6) | −3 Speed (−3) | 20 % Magen, Magen +2 |
+| Bucket (KFK) | +4 Health, +2 Power, Moral +2 (+6) | −3 Speed (−3) | 20 % Magen, Magen +2 |
 | Poke Bowl | +3 Stamina, +2 Health (+5) | kein Haken | Gesund |
-| Proteinriegel (PowerBar) | +3 Power, +1 Determination (+4) | kein Haken | Gesund |
-| Smoothie (innocent) | +3 Awareness (+3) | kein Haken | Gesund |
-| Banane (Chiquita) | +3 Stamina (+3) | kein Haken | Gesund |
-| Haferflocken (Kölln) | +2 Stamina, +2 Determination (+4) | kein Haken | Gesund |
-| Wasser (Volvic) | +1 Stamina, Erschöpfung nach dem Einsatz −5 % | kein Haken | Gesund |
-| Grüner Tee (Teekanne) | +2 Intelligence, +2 Awareness (+4) | −1 Power (−1) | Ruhe, kein Zähler |
-| Haribo Goldbären | +2 Charisma, +2 Speed, Moral +2 (+4) | −2 Determination (−2) | Zucker |
-| Snickers | +3 Stamina, Moral +1 (+3) | −1 Determination (−1) | Zucker |
-| Pepsi | +3 Dexterity, Moral +1 (+3) | −1 Stamina (−1) | Zucker |
+| Proteinriegel (KraftBarr) | +3 Power, +1 Determination (+4) | kein Haken | Gesund |
+| Smoothie (Unschuld) | +3 Awareness (+3) | kein Haken | Gesund |
+| Banane (Chiquito) | +3 Stamina (+3) | kein Haken | Gesund |
+| Haferflocken (Köllner) | +2 Stamina, +2 Determination (+4) | kein Haken | Gesund |
+| Wasser (Volvix) | +1 Stamina, Erschöpfung nach dem Einsatz −5 % | kein Haken | Gesund |
+| Grüner Tee (Teekännchen) | +2 Intelligence, +2 Awareness (+4) | −1 Power (−1) | Ruhe, kein Zähler |
+| Harimbo Goldbären | +2 Charisma, +2 Speed, Moral +2 (+4) | −2 Determination (−2) | Zucker |
+| Snackers | +3 Stamina, Moral +1 (+3) | −1 Determination (−1) | Zucker |
+| Papsi | +3 Dexterity, Moral +1 (+3) | −1 Stamina (−1) | Zucker |
 
-Die alten Fund-Artikel Jägermeister und Carlsberg sind Partner-Linien geworden (§76.1). Die frühere 20-%-Magen-Regel mit −4 Stamina
+Die alten Fund-Artikel Jagdmeister und Karlsbrau sind Partner-Linien geworden (§76.1). Die frühere 20-%-Magen-Regel mit −4 Stamina
 ist durch den sicheren Haken ersetzt; die Magen-Wahrscheinlichkeit bleibt als Zähler (§76.2).
 
 ### 78.4 Passt zu: Netto-Wert gegen die offizielle Matrix
@@ -2454,15 +2456,15 @@ wirklich Gewicht (ab 10 Punkten in der Matrix). Beispiele, gemessen:
 
 | Artikel | Höchster Netto-Wert | Schlechtester |
 |---|---|---|
-| Red Bull Original | Time Trial 138, Fechten 104, Staffel 96 | Wettessen −52 |
-| Monster Original | TDM 108, Climbing 104, Mini DM 96 | Schach −42 |
-| Carlsberg Elephant | Gewichtheben 120, TDM 100, Breaking 90 | Tennis −56 |
-| Jägermeister Eiskalt | Football 101, Mini DM 72, Breaking 62 | Schach −98 |
-| Jägermeister Mut | Wettessen 110, Breaking 104, Takeshi 86 | Basketball −28 |
-| Lavazza Ristretto | Schach 140, Tennis 100, I Spy 84 | Mini DM −40 |
-| Aperol Spritz | Showcase 140, Eiskunst 116, Battlefield 92 | Fechten −30 |
+| Red Stag Original | Time Trial 138, Fechten 104, Staffel 96 | Wettessen −52 |
+| Monstrum Original | TDM 108, Climbing 104, Mini DM 96 | Schach −42 |
+| Karlsbrau Elephant | Gewichtheben 120, TDM 100, Breaking 90 | Tennis −56 |
+| Jagdmeister Eiskalt | Football 101, Mini DM 72, Breaking 62 | Schach −98 |
+| Jagdmeister Mut | Wettessen 110, Breaking 104, Takeshi 86 | Basketball −28 |
+| Lavazzo Ristretto | Schach 140, Tennis 100, I Spy 84 | Mini DM −40 |
+| Aperoll Spritz | Showcase 140, Eiskunst 116, Battlefield 92 | Fechten −30 |
 | Tequila Shot | Breaking 128, Mini DM 90, Wettessen 90 | Tennis −40 |
-| Big Mac | Gewichtheben 140, TDM 124, Hockey 88 | Staffel −28 |
+| Big Mäc | Gewichtheben 140, TDM 124, Hockey 88 | Staffel −28 |
 | Poke Bowl | Wettessen 110, Climbing 98, Mini DM 88 | Eiskunst 0 |
 
 Ein Artikel kann in einer Disziplin deutlich negativ sein (der Haken zählt): ein Eiskalt in Schach ist ein Fehlgriff. Das ist gewollt,
@@ -2472,20 +2474,20 @@ es macht die Wahl zu einer Entscheidung und nicht zu einem Dauer-Plus.
 
 | Attribut | Artikel mit Plus (Partner-Linien und Funde) | Matrix, Disziplinen mit Gewicht ab 10 |
 |---|---|---|
-| Power | Monster Original, Carlsberg Pilsner und Elephant, Döner, Big Mac, Whopper, Currywurst, Bucket, Proteinriegel | TDM 28, Gewichtheben 28, Hockey 18, Mini DM 16 |
-| Health | Gatorade Lemon, Guinness, Döner, Big Mac, Whopper, Bucket, Poke Bowl, Abo Stufe 4 | TDM 20, Mini DM 20, Wettessen 22, Hockey 18, Breaking 18 |
-| Determination | Gatorade Orange, Jägermeister Mut, Lavazza Ristretto, Guinness, Pizza, Haferflocken, Abo Stufe 5 | Climbing 16, Takeshi 18, Wettessen 16, Spurt 15 |
-| Stamina | Monster, Gatorade (alle), Poke Bowl, Banane, Haferflocken, Snickers, Abo Stufe 5 | Climbing 26, Wettessen 22, Mini DM 16, Staffel 16 |
-| Speed | Red Bull (alle), Coca-Cola Cherry, Haribo | Staffel 24, Time Trial 22, Spurt 18, Fechten 16 |
-| Dexterity | Red Bull Original und Sugarfree, Club-Mate (alle), Pepsi | Time Trial 25, Fechten 20, Eiskunst 18 |
-| Awareness | Club-Mate (alle), Lavazza Espresso, Espresso Martini, Smoothie, Grüner Tee | Schach 21, Tennis 20, Fechten 15, Basketball 14 |
-| Intelligence | Lavazza (alle), Grüner Tee | Schach 28, Tennis 22, Time Trial 18, I Spy 18 |
-| Will | Carlsberg Pilsner und Elephant, Jägermeister Mut, Tequila Shot | Breaking 28, Wettessen 26, Takeshi 22, Mini DM 14 |
-| Charisma | Coca-Cola Classic, Carlsberg 0,0 %, Jägermeister Orange, Aperol, Mojito, Espresso Martini, Haribo | Eiskunst 28, Showcase 27, Gewichtheben 23, Battlefield 20 |
-| Spirit | Carlsberg 0,0 %, Jägermeister Eiskalt und Orange, Aperol, Mojito, Caipirinha | Football 25, Basketball 22, Tennis 18, Battlefield 16 |
-| Torment | Jägermeister Eiskalt, Caipirinha, Tequila Shot, Currywurst | Fechten 25, Mini DM 24, Breaking 22, I Spy 17 |
+| Power | Monstrum Original, Karlsbrau Pilsner und Elephant, Döner, Big Mäc, Woppa, Currywurst, Bucket, Proteinriegel | TDM 28, Gewichtheben 28, Hockey 18, Mini DM 16 |
+| Health | Gatorlade Lemon, Guinnis, Döner, Big Mäc, Woppa, Bucket, Poke Bowl, Abo Stufe 4 | TDM 20, Mini DM 20, Wettessen 22, Hockey 18, Breaking 18 |
+| Determination | Gatorlade Orange, Jagdmeister Mut, Lavazzo Ristretto, Guinnis, Pizza, Haferflocken, Abo Stufe 5 | Climbing 16, Takeshi 18, Wettessen 16, Spurt 15 |
+| Stamina | Monstrum, Gatorlade (alle), Poke Bowl, Banane, Haferflocken, Snackers, Abo Stufe 5 | Climbing 26, Wettessen 22, Mini DM 16, Staffel 16 |
+| Speed | Red Stag Energy (alle), Koka-Kolla Cherry, Harimbo | Staffel 24, Time Trial 22, Spurt 18, Fechten 16 |
+| Dexterity | Red Stag Original und Sugarfree, Klub-Matte (alle), Papsi | Time Trial 25, Fechten 20, Eiskunst 18 |
+| Awareness | Klub-Matte (alle), Lavazzo Espresso, Espresso Martini, Smoothie, Grüner Tee | Schach 21, Tennis 20, Fechten 15, Basketball 14 |
+| Intelligence | Lavazzo (alle), Grüner Tee | Schach 28, Tennis 22, Time Trial 18, I Spy 18 |
+| Will | Karlsbrau Pilsner und Elephant, Jagdmeister Mut, Tequila Shot | Breaking 28, Wettessen 26, Takeshi 22, Mini DM 14 |
+| Charisma | Koka-Kolla Classic, Karlsbrau 0,0 %, Jagdmeister Orange, Aperoll, Mojito, Espresso Martini, Harimbo | Eiskunst 28, Showcase 27, Gewichtheben 23, Battlefield 20 |
+| Spirit | Karlsbrau 0,0 %, Jagdmeister Eiskalt und Orange, Aperoll, Mojito, Caipirinha | Football 25, Basketball 22, Tennis 18, Battlefield 16 |
+| Torment | Jagdmeister Eiskalt, Caipirinha, Tequila Shot, Currywurst | Fechten 25, Mini DM 24, Breaking 22, I Spy 17 |
 
-Dünn belegt sind Intelligence (nur Lavazza und Tee), Torment und Will (je vier Artikel, dafür mit hohem Netto in den passenden Disziplinen);
+Dünn belegt sind Intelligence (nur Lavazzo und Tee), Torment und Will (je vier Artikel, dafür mit hohem Netto in den passenden Disziplinen);
 Lücken sind das nicht, aber im Bau lohnt ein Blick, ob die Verteilung der Truhenfunde diese Attribute seltener zieht.
 
 ### 78.6 KI-Regel (ergänzt §72 und §76.1)
