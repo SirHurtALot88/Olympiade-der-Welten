@@ -4218,7 +4218,6 @@ export type SeasonState = {
     quote: "alt" | "neu";
     anker: "alt" | "neu";
     kernschutz: "alt" | "neu";
-    rueckkauf: "alt" | "neu";
     vorjahr?: Record<string, number>;
   } | null;
   /**

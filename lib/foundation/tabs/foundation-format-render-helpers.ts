@@ -482,6 +482,13 @@ const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
 };
 
 export function formatNegotiationSignalLabel(value: string) {
+  // Verkaufs-Sperre mit Parametern: player_sold_this_season_unavailable:<sell|contract_exit>:<Saison X>:<Saison Y> (Chris 22.11.)
+  const sperre = /^player_sold_this_season_unavailable:(sell|contract_exit):([^:]+):([^:]+)$/.exec(value);
+  if (sperre) {
+    const nr = (id: string) => /(\d+)\s*$/.exec(id)?.[1] ?? id;
+    const art = sperre[1] === "contract_exit" ? "Verkauft (Vertragsende)" : "Verkauft";
+    return `${art} in Saison ${nr(sperre[2]!)} — erst wieder ab Transferfenster Saison ${nr(sperre[3]!)} verfügbar.`;
+  }
   const label = NEGOTIATION_SIGNAL_LABELS[value];
   if (label) {
     return label;

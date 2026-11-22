@@ -1,7 +1,7 @@
 /**
  * WIRTSCHAFTS-REGELN JE SAISON (22.11., Review-Fixes Runde 2, docs/design/review-fixes-wirtschaft-ki-22-11.md).
  *
- * Vier Regeln aus den Review-Fixes aendern, wie Vorstand und KI rechnen. Sie duerfen nie mitten in der Saison wechseln
+ * Drei Regeln aus den Review-Fixes aendern, wie Vorstand und KI rechnen. Sie duerfen nie mitten in der Saison wechseln
  * (unterschriebene Sponsorziele wie `underdog_story` / `golden_fairytale` haengen am Erwartungsrang), und Browser und Server muessen
  * dieselbe Zahl sehen. Deshalb stehen sie IM SPIELSTAND (`seasonState.wirtschaftsRegeln`) — Muster `wertungs-skalen.ts`:
  * gesetzt beim Anlegen eines Spiels (ab Saison 1) und beim Saisonwechsel; ein bestehender Spielstand ohne Stempel rechnet
@@ -10,15 +10,14 @@
  *   quote      "neu" = nur der Pflichtkader 8 ist quotenfrei; "alt" = Kaderpflicht-Zuschlag bis Opt (vor dem 22.11.)
  *   anker      "neu" = Erwartungsrang am Vorjahresrang verankert (Stempel `vorjahr`, ligagerecht); "alt" = nur aktuelle Staerke
  *   kernschutz "neu" = die besten 3 verkauft ein Team nur in Finanznot oder bei einem guten Angebot; "alt" = ohne Schutz
- *   rueckkauf  "neu" = Abgang durch Vertragsende zaehlt wie ein Verkauf (Rueckkauf im Fenster gesperrt); "alt" = frei
+ *   (Die Verkaufs-Sperre fuer alle Teams ist KEIN Stempel: bestehende Spielregel, gilt sofort — lib/market/transfer-sold-cooldown.ts.)
  *
  * `vorjahr` (Anker): je Team die Platzierung der abgelaufenen Saison als Anteil 0..1 (0 = Erster, 1 = Letzter) IN DER LIGA, in der
  * das Team jetzt spielt. Aufsteiger zaehlen als 1 (Letzter der neuen Liga: sie haben dort noch nichts bewiesen, kein Druck), Absteiger
  * als 0 (Erster der neuen Liga: wer absteigt, soll oben erwartet werden und nicht belohnt werden). Liga-Rang 1 aus Liga 2 ist
  * KEIN Rang 1 in Liga 1.
  *
- * SCHALTER (Server, im Browser `NEXT_PUBLIC_…`): `OLY_QUOTE_UEBER_PFLICHTKADER`, `OLY_BOARD_ERWARTUNG_ANKER`, `OLY_KI_KERNSCHUTZ`,
- * `OLY_RUECKKAUF_SPERRE`. Leer = neu. "0" / "aus" / "alt" = neue Saisons bekommen "alt"; gestempelte Saisons rechnen wie gestempelt.
+ * SCHALTER (Server, im Browser `NEXT_PUBLIC_…`): `OLY_QUOTE_UEBER_PFLICHTKADER`, `OLY_BOARD_ERWARTUNG_ANKER`, `OLY_KI_KERNSCHUTZ`. Leer = neu. "0" / "aus" / "alt" = neue Saisons bekommen "alt"; gestempelte Saisons rechnen wie gestempelt.
  */
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
 import { findLeagueMovementLog } from "@/lib/season/league-movement-service";
@@ -31,11 +30,10 @@ export type WirtschaftsRegelnStempel = {
   quote: WirtschaftsRegel;
   anker: WirtschaftsRegel;
   kernschutz: WirtschaftsRegel;
-  rueckkauf: WirtschaftsRegel;
   vorjahr?: Record<string, number>;
 };
 
-export type WirtschaftsRegelName = "quote" | "anker" | "kernschutz" | "rueckkauf";
+export type WirtschaftsRegelName = "quote" | "anker" | "kernschutz";
 
 function leseSchalter(wert: string | undefined): WirtschaftsRegel | null {
   const w = (wert ?? "").trim().toLowerCase();
@@ -52,8 +50,6 @@ function schalter(name: WirtschaftsRegelName): WirtschaftsRegel {
       return leseSchalter(process.env.NEXT_PUBLIC_OLY_BOARD_ERWARTUNG_ANKER) ?? leseSchalter(process.env.OLY_BOARD_ERWARTUNG_ANKER) ?? "neu";
     case "kernschutz":
       return leseSchalter(process.env.NEXT_PUBLIC_OLY_KI_KERNSCHUTZ) ?? leseSchalter(process.env.OLY_KI_KERNSCHUTZ) ?? "neu";
-    case "rueckkauf":
-      return leseSchalter(process.env.NEXT_PUBLIC_OLY_RUECKKAUF_SPERRE) ?? leseSchalter(process.env.OLY_RUECKKAUF_SPERRE) ?? "neu";
   }
 }
 
@@ -63,7 +59,6 @@ export function wirtschaftsRegelnFuerNeueSaison(seasonId: string, vorjahr?: Reco
     quote: schalter("quote"),
     anker: schalter("anker"),
     kernschutz: schalter("kernschutz"),
-    rueckkauf: schalter("rueckkauf"),
     ...(vorjahr && Object.keys(vorjahr).length > 0 ? { vorjahr } : {}),
   };
 }

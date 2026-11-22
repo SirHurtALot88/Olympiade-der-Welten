@@ -2304,7 +2304,6 @@ describe("Review 22.11. Befund 2: Erwartung ist am Vorjahresrang verankert (Stem
         quote: "neu",
         anker: "neu",
         kernschutz: "neu",
-        rueckkauf: "neu",
         vorjahr,
       };
     }

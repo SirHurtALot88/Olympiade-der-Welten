@@ -822,7 +822,7 @@ describe("transfermarkt local service", () => {
     });
     expect(sameTeamPreview.canBuy).toBe(false);
     expect(sameTeamPreview.blockingReasons).toContain("recently_sold_same_preseason");
-    expect(sameTeamPreview.blockingReasons).toContain("player_sold_this_season_unavailable");
+    expect(sameTeamPreview.blockingReasons.some((g: string) => g.startsWith("player_sold_this_season_unavailable"))).toBe(true);
 
     const sameTeamFeed = listLocalTransfermarktFreeAgents({
       saveId: "save-singleplayer-dev",
@@ -840,7 +840,7 @@ describe("transfermarkt local service", () => {
       transferSource: "auto_roster_fill",
     });
     expect(otherTeamPreview.canBuy).toBe(false);
-    expect(otherTeamPreview.blockingReasons).toContain("player_sold_this_season_unavailable");
+    expect(otherTeamPreview.blockingReasons.some((g: string) => g.startsWith("player_sold_this_season_unavailable"))).toBe(true);
 
     const overridePreview = previewLocalTransfermarktBuy({
       saveId: "save-singleplayer-dev",
@@ -851,7 +851,7 @@ describe("transfermarkt local service", () => {
       allowRecentlySoldRebuyOverride: true,
     });
     expect(overridePreview.canBuy).toBe(false);
-    expect(overridePreview.blockingReasons).toContain("player_sold_this_season_unavailable");
+    expect(overridePreview.blockingReasons.some((g: string) => g.startsWith("player_sold_this_season_unavailable"))).toBe(true);
   });
 
   // Root-cause fix (2026-07-04, W-W chronically stuck below hardMin on the real S1-S10 save — see
@@ -905,7 +905,7 @@ describe("transfermarkt local service", () => {
       transferSource: "preseason_roster_repair_buy",
     });
     expect(withoutBypass.canBuy).toBe(false);
-    expect(withoutBypass.blockingReasons).toContain("player_sold_this_season_unavailable");
+    expect(withoutBypass.blockingReasons.some((g: string) => g.startsWith("player_sold_this_season_unavailable"))).toBe(true);
 
     const withBypass = previewLocalTransfermarktBuy({
       saveId: "save-singleplayer-dev",
@@ -915,7 +915,7 @@ describe("transfermarkt local service", () => {
       transferSource: "preseason_roster_repair_buy",
       bypassSoldThisSeasonCooldown: true,
     });
-    expect(withBypass.blockingReasons).not.toContain("player_sold_this_season_unavailable");
+    expect(withBypass.blockingReasons.some((g: string) => g.startsWith("player_sold_this_season_unavailable"))).toBe(false);
     expect(withBypass.warnings).toContain("player_sold_this_season_cooldown_override");
     expect(withBypass.canBuy).toBe(true);
   });

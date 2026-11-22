@@ -5,7 +5,8 @@ import { ROSTER_MIN } from "@/lib/ai/organic-squad/types";
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { kaufRahmen, schaetzeFreigabeNaechsteSaison } from "@/lib/finance/vorstand-budgetfreigabe";
-import { buildRecentlySoldByTeam } from "@/lib/market/anti-rebuy-guard";
+import { baueSoldCooldownBlocker, getSoldPlayerSeasonBan, isPlayerTransferBuyBlocked, istSoldCooldownBlocker } from "@/lib/market/transfer-sold-cooldown";
+import { formatNegotiationSignalLabel } from "@/lib/foundation/tabs/foundation-format-render-helpers";
 import {
   gueltigeWirtschaftsRegeln,
   stempleWirtschaftsRegelnBeimAnlegen,
@@ -24,7 +25,7 @@ describe("Runde 2, Punkt 5: Wirtschafts-Regeln als Spielstand-Stempel", () => {
     expect(gueltigeWirtschaftsRegeln(andere)).toBeNull();
     expect(wirtschaftsRegel(andere, "anker")).toBe("alt");
     const neu = stempleWirtschaftsRegelnBeimAnlegen({ season: { id: "season-1" }, seasonState: { seasonId: "season-1" } } as unknown as GameState);
-    expect(["quote", "anker", "kernschutz", "rueckkauf"].map((n) => wirtschaftsRegel(neu, n as "quote"))).toEqual(["neu", "neu", "neu", "neu"]);
+    expect(["quote", "anker", "kernschutz"].map((n) => wirtschaftsRegel(neu, n as "quote"))).toEqual(["neu", "neu", "neu"]);
     // idempotent
     expect(stempleWirtschaftsRegelnBeimAnlegen(neu)).toBe(neu);
   });
@@ -164,25 +165,45 @@ describe("Runde 2, Punkt 11: Vorausschau auf die Freigabe der naechsten Saison (
   });
 });
 
-describe("Runde 2, Punkte 5 und 8: Rueckkauf-Sperre nach Vertragsende, Stempel und Karte", () => {
-  const exitEintrag = { id: "e1", playerId: "p1", seasonId: "season-1", transferType: "contract_exit", fromTeamId: "A", toTeamId: null, fee: 0, salary: 4, marketValue: 10, remainingContractLength: 0, happenedAt: "2027-01-01T00:00:00.000Z", seasonLabel: "S1" };
-  const stand = (regel: "alt" | "neu", history: unknown[] = [exitEintrag]) =>
-    ({
-      season: { id: "season-2" },
-      seasonState: { seasonId: "season-2", wirtschaftsRegeln: { ...NEU("season-2"), rueckkauf: regel } },
-      transferHistory: history,
-    }) as unknown as GameState;
+describe("Chris 22.11.: globale Verkaufs-Sperre (Verkauf = Vertragsende), fuer alle Teams, ein Fenster lang", () => {
+  const eintrag = (art: "sell" | "contract_exit", seasonId: string, extra: Record<string, unknown> = {}) => ({
+    id: `e-${art}-${seasonId}`,
+    playerId: "p1",
+    seasonId,
+    transferType: art,
+    fromTeamId: "A",
+    toTeamId: art === "sell" ? "B" : null,
+    fee: 5,
+    salary: 4,
+    marketValue: 10,
+    remainingContractLength: 0,
+    happenedAt: "2027-01-01T00:00:00.000Z",
+    seasonLabel: seasonId,
+    ...extra,
+  });
+  const stand = (seasonId: string, history: unknown[]) =>
+    ({ season: { id: seasonId, matchdayIds: Array.from({ length: 20 }, (_, i) => `md-${i + 1}`) }, seasonState: { seasonId }, transferHistory: history }) as unknown as GameState;
 
-  it("neu: Vertragsende der Vorsaison sperrt den Rueckkauf wie ein Verkauf; alt: frei", () => {
-    expect(buildRecentlySoldByTeam(stand("neu")).get("A")?.has("p1")).toBe(true);
-    expect(buildRecentlySoldByTeam(stand("alt")).get("A")?.has("p1")).toBeFalsy();
+  it("Vertragsende am Ende von Saison 1: im Fenster von Saison 2 fuer ALLE Teams gesperrt (mit Parametern), im Fenster von Saison 3 wieder frei", () => {
+    const hist = [eintrag("contract_exit", "season-1")];
+    const ban = getSoldPlayerSeasonBan({ gameState: stand("season-2", hist), playerId: "p1" });
+    expect(ban?.fromTeamId).toBe("A");
+    expect(baueSoldCooldownBlocker(ban!)).toBe("player_sold_this_season_unavailable:contract_exit:season-1:season-3");
+    expect(istSoldCooldownBlocker(baueSoldCooldownBlocker(ban!))).toBe(true);
+    expect(isPlayerTransferBuyBlocked({ gameState: stand("season-2", hist), playerId: "p1" })).toBe(true);
+    expect(isPlayerTransferBuyBlocked({ gameState: stand("season-3", hist), playerId: "p1" })).toBe(false);
   });
 
-  it("hat ihn seither jemand anderes verpflichtet, ist die Sperre hinfaellig; die Karte wird je Verlauf einmal gebaut", () => {
-    const spaeter = { ...exitEintrag, id: "b1", transferType: "buy", fromTeamId: null, toTeamId: "B", happenedAt: "2027-02-01T00:00:00.000Z" };
-    expect(buildRecentlySoldByTeam(stand("neu", [exitEintrag, spaeter])).get("A")?.has("p1")).toBeFalsy();
-    const gs = stand("neu");
-    expect(buildRecentlySoldByTeam(gs)).toBe(buildRecentlySoldByTeam(gs));
+  it("Verkauf im Fenster von Saison 2 (Saison-ID 2): in Saison 2 gesperrt, im Fenster von Saison 3 wieder frei; auch wenn ein anderes Team ihn kaufte, bleibt er gesperrt", () => {
+    const hist = [eintrag("sell", "season-2", { phase: "manual_transfer_window", matchdayId: "md-1" })];
+    expect(isPlayerTransferBuyBlocked({ gameState: stand("season-2", hist), playerId: "p1" })).toBe(true);
+    expect(isPlayerTransferBuyBlocked({ gameState: stand("season-3", hist), playerId: "p1" })).toBe(false);
+  });
+
+  it("die Meldung nennt Saison X und Saison Y", () => {
+    expect(formatNegotiationSignalLabel("player_sold_this_season_unavailable:contract_exit:season-1:season-3")).toBe(
+      "Verkauft (Vertragsende) in Saison 1 — erst wieder ab Transferfenster Saison 3 verfügbar.",
+    );
   });
 });
 
