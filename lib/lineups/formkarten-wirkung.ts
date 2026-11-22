@@ -31,6 +31,7 @@ import {
   isFormkartenFarbregelEnabled,
   kartenZerlegungFuerSpieler,
   resolveFormkartenFarbregel,
+  GEGENFARBE,
   type FormkartenFarbregel,
   type FormkartenZerlegung,
 } from "@/lib/lineups/formkarten-farbregel";
@@ -166,7 +167,10 @@ export function berechneKartenWirkung(input: {
       vorzeichenOffen: Math.abs(zerlegung.summe) < FORM_TAGESFORM_SPANNE,
       klasse: k.klasse,
       klassenFarbe: k.farbe,
-      farbGrund: farbGrundText({ klasse: k.klasse, klassenFarbe: k.farbe, kartenFarben, traeger: zerlegung.traeger + zerlegung.form }),
+      farbGrund:
+        zerlegung.gegen != null && zerlegung.gegen !== 0
+          ? `Gegenfarbe ${zerlegung.gegen > 0 ? "+" : "−"}${Number(Math.abs(zerlegung.gegen).toFixed(1)).toLocaleString("de-DE")}: ${k.klasse ?? "Klasse"} ist ${farbKurz(k.farbe)}, Karte ${kartenFarben.filter(Boolean).map(farbKurz).join("/")}`
+          : farbGrundText({ klasse: k.klasse, klassenFarbe: k.farbe, kartenFarben, traeger: zerlegung.traeger + zerlegung.form }),
     };
   });
   const kartenFarbenEindeutig = [...new Set(kartenFarben.filter((f): f is string => Boolean(f)))];
@@ -177,7 +181,10 @@ export function berechneKartenWirkung(input: {
           .map((f) => {
             const anzahl = spieler.filter((s) => s.klassenFarbe === f).length;
             const klassen = getClassNamesForFormCardColor(f).join(", ");
-            return `Farbbonus ${farbKurz(f)} nur für ${klassen} — ${anzahl === 0 ? "keiner aufgestellt" : `${anzahl} aufgestellt`}`;
+            const gegenFarbe = GEGENFARBE[f];
+            const gegenAnzahl = geltendeFarbregel(input.regeln)?.gegen ? spieler.filter((s) => s.klassenFarbe === gegenFarbe).length : 0;
+            const gegenText = gegenAnzahl > 0 ? ` · Abzug für ${gegenAnzahl} ${farbKurz(gegenFarbe)}-Spieler (Gegenfarbe)` : "";
+            return `Farbbonus ${farbKurz(f)} nur für ${klassen} — ${anzahl === 0 ? "keiner aufgestellt" : `${anzahl} aufgestellt`}${gegenText}`;
           })
           .join(" · ");
   return {
@@ -234,7 +241,7 @@ export function kartenEffekt(
   card: { value: number; color: string } | null,
   disziplinFarbe: string | null | undefined,
   regeln?: FormMoralRegeln | null,
-): { alle: number; traegerZusatz: number; passt: boolean; regelNeu: boolean } {
+): { alle: number; traegerZusatz: number; passt: boolean; regelNeu: boolean; gegenZusatz?: number } {
   if (!card) return { alle: 0, traegerZusatz: 0, passt: false, regelNeu: geltendeFarbregel(regeln) != null };
   const regel = geltendeFarbregel(regeln);
   const passt = Boolean(disziplinFarbe) && card.color === disziplinFarbe;
@@ -242,7 +249,13 @@ export function kartenEffekt(
   const k = { wert: card.value, farbe: card.color };
   const alle = kartenZerlegungFuerSpieler({ karte: k, disziplinFarbe, spielerFarbe: null, regel }).summe;
   const mitFarbe = kartenZerlegungFuerSpieler({ karte: k, disziplinFarbe, spielerFarbe: card.color, regel }).summe;
-  return { alle, traegerZusatz: Number((mitFarbe - alle).toFixed(2)), passt, regelNeu: true };
+  // Plus/Minus (22.11.): Spieler der Gegenfarbe tragen den spiegelbildlichen Anteil (Pluskarte kostet sie etwas).
+  const gegenZusatz = regel.gegen && GEGENFARBE[card.color]
+    ? Number((kartenZerlegungFuerSpieler({ karte: k, disziplinFarbe, spielerFarbe: GEGENFARBE[card.color], regel }).summe - alle).toFixed(2))
+    : 0;
+  return gegenZusatz !== 0
+    ? { alle, traegerZusatz: Number((mitFarbe - alle).toFixed(2)), passt, regelNeu: true, gegenZusatz }
+    : { alle, traegerZusatz: Number((mitFarbe - alle).toFixed(2)), passt, regelNeu: true };
 }
 
 /**
@@ -258,5 +271,6 @@ export function kartenEffektText(
   const e = kartenEffekt(card, disziplinFarbe, regeln);
   const vz = (x: number) => `${x > 0 ? "+" : ""}${Number(x.toFixed(1))}`;
   if (!e.regelNeu) return e.passt ? " · x2" : "";
-  return ` · ${e.passt ? "passt" : "fremd"}: ${vz(e.alle)} alle, ${vz(e.traegerZusatz)} extra für ${farbKurz(card?.color)}-Spieler`;
+  const gegen = e.gegenZusatz ? `, ${vz(e.gegenZusatz)} für ${farbKurz(GEGENFARBE[card?.color ?? ""])}-Spieler` : "";
+  return ` · ${e.passt ? "passt" : "fremd"}: ${vz(e.alle)} alle, ${vz(e.traegerZusatz)} extra für ${farbKurz(card?.color)}-Spieler${gegen}`;
 }

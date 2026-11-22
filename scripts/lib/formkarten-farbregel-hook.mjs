@@ -19,7 +19,7 @@ export function erzeugeFormHook(cfg) {
     const r = (n) => { z = (Math.imul(z, 1103515245) + 12345) & 0x7fffffff; return (z >>> 16) % n; };
     let y = (z0 ^ 0x9e3779b9) >>> 0;
     const farbwahl = (n) => { y = (Math.imul(y, 1664525) + 1013904223) >>> 0; return (y >>> 16) % n; };
-    const K = [0, 2, 4, 8], STUFEN = ["schonen", "normal", "push"];
+    const K = cfg.K || [0, 2, 4, 8], STUFEN = ["schonen", "normal", "push"];
     const karte = () => {
       const wert = K[r(4)];
       const passend = r(4) === 0;
@@ -39,12 +39,17 @@ export function erzeugeFormHook(cfg) {
           form = karten.reduce((a, k) => a + k.wert * (k.passend ? 2 : 1), 0);
         } else {
           const spielerFarbe = cfg.klassenFarbe[p.c] || null;
+          // Plus/Minus (22.11.): Gegenfarbe tritt nur ein, wenn cfg.regel.gegen gesetzt ist (sonst Zeichen fuer Zeichen wie vorher).
+          const GEGEN = { red: "blue", blue: "red", green: "yellow", yellow: "green" };
           const stufe = (cfg.stufe && cfg.stufe[p.n]) || 0;
           form = karten.reduce((a, k) => {
             const v = k.wert;
             if (!v) return a;
             const alle = v * (k.passend ? cfg.regel.allePassend : cfg.regel.alleFremd);
-            if (!k.farbe || k.farbe !== spielerFarbe) return a + alle;
+            if (!k.farbe || k.farbe !== spielerFarbe) {
+              const gegen = cfg.regel.gegen && spielerFarbe && GEGEN[k.farbe] === spielerFarbe ? -v * cfg.regel.gegen : 0;
+              return a + alle + gegen;
+            }
             const hebel = v > 0 && stufe > 0 ? 1 + cfg.hebel * stufe : 1;
             return a + alle + v * cfg.regel.traeger * hebel;
           }, 0);

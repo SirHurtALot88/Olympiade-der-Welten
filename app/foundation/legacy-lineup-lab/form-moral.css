@@ -22,6 +22,7 @@
 .fm-kmarke { display: inline-flex; gap: 3px; align-items: baseline; font-size: 12px; }
 .fm-kmarke__sum { color: var(--bc-creme, #f4e6c4); }
 .fm-kmarke__fo { color: var(--bc-gut, #62d394); font-style: normal; }
+.fm-kmarke__ge { color: var(--bc-schlecht, #e4786b); font-style: normal; }
 .fm-kmarke__tr { font-style: normal; }
 .fm-karten { display: grid; gap: 8px; font-size: 13px; }
 .fm-karten p { margin: 0; }

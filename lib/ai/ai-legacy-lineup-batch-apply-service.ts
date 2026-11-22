@@ -2,6 +2,7 @@ import { listBookedMatchdaySides, repairFrozenAiDraftsWithBlockedPlayers } from 
 import { kartenEffekt } from "@/lib/lineups/formkarten-wirkung";
 import {
   buildAiFormCardSeasonPlan,
+  duellGewicht,
   getPlannedCardIdsForSlot,
   getPlannedClaimValue,
   type FormCardSeasonPlan,
@@ -36,7 +37,7 @@ import {
 import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readiness";
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
-import { isFormkartenFarbregelEnabled, resolveFormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
+import { GEGENFARBE, isFormkartenFarbregelEnabled, isFormkartenPlusMinusEnabled, resolveFormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
 import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
 import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
@@ -325,7 +326,7 @@ function collectFormCardPlanSlots(input: {
   context: LegacyLineupLoadedContext;
   currentMatchdayIndex: number;
   remainingMatchdaysIncludingCurrent: number;
-  currentSides: Array<{ side: "d1" | "d2"; disciplineId: string | null; color: FormCardColor | null; playerCount: number }>;
+  currentSides: Array<{ side: "d1" | "d2"; disciplineId: string | null; color: FormCardColor | null; playerCount: number; gewicht?: number }>;
 }): { slots: FormCardSeasonPlanSlot[]; hasRealSchedule: boolean } {
   const slots: FormCardSeasonPlanSlot[] = input.currentSides.map((side) => ({
     matchdayIndex: input.currentMatchdayIndex,
@@ -334,6 +335,7 @@ function collectFormCardPlanSlots(input: {
     disciplineId: side.disciplineId,
     color: side.color,
     playerCount: side.playerCount,
+    ...(side.gewicht != null ? { gewicht: side.gewicht } : {}),
   }));
 
   // „Echter Spielplan" heißt: die Saison kennt für den aktuellen Spieltag ODER später eine
@@ -410,7 +412,9 @@ function formCardDeploymentValue(
   // Eine Wahrheit (Review-Befund 9): alte Regel x2, neue Regel alle + Farbtraeger-Zusatz (erwarteter Traegeranteil 1/4,
   // wie `formCardSlotValue`), beides aus `kartenEffekt`.
   const e = kartenEffekt(card, color);
-  return (e.alle + e.traegerZusatz * (farbAnteile?.[card.color] ?? 0.25)) * Math.max(1, playerCount);
+  const gegenFarbe = GEGENFARBE[card.color] as FormCardColor | undefined;
+  const gegen = e.gegenZusatz && gegenFarbe ? e.gegenZusatz * (farbAnteile?.[gegenFarbe] ?? 0.25) : 0;
+  return (e.alle + e.traegerZusatz * (farbAnteile?.[card.color] ?? 0.25) + gegen) * Math.max(1, playerCount);
 }
 
 // Team-Charakter statt Einheits-KI (Vorbild: Doktrinen in team-powers): mentale Teams
@@ -1002,7 +1006,7 @@ function takeCheapestNegativeFormCard(input: {
 }) {
   const damage = (card: LegacyFormCardOption) => {
     const e = kartenEffekt(card, input.color);
-    return Math.abs(e.alle + e.traegerZusatz * 0.25);
+    return Math.abs(e.alle + e.traegerZusatz * 0.25 + (e.gegenZusatz ?? 0) * 0.25);
   };
   const picked =
     input.cards
@@ -1558,6 +1562,15 @@ export function buildAiLegacyLineupModifiers(
       disciplineId: side.disciplineId,
       color: side.color,
       playerCount: side.playerCount,
+      // Plus/Minus (22.11., Standard AUS): knappes Duell und Rivalen zaehlen am heutigen Spieltag mehr.
+      ...(isFormkartenPlusMinusEnabled()
+        ? {
+            gewicht: duellGewicht({
+              competitiveness: side.competitiveness,
+              rivalryCount: context.teamPowerWindows?.[side.disciplineId ?? ""]?.top8Rivals.length ?? 0,
+            }),
+          }
+        : {}),
     })),
   });
   const formCardSeasonPlan = buildAiFormCardSeasonPlan({

@@ -12,6 +12,7 @@ import type {
 import {
   formkartenZerlegungFuerSpieler,
   isFormkartenFarbregelEnabled,
+  isFormkartenPlusMinusEnabled,
   kartenWertFuerSpieler,
   resolveFormkartenFarbregel,
   type FormkartenFarbregel,
@@ -21,6 +22,12 @@ import {
 import { formToStufe, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 
 const FORM_CARD_VALUES = [0, 2, 4, 8] as const;
+/**
+ * PLUS/MINUS (22.11., `OLY_FORMKARTEN_PLUSMINUS`): keine 0er. Die 0 war eine tote Karte (`getTeamFormCardOptions`
+ * blendet sie aus, also fehlte jedem vierten Spieler eine seiner zwei Karten); `[2, 3, 5, 8]` haelt den Mittelwert der
+ * sichtbaren Karten (4,5 statt 4,7) und liefert jedem Spieler wirklich ein Plus- UND ein Minuskartenpaar.
+ */
+const FORM_CARD_VALUES_PLUSMINUS = [2, 3, 5, 8] as const;
 
 const CLASS_COLOR_MAP: Record<string, FormCardColor> = {
   Berserker: "red",
@@ -118,6 +125,9 @@ function avalanche(hash: number) {
 }
 
 function pickDeterministicCardValue(seed: string) {
+  if (isFormkartenPlusMinusEnabled()) {
+    return FORM_CARD_VALUES_PLUSMINUS[avalanche(hashSeed(seed)) % FORM_CARD_VALUES_PLUSMINUS.length] ?? 2;
+  }
   const index = avalanche(hashSeed(seed)) % FORM_CARD_VALUES.length;
   return FORM_CARD_VALUES[index] ?? 0;
 }

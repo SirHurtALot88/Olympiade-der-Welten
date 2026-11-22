@@ -8,7 +8,7 @@
  * (`regeln`-Parameter der Rechenfunktionen). Fehlt er (alter Kontext), gilt der Schalterstand der
  * Umgebung bzw. im Browser der Standard.
  */
-import { FARBREGEL_PM, FARBREGEL_SCHMAL, isFormkartenFarbregelEnabled, resolveFormkartenFarbregel, type FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
+import { FARBREGEL_PM, FARBREGEL_PM_PLUSMINUS, FARBREGEL_SCHMAL, isFormkartenFarbregelEnabled, isFormkartenPlusMinusEnabled, resolveFormkartenFarbregel, type FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 import { isFormMoralEnabled, resolveFormMoralDosisPct } from "@/lib/morale/form-moral-modifikator";
 
 export type FormMoralRegeln = {
@@ -18,6 +18,8 @@ export type FormMoralRegeln = {
   dosisPct: number;
   /** Kartenregel: "neu" (PM), "schmal" oder "alt" (x2 fuer alle). */
   farbregel: "neu" | "schmal" | "alt";
+  /** Plus/Minus-Karten (22.11., `OLY_FORMKARTEN_PLUSMINUS`): Gegenfarbe wirkt mit. Fehlt = aus (bit-identisch zu vorher). */
+  plusMinus?: boolean;
 };
 
 export function resolveFormMoralRegeln(env?: Record<string, string | undefined>): FormMoralRegeln {
@@ -26,11 +28,14 @@ export function resolveFormMoralRegeln(env?: Record<string, string | undefined>)
     : resolveFormkartenFarbregel(env) === FARBREGEL_SCHMAL
       ? "schmal"
       : "neu";
-  return { formMoral: isFormMoralEnabled(env), dosisPct: resolveFormMoralDosisPct(env), farbregel };
+  const basis: FormMoralRegeln = { formMoral: isFormMoralEnabled(env), dosisPct: resolveFormMoralDosisPct(env), farbregel };
+  return farbregel === "neu" && isFormkartenPlusMinusEnabled(env) ? { ...basis, plusMinus: true } : basis;
 }
 
 /** Regel-Objekt fuer `calculateFormModifierForSide({ farbregel })`: `null` = alte Regel. */
 export function farbregelAusRegeln(regeln: FormMoralRegeln | null | undefined): FormkartenFarbregel | null | undefined {
   if (!regeln) return undefined;
-  return regeln.farbregel === "alt" ? null : regeln.farbregel === "schmal" ? FARBREGEL_SCHMAL : FARBREGEL_PM;
+  if (regeln.farbregel === "alt") return null;
+  if (regeln.farbregel === "schmal") return FARBREGEL_SCHMAL;
+  return regeln.plusMinus ? FARBREGEL_PM_PLUSMINUS : FARBREGEL_PM;
 }
