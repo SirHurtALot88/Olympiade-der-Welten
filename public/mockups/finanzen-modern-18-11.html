@@ -32,6 +32,9 @@
   NEU 22.11. Runde 4 (Chris): Arena-Ausbau von Hand in 1.000er-Schritten je Bereich (Logen in 100er-Schritten), ?ansicht=wahl
   &plan=<Steh>,<Sitz>,<Loge> (geplante Schritte). Je Schritt Bau, Unterhalt, "bringt ca. wenn die Fans kommen", Amortisation;
   die festen Bauteile (Stehtribuene, Sitzrang, Logenring; &bau=) sind ersetzt. Abschnitt (h).
+  NEU 22.11. Runde 5 (Chris: "die Plaetze muessen guenstiger werden und duerfen sich schneller amortisieren"): Bau je Schritt
+  Steh 0,9 / 1,1 C (vorher 2,0 / 2,4), Sitz 2,0 / 2,4 C (4,5 / 5,4), Loge 1,5 / 1,8 C (3,2 / 3,9); Unterhalt 0,10 / 0,20 / 0,10 C.
+  Bei vollem Haus bezahlt nach 1,8 / 2,0 / 3,0 Saisons in Liga 2. Abschnitt (i).
   URL: ?ansicht=kasse|auszug|posten|wahl|hebel|budget|slots|angebote|bonus|fans|merch  &szen=normal|eng|dispo  &st=1..20  &tag=1..21 (Auszug, 21 = Saisonende)
        &preis=-20|0|20|40  &kader=0|1|2  &notv=1  &an=pow,spe,soc  &sel=<posten>  &ctab=lage|quelle|liga
        &phone=1  &still=1  &blatt=kontext
@@ -941,10 +944,10 @@ var DKN=["wenig","normal","viel"], DKA=[.2,.4,.6], DKRAB=.25;
    Grundarena (3.000 Steh + 1.000 Sitz) + Stehtribuene + Sitzrang + Logenring = 15.300 Plaetze, volles Haus 1,68 C.
    Liga 1 = Liga 2 x 4/3 (0,08 / 0,16 / 0,80). Sponsor bleibt, wie er ist: Tickets kommen obendrauf. */
 /* Runde 4: Ausbau von Hand. sch = Plaetze je Schritt, gr = Grundarena, max = Obergrenze, bau = Staffel [bis Schritt n, C je Schritt],
-   u = Unterhalt je Schritt und Saison. Beispielarena: 9.000 Steh (6 Schritte) + 5.000 Sitz (4) + 900 Logen (9) = 14.900 Plaetze, volles Haus 1,68 C. */
-var PA=[{n:"Stehplatz",n2:"Stehplätze",kz:"Steh",pl:9000,p:.06,v:"--p4",sch:1000,gr:3000,max:15000,bau:[[6,2.0],[12,2.4]],u:.15,t:"<b>Stehplätze</b> füllen sich mit der Stimmung: ab Stimmung 70 voll, unter 40 halb leer. Billig im Bau, kleiner Preis."},
-        {n:"Sitzplatz",n2:"Sitzplätze",kz:"Sitz",pl:5000,p:.12,v:"--p5",sch:1000,gr:1000,max:10000,bau:[[5,4.5],[9,5.4]],u:.25,t:"<b>Sitzplätze</b> hängen an der Fanbasis und schwanken wenig. Doppelter Preis, teurer im Bau."},
-        {n:"Loge",n2:"Logenplätze",kz:"Loge",pl:900,p:.6,v:"--gold",sch:100,gr:0,max:1200,bau:[[6,3.2],[12,3.9]],u:.12,t:"<b>Logen</b> mieten Firmen: Auslastung 20 % + 40 % × Sponsor-Stufe + 40 % × Tabellenplatz. Zehnfacher Preis, die Stimmung ist egal."}],L1F=4/3;
+   u = Unterhalt je Schritt und Saison. Runde 5: Bau und Unterhalt gesenkt (Abschnitt i). Beispielarena: 9.000 Steh (6 Schritte) + 5.000 Sitz (4) + 900 Logen (9) = 14.900 Plaetze, volles Haus 1,68 C. */
+var PA=[{n:"Stehplatz",n2:"Stehplätze",kz:"Steh",pl:9000,p:.06,v:"--p4",sch:1000,gr:3000,max:15000,bau:[[6,0.9],[12,1.1]],u:.10,t:"<b>Stehplätze</b> füllen sich mit der Stimmung: ab Stimmung 70 voll, unter 40 halb leer. Billig im Bau, kleiner Preis."},
+        {n:"Sitzplatz",n2:"Sitzplätze",kz:"Sitz",pl:5000,p:.12,v:"--p5",sch:1000,gr:1000,max:10000,bau:[[5,2.0],[9,2.4]],u:.20,t:"<b>Sitzplätze</b> hängen an der Fanbasis und schwanken wenig. Doppelter Preis, doppelt so teuer im Bau."},
+        {n:"Loge",n2:"Logenplätze",kz:"Loge",pl:900,p:.6,v:"--gold",sch:100,gr:0,max:1200,bau:[[6,1.5],[12,1.8]],u:.10,t:"<b>Logen</b> mieten Firmen: Auslastung 20 % + 40 % × Sponsor-Stufe + 40 % × Tabellenplatz. Zehnfacher Preis, die Stimmung ist egal."}],L1F=4/3;
 function paSchritt(a,n){for(var i=0;i<a.bau.length;i++)if(n<=a.bau[i][0])return a.bau[i][1];return a.bau[a.bau.length-1][1]}
 function paHat(a){return Math.round((a.pl-a.gr)/a.sch)} function paMax(a){return Math.round((a.max-a.pl)/a.sch)}
 var FANBASIS=16400;
@@ -1048,7 +1051,7 @@ function vWahl(){
     '</div><div class="fuss"><small>Auszahlung in den Transfertopf</small><span class="sp"></span><button class="btn klein" data-toast="Kreditangebote stehen auf der Seite Kredite: Bank und jedes Team mit freiem Geld">Angebote ansehen '+ic("r")+'</button></div></div>';
   function lzr(k,a,b,c,d,e,f,g,h){return '<div class="lz'+(k?" "+k:"")+'"><span>'+a+'</span><strong class="t">'+b+'</strong><span class="t">'+c+'</span><span class="t">'+d+'</span><span class="t">'+e+'</span><span class="t">'+f+'</span><span class="t">'+g+'</span><strong class="t">'+h+'</strong></div>'}
   var vollK=0,vollU=0,vollE=0;PA.forEach(function(a){var n=Math.round((a.max-a.gr)/a.sch);for(var j=1;j<=n;j++)vollK+=paSchritt(a,j);vollU+=n*a.u;vollE+=a.max/1000*a.p*10});
-  var lei='<div class="sd lei voll"><div class="kopf">Ausbau-Leiter je Bereich<small>Runde 4: Grundarena 4.000 Plätze, danach von Hand in Schritten · Werte Liga 2 · Liga 1 · Ziel: 1 % der Einnahmen eines Top-Teams je 1.000 Plätze, der Sponsor bleibt unverändert</small></div><div class="in">'+
+  var lei='<div class="sd lei voll"><div class="kopf">Ausbau-Leiter je Bereich<small>Runde 5: Plätze günstiger, bezahlt nach rund 2 Saisons (Logen 3), wenn die Fans kommen · Werte Liga 2 · Liga 1 · Ziel: 1 % der Einnahmen eines Top-Teams je 1.000 Plätze, der Sponsor bleibt unverändert</small></div><div class="in">'+
     '<div class="lz lk"><span>Bereich</span><span>Ein Schritt</span><span>Bau je Schritt</span><span>Unterhalt je Schritt</span><span>Bringt voll je Saison</span><span>Netto je Schritt</span><span>Schritt bezahlt nach</span><span>Gebaut · Obergrenze</span></div>'+
     lzr("","<b>Grundarena</b>","4.000","–","–","3,0 · 4,0 C","–","–","3.000 Steh · 1.000 Sitz")+
     PA.map(function(a,i){var v2=a.sch/1000*a.p*10,v1=v2*L1F,b0=a.bau[0],b1=a.bau[1];
@@ -1104,7 +1107,7 @@ var POSTEN=[
  {id:"treue",s:"a",n:"Treueprämie",kat:"bon",topf:"g",st:"ist",f:an({9:.33}),w:"Sofort bei einer Verlängerung.",r:"5 oder 10 % des neuen Jahresgehalts. Beispiel: Sterling verlängert, 10 % × 3,3 C. Entspricht den „Loyalitätsboni“ im FM.",d:"Stufe aus, 5 % oder 10 %.",ki:"Wie beim Menschen.",c:"lib/finance/vorstand-praemien.ts:257"},
  {id:"betr",s:"a",n:"Arena-Betrieb",kat:"bet",topf:"l",st:"plan",ids:["bet"],nur:"heim",w:"Je Heimspiel.",r:"Fester Posten je Heimspiel × (1 + 0,2 × Arena-Stufe).",d:"Keine.",ki:"Wie beim Menschen.",c:"Nicht gebaut (Finanzkonzept V2, Stufe 5)."},
  {id:"reise",s:"a",n:"Reise",kat:"bet",topf:"l",st:"plan",ids:["bet"],nur:"ausw",w:"Je Auswärtsspiel.",r:"Fester Posten je Auswärtsspiel: 0,10 C (Liga 2).",d:"Keine.",ki:"Wie beim Menschen.",c:"Nicht gebaut (Finanzkonzept V2, Stufe 5)."},
- {id:"unt",s:"a",n:"Gebäude · Unterhalt",kat:"geb",topf:"l",st:"ist",f:je(.8),w:"Je Spieltag, 1/20.",r:"Saisonunterhalt aller gebauten Gebäude ÷ 20. Beispiel: Fan Shop 1 (0,4 C) und ein zweites Gebäude der Stufe 1 (0,4 C). Jeder Ausbau-Schritt der Arena kommt mit 0,12 bis 0,25 C je Saison dazu.",d:"Bauen heißt auch unterhalten.",ki:"Rechnet den Unterhalt in die Amortisation.",c:"lib/finance/finanzen-je-spieltag-buchung.ts:49 · lib/facilities/facility-season-end-service.ts:172"},
+ {id:"unt",s:"a",n:"Gebäude · Unterhalt",kat:"geb",topf:"l",st:"ist",f:je(.8),w:"Je Spieltag, 1/20.",r:"Saisonunterhalt aller gebauten Gebäude ÷ 20. Beispiel: Fan Shop 1 (0,4 C) und ein zweites Gebäude der Stufe 1 (0,4 C). Jeder Ausbau-Schritt der Arena kommt mit 0,10 bis 0,20 C je Saison dazu.",d:"Bauen heißt auch unterhalten.",ki:"Rechnet den Unterhalt in die Amortisation.",c:"lib/finance/finanzen-je-spieltag-buchung.ts:49 · lib/facilities/facility-season-end-service.ts:172"},
  {id:"bau",s:"a",n:"Gebäude · Bau und Ausbau",kat:"geb",topf:"t",st:"ist",f:an({0:10}),w:"Sofort bei der Aktion.",r:"Stufenpreis aus dem Katalog. Beispiel: Fan Shop Stufe 1 in der Kaufphase, 10 C.",d:"Welches Gebäude zuerst. Hart gegen die Vorstands-Freigabe.",ki:"Recovery und Training zuerst, dann nach Finanzwert.",c:"lib/facilities/facility-upgrade-service.ts:308 · lib/finance/vorstand-budgetfreigabe.ts:679"},
  {id:"wart",s:"a",n:"Gebäude · Wartung",kat:"geb",topf:"t",st:"ist",f:an({8:.6}),w:"Sofort bei der Aktion.",r:"Stellt den Zustand eines Gebäudes wieder her.",d:"Warten oder Wirkung verlieren.",ki:"Wartet, bevor die Wirkung sinkt.",c:"lib/facilities/facility-maintenance-service.ts:126"},
  {id:"kre",s:"a",n:"Kreditrate und Zins",kat:"kre",topf:"l",st:"ist",ids:["kre"],w:"Heute am Saisonende, geplant je Spieltag.",r:"Annuität je Saison. Der Zins zählt zur GuV, die Tilgung nicht.",d:"Kredit aufnehmen oder vorzeitig ablösen. Entschieden 22.11.: freiwillige Kredite gibt es schon ab Saison 1.",ki:"Leiht nur für Pflichtkader und Notfälle; in Saison 1 nie für den Draft.",c:"lib/finance/loan-service.ts:811 (Rate), :514 (Aufnahme), :1068 (Ablösung), :953 (Notkredit)"},

@@ -1,4 +1,4 @@
-# Marketing: Marketability je Spieler, Fanprofil je Team (22.11., Runde 2)
+# Marketing: Marketability je Spieler, Fanprofil je Team (22.11., Runde 3)
 
 Chris, 22.11., wörtlich: „Was ist mit marketing? können wir ne marketing score für die spieler generieren basieren auf ihrer
 marketability? die sich aus traits etc zusammensetzt? wichtig ist nicht nur 'gute' stats heißen direkt gute marketability
@@ -13,6 +13,14 @@ seine Moral heben und nur zum Teil ans Team, weil wenn ein Team z. B. 8C bekommt
 Ende selber, das möchte ich nicht! wenn es 8C pro Season für alle sind dann ist das vollkommen fine, evtl. sogar etwas zu
 gering? wären ja nur 0,5 pro Season pro Spieler im Schnitt, glaub da geht mehr, schwache Spieler bringen vermutlich auch fast
 gar nichts dann außer sie heben sich durch Aktionen hervor oder haben eine Persönlichkeit die hervorsticht.“
+
+**Runde 3, Chris am 22.11. zum zweiten Mockup, wörtlich:** „im Marketing brauch ich nur meine eigenen Spieler und wie die sich
+warum und wie aufs Marketing auswirken, da brauch ich keine Leute vom Transfermarkt. Du kannst aber die Marketability auch beim
+TM einfügen als eigenen Stat, der natürlich auch etwas vernebelt ist! 1. wieso soll Team-Anteil fix 15 % vom Gehalt sein? das
+ist ja lame, das soll doch ein dynamischer Wert werden“. Umgesetzt: Die Seite zeigt nur den eigenen Kader mit der Zerlegung
+„warum“ (Abschnitt 7a), der Team-Anteil ist dynamisch (4.2), die Marketability wird ein eigener Stat im Transfermarkt mit
+Scouting-Nebel (5.1). Die Fragen 2 und 3 derselben Rückmeldung (Einnahmen gegen Ausgaben, günstigere Plätze) stehen im
+Finanzpapier, Abschnitt (i).
 
 Konzept und Mockup, kein App-Code. Mockup: `public/mockups/marketing-22-11.html` (`?team=H-R|G-G`, `&sel=<spieler>`,
 `&so=<spalte>`, `&ktab=fan|spieler|verlauf`). Alle Gewichte sind Startwerte für einen Messlauf. Die Beispielzahlen sind mit
@@ -32,11 +40,15 @@ Referenzkader (`data/generated/oly-rosters.json`, 261 Spieler in 32 Teams).
   Strahlemann, aber auch bei Liebling-Fans ist „edgy-charmant“ besser als langweilig.
 - **Marketability bei einem Team = Reichweite × Passung** (0,6 bis 1,4). Mauler (Demon, `Scandalous`, `Egomaniac`) kommt bei
   Hell Raisers auf 100, bei Golden Gladiators auf 62.
-- **Das Werbegeld wird geteilt** (neu): Je Spieler entsteht Werbegeld von 0 bis 10 C je Saison. Die Hälfte geht ans Team,
-  **höchstens 15 % seines Gehalts**; der Rest sind seine eigenen Werbeverträge, sie stehen nicht in der Kasse und **heben
-  seine Moral**. Kein Spieler bezahlt sein Gehalt selbst.
-- Größenordnung: ein Team bekommt 4 bis 14 C je Saison (Mittel rund 8 C), die Spieler zusammen noch einmal rund 200 C in
-  der Liga. Schwache Spieler ohne Profil bringen 0. **Sponsor und Marktwert bleiben unverändert.**
+- **Das Werbegeld wird geteilt, der Team-Anteil ist dynamisch** (Runde 3): Je Spieler entsteht Werbegeld von 0 bis 10 C je
+  Saison. Das Team bekommt davon **15 bis 65 %**: 40 % als Ausgangswert, dazu Persönlichkeit, Werbeklausel im Vertrag,
+  Vertragslaufzeit, Moral, Aushängeschild und Teamerfolg. Ein `Egomaniac` will mehr für sich, ein `Loyal` gibt mehr ab. Der
+  Rest sind seine eigenen Werbeverträge und **hebt seine Moral**. Sicherheitsnetz: nie mehr als 25 % seines Gehalts, kein
+  Spieler bezahlt sein Gehalt selbst.
+- Größenordnung: ein Team bekommt 4 bis 17 C je Saison (Mittel 7,3 C), die Spieler zusammen rund 215 C in der Liga. Schwache
+  Spieler ohne Profil bringen 0. **Sponsor und Marktwert bleiben unverändert.**
+- **Die Seite Marketing zeigt nur den eigenen Kader.** Fremde Spieler bekommen die Marketability als eigene Spalte im
+  Transfermarkt, mit Scouting-Nebel (Runde 3).
 
 ---
 
@@ -147,17 +159,18 @@ Bösewicht dort über das Thema (Abschnitt 3). Bei neutralen Fans zählt nur die
 
 ### 2.4 Beispiele aus dem Pool
 
-Gerechnet mit der Startfarbe der Fans. Werbegeld und Anteile in C je Saison, Liga 1.
+Gerechnet mit der Startfarbe der Fans. Werbegeld in C je Saison, Liga 1; die Aufteilung zwischen Team und Spieler steht in 4.2.
+Die Tabelle erklärt die Formel an Spielern aus dem Pool; die Seite Marketing selbst zeigt nur den eigenen Kader.
 
-| Spieler | Rasse · Klasse | Rating | Gehalt | Reichweite | Ton · Kante | Hell Raisers | Werbegeld → Team · ihn | Golden Gladiators | Werbegeld → Team · ihn |
+| Spieler | Rasse · Klasse | Rating | Gehalt | Reichweite | Ton · Kante | Hell Raisers | Werbegeld | Golden Gladiators | Werbegeld |
 |---|---|---:|---:|---:|---|---:|---|---:|---|
-| Mauler | Demon · Templar | 68 | 20,5 | 80 | −1,00 · 0,94 | ×1,40 = **100** | 10,0 → 3,1 · 6,9 | ×0,78 = **62** | 2,1 → 1,1 · 1,1 |
-| Aurelia Rosethorn | Divine · Hero | 67 | 17,1 | 84 | +1,00 · 1,00 | ×0,68 = **57** | 1,5 → 0,7 · 0,7 | ×1,40 = **100** | 10,0 → 2,6 · 7,4 |
-| Zephiroth | Dragon · Warlord | 63 | 17,1 | 85 | −0,03 · 1,00 | ×1,28 = 100 | 10,0 → 2,6 · 7,4 | ×1,05 = 89 | 7,2 → 2,6 · 4,6 |
-| Com Shepard | Human · Hero | 56 | 12,1 | 80 | +1,00 · 1,00 | ×0,83 = 67 | 2,7 → 1,4 · 1,4 | ×1,40 = 100 | 10,0 → 1,8 · 8,2 |
-| Luxariel | Demon · Bard | 36 | 6,6 | 67 | −1,00 · 1,00 | ×1,40 = **93** | 8,2 → 1,5 · 6,7 | ×0,81 = 54 | 1,2 → 0,6 · 0,6 |
-| King Arthur | Human · Templar | 76 | 18,0 | 44 | +0,55 · 0,09 | ×0,80 = 35 | 0,1 → 0,0 · 0,0 | ×1,17 = 52 | 1,0 → 0,5 · 0,5 |
-| Jasper Kane | Alien · Warlord | 71 | 14,0 | 43 | +0,57 · 0,10 | ×0,81 = 35 | 0,1 → 0,0 · 0,0 | ×0,97 = 42 | 0,3 → 0,1 · 0,1 |
+| Mauler | Demon · Templar | 68 | 20,5 | 80 | −1,00 · 0,94 | ×1,40 = **100** | 10,0 C | ×0,78 = **62** | 2,1 C |
+| Aurelia Rosethorn | Divine · Hero | 67 | 17,1 | 84 | +1,00 · 1,00 | ×0,68 = **57** | 1,5 C | ×1,40 = **100** | 10,0 C |
+| Zephiroth | Dragon · Warlord | 63 | 17,1 | 85 | −0,03 · 1,00 | ×1,28 = 100 | 10,0 C | ×1,05 = 89 | 7,2 C |
+| Com Shepard | Human · Hero | 56 | 12,1 | 80 | +1,00 · 1,00 | ×0,83 = 67 | 2,7 C | ×1,40 = 100 | 10,0 C |
+| Luxariel | Demon · Bard | 36 | 6,6 | 67 | −1,00 · 1,00 | ×1,40 = **93** | 8,2 C | ×0,81 = 54 | 1,2 C |
+| King Arthur | Human · Templar | 76 | 18,0 | 44 | +0,55 · 0,09 | ×0,80 = 35 | 0,1 C | ×1,17 = 52 | 1,0 C |
+| Jasper Kane | Alien · Warlord | 71 | 14,0 | 43 | +0,57 · 0,10 | ×0,81 = 35 | 0,1 C | ×0,97 = 42 | 0,3 C |
 
 King Arthur hat das höchste Rating im Pool und bringt fast nichts: Er ist die brave Mitte. Zephiroth verkauft bei beiden
 Teams, weil er Kante hat, ohne auf einer Seite zu stehen. Gegenüber Runde 1 fällt Mauler bei Golden Gladiators weniger tief
@@ -280,16 +293,43 @@ Nur Spieler im Kader zählen, Verletzte zur Hälfte.
 Schwache Spieler bringen also fast nichts. Die Ausnahme ist Persönlichkeit: Luxariel (Rating 36) kommt bei Hell Raisers auf
 8,2 C, weil seine Traits und die Fans passen.
 
-### 4.2 Die Teilung
+### 4.2 Die Teilung: dynamischer Team-Anteil (Runde 3)
 
-| | Regel | Wirkung |
-|---|---|---|
-| **Team-Anteil** | die Hälfte des Werbegelds, **höchstens 15 % des Saisongehalts** des Spielers (bei Gehältern unter 10 C höchstens 1,5 C, Liga 2 1,1 C) | Einnahme der Kasse, Posten „Marketing“ |
-| **Spieler-Anteil** | der Rest | eigene Werbeverträge. **Nicht in der Kasse.** Hebt die Moral |
+Runde 2 teilte fest: die Hälfte ans Team, höchstens 15 % des Gehalts. Das war eine Zahl ohne Geschichte. Jetzt hat jeder
+Spieler einen eigenen **Team-Anteil** in Prozent seines Werbegelds, und der bewegt sich.
 
-**Der Deckel ist die Antwort auf „der Spieler bezahlt sein Gehalt selbst“.** Über alle Spieler mit Gehalt ab 12 C gerechnet,
-selbst bei bester Passung, liegt der höchste Team-Anteil bei genau 15 % des Gehalts. In den Referenzkadern greift der Deckel
-bei 42 von 261 Spielern. Was über dem Deckel liegt, geht nicht verloren, sondern an den Spieler.
+    Team-Anteil = 40 % + Persönlichkeit + Werbeklausel + Vertragslaufzeit + Moral + Aushängeschild + Teamerfolg
+                  begrenzt auf 15 bis 65 %
+    ans Team    = Team-Anteil × Werbegeld, höchstens 25 % des Saisongehalts (Sicherheitsnetz)
+    an ihn      = Werbegeld − ans Team
+
+| Baustein | Punkte | Regel |
+|---|---:|---|
+| **Persönlichkeit** (Traits) | −20 bis +20 | gibt ab: `Loyal` +8, `Altruistic` +8, `Caring` +5, `Fair` +4, `Timid` +3 · will mehr für sich: `Egomaniac` −10, `Diva` −8, `Mercenary` −8, `Ambitious` −4, `Manipulative` −4, `Renegade` −4, `Gambler` −3. Summe begrenzt auf ±20 |
+| **Werbeklausel** (Verhandlung) | −10 · 0 · +10 | Teil jedes Vertrags und jeder Verlängerung, drei Stufen. „Spieler behält mehr“: −10 Punkte, dafür verlangt er 4 % weniger Gehalt. „Standard“: 0. „Team bekommt mehr“: +10 Punkte, dafür 4 % mehr Gehalt. `Egomaniac` und `Diva` lehnen „Team bekommt mehr“ ab, `Loyal` nimmt sie ohne Aufschlag |
+| **Vertragslaufzeit** | −5 · 0 · +5 | letzte Vertragssaison −5 (er hält sich alles offen), noch zwei Saisons 0, drei und mehr +5 |
+| **Moral** | −5 bis +5 | (Moral − 60) ÷ 4, gerundet. Wer zufrieden ist, wirbt für den Verein |
+| **Aushängeschild** | +8 | nur das Gesicht der Saison: der Verein führt seine Kampagne |
+| **Teamerfolg** | −3 · +3 · +6 | Vorsaison: Saisonziel verfehlt −3, erreicht +3, Titel, Aufstieg oder Farb-Meister +6. Gilt für alle Spieler des Teams. In Saison 1: 0 |
+
+Beispiele aus dem Mockup (Hell Raisers, Saisonziel verfehlt; Moral, Laufzeit und Klausel sind dort Beispielwerte):
+
+| Spieler | Werbegeld | Rechnung | Team-Anteil | ans Team | an ihn |
+|---|---:|---|---:|---:|---:|
+| Bloodseeker (Gesicht) | 11,4 C | 40 + 8 Gesicht − 3 Erfolg | 45 % | 3,3 C (Netz: 25 % von 13,4 C Gehalt) | 8,0 C, Moral +8 |
+| Mazzikin (`Loyal`, Vertrag drei Saisons, Moral 74) | 8,5 C | 40 + 8 + 5 + 4 − 3 | 54 % | 2,9 C (Netz) | 5,6 C, Moral +8 |
+| Vixen (`Diva`, letzte Vertragssaison, Klausel für sie) | 6,9 C | 40 − 8 − 5 − 10 − 1 − 3 = 13, Untergrenze | 15 % | 1,0 C | 5,9 C, Moral +8 |
+| Rocky (`Renegade`, letzte Saison, Moral 48) | 3,7 C | 40 − 4 − 5 − 3 − 3 | 25 % | 0,9 C | 2,8 C, Moral +4 |
+| Kadis bei Golden Gladiators (`Loyal`, `Caring`, Gesicht, Farb-Meister) | 3,1 C | 40 + 13 + 5 + 5 + 8 + 6 = 77, Obergrenze | 65 % | 2,0 C | 1,1 C, Moral +2 |
+
+**Warum es trotzdem ein Sicherheitsnetz gibt.** Chris' Regel aus Runde 2 gilt weiter: Kein Spieler soll sein Gehalt faktisch
+selbst bezahlen. Ohne Netz brächte ein billiger Spieler mit großer Persönlichkeit und hohem Anteil dem Team bis zu 60 % seines
+Gehalts zurück. Das Netz ist kein fester Satz mehr, sondern eine Grenze, die selten greift: in den Referenzkadern bei 7 von
+261 Spielern (der alte 15-%-Deckel griff bei 42). Was darüber liegt, geht an den Spieler. Üblich sind 5 bis 15 % des Gehalts.
+
+**Was der Manager damit tun kann:** die Klausel verhandeln (Gehalt jetzt gegen Marketing später), Verträge früh verlängern (+5
+statt −5), die Moral halten und das Aushängeschild so wählen, dass die +8 Punkte auf viel Werbegeld treffen. Einen `Egomaniac`
+kauft man für die Reichweite, nicht für die Kasse: Sein Werbegeld geht zu drei Vierteln an ihn, aber es hält ihn bei Laune.
 
 **Moral aus dem Spieler-Anteil** (je Saison, wirkt als fester Zuschlag, solange er im Kader ist):
 
@@ -298,48 +338,45 @@ bei 42 von 261 Spielern. Was über dem Deckel liegt, geht nicht verloren, sonder
 | Moral | +2 | +4 | +6 | +8 |
 
 - `Diva`, `Egomaniac`, `Mercenary` und `Ambitious` zählen den Zuschlag anderthalbfach, `Altruistic` und `Timid` halb.
+- **Kein Kreis:** Die Moral im Team-Anteil ist die Moral **ohne** den Werbe-Zuschlag, sonst zöge sich der Wert selbst hoch.
 - **Vertrag:** Bei einer Verlängerung verlangt der Spieler je vollen 5 % seines Gehalts, die er hier an Werbung verdient, 1 %
   weniger, höchstens 5 %. Ein Wechsel zu einem Team mit schlechterer Passung kostet ihn Werbegeld; die KI des abgebenden
   Spielers rechnet das als Grund zu bleiben. Der Marktwert bleibt exakt und unverändert.
 - **Neid:** keiner. Der Zuschlag hängt nur am eigenen Anteil.
+- **KI:** wählt die Klausel nach Finanzwert des Teams (ab 7 „Team bekommt mehr“, unter 4 „Spieler behält mehr“, sonst
+  Standard) und für delegierte Verträge genauso.
 
 ### 4.3 Teammarke und Aushängeschild
 
 - **Teammarke (Sockel):** 4,0 C (Liga 1) bzw. 3,0 C (Liga 2) × Stimmung × Fan-Shop. Das ist der bisherige Merch-Posten des
   Finanzkonzepts V2 ohne Starfaktor; den Star-Teil übernimmt jetzt das Werbegeld.
 - **Aushängeschild:** Einmal je Saison wählt der Manager eines unter seinen sechs besten Spielern. Sein Werbegeld steigt um
-  25 % (der Deckel gilt weiter, das Mehr geht meist an ihn). Wird er in der Saison verkauft, fällt die Stimmung um 8 Punkte;
+  25 % und sein Team-Anteil um 8 Punkte (4.2). Wird er in der Saison verkauft, fällt die Stimmung um 8 Punkte;
   fällt er verletzt aus, ruht der Zuschlag. Das bleibt die einzige Entscheidung des Systems.
 
 ### 4.4 Größenordnung und GuV
 
-Gerechnet über die Referenzkader (im Mittel 8 Spieler und 63 C Gehalt je Team; die Gehaltssumme entspricht den gemessenen
-57 C je Team aus dem Spiel). Je Team: Sockel + Team-Anteile, Liga-1-Sätze.
+Neu gerechnet mit dem dynamischen Anteil über die Referenzkader (261 Spieler, 32 Teams, im Mittel 8 Spieler je Team). In
+dieser Rechnung zählt nur die Persönlichkeit; Klausel, Laufzeit, Moral und Erfolg stehen auf neutral, weil es dafür noch keine
+Daten gibt. Liga-1-Sätze für Budget-Rang 1 bis 16, Liga-2-Sätze für 17 bis 32.
 
-| | Marketing in der Kasse je Saison | an die Spieler |
+| | Runde 2 (Hälfte, Deckel 15 %) | Runde 3 (dynamisch, Netz 25 %) |
 |---|---:|---:|
-| Hell Raisers, Zero Heroes (beste Werbekader) | 13,8 C | 26 C, 17 C |
-| Wicked Wizards, Raging Lunatics, Lost Kingdom, Pirate Crew, Dire Legion | 11 bis 12,5 C | 12 bis 18 C |
-| Median der 32 Teams | 8,1 C | rund 5 C |
-| Golden Gladiators | 7,8 C | 3,8 C |
-| Cash Creators, Riptide Rivers, Wrecking Legionnaires (blasse Kader) | 5 bis 6 C | 1 bis 3 C |
-| Terrible Teachers (nur Talente, keine Kante) | 4,1 C | 0,1 C |
+| Werbegeld aller Spieler | 336 C | 336 C |
+| Team-Anteile in den Kassen | 135 C | 122 C |
+| mittlerer Team-Anteil | 40 % (nach Deckel) | 39 % |
+| Deckel oder Netz greift bei | 42 Spielern | 7 Spielern |
+| an die Spieler (Moral) | rund 200 C | rund 215 C |
+| Teammarke (Sockel 4,0 · 3,0 C) | 112 C | 112 C |
+| **Marketing in den Kassen** | 247 C, 7,7 C je Team | **234 C, 7,3 C je Team** |
+| Liga 1 · Liga 2 je Team | – | 8,4 · 6,2 C |
+| kleinstes · mittleres · größtes Team | 4,1 · 8,1 · 13,8 C | 4,1 · 6,5 · 16,9 C |
 
-Mit vollen Kadern und Stars über Rating 60, die in den Referenzkadern fehlen, reicht die Spitze bis rund 20 C.
-
-| Liga-Summe je Saison | Betrag | Anmerkung |
-|---|---:|---|
-| Teammarke (Sockel), 16 × 4,0 + 16 × 3,0 C | 112 C | nahe am Merch-Plan von V2 (118 C) |
-| Team-Anteile am Werbegeld, 16 Teams Liga-1-Satz, 16 Liga-2-Satz | rund 135 C | 149 C, wenn alle Liga 1 wären; 121 C bei Liga 2 |
-| **Marketing in den Kassen** | **rund 247 C** | 7,7 C je Team; mit Schub und Aushängeschild 260 bis 280 C |
-| Spieler-Anteile (nicht in der GuV) | rund 205 C | Moral statt Kasse |
-| Mehr gegenüber dem V2-Plan (118 C Merch) | **+130 bis +160 C** | +6 bis +7 % der heutigen Liga-Einnahmen (2.182 C) |
-
-**Wer fängt das Mehr auf?** Dieselben Posten wie bei den Tickets (Finanzpapier g.2): Ausrüstung und Verpflegung kosten 320
-bis 800 C je Saison in der Liga. Tickets (294 bis 575 C netto) und Marketing (+130 bis +160 C) zusammen liegen in dieser
-Spanne. Der Sponsor bleibt unverändert; sein Anteil an den Einnahmen eines Top-Teams der Liga 1 sinkt durch 14 C Marketing von
-73 % auf rund 66 %. Stellschraube für die Messung ist der Höchstwert (10 · 7,5 C): Er skaliert Team- und Spieler-Anteil
-zusammen, der Deckel hält die Regel „höchstens 15 % des Gehalts“ in jedem Fall.
+Die Summe bleibt fast gleich, die Verteilung wird breiter: Hell Raisers kommen auf 16,9 C (viele Anecker mit hohem Werbegeld
+und Bösewicht-Fans), Golden Gladiators auf 7,6 C, Teams ohne Kante auf 4 C. Mit vollen Kadern (im Spiel rund 12 statt 8
+Spieler) liegt alles etwas höher. Das ganze Bild aus Einnahmen und Ausgaben je Saison, mit Marketing als einer Zeile, steht
+im Finanzpapier (`docs/design/finanzen-posten-22-11.md`, Abschnitt i). Dort steht auch der Vorschlag, den Sockel der Teammarke
+in Liga 2 von 3,0 auf 4,0 C zu heben. Stellschraube für die Messung bleibt der Höchstwert (10 · 7,5 C).
 
 ### 4.5 Tickets und Sponsor
 
@@ -357,7 +394,7 @@ zusammen, der Deckel hält die Regel „höchstens 15 % des Gehalts“ in jedem 
 **KI-Regel** (für KI-Teams und delegierte Bereiche gleich):
 
 - Beim Kauf rechnet die KI den **Team-Anteil** über die Vertragsjahre auf ihre Zahlungsbereitschaft, **höchstens +8 %**. Cash
-  Creators rechnen das Doppelte (bis +16 %). Weil der Team-Anteil bei 15 % des Gehalts endet, kann die Rechnung nie einen
+  Creators rechnen das Doppelte (bis +16 %). Weil der Team-Anteil bei 25 % des Gehalts endet, kann die Rechnung nie einen
   Kauf allein tragen.
 - Beim Verkauf verlangt sie für ihr Aushängeschild 10 % mehr.
 - Das Aushängeschild ist der Spieler mit der höchsten Marketability unter den besten sechs.
@@ -369,20 +406,42 @@ zusammen, der Deckel hält die Regel „höchstens 15 % des Gehalts“ in jedem 
   ist je Team verschieden; jeder Manager sieht die Zahl für **sein** aktives Team (`activeManagerTeamId`).
 - Das Aushängeschild liegt je Team im Spielstand, geschrieben über `authorizeServerRoomWrite`, delegierbar im Bereich
   Sponsor. Ohne Wahl gilt die KI-Regel; kein Spieltag wartet.
-- **Scouting-Nebel:** Traits und Rating ungescouteter Spieler sind verdeckt, also auch Marketability und Werbegeld.
-  Ungescoutet zeigt die App fünf feste Stufen, beobachtet 10er-Schritte, gescoutet die Zahl. Sortieren nach Stufe,
-  Gleichstand nach Name. Der Schalter „Fog of War aus“ zeigt alles.
+- **Scouting-Nebel:** Traits und Rating ungescouteter Spieler sind verdeckt, also auch die Marketability (5.1).
 
 **Was gezeigt wird:**
 
 | Ort | Anzeige |
 |---|---|
-| Spielerprofil | Marketability für das eigene Team, Herleitung (Reichweite, Kante, Richtung, Thema, Farbe), Werbegeld mit Team-Anteil, Spieler-Anteil und Moral |
-| Transfermarkt | Spalte Marketability, Spalte „ans Team“ in C; Hinweis „passt zu deinen Fans“ ab Passung 1,15 |
-| Kader | Seite Marketing (Mockup) |
+| Spielerprofil | Marketability für das eigene Team, Herleitung (Reichweite, Kante, Ton, Thema, Farbe), Werbegeld, Team-Anteil mit seinen Gründen, Spieler-Anteil und Moral |
+| Transfermarkt | eigene Spalte **Marketability** mit Scouting-Nebel (5.1); Hinweis „passt zu deinen Fans“ erst ab „gescoutet“ |
+| Kader | Seite Marketing (Mockup): **nur der eigene Kader**, je Spieler die Zerlegung warum |
 | Finanzen | Posten „Marketing“: Teammarke und Team-Anteile je Spieler, je Spieltag gebucht |
 | Moral | Zeile „Werbeverträge +n“ in der Herleitung der Moral des Spielers |
 | Fremde Teams | Fanprofil und Verlauf immer sichtbar, Marketability ihrer Spieler nach Scouting-Stand |
+
+### 5.1 Marketability als Stat im Transfermarkt (Runde 3)
+
+Gebaut wird das später zusammen mit dem Transfermarkt (`docs/design/transfermarkt-modern-18-11.md`); hier steht nur die Regel.
+
+- **Eine Spalte „Marketability“** neben den anderen Stats, sortierbar wie jede Spalte. Die Zahl gilt für **das eigene Team**
+  (`activeManagerTeamId`), denn sie hängt am Fanprofil: Derselbe Spieler hat für Hell Raisers und Golden Gladiators
+  verschiedene Werte.
+- **Nebel in den festen Stufen des Scoutings**, wie bei jedem verdeckten Wert:
+
+| Scouting-Stand | Anzeige | Beispiel (wahrer Wert 88) |
+|---|---|---|
+| unbekannt | 10er-Stufe | 80–89 |
+| beobachtet | 5er-Stufe | 85–89 |
+| gescoutet | exakt | 88 |
+
+- Nie „~88“ um den wahren Wert, nie eine Farbe oder ein Balken, der genauer ist als die Stufe.
+- **Sortieren und Filtern nach der Stufe, Gleichstand nach Name.** Zwei Spieler in derselben 10er-Stufe stehen alphabetisch,
+  nicht nach dem wahren Wert.
+- Werbegeld und Team-Anteil in C erscheinen im Transfermarkt erst ab „gescoutet“, weil sie Traits und Gehalt verraten würden.
+  Davor steht nur die Stufe.
+- Der **Marktwert bleibt immer exakt** und hängt nicht an der Marketability.
+- Der Schalter „Fog of War aus“ zeigt überall die exakte Zahl.
+- Eigene Spieler sind immer exakt; darum braucht die Seite Marketing keinen Nebel.
 
 ## 6. Was am Bestand anzupassen wäre
 
@@ -432,10 +491,48 @@ Die Aufnahmen ohne `runde2-` zeigen den Stand von Runde 1. Geprüft in Chromium 
 JS-Fehler, kein Seitenscroll und kein inneres Scrollen bei 2560×1440, 1920×1080 und 1710×1112, kein abgeschnittener Text. Bei
 1080 und 1112 px Höhe entfällt der erklärende Fußtext der drei Karten.
 
+## 7a. Das Mockup, Runde 3
+
+Geändert gegenüber Runde 2 (Abschnitt 7 beschreibt den alten Stand):
+
+- **Nur der eigene Kader.** Die Gruppe „Auf dem Markt“ und die sieben Pool-Spieler sind entfernt, ebenso die Spalten Stärke
+  und Ton-Achse. Dafür sind die Zeilen höher und füllen die Tafel.
+- **Warum, in drei Schritten je Zeile:** **Reichweite** als gestapelter Balken (Leistung, Ausstrahlung aus den Traits, Typ)
+  mit den drei Zahlen darunter · **Passung** als Faktor mit den vier Beiträgen Kante, Ton, Thema, Farbe in Prozentpunkten
+  (grün hebt, rot senkt) · **Team-Anteil** als Balken mit Prozent und den zwei stärksten Gründen („Klausel −10 · Diva −8“).
+- Neue Spalte **Werbegeld**; „ans Team“ zeigt darunter den Anteil am Gehalt oder „Netz: 25 % vom Gehalt“. Summenzeile für
+  den Kader. Alle Spalten sortierbar.
+- **Reiter Spieler** rechts: dieselben drei Fragen ausführlich („Warum fällt er auf?“, „Warum passt er zu deinen Fans?“, „Wie
+  viel davon bekommt das Team?“) mit jedem Trait und jedem Baustein des Team-Anteils.
+- **Karte „Team-Anteil: dynamisch“** ersetzt die Ton-Karte: die sechs Bausteine mit Spanne und der Teamerfolg dieser Saison.
+  Die Karten „Wohin das Werbegeld geht“ und „Aushängeschild“ zeigen den neuen Anteil.
+
+| Mockup-Feature aus Chris' Rückmeldung (Runde 3) | Stand |
+|---|---|
+| Nur eigene Spieler, keine Leute vom Transfermarkt | drin |
+| Wie und warum sich jeder Spieler auswirkt | drin (Zerlegung je Zeile, Reiter Spieler) |
+| Marketability als eigener, vernebelter Stat im Transfermarkt | Konzept (5.1), gebaut mit dem Transfermarkt; im Mockup nur der Hinweis im Fuß |
+| Team-Anteil dynamisch statt fix | drin (Formel, Spalte, Karte, Reiter Spieler) |
+
+Ehrlich gekennzeichnet: **Moral, Restlaufzeit und Werbeklausel je Spieler sind Beispielwerte** des Mockups, ebenso der
+Teamerfolg der Vorsaison. Die Karte „Ton: Kante schlägt Mitte“ aus Runde 2 ist entfallen; die Regel gilt weiter und steht je
+Spieler in den Beiträgen Kante und Ton.
+
+| Datei (`docs/design/marketing-22-11/`) | Zeigt |
+|---|---|
+| `runde3-hell-raisers-kader-vixen-1920x1080.png` | Hell Raisers, Vixen gewählt: Team-Anteil 15 % (`Diva`, Klausel, letzte Vertragssaison) |
+| `runde3-hell-raisers-kader-bloodseeker-2560x1440.png` | Aushängeschild Bloodseeker, Sicherheitsnetz greift |
+| `runde3-golden-gladiators-team-anteil-1920x1080.png` | Golden Gladiators, nach Team-Anteil sortiert, Kadis 65 % |
+| `runde3-hell-raisers-fanprofil-1710x1112.png` | MacBook-Format, Reiter Fanprofil |
+| `runde3-phone-412x900.png` | Nebenprobe Phone |
+
+Geprüft in Chromium unter `flock /tmp/oly-aufnahme.lock`: keine JS-Fehler, kein Seitenscroll und kein inneres Scrollen bei
+2560×1440, 1920×1080 und 1710×1112 in allen drei Reitern. Die Aufnahmen `runde2-…` zeigen den alten Stand.
+
 ## 8. Offene Fragen an Chris
 
 | # | Frage | Empfehlung |
 |---:|---|---|
-| 1 | Deckel für den Team-Anteil: 15 % des Gehalts mit der Untergrenze 1,5 C für billige Spieler, oder streng 15 % für alle? | **Mit Untergrenze.** Sonst bringt eine billige Persönlichkeit wie Luxariel dem Team höchstens 1,0 C, und „Persönlichkeit zahlt sich aus“ gilt nur für den Spieler. Schon mit Untergrenze 1,0 statt 1,5 C sind es in der Liga 8 C weniger. |
-| 2 | Höchstwert 10 C (Liga 1) je Spieler, also 4 bis 14 C je Team, im Mittel 8 C: genug, oder soll mehr in die Kassen? | **So messen.** Mehr geht nur über den Sockel oder einen höheren Deckel; ein höherer Höchstwert landet wegen des Deckels fast ganz bei den Spielern. |
+| 1 | Sicherheitsnetz bei 25 % des Gehalts (greift bei 7 von 261 Spielern), oder ganz ohne Netz? | **Mit Netz.** Ohne bringt ein billiger Spieler mit großer Persönlichkeit bis zu 60 % seines Gehalts zurück. |
+| 2 | Werbeklausel als dritte Zahl in jeder Vertragsverhandlung (drei Stufen), oder erst später mit einem Verhandlungs-Baustein? | **Gleich, als drei Stufen.** Sie ist die einzige Stelle, an der der Manager den Anteil selbst bewegt. |
 | 3 | Sollen neben der Farbe auch Vorlieben wachsen (Klasse des Aushängeschilds nach zwei Saisons)? | **Ja, klein halten:** ein Zugang je Team, nur Klassen. |
