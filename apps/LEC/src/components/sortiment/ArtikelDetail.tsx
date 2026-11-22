@@ -5,7 +5,7 @@ import { SORTIMENT_LABEL } from "@/lib/dashboard/lifecycle";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SortimentRow } from "@/lib/dashboard/viewModel";
-import { boardVk, cardmarketHint, cardmarketLink, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
+import { boardVk, cardmarketDirektLink, cardmarketHint, cardmarketLink, cleanTitle, ebayLinks } from "@/lib/dashboard/board";
 import { CopyCode } from "./CopyCode";
 import { rarityFromTitle } from "@/lib/market/rarity";
 import { conditionOf } from "@/lib/market/condition";
@@ -16,6 +16,7 @@ import { salesPattern, type PriceEffect } from "@/lib/dashboard/kennzahlen";
 
 interface Detail {
   billbeeId?: string | null;
+  cardmarketPfad?: string | null;
   kennzahlen: KennzahlenData | null;
   losses: LossRow[];
   lossCost: number;
@@ -244,7 +245,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             In Billbee und bei eBay korrigieren.
           </div>
         )}
-        <EbayActions row={row} hidden={row.hidden === true} busy={busy} onToggleHidden={() => setHidden(row.hidden !== true)} onToggleDelist={() => setDelist(!row.delistMarkedAt)} />
+        <EbayActions row={row} cardmarketPfad={detail?.cardmarketPfad ?? null} hidden={row.hidden === true} busy={busy} onToggleHidden={() => setHidden(row.hidden !== true)} onToggleDelist={() => setDelist(!row.delistMarkedAt)} />
 
         <section className="bd-dec" aria-label="Entscheidung">
           <div className={`bd-dec-f${priceTone ? ` ${priceTone}` : ""}`} title={m?.targetMin != null && m.targetOpt != null ? `Dein VK ${eur(vk)} gegen die Zielspanne ${eur(m.targetMin)} – ${eur(m.targetOpt)}. Zu günstig liegt unter, zu teuer über der Spanne.${m.soldAt ? ` ${m.soldAt.qty} ${m.soldAt.qty === 1 ? "Verkauf" : "Verkäufe"} in ${m.soldAt.days} Tagen im Schnitt für ${eur(m.soldAt.avg)}.${m.provenByDemand ? " Der Markt nimmt diesen Preis, das Urteil „zu teuer“ entfällt." : ""}` : ""}` : undefined}>
@@ -633,9 +634,12 @@ function Stat({ label, value, sub, info, tone }: { label: string; value: string;
   );
 }
 
-function EbayActions({ row, hidden, busy, onToggleHidden, onToggleDelist }: { row: SortimentRow; hidden: boolean; busy: boolean; onToggleHidden: () => void; onToggleDelist: () => void }) {
+function EbayActions({ row, cardmarketPfad, hidden, busy, onToggleHidden, onToggleDelist }: { row: SortimentRow; cardmarketPfad: string | null; hidden: boolean; busy: boolean; onToggleHidden: () => void; onToggleDelist: () => void }) {
   const l = ebayLinks(row);
-  const cm = cardmarketLink(row, cleanTitle(row.nameRaw).pack);
+  const pack = cleanTitle(row.nameRaw).pack;
+  // Direktlink auf die Version mit der richtigen Seltenheit (RA01-RA05), sonst die Suche mit Warnhinweis
+  const cm = cardmarketPfad ? cardmarketDirektLink(row, cardmarketPfad, pack) : cardmarketLink(row, pack);
+  const cmDirekt = cardmarketPfad !== null;
   const cmHint = cardmarketHint(row);
   return (
     <div className="bd-dt-actions">
@@ -652,18 +656,20 @@ function EbayActions({ row, hidden, busy, onToggleHidden, onToggleDelist }: { ro
       </a>
       {cm && (
         <a
-          className={`chip${cmHint.multi ? " bd-cm-multi" : ""}`}
+          className={`chip${cmHint.multi && !cmDirekt ? " bd-cm-multi" : ""}`}
           href={cm}
           target="_blank"
           rel="noopener noreferrer"
           title={
-            cmHint.multi
+            cmDirekt
+              ? `Öffnet direkt die Version mit Seltenheit ${cmHint.rarity ?? ""} bei Cardmarket (Sprache der Karte, ab NM).`
+              : cmHint.multi
               ? `Achtung: Die Suche zeigt ${cmHint.variants} Versionen dieser Karte${cmHint.rarity ? `. Nimm nur die Version mit Seltenheit ${cmHint.rarity}` : ", achte auf die Seltenheit"} und vergleiche Bild und Nummer.`
               : `Sucht die Karte bei Cardmarket (Sprache der Karte, ab NM).${cmHint.rarity ? ` Seltenheit: ${cmHint.rarity}.` : ""}`
           }
         >
           Cardmarket{cmHint.rarity ? ` · ${cmHint.rarity}` : ""}
-          {cmHint.multi ? ` · ${cmHint.variants} Versionen` : ""} ↗
+          {cmHint.multi && !cmDirekt ? ` · ${cmHint.variants} Versionen` : ""} ↗
         </a>
       )}
       <button
