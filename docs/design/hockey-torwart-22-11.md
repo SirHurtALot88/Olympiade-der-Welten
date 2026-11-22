@@ -43,7 +43,7 @@ Befehle: `OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs 24 hockey -
 
 Rangtreue nach Rolle, Einzelkader (`miss-rangtreue-nach-rolle.mjs hockey 48`, jetzt mit `OLY_FORM_MODUS=echt`; Vorwert ohne echte Formkarten 0,930 / 0,973 / Lücke 0,043): alle 0,965, nur Feldspieler 0,982, Lücke 0,017.
 
-**Pp-Abweichung:** siehe Abschnitt 6 (läuft/ist ein Abnahmerest). Gepoolter Altwert 19,9 / 20,3.
+**Pp-Abweichung: NICHT neu gemessen.** Ein Strom n=48 kostet im Node-Motor rund 45 CPU-Minuten (Hockey-Messung `messe-arena-einfluss.mjs`, Pool = 3 Ströme, zwei Pools verlangt); der Rechner war durch andere Sitzungen ausgelastet, der gestartete Pool wurde abgebrochen. Gepoolter Altwert 19,9 / 20,3 (nicht frisch). Erwartung: Torwart-Wert hängt jetzt zu 60 % an der matrixgewichteten Eignung, die Abweichung sollte nicht steigen; das ist eine Erwartung, keine Messung. Beleg-Befehl: `OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs hockey 48 --saat-versatz=0|1e7|2e7 --rohdaten=...` plus `poole-arena-einfluss.mjs`.
 
 ## 4. PP
 
@@ -71,4 +71,4 @@ Hinweis: Der Tagesbeste liegt wie in `pp-analyse-21-11.md` bei 4,7–4,8 (fester
 
 Aufnahmen aus der **Motor-Seite** (`scripts/screenshot-hockey-torwart.mjs`, `docs/design/hockey-torwart-22-11/`): `neu-1920x1080.png`, `neu-2560x1440.png`, `neu-canvas-dauerfeuer.png`, `alt-canvas-dauerfeuer.png`. Angesehen: Torwart-Karte, Puste-Leiste unter den Füßen des Torwarts und Ticker laufen; keine Überlappung, kein Seitenfehler. Nicht aus der eingeloggten App-Hostseite (kein Login im Container). Die Leiste ist klein; ein eigenes Torwart-HUD wurde nicht gebaut.
 
-Offen: (a) Pp-Abweichung nach der Regel: ein Pool von drei n=48-Strömen läuft (Node-Variante von `messe-arena-einfluss.mjs`), Ergebnis steht in `disziplin-abnahme.json`, falls rechtzeitig fertig, sonst gilt der Altwert 19,9/20,3 als nicht neu gemessen; (b) Torwart-Referenz ist dünn (128 Werte je Größe); (c) Hockey-rho bleibt unter 0,75, Hebel liegt bei den Feldspielern.
+Offen: (a) Pp-Abweichung nach der Regel nicht neu gemessen (Abschnitt 3); (b) Torwart-Referenz ist dünn (128 Werte je Größe); (c) Hockey-rho bleibt unter 0,75, Hebel liegt bei den Feldspielern.
