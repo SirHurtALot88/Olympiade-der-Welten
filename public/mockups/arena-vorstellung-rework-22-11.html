@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Arena-Vorstellung – Rework (Mockup 22.11.)</title>
+<!--
+  REWORK DES VORSTELLUNGS-SCREENS DER ARENA (Fable, 22.11.). Erklaerung: docs/design/arena-vorstellung-rework-22-11.md
+  Kernidee: EINE ZEILE = EIN SLOT. Wer denselben Slot der Einsatzliste besetzt, steht auf allen Seiten auf derselben Hoehe.
+  Duell: links eigenes Team, rechts Gegner, in der Mitte die Slot-Spalte. Vierergruppe: Zeilen = Slots, Spalten = Teams.
+  ECHT: Teamnamen, Wappen, Spielernamen, Klassen, Rassen, Portraits, PixelLab-Figuren, Kulissen, Slot-Namen/-Texte/-Schluesselattribute
+        (lib/lineups/matchday-slot-roles.ts), Punkteschema, Nebel-Stufen (10er / 5er / exakt), Form-Stufen, Moral-Stufen.
+  ERFUNDEN: jede Zahl, wer in welchem Slot steht, Liga-Raenge, Scouting-Stufe je Spieler, Feldpositionen im Mini-Feldplan.
+  Kein App-Code, keine externen Skripte, Schriften lokal, 0 PixelLab-Generationen.
+  URL: ?v=hockey|fechten|battlefield|staffel   ?nebel=0 (Fog of War aus)   ?slot=<nr> (Zeile gewaehlt)   ?still=1 (ohne Mockup-Leiste)
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --drei:#B58BE8; --vier:#EC7AA6; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --k-red:#ea6a5c; --k-green:#5fcf86; --k-blue:#62a8f2; --k-yellow:#f0c35a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --glas:rgba(8,11,17,.84);
+}
+/* VOLLE FLAECHE: Entwurfsmass 120 x 67,5 rem (= 1920 x 1080 bei 16 px); alles in rem, waechst bis 4K mit. */
+html{font-size:clamp(11px,min(0.8333vw,1.4815vh),34px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem;overflow:hidden}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+kbd{font:600 .7rem/1 var(--zahl);padding:.15rem .3rem;border:1px solid var(--linie-2);border-radius:.2rem;color:var(--leise)}
+.sp{flex:1}
+
+/* Mockup-Leiste */
+.demo{height:2.25rem;display:flex;align-items:center;gap:.5rem;padding:0 .9rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem;margin:0 .3rem 0 .6rem}
+.demo b:first-child{margin-left:0}
+.demo a{color:var(--leise);padding:.1rem .6rem;border:1px solid var(--linie);border-radius:1rem}
+.demo a.an{color:#17120a;background:var(--gold);border-color:var(--gold);font-weight:700}
+body.still .demo{display:none}
+
+.buehne{--kopf:2.25rem;position:relative;height:calc(100vh - var(--kopf));background:var(--grund);overflow:hidden;
+  display:grid;grid-template-rows:3.5rem auto minmax(0,1fr) 4.6rem;isolation:isolate}
+body.still .buehne{--kopf:0rem}
+.bild{position:absolute;inset:0;z-index:-2;background:var(--bild) center/cover;image-rendering:pixelated}
+.bild::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,8,12,.86),rgba(6,8,12,.9) 35%,rgba(6,8,12,.95))}
+
+/* REGIELEISTE (wie arena-spieltag-modern-18-11) */
+.reg{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:1rem;padding:0 .9rem;background:rgba(6,8,12,.92);border-bottom:1px solid var(--linie)}
+.reg .l,.reg .r{display:flex;align-items:center;gap:.6rem;min-width:0} .reg .r{justify-content:flex-end}
+.hk2{display:inline-flex;align-items:center;gap:.5rem;height:2.4rem;padding:0 .8rem;background:var(--glas);border:1px solid var(--linie-2);border-radius:.5rem;font-size:.92rem;font-weight:600;white-space:nowrap}
+.reg .ort{font-size:.95rem;color:var(--leise);white-space:nowrap} .reg .ort b{color:var(--creme);font-weight:600}
+.weg{display:flex;align-items:center;gap:.3rem}
+.weg a{display:flex;align-items:center;gap:.5rem;height:2.4rem;padding:0 1rem 0 .7rem;font-size:.95rem;color:var(--stumm);white-space:nowrap;border-bottom:2px solid transparent}
+.weg a u{text-decoration:none;display:grid;place-items:center;width:1.4rem;height:1.4rem;border-radius:50%;border:1px solid currentColor;font-size:.78rem;font-weight:700}
+.weg a b{font:400 1.1rem/1 var(--haus)}
+.weg a.ok{color:var(--gut)} .weg a.ok u{background:var(--gut);color:#06140c;border-color:var(--gut)}
+.weg a.an{color:var(--gold);border-bottom-color:var(--gold)} .weg a.an b{color:#fff} .weg a.an u{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.weg span{width:1.6rem;height:1px;background:var(--linie-2)}
+.ich{display:flex;align-items:center;gap:.5rem;height:2.4rem;padding:0 .8rem 0 .3rem;border:1px solid var(--heim);border-radius:.5rem;background:rgba(242,160,61,.12);white-space:nowrap}
+.ich img{width:1.8rem;height:1.8rem;border-radius:.3rem;object-fit:cover}
+.ich small{display:block;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--heim);font-weight:700;line-height:1}
+.ich b{display:block;font:400 1.02rem/1.05 var(--haus);color:#fff}
+
+/* KOPF: Disziplin, Spielart, Punkteschema */
+.kopf{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:1.5rem;padding:.7rem 1.2rem .6rem}
+.kopf .dz{display:flex;align-items:center;gap:.9rem;min-width:0}
+.kopf .dz img{width:3.4rem;height:3.4rem;object-fit:contain;filter:drop-shadow(0 0 .5rem rgba(240,195,90,.35))}
+.kopf h1{margin:0;font:400 2.7rem/1 var(--haus);color:#fff;letter-spacing:.01em}
+.schema{display:flex;gap:.4rem}
+.schema div{min-width:5.2rem;padding:.3rem .8rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--glas);text-align:center}
+.schema small{display:block;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.schema b{font-size:1.35rem;font-weight:700}
+.kopf .re{display:flex;justify-content:flex-end;align-items:center;gap:.5rem;flex-wrap:wrap}
+.marke{display:inline-flex;align-items:center;gap:.4rem;height:1.9rem;padding:0 .7rem;border-radius:1rem;border:1px solid var(--linie-2);background:var(--glas);font-size:.88rem;color:var(--creme);white-space:nowrap}
+.marke.gold{border-color:var(--gold);color:var(--gold);background:rgba(240,195,90,.1);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.marke.zu{color:var(--leise)}
+
+/* TAFEL: eine Zeile = ein Slot */
+.tafel{display:grid;grid-template-rows:auto minmax(0,1fr);gap:.5rem;padding:0 1.2rem;min-height:0}
+.tafel.duell{--sp:minmax(0,1fr) 18rem minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-columns:19rem minmax(0,1fr) 19rem;gap:.6rem;padding-bottom:.6rem}
+.tafel.pod{--sp:12.5rem repeat(4,minmax(0,1fr))}
+.kz,.zeile{display:grid;grid-template-columns:var(--sp);gap:.5rem}
+.zeilen{display:grid;grid-auto-rows:minmax(0,1fr);gap:.4rem;min-height:0;align-self:center;height:100%;max-height:calc(var(--k) * 15rem)}
+.tafel.pod .zeilen{padding-bottom:.6rem}
+.zeile{position:relative;min-height:0;border-radius:.55rem;cursor:pointer}
+.zeile::before{content:"";position:absolute;inset:0;border-radius:.55rem;background:rgba(255,255,255,.028);border:1px solid transparent;pointer-events:none}
+.zeile:hover::before{background:rgba(255,255,255,.055)}
+.zeile.wahl{outline:2px solid var(--gold);outline-offset:1px}
+
+/* Teamkopf */
+.tk{--tf:var(--gast);display:grid;grid-template-columns:auto minmax(0,1fr);gap:.2rem .8rem;align-items:center;padding:.55rem .8rem;border-radius:.55rem;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--tf) 16%,rgba(8,11,17,.9)),rgba(8,11,17,.88));border:1px solid color-mix(in srgb,var(--tf) 55%,transparent);border-top:.22rem solid var(--tf);min-width:0}
+.tk.eigen{border-color:var(--heim);box-shadow:0 0 0 1px var(--heim) inset}
+.tk>img{width:3.6rem;height:3.6rem;border-radius:.45rem;object-fit:cover;grid-row:span 2}
+.tk .nm{display:flex;align-items:baseline;gap:.5rem;min-width:0}
+.tk h2{margin:0;font:400 1.55rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.du{padding:.08rem .45rem;border-radius:.25rem;background:var(--heim);color:#17120a;font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.mg{padding:.05rem .45rem;border-radius:1rem;border:1px solid var(--linie-2);font-size:.74rem;color:var(--creme);white-space:nowrap}
+.mg.ki{color:var(--stumm);border-color:var(--linie)}
+.tk dl{display:flex;gap:1.1rem;margin:0;min-width:0}
+.tk dl div{min-width:0} .tk dt{font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.tk dd{margin:0;font-size:1.3rem;font-weight:700;line-height:1.1;white-space:nowrap} .tk dd small{font-size:.74rem;font-weight:500;color:var(--leise);margin-left:.25rem}
+.tk .zus{grid-column:1/-1;display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-top:.15rem}
+.tafel.duell .tk.r{grid-template-columns:minmax(0,1fr) auto;text-align:right}
+.tafel.duell .tk.r>img{grid-column:2;grid-row:1/span 2} .tafel.duell .tk.r .nm,.tafel.duell .tk.r dl,.tafel.duell .tk.r .zus{justify-content:flex-end;grid-column:1}
+.tafel.duell .tk.r .nm{grid-row:1} .tafel.duell .tk.r dl{grid-row:2} .tafel.duell .tk.r .zus{grid-column:1/-1}
+.tafel.pod .tk>img{width:2.9rem;height:2.9rem} .tafel.pod .tk h2{font-size:1.25rem} .tafel.pod .tk dl{gap:.8rem} .tafel.pod .tk dd{font-size:1.12rem}
+.balken{display:inline-flex;gap:.15rem;vertical-align:.1em} .balken i{width:.85rem;height:.42rem;border-radius:.1rem;background:var(--tf)} .balken i.o{opacity:.22}
+.chip{display:inline-flex;align-items:center;gap:.3rem;height:1.5rem;padding:0 .5rem;border-radius:.3rem;border:1px solid var(--linie);background:rgba(8,11,17,.6);font-size:.8rem;color:var(--creme);white-space:nowrap}
+.chip.karte{border-color:var(--kf);color:var(--kf);font-weight:700}
+.chip.zu{color:var(--stumm)} .chip.aus{border-color:rgba(255,96,88,.5);color:var(--warn)}
+.mitte-kopf{display:grid;place-items:center;align-content:center;gap:.2rem;text-align:center}
+.mitte-kopf b{font:400 2rem/1 var(--haus);color:var(--gold)}
+.slot-kopf{display:flex;flex-direction:column;justify-content:flex-end;padding:.4rem .6rem}
+.slot-kopf b{font:400 1.2rem/1.1 var(--haus);color:var(--creme)}
+
+/* Slot-Spalte */
+.slot{position:relative;display:grid;align-content:center;justify-items:center;gap:.25rem;padding:.3rem .5rem;text-align:center;min-width:0;
+  background:rgba(8,11,17,.82);border:1px solid var(--linie-2);border-radius:.45rem}
+.tafel.pod .slot{justify-items:start;text-align:left;padding:.4rem .7rem}
+.slot .nr{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.slot b{font:400 1.3rem/1.02 var(--haus);color:#fff}
+.attr{display:flex;gap:.25rem;flex-wrap:wrap;justify-content:inherit}
+.tafel.duell .attr{justify-content:center}
+.attr i{font-style:normal;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;padding:.05rem .35rem;border-radius:.2rem;background:rgba(244,230,196,.1);color:var(--creme)}
+.vgl{display:flex;align-items:center;gap:.3rem;font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--stumm)}
+.vgl.vorn{color:var(--heim)} .vgl.hinten{color:var(--gast)}
+.feld{width:6.4rem;height:2.5rem;flex:none}
+.unten{display:flex;align-items:center;justify-content:center;gap:.6rem}
+
+/* Spielerzelle */
+.spz{--kl:var(--stumm);--tf:var(--gast);position:relative;display:grid;align-items:center;gap:.6rem;min-width:0;min-height:0;padding:.3rem .7rem;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--tf) 9%,rgba(8,11,17,.82)),rgba(8,11,17,.82));border:1px solid var(--linie);border-radius:.45rem;overflow:hidden}
+.spz.eigen{border-color:color-mix(in srgb,var(--heim) 60%,transparent)}
+.spz::before{content:"";position:absolute;top:0;bottom:0;left:0;width:.28rem;background:var(--kl)}
+.tafel.duell .spz.l{grid-template-columns:minmax(0,1fr) auto auto;text-align:right}
+.tafel.duell .spz.l::before{left:0}
+.tafel.duell .spz.r{grid-template-columns:auto auto minmax(0,1fr);background:linear-gradient(270deg,color-mix(in srgb,var(--tf) 9%,rgba(8,11,17,.82)),rgba(8,11,17,.82))}
+.tafel.duell .spz.r::before{left:auto;right:0}
+.tafel.duell .spz.r .info{order:3} .tafel.duell .spz.r .fg{order:2} .tafel.duell .spz.r .wert{order:1}
+.tafel.pod .spz{grid-template-columns:auto minmax(0,1fr) auto;padding-left:.8rem}
+.spz.leer{display:grid;place-items:center;grid-template-columns:1fr!important;border-style:dashed;color:var(--stumm);font-size:.95rem;background:rgba(8,11,17,.5)}
+.spz.leer::before{display:none}
+.info{min-width:0;display:grid;gap:.22rem}
+.info .n{font:400 1.55rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 .2em}
+.tafel.pod .info .n,.tafel.duell .spz.r .info .n{padding-left:0}.tafel.duell .spz.l .info .n{padding-right:.2em}
+.tafel.pod .info .n{font-size:1.2rem}
+.kl{display:flex;align-items:center;gap:.35rem;font-size:.92rem;font-weight:600;color:var(--kl);white-space:nowrap}
+.kl img{width:1.15rem;height:1.15rem;object-fit:contain}
+.kl small{font-size:.8rem;font-weight:500;color:var(--stumm)}
+.tafel.duell .spz.l .kl,.tafel.duell .spz.l .chips{justify-content:flex-end}
+.chips{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center}
+.cap{display:inline-grid;place-items:center;width:1.45rem;height:1.45rem;border-radius:50%;background:var(--gold);color:#17120a;font-weight:700;font-size:.82rem}
+.form{display:inline-flex;align-items:center;gap:.2rem;font-size:.82rem;font-weight:600}
+.moral{display:inline-flex;align-items:center;gap:.2rem;font-size:.86rem;font-weight:700} .moral svg{width:1.25rem;height:1.25rem}
+.fg{position:relative;height:100%;aspect-ratio:1;max-height:10.5rem;min-height:3.2rem;display:grid;place-items:end center}
+.tafel.pod .fg{max-height:5.4rem}
+.fg::after{content:"";position:absolute;left:12%;right:12%;bottom:4%;height:16%;border-radius:50%;background:color-mix(in srgb,var(--tf) 45%,transparent);filter:blur(.25rem);z-index:0}
+.fg img.f{position:relative;z-index:1;height:100%;width:100%;object-fit:contain;image-rendering:pixelated}
+.fg img.p{position:relative;z-index:1;width:74%;height:74%;margin-bottom:10%;border-radius:50%;object-fit:cover;border:2px dashed var(--tf)}
+.wert{display:grid;justify-items:center;min-width:4.6rem}
+.wert small{font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.wert b{font-size:2.8rem;font-weight:700;line-height:.95}
+.wert b.sp2{font-size:1.75rem;color:var(--creme)} .wert u{text-decoration:none;font-size:.74rem;color:var(--stumm);white-space:nowrap}
+.tafel.pod .wert{min-width:3.8rem} .tafel.pod .wert b{font-size:1.95rem} .tafel.pod .wert b.sp2{font-size:1.4rem}
+.spz.eigen .wert b{color:var(--heim)}
+
+/* Teamtafel am Rand (Duell): nutzt die Breite, die Zeilen bekommen die ganze Hoehe */
+.tp{--tf:var(--gast);display:flex;flex-direction:column;gap:.7rem;padding:.9rem .9rem 1rem;min-height:0;overflow:hidden;border-radius:.55rem;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--tf) 18%,rgba(8,11,17,.9)),rgba(8,11,17,.88) 45%);border:1px solid color-mix(in srgb,var(--tf) 55%,transparent);border-top:.25rem solid var(--tf)}
+.tp.eigen{border-color:var(--heim);box-shadow:0 0 0 1px var(--heim) inset}
+.tp .wp{display:flex;align-items:center;gap:.7rem} .tp .wp img{width:4.6rem;height:4.6rem;border-radius:.5rem;object-fit:cover;flex:none}
+.tp h2{margin:.15rem 0 .2rem;font:400 1.6rem/1.05 var(--haus);color:#fff}
+.tp dl{display:grid;grid-template-columns:1fr 1fr;gap:.6rem .8rem;margin:0;padding:.7rem 0;border-top:1px solid var(--linie);border-bottom:1px solid var(--linie)}
+.tp dt{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.tp dd{margin:0;font-size:1.7rem;font-weight:700;line-height:1.05} .tp dd small{display:block;font-size:.78rem;font-weight:500;color:var(--leise);line-height:1.2}
+.tp dd .balken i{width:1.1rem;height:.5rem}
+.fk{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.7rem;align-items:center}
+.fk .k{--kf:var(--stumm);width:3.6rem;height:4.9rem;border-radius:.4rem;display:grid;place-items:center;align-content:center;border:2px solid var(--kf);background:linear-gradient(160deg,color-mix(in srgb,var(--kf) 38%,#0c1017),#0c1017);color:#fff;font-size:1.7rem;font-weight:700;line-height:1}
+.fk .k small{font-size:.62rem;letter-spacing:.12em;color:var(--kf);font-weight:700}
+.fk .k.zu{background:repeating-linear-gradient(135deg,#161d29 0 .35rem,#0f141d .35rem .7rem);color:var(--stumm);font-size:1.3rem}
+.fk p{margin:0;font-size:.9rem;line-height:1.25;color:var(--leise)} .fk p b{display:block;color:var(--creme);font-weight:600;font-size:1rem}
+.tp .lst{display:grid;gap:.3rem} .tp .lst .chip{height:auto;min-height:1.6rem;white-space:normal;padding:.2rem .5rem;line-height:1.2}
+.tp .fussn{margin-top:auto;font-size:.82rem;color:var(--stumm);line-height:1.3}
+
+.tp h3{margin:.2rem 0 0;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.bank{display:grid;gap:.3rem} .bank div{display:flex;align-items:center;gap:.5rem;font-size:.95rem;color:var(--creme)} .bank img{width:1.9rem;height:1.9rem;border-radius:50%;object-fit:cover}
+.bank small{margin-left:auto;white-space:nowrap;font-size:.78rem;color:var(--stumm)} .bank .v{color:var(--warn)} .bank .v img{filter:grayscale(1);opacity:.6}
+.sct{display:flex;height:.6rem;border-radius:.3rem;overflow:hidden;gap:2px} .sct i{display:block;background:var(--tf)} .sct i.b{opacity:.55} .sct i.u{opacity:.2}
+.sctl{display:flex;justify-content:space-between;font-size:.8rem;color:var(--leise)}
+
+/* FUSS */
+.fuss{display:flex;align-items:center;gap:1rem;padding:0 1.2rem;background:rgba(6,8,12,.92);border-top:1px solid var(--linie)}
+.fuss .hin{font-size:1rem;color:var(--leise);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fuss .hin b{color:var(--creme);font-weight:600}
+.leg{display:flex;gap:.8rem;font-size:.82rem;color:var(--leise);white-space:nowrap}
+.leg span{display:inline-flex;align-items:center;gap:.3rem} .leg i{width:.6rem;height:.6rem;border-radius:.12rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:700;white-space:nowrap}
+.btn.haupt{height:3.1rem;padding:0 1.8rem;font-size:1.12rem;letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn.neben{height:3.1rem;padding:0 1.3rem;font-size:1rem;letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--linie-2);background:var(--glas);color:var(--creme);clip-path:polygon(.6rem 0,100% 0,calc(100% - .6rem) 100%,0 100%)}
+.btn:hover{filter:brightness(1.1)}
+.toast{position:absolute;left:50%;bottom:5.6rem;transform:translateX(-50%);padding:.5rem 1rem;border-radius:.4rem;background:var(--gold);color:#17120a;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.an{opacity:1}
+
+/* Schmale Fenster (Nebenprobe Phone): Tafel darf dort scrollen, Zeilen bleiben ausgerichtet */
+@media (max-width:900px){
+  html{font-size:13px} body{overflow:auto} .buehne{height:auto;min-height:100vh;grid-template-rows:auto auto auto auto}
+  .reg,.kopf{grid-template-columns:1fr;gap:.4rem;padding:.5rem} .reg{height:auto} .weg,.schema,.leg{display:none}
+  .tafel{overflow-x:auto} .tafel.duell{grid-template-columns:1fr;grid-template-rows:auto} .tafel.duell .tp{order:-1} .kz,.zeile{min-width:58rem} .zeilen{max-height:none;height:auto;grid-auto-rows:6.5rem} .fuss{flex-wrap:wrap;padding:.6rem;position:sticky;bottom:0}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-l" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-vor" viewBox="0 0 24 24"><path d="M4 5l8 7-8 7zM13 5l8 7-8 7z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" fill="currentColor"/></symbol>
+  <symbol id="i-schloss" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-auge" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-nebel" viewBox="0 0 24 24"><path d="M4 8h12M7 12h13M4 16h10"/></symbol>
+  <symbol id="i-kreuz" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-gleich" viewBox="0 0 24 24"><path d="M6 9h12M6 15h12"/></symbol>
+  <symbol id="i-haus" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/></symbol>
+  <symbol id="i-ort" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 0 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+  <symbol id="i-auf" viewBox="0 0 24 24"><path d="M6 14l6-6 6 6"/></symbol>
+  <symbol id="i-ab" viewBox="0 0 24 24"><path d="M6 10l6 6 6-6"/></symbol>
+</svg>
+<div class="demo" id="demo"></div>
+<div class="buehne" id="b"></div>
+<script>
+(function(){
+"use strict";
+var q=new URLSearchParams(location.search);
+if(q.get("still"))document.body.classList.add("still");
+var Z={v:q.get("v")||"hockey",nebel:q.get("nebel")!=="0",slot:q.get("slot")?+q.get("slot"):null};
+var ICH="N-N";
+function ico(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>'}
+function h(s){s|=0;s=Math.imul(s^s>>>16,0x45d9f3b);s=Math.imul(s^s>>>13,0x45d9f3b);return ((s^s>>>16)>>>0)/4294967296}
+function hs(str){var x=7;for(var i=0;i<str.length;i++)x=(x*31+str.charCodeAt(i))|0;return x}
+
+/* ---------- Echte Stammdaten: Teams, Spieler (Klasse, Rasse, Disziplinwert aus oly-player-stats), Slots ---------- */
+var T={"N-N":"Nunchuck Ninjas","N-W":"Natures Wrath","M-M":"Mayhem Mavericks","P-S":"Project Suicide"};
+var MGR={"N-N":"Chris"};
+var FARBE={"N-N":"var(--heim)","N-W":"var(--gast)","M-M":"var(--drei)","P-S":"var(--vier)"};
+var KF={Berserker:"red",Warlord:"red",Tank:"red",Sprinter:"green",Rogue:"green",Charger:"green",Mage:"blue",Overseer:"blue",Templar:"blue",Bard:"yellow",Hero:"yellow",Badass:"yellow",Tactician:"yellow"};
+/* slug: [Name, Klasse, Rasse, hockey, fechten, battlefield, staffel, hat PixelLab-Figur] */
+var P={
+ "skull-knight":["Skull Knight","Badass","Demon",41,31,42,23,1],"whaam":["Whaam","Tank","Construct",33,17,19,16,1],"enforcer":["Enforcer","Templar","Human",43,26,25,27,1],
+ "shadowsong":["Shadowsong","Rogue","Elf",43,46,47,54,1],"cyra":["Cyra","Sprinter","Human",38,47,21,40,1],"yurei":["Yurei","Rogue","Animal",26,71,17,40,1],
+ "treantos":["Treantos","Warlord","Construct",65,21,53,34,1],"greybeard":["Greybeard","Tank","Human",51,29,46,43,1],"grimflora":["Grimflora","Warlord","Plant",46,42,26,10,1],
+ "elyon":["Elyon","Templar","Divine",45,29,44,27,1],"angrod":["Angrod","Badass","Human",56,68,62,64,1],"sylvara":["Sylvara","Bard","Elf",20,25,46,48,1],"frostseer":["Frostseer","Overseer","Human",24,27,44,44,1],
+ "devastator":["Devastator","Warlord","Demon",35,36,13,8,1],"eradicator":["Eradicator","Berserker","Alien",71,74,40,27,1],"harbinger":["Harbinger","Rogue","Construct",45,62,45,41,1],
+ "gralakar":["Gralakar","Sprinter","Human",41,45,43,64,1],"ragnarok":["Ragnarok","Berserker","Animal",83,49,35,34,0],
+ "tartarus":["Tartarus","Charger","Tauren",64,62,30,47,1],"webweaver":["Webweaver","Overseer","Construct",24,43,33,46,1],"chyros":["Chyros","Warlord","Aqua",45,26,56,26,1],
+ "erna-wellenlaut":["Erna Wellenlaut","Bard","Aqua",37,25,51,62,1],"rask":["Rask","Templar","Orc",48,45,38,48,0]
+};
+var DI={hockey:3,fechten:4,battlefield:5,staffel:6};
+/* Slot-Themen woertlich aus lib/lineups/matchday-slot-roles.ts (Label, Text, Schluesselattribute); Reihenfolge = Einsatzliste */
+var SLOTS={
+ hockey:[["Power Forward","Geht dahin, wo es weh tut.",["Power","Health"],[72,30]],["Defensive Wall","Schließt Räume über Health und Spirit.",["Health","Spirit"],[24,66]],
+         ["Goaltender","Steht im Tor und hält den Kasten sauber über Health und Awareness.",["Health","Awareness"],[7,50]],["Playmaker","Verbindet Linien über Power und Awareness.",["Awareness","Power"],[44,48]],
+         ["Transition Runner","Dreht Tempo über Speed und Stamina.",["Speed","Stamina"],[56,78]],["Slot Finisher","Schließt Chancen über Power und Torment.",["Power","Torment"],[84,56]]],
+ fechten:[["Duelist","Sauberer Kernslot für direkte Duelle.",["Dexterity","Speed"]],["Aggressor","Bringt Druck über Torment und Power.",["Torment","Power"]],["Defender","Hält Duelle stabil und federt Gegenangriffe ab.",["Awareness","Health"]]],
+ battlefield:[["Siege Core","Drückt Fronten mit Power und Torment — erobert gegnerische und neutrale Punkte am schnellsten.",["Power","Torment"]],["Field Control","Kontrolliert Raum über Intelligence und Spirit — erobert schneller und drängt Fortschritt an eigenen Punkten zurück.",["Intelligence","Spirit"]],
+         ["Commander","Führt große Situationen über Charisma und Intelligence — geht selbst auf die Punkte.",["Charisma","Intelligence"]],["Disruptor","Stört gegnerische Pläne mit Torment und Awareness — baut gegnerischen Eroberungsfortschritt ab.",["Torment","Awareness"]],
+         ["Morale Anchor","Hält Linien über Spirit und Charisma zusammen — drängt gegnerischen Fortschritt an eigenen Punkten zurück.",["Spirit","Charisma"]]],
+ staffel:[["Start Runner","Bringt die Staffel mit Speed in Position.",["Speed","Stamina"]],["Tempo Link","Hält Zwischenzeiten über Stamina und Spirit.",["Stamina","Spirit"]],
+         ["Baton Tech","Sichert Wechsel über Awareness und Dexterity.",["Awareness","Dexterity"]],["Curve Runner","Braucht Speed und Will für schwierige Abschnitte.",["Speed","Will"]]]
+};
+var V={
+ hockey:{n:"Hockey",icon:"Hockey",art:"duell",typ:"Feldspiel",nr:1,kul:["hockey","bergsee","Bergsee"],zeile:"Slot",kat:"red",
+   teams:{"N-N":["skull-knight","whaam","enforcer","shadowsong","cyra","yurei"],"N-W":["treantos","greybeard","grimflora","elyon","angrod","sylvara"]},
+   karte:{f:"red",w:2,name:"Rot +2"},cap:"shadowsong",aus:[["Ilvathra","verletzt · noch 2 Spieltage"]],bank:[["ilvathra","Ilvathra","verletzt · 2 Spieltage"]]},
+ fechten:{n:"Fechten",icon:"Fechten",art:"duell",typ:"Bühne · Gefechte je Slot",nr:1,kul:["fechten","schlosshof","Schlosshof"],zeile:"Gefecht",kat:"green",
+   teams:{"N-N":["yurei","shadowsong","cyra"],"N-W":["angrod","grimflora","greybeard"]},
+   karte:{f:"green",w:3,name:"Grün +3"},cap:"yurei",aus:[],bank:[["skull-knight","Skull Knight",""],["enforcer","Enforcer",""],["whaam","Whaam",""]]},
+ battlefield:{n:"Battlefield",icon:"Battlefield",art:"pod",typ:"Fünf Punkte",nr:2,kul:["battlefield","wuestenruine","Wüstenruine"],zeile:"Slot",kat:"blue",
+   teams:{"N-N":["skull-knight","shadowsong","enforcer","yurei","cyra"],"N-W":["treantos","elyon","angrod","frostseer","sylvara"],"M-M":["ragnarok","harbinger","eradicator","devastator","gralakar"],"P-S":["chyros","webweaver","tartarus",null,"erna-wellenlaut"]},
+   karte:{f:"blue",w:1,name:"Blau +1"},cap:"enforcer",aus:[["Whaam","verletzt · noch 1 Spieltag"]]},
+ staffel:{n:"Staffel",icon:"Staffel",art:"pod",typ:"Bahn · Laufreihenfolge",nr:2,kul:["staffel","arena","Arena"],zeile:"Läufer",kat:"green",
+   teams:{"N-N":["cyra","shadowsong","yurei","enforcer"],"N-W":["angrod","sylvara","frostseer","greybeard"],"M-M":["gralakar","harbinger","rask","eradicator"],"P-S":["erna-wellenlaut","tartarus","webweaver","chyros"]},
+   karte:null,cap:"cyra",aus:[]}
+};
+var TEAMINFO={"N-N":{rang:5,dr:{hockey:[7,21],fechten:[3,6],battlefield:[9,24],staffel:[6,14]},pkt:14.3,st:{hockey:54,fechten:58,battlefield:47,staffel:52}},
+ "N-W":{rang:3,dr:{hockey:[4,11],fechten:[8,19],battlefield:[2,5],staffel:[9,22]},pkt:17,stufe:{hockey:4,fechten:3,battlefield:4,staffel:3}},
+ "M-M":{rang:11,dr:{battlefield:[6,15],staffel:[5,12]},pkt:9.3,stufe:{battlefield:3,staffel:3}},
+ "P-S":{rang:8,dr:{battlefield:[4,10],staffel:[7,18]},pkt:12,stufe:{battlefield:3,staffel:4}}};
+
+var D=V[Z.v]||V.hockey; if(!V[Z.v])Z.v="hockey";
+var SL=SLOTS[Z.v],K=SL.length,CODES=Object.keys(D.teams);
+
+/* ---------- Abgeleitete (ERFUNDENE) Werte: Eignung im Slot, Scouting-Stufe, Form, Moral ---------- */
+var HEIMPLUS={hockey:16,fechten:6,battlefield:14,staffel:10},EIGEN={};
+Object.keys(V).forEach(function(k){V[k].teams[ICH].forEach(function(s){EIGEN[s]=1})});
+function eig(s,i){var p=P[s];return Math.max(8,Math.round(p[DI[Z.v]]+(EIGEN[s]?HEIMPLUS[Z.v]:0)+(h(hs(s+Z.v)+i)*12-4)))}
+function stufe(s){var x=h(hs(s)+91);return x<.4?0:x<.75?1:2} /* 0 unbekannt (10er), 1 beobachtet (5er), 2 gescoutet (exakt) */
+function spanne(w,st){if(!Z.nebel||st===2)return {min:w,max:w};var b=st===0?10:5,lo=Math.floor(w/b)*b;return {min:lo,max:lo+b}}
+function formSt(s){return Math.round(h(hs(s)+5)*4)-2}
+function moralW(s){return 22+Math.round(h(hs(s)+17)*72)}
+var FORMWORT={"-2":"eiskalt","-1":"kalt","0":"normal","1":"gut drauf","2":"heiß"};
+function moralFarbe(w){return w>=80?"#62d394":w>=60?"#a6d86a":w>=40?"#f3b54a":w>=20?"#f08a4b":"#ff6058"}
+function gesicht(w){var f=moralFarbe(w),m=(w-50)/50,ey=15-m*3.2,my=15+m*3.6;
+  return '<span class="moral" style="color:'+f+'" title="Moral '+w+'"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.2" fill="none" stroke="'+f+'" stroke-width="1.8"/><circle cx="12" cy="12" r="9" fill="'+f+'" fill-opacity=".16"/><circle cx="8.9" cy="9.6" r="1.35" fill="'+f+'"/><circle cx="15.1" cy="9.6" r="1.35" fill="'+f+'"/><path d="M7.6 '+ey.toFixed(2)+' Q12 '+my.toFixed(2)+' 16.4 '+ey.toFixed(2)+'" fill="none" stroke="'+f+'" stroke-width="1.8" stroke-linecap="round"/></svg>'+w+'</span>'}
+function formPfeil(st){var f=st>0?"var(--gut)":st<0?"var(--warn)":"var(--leise)";
+  return '<span class="form" style="color:'+f+'" title="Form">'+(st>0?ico("auf"):st<0?ico("ab"):ico("gleich"))+FORMWORT[st]+'</span>'}
+function stand(eigen,sp){return eigen>sp.max?"vorn":eigen<sp.min?"hinten":"gleich"} /* = duellStand() */
+
+/* ---------- Bausteine ---------- */
+function figur(s,dir){var p=P[s];
+  return p[7]?'<img class="f" src="../sprites/figuren/'+s+'/'+dir+'.png" alt="">':'<img class="p" src="../portraits/'+s+'.jpg" alt="" title="Noch keine PixelLab-Figur: Porträt-Marke wie in der Arena">'}
+function wertBlock(s,i,eigen){var w=eig(s,i);
+  if(eigen)return '<div class="wert"><small>Eignung</small><b class="t">'+w+'</b><u>im Slot</u></div>';
+  var st=stufe(s),sp=spanne(w,st);
+  return sp.min===sp.max?'<div class="wert"><small>Eignung</small><b class="t">'+w+'</b><u>'+(Z.nebel?"gescoutet":"Nebel aus")+'</u></div>'
+    :'<div class="wert"><small>Eignung</small><b class="t sp2">'+sp.min+'–'+sp.max+'</b><u>'+ico("nebel")+' '+(st===0?"unbekannt":"beobachtet")+'</u></div>'}
+function zelle(code,i,seite){var s=D.teams[code][i],eigen=code===ICH;
+  if(!s)return '<div class="spz leer">Slot unbesetzt · Kader zu klein</div>';
+  var p=P[s],kf=KF[p[1]],chips="";
+  if(eigen){
+    if(D.cap===s)chips+='<span class="cap" title="Captain">C</span>';
+    chips+=formPfeil(formSt(s))+gesicht(moralW(s));
+    if(D.karte){var bonus=kf===D.karte.f;chips+='<span class="chip karte" style="--kf:var(--k-'+D.karte.f+')" title="Formkarte: Wert aus formByPlayerId">Karte +'+(bonus?D.karte.w*2:D.karte.w)+(bonus?" · Farbbonus":"")+'</span>'}
+  }
+  return '<div class="spz '+(seite||"")+(eigen?" eigen":"")+'" style="--kl:var(--k-'+kf+');--tf:'+FARBE[code]+'">'+
+    '<div class="info"><div class="n">'+p[0]+'</div><div class="kl"><img src="../class-icons/'+p[1]+'.png" alt="">'+p[1]+'<small>· '+p[2]+'</small></div>'+(chips?'<div class="chips">'+chips+'</div>':'')+'</div>'+
+    '<div class="fg">'+figur(s,seite==="l"?"east":seite==="r"?"west":"south")+'</div>'+wertBlock(s,i,eigen)+'</div>'}
+function staerke(code){var t=TEAMINFO[code];
+  if(code===ICH)return '<dd class="t">'+t.st[Z.v]+'</dd>';
+  var n=t.stufe[Z.v];return '<dd><span class="balken">'+[1,2,3,4,5].map(function(x){return '<i'+(x<=n?"":' class="o"')+'></i>'}).join("")+'</span><small>'+["","schwach","unter Schnitt","Schnitt","stark","sehr stark"][n]+'</small></dd>'}
+function teamkopf(code,seite){var t=TEAMINFO[code],eigen=code===ICH,dr=t.dr[Z.v],zus="";
+  if(eigen){
+    zus+=D.karte?'<span class="chip karte" style="--kf:var(--k-'+D.karte.f+')">Formkarte '+D.karte.name+'</span>':'<span class="chip zu">Keine Formkarte gelegt</span>';
+    zus+='<span class="chip">Einsatz: Normal</span>';
+    D.aus.forEach(function(a){zus+='<span class="chip aus">'+ico("kreuz")+a[0]+' · '+a[1]+' · nicht einsetzbar</span>'});
+  }else zus+='<span class="chip zu">'+ico("schloss")+'Formkarte verdeckt bis zum Anpfiff</span>';
+  return '<div class="tk '+(seite||"")+(eigen?" eigen":"")+'" style="--tf:'+FARBE[code]+'"><img src="../team-logos/'+code+'.jpg" alt="">'+
+    '<div class="nm">'+(eigen?'<span class="du">Dein Team</span>':'')+'<h2>'+T[code]+'</h2>'+(MGR[code]?'<span class="mg">'+MGR[code]+'</span>':'<span class="mg ki">KI</span>')+'</div>'+
+    '<dl><div><dt>Saison</dt><dd class="t">'+t.rang+'.</dd></div><div><dt>'+D.n+'-Rang</dt><dd class="t">'+dr[0]+'.<small>Liga 2 · '+dr[1]+'. von 32</small></dd></div>'+
+    '<div><dt>Punkte</dt><dd class="t">'+String(t.pkt).replace(".",",")+'</dd></div><div><dt>Stärke · beste 6</dt>'+staerke(code)+'</div></dl>'+
+    '<div class="zus">'+zus+'</div></div>'}
+function teamtafel(code){var t=TEAMINFO[code],eigen=code===ICH,dr=t.dr[Z.v],k=D.karte,x="";
+  if(eigen){
+    x+=k?'<div class="fk"><div class="k" style="--kf:var(--k-'+k.f+')"><small>FORM</small>+'+k.w+'</div><p><b>Formkarte '+k.name+'</b>alle +'+k.w+' · Farbträger +'+(k.w*2)+'<br>steht je Spieler in der Zeile</p></div>'
+        :'<div class="fk"><div class="k zu">–</div><p><b>Keine Formkarte gelegt</b></p></div>';
+    x+='<div class="lst"><span class="chip">Einsatz: Normal</span></div>';
+    if(D.bank&&D.bank.length)x+='<h3>Nicht aufgestellt</h3><div class="bank">'+D.bank.map(function(b){return '<div'+(b[2]?' class="v"':'')+'><img src="../portraits/'+b[0]+'.jpg" alt="">'+b[1]+'<small>'+(b[2]?b[2]:'Bank')+'</small></div>'}).join("")+'</div>';
+    x+='<div class="fussn">Deine Einsatzliste, wie abgegeben. Gezeigt = gebucht.</div>';
+  }else{
+    x+='<div class="fk"><div class="k zu">'+ico("schloss")+'</div><p><b>Formkarte verdeckt</b>wird mit dem Anpfiff aufgedeckt</p></div>';
+    var zs=[0,0,0];D.teams[code].forEach(function(s){if(s)zs[Z.nebel?stufe(s):2]++});
+    x+='<h3>Dein Scouting-Stand · diese Aufstellung</h3><div class="sct">'+(zs[2]?'<i style="flex:'+zs[2]+'"></i>':'')+(zs[1]?'<i class="b" style="flex:'+zs[1]+'"></i>':'')+(zs[0]?'<i class="u" style="flex:'+zs[0]+'"></i>':'')+'</div><div class="sctl"><span>'+zs[2]+' gescoutet</span><span>'+zs[1]+' beobachtet</span><span>'+zs[0]+' unbekannt</span></div>';
+    x+='<div class="fussn">'+(Z.nebel?ico("nebel")+' Werte nach deiner Scouting-Stufe je Spieler: unbekannt in 10er-, beobachtet in 5er-Stufen, gescoutet exakt.':'Fog of War ist in den Einstellungen aus: alle Werte exakt.')+'</div>';
+  }
+  return '<div class="tp'+(eigen?" eigen":"")+'" style="--tf:'+FARBE[code]+'"><div class="wp"><img src="../team-logos/'+code+'.jpg" alt=""><div>'+(eigen?'<span class="du">Dein Team</span> ':'')+(MGR[code]?'<span class="mg">'+MGR[code]+'</span>':'<span class="mg ki">KI</span>')+'<h2>'+T[code]+'</h2></div></div>'+
+    '<dl><div><dt>Saison</dt><dd class="t">'+t.rang+'.<small>'+String(t.pkt).replace(".",",")+' Punkte</small></dd></div><div><dt>'+D.n+'-Rang</dt><dd class="t">'+dr[0]+'.<small>Liga 2 · '+dr[1]+'. von 32</small></dd></div>'+
+    '<div style="grid-column:1/-1"><dt>Kaderstärke · beste 6</dt>'+(eigen?'<dd class="t">'+t.st[Z.v]+'</dd>':staerke(code).replace("<small>","<small style=\"display:inline;margin-left:.4rem\">"))+'</div></dl>'+x+'</div>'}
+function attr(i){return '<div class="attr">'+SL[i][2].map(function(a){return '<i>'+a+'</i>'}).join("")+'</div>'}
+function feldplan(i){var pos=SL[i][3];if(!pos)return "";var x=pos[0],y=pos[1];
+  return '<svg class="feld" viewBox="0 0 128 50" aria-label="Wo der Slot auf dem Feld steht"><rect x="1" y="1" width="126" height="48" rx="12" fill="rgba(255,255,255,.05)" stroke="rgba(244,230,196,.35)"/><path d="M64 1v48" stroke="rgba(244,230,196,.3)"/><circle cx="64" cy="25" r="7" fill="none" stroke="rgba(244,230,196,.25)"/>'+
+    '<circle cx="'+(x*.62+2)+'" cy="'+(y*.48+1)+'" r="4.2" fill="#F2A03D"/><circle cx="'+(126-x*.62)+'" cy="'+(49-y*.48)+'" r="4.2" fill="#45B0C9"/></svg>'}
+
+function duell(){var a=CODES[0],b=CODES[1],z="";
+  for(var i=0;i<K;i++){var sb=D.teams[b][i],sp=spanne(eig(sb,i),stufe(sb)),st=stand(eig(D.teams[a][i],i),sp);
+    var vgl=st==="vorn"?'<span class="vgl vorn">'+ico("l")+'vorn</span>':st==="hinten"?'<span class="vgl hinten">vorn'+ico("r")+'</span>':'<span class="vgl">'+ico("gleich")+'offen</span>';
+    z+='<div class="zeile'+(Z.slot===i+1?" wahl":"")+'" data-slot="'+(i+1)+'" tabindex="0">'+zelle(a,i,"l")+
+      '<div class="slot"><span class="nr">'+D.zeile+' '+(i+1)+'</span><b>'+SL[i][0]+'</b>'+attr(i)+'<div class="unten">'+feldplan(i)+vgl+'</div></div>'+zelle(b,i,"r")+'</div>'}
+  return '<div class="tafel duell">'+teamtafel(a)+'<div class="zeilen" style="--k:'+K+'">'+z+'</div>'+teamtafel(b)+'</div>'}
+function pod(){var z="";
+  for(var i=0;i<K;i++){var e=eig(D.teams[ICH][i],i),vorn=0,ges=0;
+    CODES.forEach(function(c){if(c===ICH)return;var s=D.teams[c][i];if(!s)return;ges++;if(stand(e,spanne(eig(s,i),stufe(s)))==="vorn")vorn++});
+    z+='<div class="zeile'+(Z.slot===i+1?" wahl":"")+'" data-slot="'+(i+1)+'" tabindex="0"><div class="slot"><span class="nr">'+D.zeile+' '+(i+1)+'</span><b>'+SL[i][0]+'</b>'+attr(i)+
+      '<span class="vgl'+(vorn?" vorn":"")+'">Du: vorn gegen '+vorn+' von '+ges+'</span></div>'+CODES.map(function(c){return zelle(c,i,"")}).join("")+'</div>'}
+  return '<div class="tafel pod"><div class="kz"><div class="slot-kopf"><span class="gk">'+K+' Slots</span><b>Zeile = Slot<br>Spalte = Team</b></div>'+CODES.map(function(c){return teamkopf(c,"")}).join("")+'</div><div class="zeilen" style="--k:'+K+'">'+z+'</div></div>'}
+
+function schema(){var s=D.art==="pod"?[["Platz 1",2],["Platz 2",1],["Platz 3",0],["Platz 4",0]]:[["Sieg",2],["Remis",1],["Niederlage",0]];
+  return '<div class="schema">'+s.map(function(x){return '<div><small>'+x[0]+'</small><b class="t">'+x[1]+' Pkt</b></div>'}).join("")+'</div>'}
+function reg(){return '<div class="reg"><div class="l"><a class="hk2">'+ico("haus")+'Büro</a><span class="ort"><b>Spieltag 12</b> · Liga 2 · Saison 1</span></div>'+
+  '<div class="weg"><a class="ok"><u>✓</u><b>Laden</b></a><span></span><a class="an"><u>2</u><b>Vorstellung</b></a><span></span><a><u>3</u><b>Live</b></a><span></span><a><u>4</u><b>Ergebnis</b></a></div>'+
+  '<div class="r"><div class="ich"><img src="../team-logos/'+ICH+'.jpg" alt=""><div><small>Du steuerst</small><b>'+T[ICH]+'</b></div></div></div></div>'}
+function hinweis(){
+  if(Z.slot&&SL[Z.slot-1])return '<b>'+D.zeile+' '+Z.slot+' · '+SL[Z.slot-1][0]+':</b> '+SL[Z.slot-1][1];
+  return D.art==="pod"?'<b>Gleiche Zeile = gleicher Slot</b> in allen vier Teams. Klick auf eine Zeile erklärt die Rolle.'
+    :Z.v==="fechten"?'<b>Gleiche Zeile = gleiches Gefecht:</b> Slot 1 ficht gegen Slot 1. Klick auf eine Zeile erklärt die Rolle.'
+    :'<b>Gleiche Zeile = gleicher Slot</b> auf beiden Seiten. Klick auf eine Zeile erklärt die Rolle.'}
+function zeichne(){
+  D=V[Z.v];SL=SLOTS[Z.v];K=SL.length;CODES=Object.keys(D.teams);
+  document.getElementById("demo").innerHTML='<b>Variante</b>'+[["hockey","Duell · Feldspiel (Hockey, 6 Slots)"],["fechten","Duell · Bühne (Fechten, 3 Slots)"],["battlefield","Vierergruppe (Battlefield, 5 Slots)"],["staffel","Vierergruppe · Bahn (Staffel, 4 Slots)"]]
+    .map(function(x){return '<a data-v="'+x[0]+'"'+(Z.v===x[0]?' class="an"':'')+'>'+x[1]+'</a>'}).join("")+
+    '<b>Fog of War</b><a data-nebel="1"'+(Z.nebel?' class="an"':'')+'>an</a><a data-nebel="0"'+(Z.nebel?'':' class="an"')+'>aus (Einstellung)</a><span class="sp"></span><span>Tasten 1–4 · N · Mockup 22.11. · Zahlen erfunden</span>';
+  document.getElementById("b").innerHTML='<div class="bild" style="--bild:url(../sprites/kulissen/'+D.kul[0]+'/'+D.kul[1]+'.jpg)"></div>'+reg()+
+   '<div class="kopf"><div class="dz"><img src="../discipline-icons/'+D.icon+'.png" alt=""><div><div class="gk">Disziplin '+D.nr+' von 2 · '+(D.art==="pod"?"Vierergruppe · jeder gegen jeden":"Duell")+' · '+D.typ+'</div><h1>'+D.n+'</h1></div></div>'+
+   schema()+'<div class="re">'+(D.art==="pod"?'<span class="marke gold">4 Teams · Pod</span>':'')+'<span class="marke">'+ico("ort")+D.kul[2]+'</span><span class="marke zu">'+ico("schloss")+'Einsatzlisten gesperrt</span></div></div>'+
+   (D.art==="pod"?pod():duell())+
+   '<div class="fuss"><span class="hin">'+hinweis()+'</span><span class="sp"></span>'+
+   '<div class="leg"><span><i style="background:var(--k-red)"></i>POW</span><span><i style="background:var(--k-green)"></i>SPE</span><span><i style="background:var(--k-blue)"></i>MEN</span><span><i style="background:var(--k-yellow)"></i>SOC</span><span>'+ico("nebel")+'Gegnerwerte nach Scouting-Stufe</span></div>'+
+   '<a class="btn neben" data-tu="Quick-Sim: derselbe Verlauf, nur schneller">'+ico("vor")+'Quick-Sim</a><a class="btn haupt" data-tu="Zur Arena: startet den Motor">'+ico("play")+'Zur Arena <kbd style="color:#17120a;border-color:#17120a">↵</kbd></a></div><div class="toast" id="toast"></div>';
+  var u=new URLSearchParams();u.set("v",Z.v);if(!Z.nebel)u.set("nebel","0");if(Z.slot)u.set("slot",Z.slot);if(q.get("still"))u.set("still","1");
+  history.replaceState(null,"","?"+u.toString());
+}
+document.addEventListener("click",function(e){
+  var a=e.target.closest("[data-v]");if(a){Z.v=a.dataset.v;Z.slot=null;return zeichne()}
+  a=e.target.closest("[data-nebel]");if(a){Z.nebel=a.dataset.nebel==="1";return zeichne()}
+  a=e.target.closest("[data-tu]");if(a){var t=document.getElementById("toast");t.textContent="Im Mockup ohne Funktion · "+a.dataset.tu;t.classList.add("an");return setTimeout(function(){t.classList.remove("an")},1600)}
+  a=e.target.closest(".zeile");if(a){var n=+a.dataset.slot;Z.slot=Z.slot===n?null:n;zeichne()}
+});
+document.addEventListener("keydown",function(e){
+  var v=["hockey","fechten","battlefield","staffel"][+e.key-1];if(v){Z.v=v;Z.slot=null;return zeichne()}
+  if(e.key==="n"||e.key==="N"){Z.nebel=!Z.nebel;return zeichne()}
+  if(e.key==="Enter"&&document.activeElement&&document.activeElement.classList.contains("zeile")){Z.slot=+document.activeElement.dataset.slot;zeichne()}
+});
+zeichne();
+})();
+</script>
+</body>
+</html>
