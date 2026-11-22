@@ -410,6 +410,17 @@ export type ContractRenewalApiResponse = {
     negotiationPreview?: ContractRenewalNegotiationPreviewPayload | null;
     morale?: ContractRenewalMoralePayload | null;
     moraleAdjustedExpectedSalary?: number | null;
+    /** Nur bei einer Verlängerung mitten in der Saison: ab wann, bis wann, alt gegen neu (je Saison groß, je Spieltag klein). */
+    inSaison?: {
+      abSpieltag: number;
+      gesamtSpieltage: number;
+      endSaisonNummer: number | null;
+      endSaisonLabel: string | null;
+      altesGehaltSaison: number;
+      neuesGehaltSaison: number;
+      altesGehaltProSpieltag: number;
+      neuesGehaltProSpieltag: number;
+    } | null;
     contractEvent?: {
       eventType: string;
       oldSalary: number | null;

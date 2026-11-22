@@ -11,6 +11,7 @@ import type {
   Team,
   TeamControlSettings,
 } from "@/lib/data/olyDataTypes";
+import { baueSaisonpauseBericht, formatSaisonpauseBericht } from "@/lib/fatigue/saisonpause-bericht";
 import { buildSeasonRecap } from "@/lib/foundation/season-recap-service";
 import { leseSaisonSchnappschuesse } from "@/lib/persistence/foundation-season-history-projection";
 import { getInjuryRiskPercent, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
@@ -1336,6 +1337,32 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         targetParams: { team: teamId, player: transfer.playerId },
         source: "transfer_history",
         createdAt: transfer.happenedAt ?? createdAt,
+      }),
+    );
+  }
+
+  // Saisonpause nach Spieltag 10: ein Bericht je sichtbarem Team, solange die Pause in DIESER Saison gebucht ist.
+  // Reine Anzeige der gebuchten Zahlen; Info, hält keinen Spieltag auf.
+  for (const team of input.gameState.teams) {
+    if (!teamVisible(team.teamId)) continue;
+    const bericht = baueSaisonpauseBericht(input.gameState, team.teamId);
+    if (!bericht) continue;
+    items.push(
+      createItem({
+        itemId: `saisonpause:${input.saveId}:${seasonId}:${team.teamId}`,
+        saveId: input.saveId,
+        seasonId,
+        matchday: input.gameState.seasonState.belastungsPause?.nachMatchdayId ?? null,
+        teamId: team.teamId,
+        category: "news",
+        severity: "info",
+        title: "Saisonpause: alle Spieler erholen sich",
+        description: formatSaisonpauseBericht(bericht),
+        ctaLabel: "Zur Einsatzliste",
+        targetView: "lineup",
+        targetParams: { team: team.teamId },
+        source: "saisonpause",
+        createdAt,
       }),
     );
   }

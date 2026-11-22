@@ -399,6 +399,7 @@ export default function FoundationTeamsViewHost({
         formatMoney={formatMoney}
         formatDisplayMoney={panelProps.formatDisplayMoney as FoundationTeamsNewLookProps["formatDisplayMoney"]}
         selectedTeamRosterActionsAvailable={Boolean(panelProps.selectedTeamRosterActionsAvailable)}
+        selectedTeamCanManage={Boolean(panelProps.selectedTeamCanManage)}
         selectedTeamRosterActionHint={
           panelProps.selectedTeamRosterActionHint as FoundationTeamsNewLookProps["selectedTeamRosterActionHint"]
         }

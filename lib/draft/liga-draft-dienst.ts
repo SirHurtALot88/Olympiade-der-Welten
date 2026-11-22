@@ -838,7 +838,7 @@ export function setzeDraftWunschliste(input: {
     const gameState = ctx.save.gameState;
     const vorhanden = gameState.seasonState.transferWishlist ?? [];
     const schonDrin = vorhanden.some((e) => e.playerId === input.playerId && e.teamId === input.teamId);
-    if (input.an === schonDrin) return vorhanden.length;
+    if (input.an === schonDrin) return vorhanden.filter((e) => e.teamId === input.teamId && !e.ki).length;
     const spieler = gameState.players.find((p) => p.id === input.playerId);
     if (!spieler) throw new LigaDraftFehler("spieler_unbekannt", 404);
     let naechste: TransferWishlistEntry[];
@@ -872,7 +872,7 @@ export function setzeDraftWunschliste(input: {
     const mitListe: GameState = { ...gameState, seasonState: { ...gameState.seasonState, transferWishlist: naechste } };
     ctx.save = { ...ctx.save, gameState: syncWishlistToScoutingWatchlist(mitListe, input.teamId) };
     ctx.deferredWrites += 1;
-    return naechste.length;
+    return naechste.filter((e) => e.teamId === input.teamId && !e.ki).length;
   });
 }
 

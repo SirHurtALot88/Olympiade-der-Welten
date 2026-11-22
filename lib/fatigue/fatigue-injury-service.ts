@@ -1929,11 +1929,22 @@ export function applyFatigueAndInjuryAfterMatchday(input: {
 }
 
 /**
+ * Rückweg: `OLY_SAISONPAUSE=0` schaltet die Pause nach Spieltag 10 ab (Buchung, Ankündigung in der
+ * Einsatzliste, Marken). Die Belastungsregel v2 selbst (Stempel im Spielstand) bleibt unberührt.
+ * Notbremse, kein Normalbetrieb: wirkt ab dem nächsten Abschluss, gebuchte Pausen bleiben gebucht.
+ */
+export function istSaisonpauseAbgeschaltet() {
+  const wert = typeof process !== "undefined" ? process.env?.OLY_SAISONPAUSE : undefined;
+  return wert === "0" || wert === "aus";
+}
+
+/**
  * Liegt nach diesem Spieltag die Pause? Nur unter Belastungsregel v2, nur nach Spieltag 10 und nur,
  * wenn die Saison danach noch weitergeht (bei 10 Spieltagen wäre sie am Saisonende wirkungslos).
  */
 export function isBelastungsPauseNachSpieltag(gameState: GameState, matchdayId: string) {
   if (belastungsRegelFuer(gameState) !== "v2") return false;
+  if (istSaisonpauseAbgeschaltet()) return false;
   const ids = gameState.season?.matchdayIds ?? [];
   return ids.length > BELASTUNG_PAUSE_NACH_SPIELTAG && ids.indexOf(matchdayId) === BELASTUNG_PAUSE_NACH_SPIELTAG - 1;
 }
@@ -1941,6 +1952,7 @@ export function isBelastungsPauseNachSpieltag(gameState: GameState, matchdayId: 
 /** Der Spieltag, nach dem in DIESER Saison die Pause liegt (null ohne Belastungsregel v2). */
 export function getBelastungsPauseMatchdayId(gameState: GameState): string | null {
   if (belastungsRegelFuer(gameState) !== "v2") return null;
+  if (istSaisonpauseAbgeschaltet()) return null;
   const ids = gameState.season?.matchdayIds ?? [];
   return ids.length > BELASTUNG_PAUSE_NACH_SPIELTAG ? ids[BELASTUNG_PAUSE_NACH_SPIELTAG - 1] ?? null : null;
 }

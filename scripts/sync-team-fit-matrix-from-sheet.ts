@@ -101,7 +101,8 @@ function parseMatrix(csvText: string) {
   }
 
   const tokenColumns = headers
-    .map((header, index) => ({ token: header.trim(), index }))
+    // Chris 21.11.: „fish = aqua“ — das Sheet führt die Rasse als „Fish“, der Spielerpool als „Aqua“.
+    .map((header, index) => ({ token: header.trim() === "Fish" ? "Aqua" : header.trim(), index }))
     .filter((entry) => entry.index !== teamIndex && entry.index !== playerIndex && entry.index !== sumIndex && entry.token.length > 0);
   const matrixRows = rows
     .slice(1)

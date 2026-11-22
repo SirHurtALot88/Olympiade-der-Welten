@@ -192,10 +192,13 @@ export type GameInboxStatus = "open" | "done" | "dismissed";
 /** Interesse-Stufe einer KI-Merkliste: 1 = beobachtet, 2 = interessiert, 3 = Wunschziel. */
 export type KiMerklisteStufe = 1 | 2 | 3;
 
+/** Zusatz an einem Wunschlisten-Eintrag eines KI-Teams: dieselben Felder wie `KiMerklisteEintrag` ohne `playerId`. */
+export type KiWunschMeta = Omit<KiMerklisteEintrag, "playerId">;
+
 export type KiMerklisteEintrag = {
   playerId: string;
-  /** Team, dem der Spieler beim letzten Abgleich gehoerte. */
-  besitzerTeamId: string;
+  /** Team, dem der Spieler beim letzten Abgleich gehoerte; `null` = freier Spieler des Transfermarkts. */
+  besitzerTeamId: string | null;
   stufe: KiMerklisteStufe;
   /** Vorsprung des Kaufnutzens vor dem Stop-Nutzen (Rangfolge, nicht anzeigen). */
   vorsprung: number;
@@ -2595,6 +2598,27 @@ export type RosterEntry = {
   roleTag: "starter" | "bench" | "prospect";
   promisedRole?: RosterPromisedRole | null;
   joinedSeasonId: string;
+  /**
+   * Verlaengerung WAEHREND der Saison (21.11., docs/design/verlaengerung-in-saison-21-11.md).
+   *
+   * Das neue Gehalt gilt ab dem naechsten Spieltag, gebucht wird die Saison aber in EINER Summe am Saisonende:
+   * damit nichts rueckwirkend teurer (oder billiger) wird, haelt dieser Vermerk fest, wie viele Spieltage dieser Saison
+   * noch zum ALTEN Gehalt liefen. `getTeamActualSalaryTotal` mischt daraus die Saisonsumme. Zugleich der Beleg
+   * „einmal je Spieler und Saison“.
+   */
+  inSaisonVerlaengerung?: {
+    seasonId: string;
+    /** Spieltage, die beim Unterschreiben schon gebucht waren (alt gerechnet). */
+    spieltageAlt: number;
+    /** Spieltage der ganzen Saison. */
+    spieltageGesamt: number;
+    /** Saisongehalt (`contract.salary`) VOR der Unterschrift. */
+    altesGehalt: number;
+    /** Saisongehalt NACH der Unterschrift. */
+    neuesGehalt: number;
+    /** Letzte gebundene Saison (Nummer). */
+    endSaisonNummer: number | null;
+  } | null;
 };
 
 export type ContractYearSalary = {
@@ -2685,6 +2709,11 @@ export type TransferWishlistEntry = {
   soc?: number | null;
   teamId?: string | null;
   createdAt: string;
+  /**
+   * Nur bei Eintraegen eines KI-Teams (Runde 2, 21.11.): die Ableitung aus `lib/ai/ki-merkliste.ts` (Stufe, Grund, seit).
+   * Fehlt bei jedem Eintrag eines Menschen. Wer die Wunschliste eines Menschen anzeigt oder aendert, ueberspringt Eintraege mit `ki`.
+   */
+  ki?: KiWunschMeta;
   /** Scouting focus queue order — lower rank scouts first. Falls back to createdAt for legacy entries. */
   priorityRank?: number | null;
   /**
@@ -4288,9 +4317,10 @@ export type SeasonState = {
    */
   inboxGelesen?: Record<string, string[]>;
   /**
-   * KI-MERKLISTE (21.11., lib/ai/ki-merkliste.ts): je KI-Team die fremden Spieler, die seine Kaderplanung (`buyUtility` gegen
-   * `stopUtility`, dieselbe Bewertung wie beim Kauf) ankaufen wuerde. Hoechstens `KI_MERKLISTE_MAX` je Team, absteigend.
-   * Neu berechnet beim Spieltagsabschluss; `kiMerklisteStand` sagt, wann zuletzt.
+   * KI-MERKLISTE, ALTE FORM (Runde 1, 21.11.): wird nicht mehr geschrieben. Seit Runde 2 liegt die Liste im selben Speicher
+   * wie die des Menschen (`transferWishlist`, Eintraege mit `ki`-Zusatz). Das Feld bleibt nur als Lese-Huelle fuer alte
+   * Spielstaende; die naechste Neuberechnung beim Spieltagsabschluss uebernimmt es und entfernt es.
+   * `kiMerklisteStand` sagt weiter, wann zuletzt neu gerechnet wurde.
    */
   kiMerkliste?: Record<string, KiMerklisteEintrag[]>;
   kiMerklisteStand?: { seasonId: string; matchdayId: string | null } | null;

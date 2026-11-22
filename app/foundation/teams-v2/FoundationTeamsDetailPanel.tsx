@@ -1,6 +1,7 @@
 // @ts-nocheck
 "use client";
 
+import { istVerlaengernInSaisonOffen } from "@/lib/contracts/verlaengerung-in-saison";
 import { Fragment, memo, startTransition, useEffect, useMemo, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 
@@ -792,7 +793,13 @@ function FoundationTeamsDetailPanel({
     : TEMP_FORCE_ROSTER_ACTIONS
       ? "Test-Modus: Aktion freigeschaltet. Verkauf öffnet regulär am Season-End (nach MD10)."
       : "Verkauf öffnet am Season-End (nach MD10).";
-  const renewActionTitle = selectedTeamRosterActionsAvailable
+  // Verlängern geht auch zwischen den Spieltagen (21.11., docs/design/verlaengerung-in-saison-21-11.md) — nur Verträge, die
+  // mit dieser Saison auslaufen; Verkaufen bleibt im Saisonende-Fenster.
+  const renewInSaisonOffen = Boolean(selectedTeamCanManage) && Boolean(gameState) && istVerlaengernInSaisonOffen(gameState);
+  const renewEnabled = rosterActionsEnabled || renewInSaisonOffen;
+  const renewActionTitle = renewInSaisonOffen && !selectedTeamRosterActionsAvailable
+    ? "Verlängern — gilt ab dem nächsten Spieltag, die laufende Saison zählt mit"
+    : selectedTeamRosterActionsAvailable
     ? "Verlängern — öffnet die Gehaltsverhandlung"
     : TEMP_FORCE_ROSTER_ACTIONS
       ? "Test-Modus: Aktion freigeschaltet. Gehaltsverhandlung öffnet regulär am Season-End (nach MD10)."
@@ -1172,7 +1179,7 @@ function FoundationTeamsDetailPanel({
                                                 type="button"
                                                 title={renewActionTitle}
                                                 aria-label={`${player.name} verlängern`}
-                                                disabled={!rosterActionsEnabled || contractRenewalBusy != null}
+                                                disabled={!renewEnabled || contractRenewalBusy != null}
                                                 onClick={(event) => {
                                                   event.stopPropagation();
                                                   void openContractRenewalNegotiation({
@@ -1865,7 +1872,7 @@ function FoundationTeamsDetailPanel({
                                         <button
                                           className="nl-teams-action"
                                           type="button"
-                                          disabled={!rosterActionsEnabled || contractRenewalBusy != null}
+                                          disabled={!renewEnabled || contractRenewalBusy != null}
                                           title={renewActionTitle}
                                           onClick={() =>
                                             void openContractRenewalNegotiation({
@@ -2512,7 +2519,7 @@ function FoundationTeamsDetailPanel({
                                     <button
                                       className="nl-teams-action"
                                       type="button"
-                                      disabled={!rosterActionsEnabled || contractRenewalBusy != null}
+                                      disabled={!renewEnabled || contractRenewalBusy != null}
                                       title={renewActionTitle}
                                       onClick={() =>
                                         void openContractRenewalNegotiation({

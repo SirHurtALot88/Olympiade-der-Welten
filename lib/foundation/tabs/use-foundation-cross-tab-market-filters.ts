@@ -91,7 +91,7 @@ export function useFoundationCrossTabMarketFilters(input: {
   const transferWishlistEntries = useMemo(
     () =>
       shouldBuildTransferWishlist
-        ? (input.gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.saveId === input.activeSaveId)
+        ? (input.gameState.seasonState.transferWishlist ?? []).filter((entry) => entry.saveId === input.activeSaveId && !entry.ki)
         : [],
     [input.activeSaveId, input.gameState.seasonState.transferWishlist, shouldBuildTransferWishlist],
   );
@@ -266,6 +266,7 @@ export function useFoundationCrossTabMarketFilters(input: {
             .filter(
               (entry) =>
                 entry.saveId === input.activeSaveId &&
+                !entry.ki &&
                 (!input.selectedTeam || entry.teamId == null || entry.teamId === input.selectedTeam.teamId),
             )
             .slice(0, 4)

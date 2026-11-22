@@ -1794,7 +1794,7 @@ export default function EinsatzlisteModern(props: Props) {
             return (
               <div className={`elm-pause${pause.gebucht ? " is-gebucht" : ""}`} data-testid="elm-pause">
                 <span className="elm-pause__t">
-                  <b>Pause nach Spieltag {pause.nachSpieltag}</b>
+                  <b>Pause nach Spieltag {pause.nachSpieltag}</b>{!pause.gebucht && md >= pause.nachSpieltag - 1 && md <= pause.nachSpieltag ? <b className="elm-pause__bald">{md === pause.nachSpieltag ? " — gleich nach diesem Spieltag" : " — nach dem nächsten Spieltag"}</b> : null}
                   {pause.gebucht ? (
                     <> · alle haben einen spielfreien Spieltag regeneriert{schnitt != null ? <>, im Kader <b className="bc-plus bc-t">Ø −{f1(schnitt)}</b> Erschöpfung</> : null}. Zählte nicht als Spieltag (Sperren, Training).</>
                   ) : (

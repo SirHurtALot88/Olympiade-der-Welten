@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { kiMerklisteSpielerIds } from "@/lib/ai/ki-merkliste-lesen";
 import { kaufRahmen, VORSTAND_PFLICHT_KADER } from "@/lib/finance/vorstand-budgetfreigabe";
 import { resolveTeamRosterMarketValue } from "@/lib/ai/planner-cash-buffer-policy";
 import { GAMEPLAY_HARD_ROSTER_MIN } from "@/lib/foundation/roster-limits";
@@ -632,6 +633,7 @@ function buildFinalBuyGate(input: {
     field: "race",
   });
   const watchPlayerIds = buildScoutingWatchPlayerIds(input.gameState, input.team.teamId);
+  const kiPlayerIds = kiMerklisteSpielerIds(input.gameState, input.team.teamId);
   const blockedCandidateIds = new Set<string>();
   /**
    * Gehalt, das die bereits gewählten Zugänge dieses Laufs zusätzlich auf die Apron-Grundlage legen.
@@ -669,6 +671,7 @@ function buildFinalBuyGate(input: {
       coverageFallback,
       pickedCount: picked.length,
       watchPlayerIds,
+      kiPlayerIds,
     });
     const candidate = sorted[0];
     if (!candidate) break;
@@ -759,6 +762,7 @@ function buildFinalBuyGate(input: {
         raceCounts,
         coverageFallback,
         watchPlayerIds,
+        kiPlayerIds,
       }),
       cashBefore: cashRemaining,
       price,
@@ -920,9 +924,12 @@ function buildRosterTokenCounts(input: {
 function buildScoutingWatchPlayerIds(gameState: GameState, teamId: string) {
   const watchlistIds = getScoutingWatchlistForTeam(gameState, teamId).map((entry) => entry.playerId);
   const wishlistIds = (gameState.seasonState.transferWishlist ?? [])
-    .filter((entry) => entry.teamId === teamId)
+    .filter((entry) => entry.teamId === teamId && !entry.ki)
     .map((entry) => entry.playerId);
-  return new Set([...watchlistIds, ...wishlistIds]);
+  // Die KI-Merkliste teilt sich seit 21.11. (Runde 2) den Speicher der Wunschliste, ist aber keine Wahl des Teams im Sinne
+  // dieses Bonus: Kaufverhalten bleibt unveraendert, deshalb zaehlen ihre Eintraege (und deren Spiegel in der Watchlist) nicht.
+  const kiIds = kiMerklisteSpielerIds(gameState, teamId);
+  return new Set([...watchlistIds, ...wishlistIds].filter((id) => !kiIds.has(id)));
 }
 
 function getDiversityAdjustedBuyScore(input: {
@@ -934,6 +941,8 @@ function getDiversityAdjustedBuyScore(input: {
   raceCounts: Map<string, number>;
   coverageFallback: boolean;
   watchPlayerIds: Set<string>;
+  /** Spieler, die nur ueber die KI-Merkliste (Runde 2) im Scouting stehen: ihre Intel zaehlt beim Kauf nicht. */
+  kiPlayerIds?: Set<string>;
 }) {
   const baseScore = input.candidate.overallRecommendationScore ?? input.candidate.score ?? 0;
   const classToken = getCandidateToken(input.candidate, input.playersById, "className");
@@ -948,7 +957,9 @@ function getDiversityAdjustedBuyScore(input: {
   const stableJitter = (getStableUnitHash(`${input.gameState.season.id}:${input.teamId}:${input.candidate.playerId}:buy-window-v2`) - 0.5) * 1.6;
   const coverageValueNudge = input.coverageFallback ? Math.min(1.5, Math.max(0, 6 - (input.candidate.salary ?? 6)) * 0.18) : 0;
   const scoutingWatchBonus = input.watchPlayerIds.has(input.candidate.playerId) ? 5 : 0;
-  const intelBonus = getPlayerScoutCertainty(input.gameState, input.teamId, input.candidate.playerId) / 20;
+  const intelBonus = input.kiPlayerIds?.has(input.candidate.playerId)
+    ? 0
+    : getPlayerScoutCertainty(input.gameState, input.teamId, input.candidate.playerId) / 20;
   return baseScore + noveltyBonus + stableJitter + coverageValueNudge + scoutingWatchBonus + intelBonus - repeatPenalty;
 }
 
@@ -962,6 +973,7 @@ export function rankFinalBuyCandidates(input: {
   coverageFallback: boolean;
   pickedCount: number;
   watchPlayerIds: Set<string>;
+  kiPlayerIds?: Set<string>;
 }) {
   return [...input.candidates].sort((left, right) => {
     const leftStrategic = left.strategicBuyScore ?? null;

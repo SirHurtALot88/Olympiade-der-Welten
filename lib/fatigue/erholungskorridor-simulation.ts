@@ -247,6 +247,10 @@ export type SeasonResult = {
   avgFatigueEnd: number;
   avgFatigueMid: number;
   teamsWithLineupShortfall: number;
+  /** Ø Erschöpfung aller Kaderspieler nach jedem Spieltag (Index 0 = nach Spieltag 1; Pause eingerechnet). */
+  avgFatigueByMatchday: number[];
+  /** Anteil der Kaderspieler mit Erschöpfung >= 65 nach jedem Spieltag. */
+  anteilRotByMatchday: number[];
   /** Der Spielstand nach dem letzten Spieltag (für Bit-Gleichheits-Prüfungen). */
   endState: GameState;
 };
@@ -258,6 +262,8 @@ export function runKorridorSeason(saveId: string, slots: Slots, optionen: Korrid
   let rollsAt80Plus = 0;
   let avgFatigueMid = 0;
   const shortfallTeams = new Set<string>();
+  const avgFatigueByMatchday: number[] = [];
+  const anteilRotByMatchday: number[] = [];
 
   const averageFatigue = (state: GameState) => {
     const values = state.rosters.map((r) => getPlayerAvailabilityView(state, r.playerId, r.teamId, "md-1").fatigue);
@@ -338,6 +344,9 @@ export function runKorridorSeason(saveId: string, slots: Slots, optionen: Korrid
     rollsAt80Plus += result.injuryEvents.filter((event) => event.fatigueBefore >= 80).length;
     injuriesByMatchday.push(result.injuryEvents.filter((event) => event.result === "injured").length);
     if (mdIndex + 1 === Math.floor(slots.length / 2)) avgFatigueMid = averageFatigue(gameState);
+    const konten = gameState.rosters.map((r) => getPlayerAvailabilityView(gameState, r.playerId, r.teamId, "md-1").fatigue);
+    avgFatigueByMatchday.push(konten.reduce((a, b) => a + b, 0) / Math.max(1, konten.length));
+    anteilRotByMatchday.push(konten.filter((f) => f >= 65).length / Math.max(1, konten.length));
   }
 
   return {
@@ -348,6 +357,8 @@ export function runKorridorSeason(saveId: string, slots: Slots, optionen: Korrid
     avgFatigueEnd: averageFatigue(gameState),
     avgFatigueMid,
     teamsWithLineupShortfall: shortfallTeams.size,
+    avgFatigueByMatchday,
+    anteilRotByMatchday,
     endState: gameState,
   };
 }

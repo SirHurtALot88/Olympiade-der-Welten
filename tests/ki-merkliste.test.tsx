@@ -1,14 +1,17 @@
 /**
- * KI-MERKLISTE (Chris, 21.11.): jedes KI-Team fuehrt eine Liste fremder Spieler, die seine Kaderplanung ankaufen wuerde.
+ * KI-MERKLISTE (Chris, 21.11., Runde 2): jedes KI-Team fuehrt eine Liste von Spielern des Transfermarkts UND anderer Teams
+ * (nie der eigenen), ohne Listen-Limit; begrenzt ist nur das Scouting, und zwar mit derselben Queue wie beim Menschen.
  *
- * Geprueft wird die Wirkung: die Liste ist deterministisch, enthaelt nur fremde Spieler, ist begrenzt und stuft nach dem
- * Vorsprung; die Meldung „Interesse an einem Spieler" entsteht je Manager getrennt, nicht doppelt je Spieltag, haelt den
- * Spieltag nie auf und nennt keine Werte. Die Neuberechnung beim Spieltagsabschluss schreibt `seasonState.kiMerkliste`.
+ * Geprueft wird die Wirkung: die Liste ist deterministisch, enthaelt freie und fremde Spieler, stuft nach dem Vorsprung und
+ * liegt im Speicher der Wunschliste (`transferWishlist` mit `ki`); die Scouting-Plaetze sind begrenzt wie beim Menschen und
+ * nach Stufe belegt; alte `kiMerkliste`-Staende laden weiter. Die Meldung „Interesse an einem Spieler" entsteht je Manager
+ * getrennt, nicht doppelt je Spieltag, nur fuer Spieler menschlicher Teams, haelt den Spieltag nie auf und nennt keine Werte.
  */
 import { describe, expect, it } from "vitest";
 
 import { aktualisiereKiMerkliste, berechneKiMerklisteFuerTeam, istKiTeam } from "@/lib/ai/ki-merkliste";
-import { KI_MERKLISTE_MAX, kiInteresseAnSpieler } from "@/lib/ai/ki-merkliste-lesen";
+import { KI_MERKLISTE_TECHNIK_MAX, kiInteresseAnSpieler, kiMerklisteFuerTeam } from "@/lib/ai/ki-merkliste-lesen";
+import { getScoutingWishlistQueue } from "@/lib/scouting/scouting-wishlist-slots";
 import type { GameInboxItem, GameState, KiMerklisteEintrag, Player, Team } from "@/lib/data/olyDataTypes";
 import { buildGameInboxItems } from "@/lib/foundation/game-inbox-service";
 import { absenderFuerMeldung, baueModell, haeltSpieltagAuf } from "@/lib/foundation/inbox-postfach";
@@ -74,6 +77,8 @@ function makeGameState(extra?: (state: GameState) => void): GameState {
   for (let i = 0; i < 9; i += 1) sitze.push([`m${i}`, 80, 85]);
   for (let i = 0; i < 9; i += 1) sitze.push([`b${i}`, 75, 80]);
   for (let i = 0; i < 8; i += 1) sitze.push([`k${i}`, 30, 20]);
+  // 10 freie Spieler (ohne Kader): starke Marktspieler, die auch die Kaufbewertung des KI-Teams anspricht.
+  for (let i = 0; i < 10; i += 1) players.push(makePlayer(`f${i}`, 70, 75));
   for (const [id, pow, rating] of sitze) {
     players.push(makePlayer(id, pow, rating));
     const teamId = id.startsWith("m") ? "M-M" : id.startsWith("b") ? "B-B" : "K-K";
@@ -123,19 +128,25 @@ function eintrag(playerId: string, besitzer: string, stufe: 1 | 2 | 3 = 2): KiMe
 }
 
 describe("KI-Merkliste: Berechnung", () => {
-  it("ist deterministisch, enthaelt nur fremde Spieler und ist auf KI_MERKLISTE_MAX begrenzt", () => {
+  it("ist deterministisch, enthaelt freie UND fremde Spieler, nie eigene, und hat kein 6er-Limit", () => {
     const state = makeGameState();
     const a = berechneKiMerklisteFuerTeam(state, "K-K");
     const b = berechneKiMerklisteFuerTeam(makeGameState(), "K-K");
     expect(a).toEqual(b);
-    expect(a.length).toBeGreaterThan(0);
-    expect(a.length).toBeLessThanOrEqual(KI_MERKLISTE_MAX);
+    // 18 starke Spieler bei den Menschen + 10 freie: deutlich mehr als die frueheren sechs
+    expect(a.length).toBeGreaterThan(6);
+    expect(a.length).toBeLessThanOrEqual(KI_MERKLISTE_TECHNIK_MAX);
     const eigene = new Set(state.rosters.filter((r) => r.teamId === "K-K").map((r) => r.playerId));
     for (const zeile of a) {
       expect(eigene.has(zeile.playerId)).toBe(false);
       expect(zeile.besitzerTeamId).not.toBe("K-K");
       expect([1, 2, 3]).toContain(zeile.stufe);
     }
+    const markt = a.filter((zeile) => zeile.besitzerTeamId === null);
+    const fremde = a.filter((zeile) => zeile.besitzerTeamId !== null);
+    expect(markt.length).toBeGreaterThan(0);
+    expect(fremde.length).toBeGreaterThan(0);
+    for (const zeile of markt) expect(zeile.playerId.startsWith("f")).toBe(true);
     // absteigend nach Vorsprung, der erste ist immer Stufe 3
     for (let i = 1; i < a.length; i += 1) expect(a[i - 1]!.vorsprung).toBeGreaterThanOrEqual(a[i]!.vorsprung);
     expect(a[0]!.stufe).toBe(3);
@@ -148,19 +159,67 @@ describe("KI-Merkliste: Berechnung", () => {
     expect(berechneKiMerklisteFuerTeam(arm, "K-K")).toEqual([]);
   });
 
-  it("aktualisiereKiMerkliste schreibt nur fuer KI-Teams und traegt `seit` fort", () => {
+  it("aktualisiereKiMerkliste schreibt in die Wunschliste des KI-Teams (nur KI-Teams), traegt `seit` fort", () => {
     const state = makeGameState();
     expect(istKiTeam(state, "K-K")).toBe(true);
     expect(istKiTeam(state, "M-M")).toBe(false);
-    const eins = aktualisiereKiMerkliste(state);
-    expect(Object.keys(eins.seasonState.kiMerkliste ?? {})).toEqual(["K-K"]);
+    const eins = aktualisiereKiMerkliste(state, "save-1");
+    const zeilen = eins.seasonState.transferWishlist ?? [];
+    expect(zeilen.length).toBeGreaterThan(6);
+    expect(zeilen.every((z) => z.teamId === "K-K" && z.ki && z.saveId === "save-1")).toBe(true);
+    expect(eins.seasonState.kiMerkliste).toBeUndefined();
     expect(eins.seasonState.kiMerklisteStand).toEqual({ seasonId: "season-2", matchdayId: "season-2-matchday-2" });
     const spaeter: GameState = { ...eins, matchdayState: { ...eins.matchdayState, matchdayId: "season-2-matchday-3" } };
-    const zwei = aktualisiereKiMerkliste(spaeter);
-    const alt = eins.seasonState.kiMerkliste!["K-K"]!;
-    const neu = zwei.seasonState.kiMerkliste!["K-K"]!;
-    expect(neu.map((z) => z.playerId)).toEqual(alt.map((z) => z.playerId));
+    const zwei = aktualisiereKiMerkliste(spaeter, "save-1");
+    const alt = kiMerklisteFuerTeam(eins, "K-K");
+    const neu = kiMerklisteFuerTeam(zwei, "K-K");
+    expect(neu.map((z) => z.playerId).sort()).toEqual(alt.map((z) => z.playerId).sort());
     expect(neu.every((z) => z.seit === "season-2-matchday-2" && z.stand === "season-2-matchday-3")).toBe(true);
+    // keine Dopplung bei erneutem Lauf
+    expect((zwei.seasonState.transferWishlist ?? []).length).toBe(zeilen.length);
+  });
+
+  it("die Wunschliste des Menschen bleibt unberuehrt, ein Handeintrag des KI-Teams geht vor", () => {
+    const mensch = { id: "w-mensch", saveId: "save-1", seasonId: "season-2", playerId: "f0", playerName: "x", className: "", race: "", marketValue: 1, salary: 1, bracket: null, teamId: "M-M", createdAt: "2028-01-01T00:00:00.000Z", priorityRank: 0 };
+    const hand = { ...mensch, id: "w-hand", playerId: "f1", teamId: "K-K" };
+    const state = makeGameState((s) => {
+      s.seasonState.transferWishlist = [mensch, hand];
+    });
+    const neu = aktualisiereKiMerkliste(state, "save-1").seasonState.transferWishlist ?? [];
+    expect(neu.filter((z) => !z.ki)).toEqual([mensch, hand]);
+    expect(neu.filter((z) => z.ki && z.teamId === "K-K" && z.playerId === "f1")).toHaveLength(0);
+    // KI-Eintraege reihen sich hinter die Handeintraege ein
+    expect(Math.min(...neu.filter((z) => z.ki).map((z) => z.priorityRank ?? 0))).toBeGreaterThan(0);
+  });
+
+  it("Scouting ist begrenzt wie beim Menschen: nur die obersten X nicht fertigen Eintraege, nach Stufe belegt", () => {
+    const eins = aktualisiereKiMerkliste(makeGameState(), "save-1");
+    const liste = kiMerklisteFuerTeam(eins, "K-K");
+    expect(liste.length).toBeGreaterThan(6);
+    const queue = getScoutingWishlistQueue(eins, "K-K");
+    // ohne Scouting-Buero: 6 aktive Plaetze (SCOUTING_WISHLIST_BASE_SLOTS), der Rest wartet
+    expect(queue.capacity).toBe(6);
+    expect(queue.active).toHaveLength(6);
+    expect(queue.waiting).toHaveLength(liste.length - 6);
+    const stufeJe = new Map(liste.map((z) => [z.playerId, z.stufe]));
+    const aktiv = queue.active.map((z) => stufeJe.get(z.playerId)!);
+    const wartend = queue.waiting.map((z) => stufeJe.get(z.playerId)!);
+    expect(Math.min(...aktiv)).toBeGreaterThanOrEqual(Math.max(...wartend));
+    // dieselben Plaetze stehen als Scouting-Records des Teams
+    const records = (eins.seasonState.scoutIntelByTeamId?.["K-K"] ?? []).filter((r) => !r.parked && r.source === "wishlist_mirror");
+    expect(records.map((r) => r.playerId).sort()).toEqual(queue.active.map((z) => z.playerId).sort());
+  });
+
+  it("alte `kiMerkliste` (Runde 1) wird gelesen, bei der ersten Neuberechnung uebernommen (`seit` bleibt) und entfernt", () => {
+    const alt = makeGameState((s) => {
+      s.seasonState.kiMerkliste = { "K-K": [eintrag("m0", "M-M", 3)] };
+    });
+    expect(kiInteresseAnSpieler(alt, "m0").map((t) => t.teamId)).toEqual(["K-K"]);
+    expect(kiMerklisteFuerTeam(alt, "K-K")).toHaveLength(1);
+    const neu = aktualisiereKiMerkliste(alt, "save-1");
+    expect(neu.seasonState.kiMerkliste).toBeUndefined();
+    const m0 = kiMerklisteFuerTeam(neu, "K-K").find((z) => z.playerId === "m0");
+    expect(m0?.seit).toBe("season-2-matchday-1");
   });
 
   it("OLY_KI_MERKLISTE=0 schaltet ab", () => {
@@ -178,6 +237,13 @@ describe("KI-Merkliste: Berechnung", () => {
       s.seasonState.kiMerkliste = { "K-A": [eintrag("m0", "M-M", 1)], "K-B": [eintrag("m0", "M-M", 3)] };
     });
     expect(kiInteresseAnSpieler(state, "m0").map((t) => t.teamId)).toEqual(["K-B", "K-A"]);
+  });
+
+  it("kiInteresseAnSpieler liest auch die neue Form (Wunschliste mit `ki`)", () => {
+    const neu = aktualisiereKiMerkliste(makeGameState(), "save-1");
+    const treffer = kiInteresseAnSpieler(neu, "m0");
+    expect(treffer.map((t) => t.teamId)).toEqual(["K-K"]);
+    expect(treffer[0]!.eintrag.besitzerTeamId).toBe("M-M");
   });
 });
 
@@ -233,6 +299,15 @@ describe("KI-Merkliste: Meldung „Interesse an einem Spieler“", () => {
     const viele = Array.from({ length: 9 }, (_, i) => eintrag(`m${i}`, "M-M", 2));
     const meldungen = inboxFuer(mitListe(viele), "M-M", "user_local").filter((i) => i.source === "ki_interesse");
     expect(meldungen).toHaveLength(5);
+  });
+
+  it("freie Spieler erzeugen keine Meldung, Spieler des Menschen schon (neue Form)", () => {
+    const neu = aktualisiereKiMerkliste(makeGameState(), "save-1");
+    const meldungen = inboxFuer(neu, "M-M", "user_local").filter((i) => i.source === "ki_interesse");
+    expect(meldungen.length).toBeGreaterThan(0);
+    expect(meldungen.length).toBeLessThanOrEqual(5);
+    expect(meldungen.every((i) => !String(i.playerId).startsWith("f"))).toBe(true);
+    expect(new Set(meldungen.map((i) => i.itemId)).size).toBe(meldungen.length);
   });
 
   it("ohne Merkliste im Spielstand gibt es keine Meldung", () => {
