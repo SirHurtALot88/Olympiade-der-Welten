@@ -8,6 +8,7 @@ import type {
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
 import { ppSkalaUmrechnung } from "@/lib/resolve/pp-skala";
+import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
 import {
   entwicklungsKurvenSkala,
@@ -812,8 +813,7 @@ function getPerformanceRecords(gameState: GameState, playerId: string): PlayerDi
 
 /**
  * ENTWICKLUNG NEU (22.11.): Leistungsrang eines Spielers in der Liga dieser Saison, 0 (schwaecher als alle) bis 1 (staerker als
- * alle), aus demselben Leistungssignal je Einsatz wie der Leistungskanal (`getPerformanceSetpoints`: Score, Rang in der
- * Disziplin, PP-Beitrag). Spieler mit weniger als `einsatzMin` Einsaetzen gehen nicht in die Rangfolge ein und bekommen
+ * alle), nach PP je Einsatz. Spieler mit weniger als `einsatzMin` Einsaetzen gehen nicht in die Rangfolge ein und bekommen
  * `rangWenigEinsaetze`. Je Spielstand einmal gerechnet (WeakMap wie der Leistungsindex).
  */
 type LeistungsRangIndex = { sortiert: number[]; signalJeSpieler: Map<string, number> };
@@ -825,11 +825,26 @@ function getLeistungsRangIndex(gameState: GameState): LeistungsRangIndex {
   const p = entwicklungsParameter();
   const ppEinsatzFaktor = ppSkalaUmrechnung(gameState).einsatz;
   const signalJeSpieler = new Map<string, number>();
-  for (const [playerId, records] of getPerformanceIndex(gameState).byPlayerId) {
-    if (records.length < p.einsatzMin) continue;
-    let summe = 0;
-    for (const record of records) summe += getPerformanceSetpoints(record, ppEinsatzFaktor);
-    signalJeSpieler.set(playerId, summe / records.length);
+  // Bevorzugt die PP selbst (Punktebuch der Saison, PP je Einsatz): "Leistung in PP" ist die Groesse, nach der Chris
+  // fragt, und die Abnahme misst sie auch so. Fehlen dem Spielstand die Disziplin-Ergebnisse (Browser-Auszug,
+  // Testfaelle), faellt der Rang auf das Leistungssignal des Leistungskanals zurueck.
+  const buch = new Map<string, { summe: number; n: number }>();
+  for (const e of buildSeasonPointsLedger(gameState, gameState.season.id).pointEntries as unknown as Array<{ playerId: string; basePoints?: number }>) {
+    const z = buch.get(e.playerId) ?? { summe: 0, n: 0 };
+    z.summe += Number(e.basePoints ?? 0);
+    z.n += 1;
+    buch.set(e.playerId, z);
+  }
+  const ausBuch = [...buch.values()].filter((z) => z.n >= p.einsatzMin).length >= 8;
+  if (ausBuch) {
+    for (const [playerId, z] of buch) if (z.n >= p.einsatzMin) signalJeSpieler.set(playerId, z.summe / z.n);
+  } else {
+    for (const [playerId, records] of getPerformanceIndex(gameState).byPlayerId) {
+      if (records.length < p.einsatzMin) continue;
+      let summe = 0;
+      for (const record of records) summe += getPerformanceSetpoints(record, ppEinsatzFaktor);
+      signalJeSpieler.set(playerId, summe / records.length);
+    }
   }
   const index = { sortiert: [...signalJeSpieler.values()].sort((a, b) => a - b), signalJeSpieler };
   leistungsRangCache.set(gameState, index);
@@ -857,7 +872,7 @@ function getGebuchtesTraining(gameState: GameState, player: Player) {
   const akku = player.seasonTrainingAccumulator;
   const zuwachs: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   let ausfallTage = 0;
-  if (!akku || akku.seasonId !== gameState.season.id) return { zuwachs, ausfallTage, dominanz: 0.5 };
+  if (!akku || akku.seasonId !== gameState.season.id) return { zuwachs, ausfallTage, dominanz: 0.5, zielTage: 0 };
   const jeZiel = new Map<string, number>();
   for (const zeile of akku.verlauf ?? []) {
     if (zeile.s === "v") ausfallTage += 1;
@@ -870,7 +885,7 @@ function getGebuchtesTraining(gameState: GameState, player: Player) {
   // Anteil des meistgewaehlten Trainingsziels an den Trainingstagen mit Ziel; mit weniger als fuenf Tagen neutral.
   const mitZiel = [...jeZiel.values()].reduce((a, b) => a + b, 0);
   const dominanz = mitZiel >= 5 ? Math.max(...jeZiel.values()) / mitZiel : 0.5;
-  return { zuwachs, ausfallTage, dominanz };
+  return { zuwachs, ausfallTage, dominanz, zielTage: mitZiel };
 }
 
 function getDisciplineWeightDistribution(disciplineId: string) {
@@ -1527,7 +1542,13 @@ export function buildOrganicSeasonProgression(input: {
       (sum, e) => sum + gebuchtJeAttribut(e.attribute) + e.regression + e.training + e.spillover + e.performance,
       0,
     );
-    const skala = entwicklungsKurvenSkala(rohSumme, entP);
+    // Ein Schub will verdient sein: ueber der Schwelle "stark besser" nur mit Leistung ueber dem Liga-Median UND gehaltenem
+    // Trainingsziel (Chris: wer waechst, hat es sich durch SP und PP verdient). Der Deckel steigt weich mit Rang und Fokus.
+    const fokusGehalten = (entGebucht?.zielTage ?? 0) >= entP.schubZielTageMin ? entGebucht?.dominanz ?? 0 : 0;
+    const verdienst =
+      Math.max(0, Math.min(1, (entRang - entP.schubRangMin) / entP.schubRampe)) *
+      Math.max(0, Math.min(1, (fokusGehalten - entP.schubFokusMin) / entP.schubRampe));
+    const skala = entwicklungsKurvenSkala(rohSumme, entP, entP.schubOhneVerdienstMax + (entP.kurveMax - entP.schubOhneVerdienstMax) * verdienst);
     for (const entry of rawAttributeBreakdown) {
       const gebucht = gebuchtJeAttribut(entry.attribute);
       const gesamt = (gebucht + entry.regression + entry.training + entry.spillover + entry.performance) * skala;

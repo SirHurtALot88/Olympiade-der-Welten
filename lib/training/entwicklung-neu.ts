@@ -33,6 +33,14 @@ export type EntwicklungsParameter = {
   kurveSigma: number;
   kurveK: number;
   kurveMax: number;
+  /** Schub-Deckel: ohne Leistung ueber dem Median und gehaltenes Ziel waechst ein Spieler hoechstens um diesen Betrag (< 8). */
+  schubOhneVerdienstMax: number;
+  /** Leistungsrang (0..1), ab dem der Deckel zu steigen beginnt; Fokus-Anteil und Mindesttage mit Ziel analog. */
+  schubRangMin: number;
+  schubFokusMin: number;
+  schubZielTageMin: number;
+  /** Breite der Rampe (Rang- und Fokus-Anteil), ueber die der Deckel von `schubOhneVerdienstMax` auf `kurveMax` steigt. */
+  schubRampe: number;
 };
 
 export const ENTWICKLUNGS_PARAMETER_STANDARD: EntwicklungsParameter = {
@@ -42,14 +50,19 @@ export const ENTWICKLUNGS_PARAMETER_STANDARD: EntwicklungsParameter = {
   einsatzMin: 4,
   rangWenigEinsaetze: 0.25,
   leistungsSkala: 0.6,
-  abbauBasis: 0.6,
+  abbauBasis: 0.48,
   verfallJeAusfalltag: 0.25,
   fokusStaerke: 0.5,
   abbauLeistungsKopplung: 1.0,
-  kurveA: 2.5,
-  kurveSigma: 4.5,
-  kurveK: 2.2,
+  kurveA: 3,
+  kurveSigma: 4,
+  kurveK: 2.6,
   kurveMax: 18,
+  schubOhneVerdienstMax: 7.5,
+  schubRangMin: 0.5,
+  schubFokusMin: 0.6,
+  schubZielTageMin: 12,
+  schubRampe: 0.15,
 };
 
 let parameterCache: EntwicklungsParameter | null = null;
@@ -100,16 +113,16 @@ export function verfallSumme(ausfallTage: number, p: EntwicklungsParameter = ent
  * Entwicklungskurve: kleine Rohsummen werden gedaempft (die Masse bleibt "kaum veraendert"), grosse verstaerkt (wenige
  * Schuebe und Einbrueche). Das Vorzeichen bleibt, nur der Betrag aendert sich -- die Verteilung auf die Attribute ebenso.
  */
-export function entwicklungsKurve(rohSumme: number, p: EntwicklungsParameter = entwicklungsParameter()): number {
+export function entwicklungsKurve(rohSumme: number, p: EntwicklungsParameter = entwicklungsParameter(), maxPlus: number = p.kurveMax): number {
   if (!Number.isFinite(rohSumme) || rohSumme === 0) return 0;
-  const betrag = Math.min(p.kurveMax, p.kurveA * Math.pow(Math.abs(rohSumme) / p.kurveSigma, p.kurveK));
+  const betrag = Math.min(rohSumme > 0 ? maxPlus : p.kurveMax, p.kurveA * Math.pow(Math.abs(rohSumme) / p.kurveSigma, p.kurveK));
   return Math.sign(rohSumme) * betrag;
 }
 
 /** Faktor, mit dem alle Attribut-Deltas eines Spielers multipliziert werden (>= 0). */
-export function entwicklungsKurvenSkala(rohSumme: number, p: EntwicklungsParameter = entwicklungsParameter()): number {
+export function entwicklungsKurvenSkala(rohSumme: number, p: EntwicklungsParameter = entwicklungsParameter(), maxPlus: number = p.kurveMax): number {
   if (!Number.isFinite(rohSumme) || Math.abs(rohSumme) < 1e-6) return 1;
-  return entwicklungsKurve(rohSumme, p) / rohSumme;
+  return entwicklungsKurve(rohSumme, p, maxPlus) / rohSumme;
 }
 
 /** Fokus-Faktor aus dem Anteil des meistgewaehlten Trainingsziels (0..1): 1 - s bei <= 0,4, 1 + s bei 1,0. */

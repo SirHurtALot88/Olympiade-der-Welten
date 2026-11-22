@@ -103,10 +103,22 @@ describe("Entwicklung neu: Saisonende (kleine Messung)", () => {
     expect(halter!).toBeGreaterThan(wechsler!);
   });
 
+  it("ein Schub will verdient sein: ohne gehaltenes Ziel oder ohne Leistung ueber dem Median bleibt es unter +8", () => {
+    // Im Umfeld ein breites Mittelfeld, damit der Leistungsrang aussagekraeftig ist.
+    const umfeld = Array.from({ length: 40 }, (_, i) => einfach({ ppRang: i / 39, trainingSumme: 5 }));
+    const gross = { trainingSumme: 15, abstand: 30, marktwert: 6 } as const;
+    const { gs, spieler: s } = liga([...umfeld, einfach({ ...gross, ppRang: 0.97, dominanz: 1 }), einfach({ ...gross, ppRang: 0.97, dominanz: 0.3 }), einfach({ ...gross, ppRang: 0.2, dominanz: 1 })], "neu");
+    const [verdient, ohneFokus, ohneLeistung] = s.slice(40).map((p) => gesamt(gs, p));
+    expect(verdient!).toBeGreaterThanOrEqual(8);
+    expect(ohneFokus!).toBeLessThan(8);
+    expect(ohneLeistung!).toBeLessThan(8);
+  });
+
   it("abnehmende Ertraege: je naeher an der Decke, desto weniger Entwicklung", () => {
     const { gs, spieler: s } = liga([einfach({ abstand: 30 }), einfach({ abstand: 8 }), einfach({ abstand: 2 })], "neu");
-    // Das gebuchte Training steht fest; die Saisonend-Rechnung nimmt es nahe der Decke nicht zurueck, aber die Leistung zaehlt weniger.
-    const ergebnisse = s.map((p) => buildOrganicSeasonProgression({ gameState: gs, player: p, accumulatedBaseTrainingBudget: 0 }).attributeBreakdown.reduce((a, e) => a + e.performance, 0));
+    // Vor der Entwicklungskurve: der Wachstumsfaktor der Leistung faellt stetig mit dem Abstand zur Decke.
+    const faktoren = s.map((p) => buildOrganicSeasonProgression({ gameState: gs, player: p, accumulatedBaseTrainingBudget: 0 }).attributeBreakdown.find((e) => e.attribute === "power")!);
+    const ergebnisse = faktoren.map((e) => e.performanceGrowthMultiplier);
     expect(ergebnisse[0]!).toBeGreaterThan(ergebnisse[1]!);
     expect(ergebnisse[1]!).toBeGreaterThan(ergebnisse[2]!);
   });

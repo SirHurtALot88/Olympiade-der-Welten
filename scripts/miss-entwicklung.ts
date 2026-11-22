@@ -217,6 +217,14 @@ async function main() {
   };
   const schreibe = () => OUT && fs.writeFileSync(OUT, JSON.stringify(ergebnis));
 
+  if (flag("erst-naechste-saison")) {
+    // Ein Lauf, der nach der Saisonend-Progression stehen blieb (vorheriger Aufruf mit --keep): zuerst die neue Saison anlegen.
+    const latest = get();
+    const setup = buildPreSeasonNextSeasonSetupToken(latest);
+    const next = applyPreSeasonNextSeasonSetupLightweight(latest, setup.confirmToken, persistence);
+    if (!next.applied) throw new Error(`Naechste Saison blockiert: ${next.blockingReasons.join(" | ")}`);
+    log(`Neue Saison ${get().gameState.season.id}`);
+  }
   for (let k = 0; k < SAISONS; k += 1) {
     const sid = get().gameState.season.id;
     let start: Record<string, number>;
