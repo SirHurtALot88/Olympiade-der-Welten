@@ -39,6 +39,8 @@ import { gueltigerStempel, ppTagesankerSchalter } from "@/lib/resolve/wertungs-s
 export const PP_TAGESANKER_ZIEL = 5.5;
 /** Wie viele Tagesbeste den Anker bilden (robust gegen einen einzelnen Ausreisser). */
 export const PP_TAGESANKER_TOP_K = 3;
+/** Deckel der C2-Skala (= `PP_SKALA_MAX`), fuer die PP vor dem Anker. */
+export const PP_TAGESANKER_DECKEL_C2 = 5;
 /** Ab hier beginnt die weiche Kappe. */
 export const PP_TAGESANKER_KNIE = 4;
 /** Asymptote der weichen Kappe -- wird nie erreicht. */
@@ -67,6 +69,20 @@ export function weicheKappe(x: number, knie: number = PP_TAGESANKER_KNIE, max: n
 
 function runde2(wert: number): number {
   return Math.round(wert * 100) / 100;
+}
+
+/**
+ * C2-PP VOR dem Tagesanker, gedeckelt und gerundet wie in der Kalibrierung der E1-Anker
+ * (`skaliereUngedeckelt()`: `runde2(min(5, u))`). Nur E1 liest diese Map (Niveau, Zeitfahren-Abstand D);
+ * gebucht und gezeigt werden die Tagesanker-PP. Ohne diese Trennung verschiebt der Tagesfaktor das Niveau
+ * (Review PR #1690: `ergebnisNormiert` in 47 % der Zeilen um bis zu +-3).
+ */
+export function ppVorTagesanker(ungedeckelt: ReadonlyMap<string, number>): Map<string, number> {
+  const ergebnis = new Map<string, number>();
+  for (const [spielerId, wert] of ungedeckelt) {
+    ergebnis.set(spielerId, runde2(Math.min(PP_TAGESANKER_DECKEL_C2, Math.max(0, wert))));
+  }
+  return ergebnis;
 }
 
 export type PpTagesankerOptionen = { ziel?: number; topK?: number; knie?: number; max?: number };

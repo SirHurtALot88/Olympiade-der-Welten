@@ -60,7 +60,30 @@ rechnet selbst nach — außer dem Ledger-Fallback oben. Geprüft:
 | Vorstands-Sportziel | `team-season-objectives-service.ts` (`ppTeamFaktor`) | wie Training |
 | Form/Moral | keine PP-Absolutschwelle gefunden (Suche nach `ppAusKurveSkaliert`/`ppSkalaUmrechnung` trifft nur die Zeilen oben) | unverändert |
 | Spielerprofil (PP-Rang, Verlauf), Arena-Panel | `spielerprofil-modell.ts`, `arena-panel` | lesen den gebuchten Wert |
-| E1-Ergebnisskala (0–10) | `ergebnis-skala-anwenden.ts` | nimmt das Mittel der Spieler-PP je Seite; der Tagesfaktor wirkt auf beide Seiten gleich, wer gewinnt ändert sich nie |
+| E1-Ergebnisskala (0–10) | `ergebnis-skala-anwenden.ts` | **liest die C2-PP VOR dem Tagesanker** (Abschnitt 3a), nicht die gebuchten; `ergebnisNormiert`, Pod-Wert, `verhaeltnis` und `teamPoints` ändern sich durch den Tagesanker nie |
+
+### 3a. E1 liest die PP vor dem Anker (Review PR #1690, Variante a)
+
+Die E1-Anker (`data/generated/ergebnis-skala-kalibrierung.json`, `lP5/lP50/lP95`, bei Zeitfahren und Breaking-Gauntlet
+auch der Abstand D über `margeQuelle: "leistung"`) sind auf C2-PP **ohne** Tagesanker gezogen. Las E1 die gebuchten
+Tagesanker-PP, verschob der Tagesfaktor das Niveau: der Reviewer maß `ergebnisNormiert` in 47 % der Zeilen um bis zu ±3
+verändert, je Disziplin in andere Richtung (Eiskunstlauf 2,63 statt 4,44, Basketball 6,38 statt 4,75), bei gleichem
+Sieger, gleichen Punkten und gleichem `verhaeltnis`. Jetzt:
+
+- Neben der Tagesanker-Map gibt es eine zweite mit der **C2-PP vor dem Anker, gedeckelt bei 5 und auf zwei Stellen
+  gerundet wie in der Kalibrierung** (`ppVorTagesanker()`, `lib/resolve/pp-tagesanker.ts`). Erzeuger:
+  `computeIndividualBoxscorePpsFromFixtureResults` (Halter-Parameter, Arena-Boxscore), `runBahnPodMatchday`,
+  `runBattlefieldPodMatchday`, `runMiniDmFfaMatchday` (Feld `playerPpsVorAnkerByPlayerId`, Arena:
+  `individualBoxscorePpsVorAnkerByPlayerId`). Nur mit Tagesanker gefüllt; ohne ist alles bit-identisch zu vorher.
+- Der Vorlauf (`arena-vorlauf-service.ts`) reicht sie als `arenaIndividualBoxscorePpsVorAnkerByDisciplineId` an die
+  Auflösung; `wendeErgebnisSkalaE1An` nimmt sie über `ppVorAnkerByPlayerId` für Niveau, Zeitfahren-/Breaking-Abstand
+  und Pod-Werte. Hat ein Spieler dort keinen Eintrag, gilt wie bisher `pointsAwarded`.
+- **Gebucht und gezeigt bleiben die Tagesanker-PP** (`pointsAwarded`, Ledger, Bestenliste). Nur E1 sieht die andere
+  Zahl; Gleichheit der beiden gibt es bewusst nicht, aber E1 ist reine Anzeige-/Tiebreaker-Größe.
+- **Mischbetrieb:** fällt eine Liga-Stufe oder ein Pod aus und die Zeile läuft über die `pps_duell`-Brücke
+  (Ledger-Fallback, fester Anker), gibt es für sie keine Vor-Anker-Werte und keine Tagesanker-PP; E1 rechnet für diese
+  Zeilen auf `pointsAwarded`, also auf den festen C2-Anker, was der Kalibrierung entspricht. Innerhalb einer Disziplin
+  können so Zeilen mit und ohne Tagesanker stehen; E1 ist dort trotzdem überall auf demselben Maßstab (C2 ohne Anker).
 
 ## 4. Messung
 
@@ -89,8 +112,25 @@ Summe ×1,05, Median-Einsatz 1,12 → 1,16. Der Live-Vergleich oben liegt wegen 
 4,78 fallen. Beides liegt in der Größenordnung der C2-Umrechnungsfaktoren (1,02–1,03) und bleibt unter 10 %. Wirkung:
 **Training und organische Entwicklung** (absolute PP-Schwelle) sehen das Mittel je Einsatz etwas niedriger oder höher
 je nach Spieltag-Mix, nicht systematisch; **Marktwert** ist rangbasiert und ändert sich nur durch die Umverteilung
-zwischen Spieltagen. Die Faktoren `ppSkalaUmrechnung` sind **nicht** nachgezogen; nach der ersten vollen Saison mit
+zwischen Spieltagen. **Abnehmer mit absoluten PP-Schwellen** (`ppSkalaUmrechnung`: organische Entwicklung, Trainings-XP, Vorstands-Sportziel):
+die Summe liegt bei −6 %, je Disziplin aber zwischen 0,64 und 1,43 des alten Werts (Faktor Tagesanker/C2). Weil die
+Umrechnung nur einen Faktor je Skala kennt, trifft sie einzelne Disziplinen zu hoch oder zu niedrig; das gleicht sich
+über den Disziplin-Mix einer Saison größtenteils aus. Die Faktoren sind **nicht** nachgezogen; nach der ersten vollen Saison mit
 Tagesanker gegen echte Saisonsummen prüfen (`werte-pp-skala-aus.mjs --schreibe-kalibrierung`).
+
+**Messung nach dem E1-Fix** (`scripts/miss-pp-skala.ts 8`, zweimal, `OLY_PP_TAGESANKER=aus` gegen `an`, `Math.random` und
+`Date.now` festgehalten, zwei Läufe mit gleichem Spiel): von 508 vergleichbaren Team-Zeilen (16 Disziplinen × 32) ist
+**in 0 Zeilen** `ergebnisNormiert`/Pod-Wert, `verhaeltnis` oder `teamPoints` verändert (vorher 47 %, ±3); die Tabellen
+beider Ligen sind platzgleich, die Siegerergebnis-Verteilung der Duelle identisch. Vier Zeilen eines Takeshi-Pods
+(Spieltag 8) sind ausgenommen: dort liefert der Motor selbst zwei verschiedene Läufe (`teamWert` 39,5 gegen 37,9, also
+vor jeder PP-Rechnung), unabhängig vom Tagesanker. Spieler-PP-Summe 0,988, Tagesbester 4,78 bis 4,98.
+
+**Hockey: gemeinsamer Anker für Torhüter und Feldspieler.** Der Tagesanker nimmt die besten drei `u` über alle Spieler
+einer Disziplin, Torhüter eingeschlossen (eigene Torwart-Referenz, aber ein Anker). Stichprobe ein Hockey-Spieltag im
+Messlauf (32 Torhüter, 64 Feldspieler): Top 10 = 8 Feldspieler, 2 Torhüter (T 4,74 auf Rang 3, T 4,60 auf Rang 5); bei
+einem Drittel Torhütern wäre Gleichverteilung 3 von 10. Die besten drei: 4,80 F, 4,79 F, 4,74 T. Median Torwart 1,33,
+Feld 1,31. Die Torhüter dominieren die Spitze **nicht**; eine Stichprobe von einem Tag, bei Auffälligkeit nach der
+ersten Saison mit mehreren Spieltagen wiederholen.
 
 ## 5. Wertung
 
@@ -101,5 +141,5 @@ Fingerabdruck. Der `arena-eingabe-hash` ändert sich **absichtlich nur** für Sa
 
 ## 6. Tests
 
-`tests/pp-tagesanker.test.ts` (Stempel: neues Spiel an, laufender Save aus, Saisonwechsel, Rückweg, Notbremse,
+`tests/pp-tagesanker-e1.test.ts` (E1 mit und ohne Tagesanker identisch je Duell, Zeitfahren, Breaking-Gauntlet, Bahn-/Battlefield-/Mini-DM-Pod; Vor-Anker-Map der Arena-Rechenstelle), `tests/pp-tagesanker.test.ts` (Stempel: neues Spiel an, laufender Save aus, Saisonwechsel, Rückweg, Notbremse,
 C2-Voraussetzung, kompakte Ladung; Verteilung; Rechenstelle Arena), `tests/wertungs-skalen.test.ts` (Stempel-Felder).

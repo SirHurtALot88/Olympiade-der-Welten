@@ -18,7 +18,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
-import { ppTagesankerFuer, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
+import { ppTagesankerFuer, ppVorTagesanker, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runBattlefieldPodFixtures,
@@ -91,6 +91,8 @@ export type RunBattlefieldPodMatchdayErgebnis = {
   rohdatenByPodId: Map<string, BattlefieldPodRohdaten>;
   /** `playerId -> PP` ueber alle Pods des Spieltags (nur aufgestellte Spieler). */
   playerPpsByPlayerId: Map<string, number>;
+  /** Nur mit Tagesanker: C2-PP VOR dem Anker (gedeckelt wie kalibriert), ausschliesslich fuer E1. */
+  playerPpsVorAnkerByPlayerId?: Map<string, number>;
   warnings: string[];
 };
 
@@ -188,6 +190,7 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
   return {
     rohdatenByPodId,
     playerPpsByPlayerId: tagesanker ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    ...(tagesanker ? { playerPpsVorAnkerByPlayerId: ppVorTagesanker(playerPpsByPlayerId) } : {}),
     warnings,
   };
 }

@@ -14,7 +14,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
-import { ppTagesankerFuer, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
+import { ppTagesankerFuer, ppVorTagesanker, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import {
   runBahnPodFixtures,
   type BahnPodFixtureInput,
@@ -50,6 +50,8 @@ export type RunBahnPodMatchdayErgebnis = {
   rohdatenByPodId: Map<string, BahnPodRohdaten>;
   /** `playerId -> PP` ueber alle Pods (ein Spieler laeuft an einem Spieltag in genau einem Pod). */
   playerPpsByPlayerId: Map<string, number>;
+  /** Nur mit Tagesanker: C2-PP VOR dem Anker (gedeckelt wie kalibriert), ausschliesslich fuer E1. */
+  playerPpsVorAnkerByPlayerId?: Map<string, number>;
   warnings: string[];
   /** k, mit dem gerechnet wurde (Spielplan-Slot), fuer Hash/Diagnose. */
   playerCount: number | null;
@@ -165,6 +167,7 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
   return {
     rohdatenByPodId,
     playerPpsByPlayerId: tagesanker ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    ...(tagesanker ? { playerPpsVorAnkerByPlayerId: ppVorTagesanker(playerPpsByPlayerId) } : {}),
     warnings,
     playerCount: k,
   };

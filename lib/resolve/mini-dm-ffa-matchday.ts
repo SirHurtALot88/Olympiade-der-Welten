@@ -27,7 +27,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
-import { ppTagesankerFuer, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
+import { ppTagesankerFuer, ppVorTagesanker, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runMiniDmFfaPodFixtures,
@@ -230,6 +230,8 @@ export type RunMiniDmFfaMatchdayErgebnis = {
   /** `playerId -> PP` ueber ALLE Pods dieses Spieltags zusammen (Team-IDs sind pod-eindeutig, nicht
    *  Spieler-IDs global -- aber ein Spieler steht an einem Spieltag in genau EINEM Pod). */
   playerPpsByPlayerId: Map<string, number>;
+  /** Nur mit Tagesanker: C2-PP VOR dem Anker (gedeckelt wie kalibriert), ausschliesslich fuer E1. */
+  playerPpsVorAnkerByPlayerId?: Map<string, number>;
   warnings: string[];
 };
 
@@ -308,6 +310,7 @@ export async function runMiniDmFfaMatchday(input: RunMiniDmFfaMatchdayInput): Pr
   return {
     rohdatenByPodId,
     playerPpsByPlayerId: tagesanker ? verteilePpNachTagesanker(playerPpsByPlayerId) : playerPpsByPlayerId,
+    ...(tagesanker ? { playerPpsVorAnkerByPlayerId: ppVorTagesanker(playerPpsByPlayerId) } : {}),
     warnings,
   };
 }

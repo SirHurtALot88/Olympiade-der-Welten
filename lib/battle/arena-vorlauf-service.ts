@@ -528,6 +528,8 @@ async function fuehreVorlaufAusOhneFortschritt(
 
   const arenaTeamPointsByDisciplineId = new Map<string, Map<string, ArenaTeamPointsOverride>>();
   const arenaIndividualBoxscorePpsByDisciplineId = new Map<string, Map<string, number>>();
+  // PP-TAGESANKER: C2-PP vor dem Anker, nur fuer E1 (lib/resolve/ergebnis-skala-anwenden.ts).
+  const arenaIndividualBoxscorePpsVorAnkerByDisciplineId = new Map<string, Map<string, number>>();
   const arenaAusfallByDisciplineId = new Map<string, ArenaAusfall>();
   // MINI-DM-FFA (PR 5), s. Kommentar weiter unten an der eigentlichen Verwendung.
   const miniDmFfaPodRohdatenByDisciplineId = new Map<string, Map<string, MiniDmFfaPodRohdaten>>();
@@ -564,13 +566,13 @@ async function fuehreVorlaufAusOhneFortschritt(
     // als naechstes fragt). Jetzt wird NUR NOCH das ENDGUELTIGE Ergebnis geschrieben -- "failed"
     // ist ab dem Schreiben immer terminal, kein Leser muss das Zwei-Zustaende-Raetsel mehr loesen.
     await semaphor(async () => {
-      let erfolg: { overridesByTeamId: Map<string, ArenaTeamPointsOverride>; individualBoxscorePpsByPlayerId: Map<string, number> } | null = null;
+      let erfolg: { overridesByTeamId: Map<string, ArenaTeamPointsOverride>; individualBoxscorePpsByPlayerId: Map<string, number>; individualBoxscorePpsVorAnkerByPlayerId?: Map<string, number> } | null = null;
       let letzterAusfall: ArenaAusfall | null = null;
       let versucheIntern = 0;
       for (let lokalerVersuch = 1; lokalerVersuch <= maxVersuche; lokalerVersuch += 1) {
         versucheIntern = lokalerVersuch;
         try {
-          const { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings } = await runBattleModeArenaMatchday({
+          const { overridesByTeamId, individualBoxscorePpsByPlayerId, individualBoxscorePpsVorAnkerByPlayerId, warnings } = await runBattleModeArenaMatchday({
             gameState: current.gameState,
             saveId: input.saveId,
             seasonId: input.seasonId,
@@ -593,7 +595,7 @@ async function fuehreVorlaufAusOhneFortschritt(
           });
           const ausfall = ableiteArenaAusfall(warnings, lokalerVersuch);
           if (!ausfall) {
-            erfolg = { overridesByTeamId, individualBoxscorePpsByPlayerId };
+            erfolg = { overridesByTeamId, individualBoxscorePpsByPlayerId, individualBoxscorePpsVorAnkerByPlayerId };
             letzterAusfall = null;
             break;
           }
@@ -626,6 +628,7 @@ async function fuehreVorlaufAusOhneFortschritt(
       if (erfolg) {
         arenaTeamPointsByDisciplineId.set(disziplinId, erfolg.overridesByTeamId);
         arenaIndividualBoxscorePpsByDisciplineId.set(disziplinId, erfolg.individualBoxscorePpsByPlayerId);
+        if (erfolg.individualBoxscorePpsVorAnkerByPlayerId) arenaIndividualBoxscorePpsVorAnkerByDisciplineId.set(disziplinId, erfolg.individualBoxscorePpsVorAnkerByPlayerId);
         const eingabeHash = berechneArenaEingabeHash({
           gameState: current.gameState,
           saveId: input.saveId,
@@ -721,6 +724,7 @@ async function fuehreVorlaufAusOhneFortschritt(
         miniDmFfaPodRohdatenByDisciplineId.set(MINI_DM_DISCIPLINE_ID, erfolg.rohdatenByPodId);
         if (erfolg.playerPpsByPlayerId.size > 0) {
           arenaIndividualBoxscorePpsByDisciplineId.set(MINI_DM_DISCIPLINE_ID, erfolg.playerPpsByPlayerId);
+          if (erfolg.playerPpsVorAnkerByPlayerId) arenaIndividualBoxscorePpsVorAnkerByDisciplineId.set(MINI_DM_DISCIPLINE_ID, erfolg.playerPpsVorAnkerByPlayerId);
         }
         const eingabeHash = berechneMiniDmFfaEingabeHash({
           gameState: current.gameState,
@@ -829,6 +833,7 @@ async function fuehreVorlaufAusOhneFortschritt(
         bahnPodRohdatenByDisciplineId.set(disziplinId, erfolg.rohdatenByPodId);
         if (erfolg.playerPpsByPlayerId.size > 0) {
           arenaIndividualBoxscorePpsByDisciplineId.set(disziplinId, erfolg.playerPpsByPlayerId);
+          if (erfolg.playerPpsVorAnkerByPlayerId) arenaIndividualBoxscorePpsVorAnkerByDisciplineId.set(disziplinId, erfolg.playerPpsVorAnkerByPlayerId);
         }
         const eingabeHash = berechneBahnPodEingabeHash({
           gameState: current.gameState,
@@ -933,6 +938,7 @@ async function fuehreVorlaufAusOhneFortschritt(
         battlefieldPodRohdatenByPodId = erfolg.rohdatenByPodId;
         if (erfolg.playerPpsByPlayerId.size > 0) {
           arenaIndividualBoxscorePpsByDisciplineId.set(BATTLEFIELD_DISCIPLINE_ID, erfolg.playerPpsByPlayerId);
+          if (erfolg.playerPpsVorAnkerByPlayerId) arenaIndividualBoxscorePpsVorAnkerByDisciplineId.set(BATTLEFIELD_DISCIPLINE_ID, erfolg.playerPpsVorAnkerByPlayerId);
         }
         const eingabeHash = berechneBattlefieldPodEingabeHash({
           gameState: current.gameState,
@@ -980,6 +986,7 @@ async function fuehreVorlaufAusOhneFortschritt(
       resolveOptionsForPreview: {
         arenaTeamPointsByDisciplineId,
         arenaIndividualBoxscorePpsByDisciplineId,
+        ...(arenaIndividualBoxscorePpsVorAnkerByDisciplineId.size > 0 ? { arenaIndividualBoxscorePpsVorAnkerByDisciplineId } : {}),
         arenaAusfallByDisciplineId,
         ...(miniDmFfaPodRohdatenByDisciplineId.size > 0 ? { miniDmFfaPodRohdatenByDisciplineId } : {}),
         ...(battlefieldPodRohdatenByPodId ? { battlefieldPodRohdatenByPodId } : {}),

@@ -195,7 +195,7 @@ import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
 import { breakingFormatFuer } from "@/lib/resolve/breaking-format";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
-import { ppTagesankerFuer, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
+import { ppTagesankerFuer, ppVorTagesanker, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 
 /**
  * ARENA_RESOLVED_DISCIPLINE_IDS lebt seit A3 (docs/pm-briefings/projektmanager-plan-kampfmodell-
@@ -1310,6 +1310,8 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   regel: "alt" | "neu" = "neu",
   /** PP-Tagesanker dieses Spieltags (`ppTagesankerFuer(gameState, matchdayId)`, Saison-Stempel): ungedeckelt rechnen, dann ueber alle Spieler verteilen. */
   tagesanker: boolean = false,
+  /** Nur mit Tagesanker: bekommt die C2-PP vor dem Anker (E1 liest sie, nicht die gebuchten PP). */
+  vorAnkerAus?: { ppVorAnker?: Map<string, number> },
 ): Map<string, number> {
   const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld", regel);
   // TORWART-EIGENE REFERENZ (Hockey-Produktivierung): nur aufgeloest, wenn irgendein Eintrag sie
@@ -1367,7 +1369,11 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
       }
     }
   }
-  return tagesanker && ppSkala === "an" ? verteilePpNachTagesanker(ppsByPlayerId) : ppsByPlayerId;
+  if (tagesanker && ppSkala === "an") {
+    if (vorAnkerAus) vorAnkerAus.ppVorAnker = ppVorTagesanker(ppsByPlayerId);
+    return verteilePpNachTagesanker(ppsByPlayerId);
+  }
+  return ppsByPlayerId;
 }
 
 /**
@@ -1486,6 +1492,8 @@ export type RunBattleModeArenaMatchdayResult = {
    * Leer, wenn kein einziges Duell einen eindeutig zuordenbaren Boxscore geliefert hat.
    */
   individualBoxscorePpsByPlayerId: Map<string, number>;
+  /** Nur mit Tagesanker: C2-PP VOR dem Anker (gedeckelt wie kalibriert), ausschliesslich fuer E1. */
+  individualBoxscorePpsVorAnkerByPlayerId?: Map<string, number>;
   warnings: string[];
 };
 
@@ -1691,6 +1699,7 @@ export async function runBattleModeArenaMatchday(
   // bewusst KEINE eigene Warnung: anders als ein fehlendes Fixture-Ergebnis ist das kein Zeichen
   // eines echten Problems.
   const fieldSizeGewuerfelt = resolveArenaFieldSizeForMatchday(gameState, matchdayId, disciplineId);
+  const vorAnkerAus: { ppVorAnker?: Map<string, number> } = {};
   const individualBoxscorePpsByPlayerId = computeIndividualBoxscorePpsFromFixtureResults(
     alleFixtureErgebnisse,
     fieldSizeGewuerfelt,
@@ -1706,11 +1715,17 @@ export async function runBattleModeArenaMatchday(
             : "neu"
           : "neu",
     ppTagesankerFuer(gameState, matchdayId),
+    vorAnkerAus,
   );
 
   // Ein Team ohne Fixture an diesem Spieltag (z. B. unvollstaendige `leagueTeamIds`) bekommt
   // schlicht keinen Eintrag in `overridesByTeamId` — der Aufrufer (die Resolve-Pipeline) faellt
   // fuer dieses Team automatisch auf den bestehenden PPS-Pfad zurueck, weil die Map dafuer keinen
   // Eintrag hat. Kein gesonderter Fehlerpfad noetig.
-  return { overridesByTeamId, individualBoxscorePpsByPlayerId, warnings };
+  return {
+    overridesByTeamId,
+    individualBoxscorePpsByPlayerId,
+    ...(vorAnkerAus.ppVorAnker ? { individualBoxscorePpsVorAnkerByPlayerId: vorAnkerAus.ppVorAnker } : {}),
+    warnings,
+  };
 }
