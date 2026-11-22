@@ -2056,3 +2056,95 @@ Spieltagen.
   neuer Wert im Spielstand.
 
 **Offen:** soll die Tiefe (A) in der Liga-Tabelle wirklich fehlen, oder reicht dir dort der Balken (B) als kleine Spalte?
+
+---
+
+# Runde 13 (22.11.): Händlerpreis, Tiefe-Reiter, Verbrauch mit Marken, Ernährung
+
+## 71. Entscheidungen
+
+- **Händlerpreis = zwei volle Reparaturen** (0,40 / 0,75 / 1,50 / 3,00 C), vorerst so übernommen (§67).
+- **Kadertiefe als eigener Reiter „Tiefe“ in der Team-Ansicht:** Variante B als Hauptbild (14 Säulen mit Porträts,
+  Verletzte schraffiert), darunter A (Stärke Top 6, Tiefe 7–12) und C (Belastbarkeit). **Die Ligatabelle bleibt ohne
+  Tiefe.** Im Mockup: `?ansicht=team&reiter=tiefe`. Fremde Teams zeigen denselben Reiter in Nebel-Stufen und ohne die
+  Zahlen A, bis sie voll gescoutet sind.
+
+## 72. Verbrauchsgegenstände mit bekannten Namen
+
+Wie der Sponsoren-Katalog (`lib/sponsor/sponsor-brand-catalog.ts`) nutzt der Kiosk echte Namen. Jeder Artikel wirkt für
+**einen Einsatz**, liegt im Verbrauchsplatz des Spielers (einer je Spieler) und ist danach weg. Im Lager stapeln sie wie
+Materialien (bis 10 je Platz). Preise folgen dem Gegenwert (§48): ein Einsatz mit kleinem Bonus ist 0,02 bis 0,05 C wert.
+
+| Kategorie | Artikel | Wirkung für einen Einsatz | Nebenwirkung | Preis | Zähler |
+|---|---|---|---|---:|---|
+| **Energy und Süßes** | Red Bull | +4 Speed, +3 Stamina | nächster Einsatz −2 Stamina | 0,04 C | Zucker +1 |
+| | Monster Energy | +6 Stamina | nächster Einsatz −3 Awareness | 0,04 C | Zucker +2 |
+| | Coca-Cola | +2 Speed, Moral +1 | – | 0,02 C | Zucker +1 |
+| | Pepsi | +2 Dexterity, Moral +1 | – | 0,02 C | Zucker +1 |
+| | Gatorade | +3 Stamina | – | 0,03 C | Zucker +1 |
+| | Club-Mate | +3 Awareness, +2 Stamina | – | 0,03 C | Zucker +1 |
+| | Haribo Goldbären | +3 Speed, Moral +2 | 30 %: −2 Awareness | 0,02 C | Zucker +2 |
+| | Snickers | +3 Stamina, Moral +1 | – | 0,02 C | Zucker +1 |
+| **Cocktails und Bier** | Aperol Spritz | +3 Charisma, Moral +2 | −2 Awareness | 0,04 C | Alkohol +1 |
+| | Mojito (Bacardí) | +4 Spirit | −2 Dexterity | 0,04 C | Alkohol +1 |
+| | Caipirinha (Pitú) | +4 Charisma, +2 Spirit | −3 Intelligence | 0,05 C | Alkohol +2 |
+| | Espresso Martini (Kahlúa) | +3 Charisma, +2 Awareness | −2 Stamina | 0,05 C | Alkohol +1 |
+| | Jägermeister | +5 Will, Moral +3 | −4 Awareness | 0,04 C | Alkohol +2 |
+| | Carlsberg | Moral +2 | −1 Speed | 0,03 C | Alkohol +1 |
+| **Gesund** | Poke Bowl | +2 Stamina, +1 Health | – | 0,05 C | Gesund +1 |
+| | Proteinriegel (PowerBar) | +2 Power | – | 0,04 C | Gesund +1 |
+| | Smoothie (innocent) | +2 Awareness | – | 0,04 C | Gesund +1 |
+| | Banane (Chiquita) | +2 Stamina | – | 0,03 C | Gesund +1 |
+| | Haferflocken (Kölln) | +1 Stamina, +1 Determination | – | 0,03 C | Gesund +1 |
+| | Wasser (Volvic) | Erschöpfung nach dem Einsatz −5 % | – | 0,03 C | Gesund +1 |
+| **Fast Food** | Döner | +5 Power, +3 Health, Moral +3 | 20 %: Magen, −4 Stamina in diesem Einsatz | 0,03 C | Fast Food +2 |
+| | Big Mac (McDonald's) | +6 Power, Moral +3 | 20 %: Magen, −4 Stamina | 0,03 C | Fast Food +2 |
+| | Whopper (Burger King) | +5 Health, +2 Power | 15 %: träge, −3 Speed | 0,03 C | Fast Food +2 |
+| | Pizza (Domino's) | +4 Determination, Moral +4 | 15 %: träge, −3 Speed | 0,03 C | Fast Food +2 |
+| | Currywurst | +5 Torment, +2 Power | 25 %: Magen, −4 Stamina | 0,02 C | Fast Food +2 |
+| | Bucket (KFC) | +4 Health, Moral +3 | 20 %: Magen, −4 Stamina | 0,03 C | Fast Food +2 |
+
+- **Charakter der Kategorien:** Energy gibt Ausdauer und Tempo jetzt und nimmt beim nächsten Einsatz etwas zurück.
+  Cocktails heben Auftreten und Geist und kosten Konzentration, sie passen in SOC-Disziplinen. Gesund ist klein und ohne
+  Haken, dafür am teuersten. Fast Food ist billig, stark, macht kurz glücklich und trägt ein Risiko.
+- **Woher:** Kiosk beim Händler (mit Handelsposten immer offen), Holz- und Eisentruhe als Standard-Funde, Sponsor-Paket
+  (wer einen Getränke-Sponsor hat, bekommt dessen Artikel je Spieltag geschenkt, sofern der Sponsoren-Katalog die Marke
+  führt).
+- **Kosten im Blick:** wer jeden Verbrauchsplatz in jedem Einsatz füllt, zahlt rund 8 C je Saison (220 Einsätze × 0,035 C);
+  üblich sind 1 bis 2 C.
+- **KI-Regel:** Verbrauch nur in Derbys und in Duellen, die laut Vorschau eng sind. Stammspieler von Teams mit Finanzwert
+  ab 6 bekommen dauerhaft Gesundes. Fast Food nur, wenn die Moral des Spielers unter 40 liegt und sein Zähler höchstens 1
+  ist. Nie ein Artikel, der einen Zähler auf die Schwelle hebt. Cocktails nur in SOC-Disziplinen.
+- **Rechtlicher Hinweis:** echte Markennamen sind im privaten Spiel wie bei den Sponsoren unkritisch; im Mockup sind die
+  Logos Text in CSS, es gibt keine Markenbilder und es wird nichts bei PixelLab bestellt.
+
+## 73. Ernährung mit Langzeitwirkung
+
+- **Vier Zähler je Spieler:** Fast Food, Zucker, Alkohol, Gesund. Jeder Artikel hebt seinen Zähler um 1 oder 2; jeder
+  Zähler sinkt je Spieltag um 1. Sichtbar im Spielerprofil und beim Anlegen, mit markierter Schwelle („noch eine Portion
+  bis zum verstimmten Magen“). Nichts ist verborgen.
+- **Schwellen lösen Ereignisse aus** (Nachricht im Postfach, bei Alkohol auch in der Kabine):
+
+| Ereignis | Auslöser | Wirkung |
+|---|---|---|
+| Verstimmter Magen | Fast Food 4 | die nächsten drei Einsätze −3 % Eignung, im Wettessen nicht einsetzbar; Zähler −2 |
+| Zuckerabsturz | Zucker 4 | nächster Einsatz −4 Stamina, −2 Awareness; Zähler −2 |
+| Kater | Alkohol 3 | nächster Spieltag −3 % Eignung, Erschöpfung +5; ab Alkohol 5 sinkt das Vertrauen des Vorstands um 0,25 |
+| Gut im Saft | Gesund 5 und Fast Food 0 | drei Spieltage Erholung +10 %, Verletzungsrisiko −10 % |
+
+- **Über die Saison:** ab 12 Fast-Food-Punkten in einer Saison sinkt das Stamina-Potential um 1, ab 20 um 2 (mehr nie).
+  Fünf Spieltage in Folge ohne Fast Food und mit Gesundem holen je einen Punkt zurück. Ab 15 Gesund-Punkten steigt das
+  Regenerationstempo für den Rest der Saison um 5 %. **Kein Spieler wird dauerhaft beschädigt;** alles ist umkehrbar.
+- **Moral:** Fast Food gibt sofort +3 bis +4 für einen Spieltag. Ein verstimmter Magen oder Kater kostet −2.
+- **Traits (nur echte):** Healthy verträgt zwei Punkte mehr je Schwelle und bekommt den gesunden Bonus doppelt.
+  FaintHearted hat das Magen-Risiko um 10 Punkte höher. Disciplined nimmt Fast Food und Alkohol nur, wenn der Manager es
+  anlegt, und verliert dann 1 Moral. Lazy bekommt von Fast Food 1 Moral mehr.
+- **Leitplanken:** on top, zählt nicht gegen die Schranke 0,75. Die Wirkung läuft über Attribute, Form, Erschöpfung und
+  Moral, also über Kanäle, die es gibt. Mensch und KI nutzen dieselben Regeln; die Zähler stehen im Spielstand je Spieler.
+  Verbrauch belegt den Verbrauchsplatz des Mini-Inventars, nie einen Ausrüstungsplatz.
+- **Auflösung:** in der Zerlegung je Spieler (§54) läuft Verbrauch in der Spalte „Gegenstand“ mit, ein Ereignis wie der
+  verstimmte Magen in der Spalte „Belastung“.
+- Im Mockup: `?ansicht=verbrauch` (Katalog in vier Spalten, Zähler für sechs Spieler, Beispiel-Ereignis).
+
+**Offen:** Sollen Getränke-Sponsoren ihre Artikel je Spieltag schenken (kleiner Vorteil, hübsche Verbindung), oder bleibt
+der Kiosk rein käuflich?
