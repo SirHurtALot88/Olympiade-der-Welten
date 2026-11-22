@@ -1938,3 +1938,75 @@ Ab Schmiede Stufe 3. Bezahlt wird mit dem Material der Familie und mit Teilen. D
 
 Im Mockup `?ansicht=familien` sind die Aufstiegskosten und die Familien-Regel eingetragen. Die Demo ist nicht betroffen
 (sie rüstet keine Spieler aus).
+
+---
+
+# Runde 12 (22.11.): Reparatur-Benchmark, Postfach, Kadertiefe
+
+## 67. Entscheidung: Reparatur rund 2 C je Saison für einen voll ausgerüsteten Kader
+
+Der Reparatur-Anteil am Gegenwert steigt von 30 % auf **37,5 %**. Die Formel aus §48 bleibt, nur die Zeile
+`Reparatur je Einsatz = 37,5 % × Gegenwert je Einsatz` ändert sich. Händlerpreise und Verkauf bleiben.
+
+| Stufe | Gegenwert je Einsatz | Reparatur je Einsatz | volle Reparatur (0→100) | kaputt (× 1,5) |
+|---|---:|---:|---:|---:|
+| Standard | 0,012 C | 0,0043 C | 0,09 C | 0,13 C |
+| Selten | 0,022 C | 0,0081 C | 0,16 C | 0,24 C |
+| Episch | 0,043 C | 0,0162 C | 0,32 C | 0,49 C |
+| Legendär | 0,086 C | 0,0324 C | 0,65 C | 0,97 C |
+
+Nachgerechnet für 28 Teile (8 Standard × 10 Einsätze, 12 Selten × 8, 6 Episch × 5, 2 Legendär × 6):
+0,34 + 0,78 + 0,49 + 0,39 = **2,0 C je Saison**. Der Kader im Mockup (fünf reparierbare Teile) kommt auf 0,79 C. Das
+ersetzt die Reparaturspalten in §48; die Zahlen in `ausruestung`, `team`, `familien` und in der Demo sind angepasst.
+
+## 68. Entscheidung: Trait-Ereignisse
+
+±2 % ist in Ordnung. „Transfergerüchte“ wirken auf Gehaltsforderungen (§56 bleibt so). Die Gerüchte bekommen dazu eine
+Nachricht im Postfach (§69).
+
+## 69. Postfach: drei neue Nachrichtentypen
+
+**Was es heute gibt** (`lib/foundation/game-inbox-service.ts`, `inbox-quick-action-service.ts`,
+`app/foundation/inbox-v2/PostfachModern.tsx`): Nachrichten der Kategorien Aufgabe, Warnung, Transfer, Vertrag, Training,
+Gebäude, Sponsor, Finanzen, Ergebnis, Nachricht; zwei Listen (Entscheidungen, Chronik); Schnellantworten der Art
+anwenden, hinspringen, später. Gerüchte, Schnäppchen und Auflösungswünsche gibt es nicht, und keine Nachricht hat mehrere
+Antworten mit Folgen. **Neu wäre** also: Antwort-Karten (dieselben wie bei Liga-Lage und Kabine), eine Frist und ein
+Standard, der ohne Antwort gilt.
+
+| Typ | Auslöser | Antworten | Standard ohne Antwort | KI-Regel |
+|---|---|---|---|---|
+| **Transfergerücht** | Spieler in zwei von drei Spieltagen unter den besten fünf seiner Disziplin, und Vertrag läuft aus oder Trait Mercenary/Renegade; in der Liga-Lage „Transfergerüchte“ doppelt so oft. Wirkung: fordert bei Verlängerung 10 % mehr, solange es läuft (3 Spieltage) | Jetzt verlängern (mit Aufschlag, Gehaltstopf, Moral +5) · Gespräch führen (50 %, mit Loyal immer; sonst Moral −2) · Abwarten (40 %: echtes Angebot im nächsten Fenster) · Angebote anhören (Ablöse +15 %, Moral −3) | Abwarten | Finanzwert ab 7 und beste 6: verlängern · Harmonie ab 6: Gespräch · außerhalb der besten 6: anhören · sonst abwarten |
+| **Schnäppchen** | ein fremdes Team liegt unter seiner Rücklage oder hat einen Spieler mit Moral unter 35; geforderte Ablöse etwa 75 % des Marktwerts. Geht gleichzeitig an alle Teams, deren Scouting-Stufe reicht (ab Stufe 2) | Merkliste · Beobachten lassen (eine Scouting-Stufe mehr für den Spieler) · Anfrage vormerken (bindet Freigabe, Zuschlag in Reihenfolge der Anfragen) · Ignorieren | Ignorieren | Bedarf laut Kaderplan und freie Freigabe: Anfrage · Scouting ab 3: beobachten · sonst ignorieren |
+| **Vertragsauflösung** | Moral drei Spieltage unter 30 und Außenseiter oder fünf Spieltage ohne Einsatz; Diva und Egomaniac schon unter 40 | Einsätze versprechen (3 in 5 Spieltagen; gehalten Moral +15, gebrochen: geht ablösefrei, Kabine −3) · Transferliste (Moral +5 bis zum Fenster) · Auflösen (sofort, Gehalt zu 100 % zurück in den Gehaltstopf, Abfindung 25 % des Restgehalts) · Ablehnen (Moral −5, steckt das Grüppchen an, fragt nach drei Spieltagen erneut) | Transferliste | beste 8: versprechen · Finanzwert unter 4: auflösen · sonst Transferliste · nie ablehnen |
+
+- **Regeln, die gelten:** Auflösung ist ein ablösefreier Verkauf (Chris, 22.11.). Der Pflichtkader 8 wird nie
+  unterschritten. Verlängerung und Kauf laufen hart gegen die Vorstands-Freigabe. Der Marktwert bleibt immer genau
+  sichtbar; das Schnäppchen ist die geforderte Ablöse, nicht ein versteckter Wert.
+- **Mehrspieler:** je Team getrennt; Schnäppchen sehen alle Berechtigten gleichzeitig. Bereich „Käufe, Verkäufe, Verträge“
+  ist delegierbar, dann antwortet die KI-Regel. Kein Spieltag wartet auf eine Antwort.
+- **Menge:** höchstens zwei solche Nachrichten je Team und Spieltag.
+- Im Mockup: `?ansicht=postfach`, die drei Nachrichten sind anklickbar.
+
+## 70. Kadertiefe neben der Kaderstärke
+
+Ausgangslage: die Kaderstärke rechnet über die besten 6 (damit sie das Ergebnis nicht vorwegnimmt). Die Saison belohnt aber
+Tiefe. Drei Varianten in `?ansicht=tiefe`:
+
+| | Variante | gut | schwach |
+|---|---|---|---|
+| A | zweite Kennzahl „Tiefe“ = Mittel der Plätze 7 bis 12, neben „Stärke (Top 6)“ | klar, sortierbar, passt in jede Tabelle | zwei Zahlen ergeben zusammen fast die Saisonstärke; Verletzte unsichtbar |
+| B | Balken mit 12 Säulen (plus 13 und 14 als Umriss): Top 6 hell, 7 bis 12 gedimmt, Verletzte schraffiert, leere Plätze gestrichelt | ein Blick zeigt Spitze, Abfall und Lücken, ohne Zahl | nicht sortierbar, braucht Breite |
+| C | Belastbarkeit: einsetzbare Spieler gegen die höchste Platzsumme der nächsten drei Spieltage | sagt, ob der Kader die Woche trägt | hängt am eigenen Spielplan, kein Maß für Qualität |
+
+**Empfehlung:** B als Standardbild überall. A nur im Teamprofil, für fremde Teams erst bei vollem Scouting; in Tabellen
+bleibt allein „Stärke (Top 6)“. C nur für das eigene Team, in der Woche und der Einsatzliste, als Warnung vor engen
+Spieltagen.
+
+- **Nebel:** für fremde Teams werden die Säulen auf die bekannten Stufen gerundet (ungescoutet 10er, beobachtet 5er,
+  gescoutet genau). Verletzungen sind öffentlich und auch dort schraffiert.
+- **Wo es steht:** Draft (Balken wächst mit jedem Pick; bei Gegnern in Stufen) · Transfermarkt (Balken vorher und nachher)
+  · Teamprofil (Balken, dazu A und C) · Arena-Vorschau (beide Balken nebeneinander) · Woche und Einsatzliste (C).
+- **Rechenweg:** Sortierung der Disziplin-Eignungen wie bei der heutigen Kaderstärke, nur über 14 statt 6 Plätze; kein
+  neuer Wert im Spielstand.
+
+**Offen:** soll die Tiefe (A) in der Liga-Tabelle wirklich fehlen, oder reicht dir dort der Balken (B) als kleine Spalte?
