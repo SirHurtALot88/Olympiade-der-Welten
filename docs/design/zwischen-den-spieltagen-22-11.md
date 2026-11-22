@@ -932,3 +932,160 @@ Sie belegen dieselben Plätze wie andere Ausrüstung: wer den Glücksbringer tr�
   Chromium geprüft: die drei Takte folgen bei 0 / 1,2 / 2,0 Sekunden, die Karten sind danach sichtbar, „nochmal öffnen“
   startet neu. Dabei gefunden und behoben: Karten in der neuen Woche und die Haltungs-Knöpfe reagierten nicht auf Klicks.
 - **Kadergröße:** die Obergrenze bleibt bei 14 (Chris). Dass die KI tiefer kauft, baut ein anderer Agent.
+
+---
+
+# Runde 6 (22.11.): Antworten von Chris eingearbeitet
+
+Geänderte und neue Ansichten: `ausruestung` (drei Plätze, Schmiede), `team` (neu: alle 14 Spieler), `zuruf` (Fenster in der
+Arena), `kiste` (klickbar, mit echten Bildern aus der PixelLab-Stilprobe).
+
+## 25. Entschieden
+
+- **Ausrüstung:** kleines Inventar statt fünf Körperplätze (Abschnitt 26).
+- **Winterpause:** vorerst **ohne** Transferfenster. Halbzeitbericht, Markt der Händler, Regel-Abstimmung und Erholung
+  bleiben. Offene Frage 3 aus Abschnitt 18 ist erledigt.
+- **Entwicklung:** das Liga-Mittel bleibt verbindlich bei **−1 bis +1** (Abschnitte 7 und 21).
+- **Zuruf:** als echtes Fenster **in der Arena**, nicht nur als Spielplan vorher (Abschnitt 28 ersetzt die Stufen aus 17).
+- **Risiko-Antworten** (Projektleitung): erlaubt, aber sparsam. Höchstens eine je Ereignis, die Chance steht immer da,
+  kein Ausgang beschädigt einen Spieler dauerhaft. Gilt für Liga-Lagen und Kabinen-Ereignisse.
+- **Kiste:** Stilprobe bestellt, Ansicht klickbar (Abschnitt 29).
+
+## 26. Ausrüstung: drei Plätze je Spieler
+
+Chris’ Sorge: 14 Spieler mal fünf Plätze wäre „ne verdammte Menge“. Deshalb:
+
+- **Drei Plätze je Spieler: zwei für Ausrüstung, einer nur für Verbrauch.** Keine festen Körperteile mehr; ein Teil passt
+  in jeden der beiden Ausrüstungsplätze. Die Figur bleibt in der Mitte, die drei Plätze liegen um sie herum
+  (Mockup `ausruestung`).
+- **Menge:** höchstens 28 Ausrüstungen und 14 Verbrauchsteile im ganzen Kader, das Lager fasst 16. Üblich sind nach
+  einer Saison 8 bis 12 Teile im Verein: die meisten Spieler tragen nichts, wenige tragen viel.
+- **Team-Übersicht** (Mockup `team`): alle 14 Spieler als Karten mit ihren drei Plätzen (eckig = Ausrüstung, rund =
+  Verbrauch) und der Wirkung auf die Eignung in den Disziplinen des Tages; rechts das unverteilte Lager mit einem
+  Vorschlag je Teil. Ziehen vom Lager auf den Spieler, oder „Vorschlag verteilen“ nach der Regel der KI; selbst Gesetztes
+  bleibt. Klick auf eine Karte öffnet den Spieler.
+- Die Wirkung bleibt wie in Abschnitt 14: Gegenstände heben Attribute, ohne Deckel, drei Arten (Disziplin, Farbe,
+  allgemein). Die Startwerte je Teil bleiben; weil nur noch zwei Ausrüstungen stapeln, ist der größte Ausreißer eines
+  Spielers etwa zwei legendäre Teile plus ein Verbrauch.
+- **Speicher:** unverändert klein; die Obergrenze sinkt auf 32 × (16 + 42) Datensätze, rund 150 KB, üblich unter 30 KB.
+
+## 27. Schmiede: zusammenlegen mit festem Ausgang
+
+Teil des Kreislaufs (Schritt 6), als Tafel unten in `ausruestung`. Grundsatz von Chris: nicht zu viel Glück. **Jedes
+Rezept hat einen festen, vorher sichtbaren Ausgang.**
+
+| Rezept | Zutaten | Ergebnis | Kosten |
+|---|---|---|---|
+| **Drei gleiche** | drei Teile derselben Art und Stufe | ein Teil der nächsten Stufe derselben Familie, Zustand 100 % (Standard → Selten → Episch; Legendär entsteht nie in der Schmiede) | 0,5 C / 1,5 C |
+| **Aufwerten** | ein Teil + 4 Teile (Material) | dasselbe Teil „+1“: Bonus +1 je Attribut, Zustand 100 %; höchstens bis „+2“ | 4 bzw. 8 Teile |
+| **Reparieren** | ein Teil + 3 Teile | Zustand zurück, Höchstwert danach 80 % des alten | 3 Teile |
+| **Zerlegen** | ein Teil | Teile nach Stufe: Standard 1, Selten 2, Episch 4, Legendär 8 | nichts |
+| **Umwidmen** | ein Teil + 2 Teile | dieselbe Stufe, andere Disziplin derselben Farbe | 2 Teile + 0,5 C |
+
+- **Woher die Teile:** aus zerlegten Duplikaten und aus den zwei nicht gewählten Funden jeder Kiste. Nie für Geld.
+  Das Geld in den Rezepten kommt aus dem Investitionstopf unter der Vorstands-Freigabe.
+- **Keine Abkürzung zur Spitze:** Legendäres bleibt Beute; „drei gleiche“ verlangt drei Lagerplätze und Geduld.
+- **KI-Regel:** legt drei gleiche zusammen, sobald sie im Lager liegen und keines davon getragen wird; wertet das Teil
+  mit den meisten Einsätzen auf, wenn mindestens 4 Teile da sind; repariert vor dem Aufwerten, wenn ein getragenes Teil
+  unter 25 % steht; zerlegt das schwächste Teil, wenn das Lager voll ist. Eine feste Reihenfolge, kein Rechenweg.
+- **Mit Gebäude:** bis es eine Werkstatt gibt, steht die Schmiede jedem offen. Später kann ein Gebäude die Kosten senken
+  oder „+3“ freischalten.
+- **Aufwand:** S nach der Ausrüstung (fünf Rezepte als Tabelle, ein Schreibweg hinter `authorizeServerRoomWrite`).
+
+## 28. Zuruf in der Arena (ersetzt die Stufen aus Abschnitt 17)
+
+Chris will den Eingriff **während** des Spiels. Die drei Haltungen und ihre Übersetzung je Disziplin bleiben
+(Abschnitt 17); neu ist das Wann und das Wie.
+
+**Ablauf für den Menschen.** Jede Disziplin hat drei Abschnitte, also **zwei Haltepunkte**. An jedem Haltepunkt steht die
+Arena, ein Fenster zeigt Stand, Lage der eigenen Mannschaft und drei Zurufe mit ihrer Wirkung in Worten; acht Sekunden,
+ohne Wahl gilt der eigene Spielplan (Mockup `zuruf`). Danach läuft der nächste Abschnitt.
+
+**Wie das mit „gezeigt = gebucht“ zusammengeht.** Heute wird vorgerechnet und dann gezeigt. Zwei Wege sind denkbar:
+
+| Weg | Idee | Rechenläufe je Begegnung | Urteil |
+|---|---|---|---|
+| **A Baum vorab** | alle Äste vor dem Anpfiff rechnen | gegen KI 1 + 3 + 9 Abschnitte; zwei Menschen 1 + 9 + 81 | gegen KI machbar, im Derby nicht |
+| **B Neu rechnen ab dem Zuruf** | nach jedem Halt dasselbe Spiel mit derselben Saat und der bisherigen Zuruf-Liste neu rechnen | 3 ganze Läufe statt einem | **Empfehlung** |
+
+Weg B im Einzelnen:
+1. **Lauf 1** vor dem Anpfiff mit den Start-Haltungen. Gezeigt wird nur Abschnitt 1.
+2. **Halt 1:** Fenster. Beide Seiten rufen verdeckt; KI und Abwesende sofort.
+3. **Lauf 2:** dasselbe Spiel, dieselbe Saat, mit der Zuruf-Liste `[Halt 1: …]`. Abschnitt 1 kommt bit-gleich wieder
+   heraus, Abschnitt 2 ist neu und wird gezeigt.
+4. **Halt 2, Lauf 3:** ebenso. **Lauf 3 ist das Ergebnis und wird gebucht**; die Zuruf-Liste steht im Eingabe-Hash und
+   reist im Kader-Umschlag.
+5. Was man gesehen hat, ist damit genau das Gebuchte: die Abschnitte 1 und 2 der früheren Läufe sind Präfixe von Lauf 3.
+
+**Die eine technische Bedingung:** ein Zuruf darf nichts **vor** seinem Haltepunkt ändern (auch nicht über den
+Zufallsstrom). Das braucht eine Motor-Regel („Haltung wird erst ab Abschnitt n gelesen, der Zufall je Abschnitt hat
+eine eigene Saat“) und einen **Wächter-Test**, der für jede Disziplin prüft, dass Lauf 1 und Lauf 3 bis zum ersten
+Haltepunkt identisch sind. Ein Motor-Schnappschuss zum Weiterrechnen ist nicht nötig. Das ist ein Eingriff in die
+Arena-Engine: Opus-Review, je Chassis ein Pilot.
+
+**Wer ruft, wenn keiner da ist.**
+- **KI-Team:** Tabelle am Haltepunkt aus dem echten Stand: führt → Kontrolle, liegt hinten → Druck, mittlere Erschöpfung
+  der Aufstellung ab 55 → Kräfte sparen. Deterministisch.
+- **Mensch sieht nicht zu** (nicht in der Arena, oder Spieltag läuft ohne ihn): sein **Spielplan** aus der Einsatzliste
+  (Start-Haltung und bis zu zwei Wenn-dann-Regeln) ruft für ihn. Kein Fenster, keine Wartezeit. Der Spielplan aus
+  Abschnitt 17 wird damit vom Hauptweg zum Autopiloten.
+- **Delegiert** (Ramona, Halbautomatik): wie KI-Team.
+
+**Mehrspieler.**
+- **Zwei Menschen im Duell:** ein gemeinsames Fenster, beide rufen verdeckt, nach acht Sekunden oder wenn beide gewählt
+  haben wird zusammen aufgedeckt. Gerechnet wird einmal mit beiden Zurufen.
+- **Vierergruppe:** ein Fenster für alle Menschen der Gruppe.
+- **Menschen in verschiedenen Begegnungen:** jeder hat seine eigenen Fenster in seinem Spiel; niemand wartet auf das
+  Fenster eines anderen. Der Spieltag ist gebucht, wenn die letzte Begegnung mit einem zusehenden Menschen durch ist; das
+  sind höchstens 16 Sekunden Fenster je Disziplin.
+
+**Kosten und Risiken.**
+- Drei Läufe statt einem, nur für Begegnungen mit Menschen: bei drei Menschen in drei Begegnungen und zwei Disziplinen
+  höchstens 12 zusätzliche Läufe je Spieltag. Die Laufzeit einer einzelnen Begegnung im Node-Motor auf dem 4-GB-Server ist
+  **nicht gemessen**; das ist die erste Messung vor dem Bau. Lauf 2 und 3 können während des Fensters und der
+  Wiederholung des Zurufs gerechnet werden (Ziel: unter zwei Sekunden Wartezeit).
+- Nicht jede der zwanzig Disziplinen hat heute drei saubere Abschnitte (Rennen, Mini-DM). Dort braucht es feste
+  Haltepunkte nach Strecke oder Zeit; im Zweifel bekommt eine Disziplin zunächst nur einen Haltepunkt.
+- Tempo: zwei Fenster je Disziplin verlängern den Spieltag um bis zu 32 Sekunden. Einstellung „Zuruf-Fenster aus“ je
+  Manager (dann ruft immer der Spielplan).
+
+**Abnahme.** Die Schranke 0,75 gilt für die Mechanik ohne Zuruf. Mit Zuruf: Präfix-Wächter grün für alle Disziplinen und
+Haltungen; eigene Fingerabdruck-Zeilen je Haltung; gebucht = Lauf 3 (Test: Wiederholung der Aufnahme zeigt dasselbe
+Ergebnis). **Aufwand:** L (Motor je Chassis, Raumsteuerung für das Fenster, Autopilot); Reihenfolge: Laufzeit messen,
+Pilot Hockey, dann je Chassis.
+
+## 29. Kiste: Stilprobe bestellt
+
+Freigabe Chris: rund 8 Generationen, nur Requisiten und VFX. Bestellt am 22.11. über `/create-image-pixflux`
+(`no_background`), jeder POST genau einmal, jeweils unter `flock /tmp/pixellab-bestell.lock`:
+
+| Datei (`public/sprites/beute/`) | Größe | `usage.generations` |
+|---|---|---:|
+| `kiste-eisen-zu.png` | 128×128 | 1,0 |
+| `kiste-eisen-offen.png` | 128×128 | 1,0 |
+| `lichtkranz.png` | 128×128 | 1,0 |
+| `fundrahmen.png` | 96×128 | 1,0 |
+| `icon-windlaeufer.png` | 64×64 | 1,0 |
+| `icon-energieriegel.png` | 64×64 | 1,0 |
+| `icon-sturmhandschuhe.png` | 64×64 | 1,0 |
+| **Summe** | | **7,0** |
+
+Guthaben laut `/balance` vorher 313,54, nachher 306,54 (Differenz 7,0, deckt sich mit der Summe). Reserve 150 unberührt.
+Prompts und Saaten stehen in `public/sprites/beute/quellen.json`. Alle sieben Bilder waren beim ersten Versuch
+brauchbar; nichts wurde wiederholt. Keine Figuren, keine Animationen: die Bewegung (Wippen, Rütteln, Lichtkranz, Wechsel
+zu/offen, Auftritt der Funde) ist CSS über den Standbildern.
+
+Die Ansicht `?ansicht=kiste` ist klickbar: Klick auf die Kiste startet die Animation, drei Funde im Rahmen erscheinen,
+ein Klick wählt einen Fund, „nochmal öffnen“ setzt zurück und startet neu. In Chromium geprüft (Takte bei 0 / 1,2 / 2,0
+Sekunden). Befund zur Stilprobe: Kiste zu und offen stammen aus zwei getrennten Bildern und unterscheiden sich leicht in
+Winkel und Schloss; für den Bau lohnt ein Paar aus einem Auftrag mit Referenzbild. Der Lichtkranz ist violett und passt
+damit zu „Episch“; die anderen Seltenheitsfarben lassen sich per Farbdrehung ableiten oder einzeln bestellen.
+
+Rest für Welle 3 (Schätzung): zwei weitere Kisten je zu und offen, rund 57 Icons, Funken und Zerfall: 70 bis 95
+Generationen.
+
+## 30. Offen nach Runde 6
+
+1. **Zuruf:** Weg B (neu rechnen ab dem Zuruf) als Grundlage, und zuerst die Laufzeit einer Begegnung messen?
+2. **Zuruf-Fenster abschaltbar** je Manager, damit der Spieltag kurz bleiben kann?
+3. **Identität und Personal** (Abschnitt 13, Fragen 3 und 4) sind noch offen.
