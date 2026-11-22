@@ -946,7 +946,11 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         teamId: params.teamId,
         lineupId: existingDraftLineupId,
       }),
-      formMoralRegeln: resolveFormMoralRegeln(),
+      // Plus/Minus-Stempel der angefragten Saison (params.seasonId), nicht der aktuellen: ein Stempel einer anderen Saison zaehlt nicht.
+      formMoralRegeln: resolveFormMoralRegeln(undefined, {
+        scenarioMeta: normalizedGameState.scenarioMeta,
+        seasonState: { seasonId: params.seasonId, formkartenRegel: normalizedGameState.seasonState.formkartenRegel },
+      }),
       formCardPlans: (normalizedGameState.seasonState.formCardPlans ?? []).filter(
         (plan) => plan.seasonId === params.seasonId && plan.teamId === params.teamId,
       ),

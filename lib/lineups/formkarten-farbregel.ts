@@ -25,12 +25,23 @@ export type FormkartenFarbregel = {
   alleFremd: number;
   allePassend: number;
   traeger: number;
+  /**
+   * PLUS/MINUS (22.11., `docs/design/formkarten-plusminus-22-11.md`, Spielstand-Stempel `seasonState.formkartenRegel`, lib/resolve/formkarten-regel.ts):
+   * Anteil des Kartenwerts, der Spieler der GEGENFARBE (`GEGENFARBE`) spiegelbildlich trifft: eine Pluskarte kostet sie
+   * `v x gegen`, eine Minuskarte bringt ihnen `|v| x gegen`. Fehlt das Feld oder ist es 0, gilt die Regel von 18.11. unveraendert.
+   */
+  gegen?: number;
 };
+
+/** Gegenfarbe je Kartenfarbe: POW (rot) gegen MEN (blau), SPE (gruen) gegen SOC (gelb). */
+export const GEGENFARBE: Record<string, string> = { red: "blue", blue: "red", green: "yellow", yellow: "green" };
 
 /** PM-Vorschlag 17.11.: Spitze 12 (passend, Farbträger) statt 16. */
 export const FARBREGEL_PM: FormkartenFarbregel = { alleFremd: 0.5, allePassend: 1.0, traeger: 0.5 };
 /** Schmalere Spitze (10), falls die Messung die PM-Faktoren zu stark findet. */
 export const FARBREGEL_SCHMAL: FormkartenFarbregel = { alleFremd: 0.5, allePassend: 0.75, traeger: 0.5 };
+/** Plus/Minus-Variante der PM-Faktoren (22.11.): wie `FARBREGEL_PM`, dazu Gegenfarbe mit Viertel des Kartenwerts. */
+export const FARBREGEL_PM_PLUSMINUS: FormkartenFarbregel = { ...FARBREGEL_PM, gegen: 0.25 };
 /** Zusatzhebel auf den Träger-Anteil je Form-Stufe (>0) einer Pluskarte. */
 export const FORM_TRAEGER_HEBEL = 0.125;
 
@@ -43,8 +54,13 @@ export function isFormkartenFarbregelEnabled(env: Record<string, string | undefi
 }
 
 /** `OLY_FORMKARTEN_FARBREGEL=schmal` wählt die schmale Variante, sonst die PM-Faktoren. */
-export function resolveFormkartenFarbregel(env: Record<string, string | undefined> = lieseUmgebung()): FormkartenFarbregel {
-  return (env.OLY_FORMKARTEN_FARBREGEL ?? "").trim().toLowerCase() === "schmal" ? FARBREGEL_SCHMAL : FARBREGEL_PM;
+export function resolveFormkartenFarbregel(
+  env: Record<string, string | undefined> = lieseUmgebung(),
+  /** Plus/Minus-Regel der Saison (aus dem Spielstand-Stempel `formkartenRegelFuer`, nie aus der Umgebung). */
+  plusMinus = false,
+): FormkartenFarbregel {
+  if ((env.OLY_FORMKARTEN_FARBREGEL ?? "").trim().toLowerCase() === "schmal") return FARBREGEL_SCHMAL;
+  return plusMinus ? FARBREGEL_PM_PLUSMINUS : FARBREGEL_PM;
 }
 
 function lieseUmgebung(): Record<string, string | undefined> {
@@ -58,6 +74,11 @@ export type FormkartenZerlegung = {
   form: number;
   summe: number;
   istTraeger: boolean;
+  /**
+   * Plus/Minus (22.11.): Anteil der Gegenfarbe (negativ bei Pluskarte, positiv bei Minuskarte). Steckt in `summe`;
+   * fehlt, solange die Regel kein `gegen` hat oder der Spieler nicht zur Gegenfarbe gehoert.
+   */
+  gegen?: number;
   /**
    * Battle-Modus (18.11., `lib/battle/battle-mutator-organisch.ts`): Formschub aus Mutator-Treffern, der ueber
    * denselben Kanal laeuft. Steckt dann bereits in `summe`; fehlt, solange kein Mutator getroffen hat.
@@ -79,7 +100,12 @@ export function kartenZerlegungFuerSpieler(input: {
   const passend = Boolean(input.karte.farbe) && input.karte.farbe === input.disziplinFarbe;
   const alle = v * (passend ? regel.allePassend : regel.alleFremd);
   const istTraeger = Boolean(input.karte.farbe) && input.karte.farbe === input.spielerFarbe;
-  if (!istTraeger) return { alle, traeger: 0, form: 0, summe: alle, istTraeger };
+  if (!istTraeger) {
+    const gegen = regel.gegen && input.spielerFarbe && input.karte.farbe && GEGENFARBE[input.karte.farbe] === input.spielerFarbe ? -v * regel.gegen : 0;
+    return gegen !== 0
+      ? { alle, traeger: 0, form: 0, summe: alle + gegen, istTraeger, gegen }
+      : { alle, traeger: 0, form: 0, summe: alle, istTraeger };
+  }
   const stufe = input.formStufe ?? 0;
   const traeger = v * regel.traeger;
   const form = v > 0 && stufe > 0 ? traeger * FORM_TRAEGER_HEBEL * stufe : 0;
@@ -106,6 +132,7 @@ export function formkartenZerlegungFuerSpieler(input: {
   regel?: FormkartenFarbregel;
 }): FormkartenZerlegung {
   const z: FormkartenZerlegung = { alle: 0, traeger: 0, form: 0, summe: 0, istTraeger: false };
+  let gegen = 0;
   for (const karte of input.karten) {
     const k = kartenZerlegungFuerSpieler({ ...input, karte });
     z.alle += k.alle;
@@ -113,8 +140,10 @@ export function formkartenZerlegungFuerSpieler(input: {
     z.form += k.form;
     z.summe += k.summe;
     z.istTraeger = z.istTraeger || k.istTraeger;
+    gegen += k.gegen ?? 0;
   }
   const r = (x: number) => Number(x.toFixed(1));
+  if (gegen !== 0) return { alle: r(z.alle), traeger: r(z.traeger), form: r(z.form), summe: r(z.summe), istTraeger: z.istTraeger, gegen: r(gegen) };
   return { alle: r(z.alle), traeger: r(z.traeger), form: r(z.form), summe: r(z.summe), istTraeger: z.istTraeger };
 }
 
@@ -162,7 +191,10 @@ export function formkartenHinweis(input: {
   const extra = input.karte.wert * regel.traeger;
   const vz = (x: number) => `${x >= 0 ? "+" : ""}${Number(x.toFixed(1))}`;
   const farbe = input.karte.farbe ?? "?";
-  return input.traegerAnzahl > 0
-    ? `Karte ${farbe}: ${vz(alle)} für alle, ${vz(extra)} zusätzlich für ${input.traegerAnzahl} Spieler dieser Farbe`
-    : `Karte ${farbe}: ${vz(alle)} für alle, kein Spieler dieser Farbe im Einsatz`;
+  const basis =
+    input.traegerAnzahl > 0
+      ? `Karte ${farbe}: ${vz(alle)} für alle, ${vz(extra)} zusätzlich für ${input.traegerAnzahl} Spieler dieser Farbe`
+      : `Karte ${farbe}: ${vz(alle)} für alle, kein Spieler dieser Farbe im Einsatz`;
+  const gegen = regel.gegen ? -input.karte.wert * regel.gegen : 0;
+  return gegen !== 0 ? `${basis}; ${vz(gegen)} für Spieler der Gegenfarbe` : basis;
 }

@@ -135,6 +135,8 @@
   padding-top: clamp(8px, 0.6vw, 14px);
   margin-bottom: 6px;
   white-space: nowrap;
+  /* Der Farbbonus-Hinweis (mit Gegenfarbe-Zusatz) ist lang: die Zeile bricht um, statt abgeschnitten zu werden. */
+  flex-wrap: wrap;
 }
 .elm-hand__kopf b {
   color: var(--bc-gold);
@@ -243,8 +245,14 @@
   align-items: baseline;
   gap: 10px;
   text-align: right;
-  white-space: nowrap;
+  white-space: normal;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   min-width: 0;
+}
+.elm-hand__summe small[data-testid="elm-farbhinweis"] {
+  flex-basis: 100%;
+  text-align: right;
 }
 .elm-hand__summe strong {
   font-size: clamp(20px, 1.3vw, 30px);

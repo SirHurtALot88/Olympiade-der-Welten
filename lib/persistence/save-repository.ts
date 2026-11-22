@@ -29,6 +29,7 @@ import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-servic
 import { stelleLaufendeSaisonAufC2Um } from "@/lib/resolve/wertungs-skalen";
 import { stempleClimbingFormat } from "@/lib/resolve/climbing-format";
 import { stempleHockeyTorwart } from "@/lib/resolve/hockey-torwart";
+import { stempleFormkartenRegelNachLaden } from "@/lib/resolve/formkarten-regel";
 import { stempleBasketballPuste } from "@/lib/resolve/basketball-puste";
 import { stempleBreakingFormat } from "@/lib/resolve/breaking-format";
 import { stempleBattlefieldFormat } from "@/lib/resolve/battlefield-format";
@@ -1439,8 +1440,9 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // BATTLEFIELD-FORMAT (Fuenf Punkte live, 22.11., lib/resolve/battlefield-format.ts): gleiches Muster.
   // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): gleiches Muster.
   // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): gleiches Muster.
+  // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): ohne Stempel rechnet die laufende Saison "alt" zu Ende.
   // BREAKING-FORMAT (22.11., lib/resolve/breaking-format.ts): gleiches Muster.
-  const gameStateWithoutBaseline = stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+  const gameStateWithoutBaseline = stempleFormkartenRegelNachLaden(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
@@ -1464,7 +1466,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  ))))))));
+  )))))))));
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),

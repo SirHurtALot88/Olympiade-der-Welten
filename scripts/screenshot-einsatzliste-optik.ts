@@ -86,6 +86,8 @@ async function bau() {
       console.log(`[optik] Kopie ${wahl} bei ${matchdayId}`);
       besitz(false);
     }
+    // OPTIK_MAX_KOPIEN: nach so vielen Kopien aufhoeren (schneller Bau, z. B. 2 Disziplinen der ersten Spieltage).
+    if (process.env.OPTIK_MAX_KOPIEN && Object.keys(meta).length >= Number(process.env.OPTIK_MAX_KOPIEN)) break;
     if (wunsch.size === 0) break;
     const lauf = await runLocalMatchdayAutoRun({ saveId, seasonId, matchdayId, source: "sqlite", execute: true, dryRun: false, confirmToken: MATCHDAY_AUTO_RUN_CONFIRM_TOKEN,
       options: { includeWarningLineups: true, overwriteExistingLineups: true, stopOnTie: false, advanceAfterCashApply: false } }, persistence);
@@ -155,6 +157,8 @@ async function foto() {
           await page.getByTestId("elm-feld").waitFor({ state: "visible", timeout: 400_000 });
           await page.waitForTimeout(3500);
           await dismiss(page);
+          // Die Hand der Formkarten gibt es nur in der Einsatzliste (nicht auf der Startseite, auf die ein Dev-Server-Neuaufbau zurueckfallen kann).
+          if (process.env.OPTIK_KARTE === "1") await page.getByTestId("elm-kartenhand").waitFor({ state: "visible", timeout: 300_000 });
           const fuell = page.getByRole("button", { name: /Auffüllen/ }).first();
           if (await fuell.isEnabled().catch(() => false)) {
             await fuell.click();
@@ -168,6 +172,23 @@ async function foto() {
             await page.waitForTimeout(900);
           }
           await page.screenshot({ path: path.join(OUT, `${praefix}-${disz}-${w}.png`) });
+          // OPTIK_KARTE=1 (Formkarten Plus/Minus, 22.11.): eine Karte legen und den Reiter Karten-Wirkung fotografieren
+          // (Spalte Gegenfarbe, Vergleichsliste mit Minuskarten).
+          if (process.env.OPTIK_KARTE === "1") {
+            // OPTIK_KARTE_FARBE=mental: eine Karte dieser Farbe legen (Gegenfarbe trifft dann die Gegenfarb-Spieler der Aufstellung).
+            const karte = page.locator('[data-testid^="elm-hka-"]').filter({ hasText: new RegExp(process.env.OPTIK_KARTE_FARBE ?? ".", "i") }).first();
+            if (await karte.isVisible().catch(() => false)) {
+              await karte.click();
+              await page.waitForTimeout(6000);
+            }
+            const kt = page.getByTestId("elm-tab-karten");
+            if (await kt.isVisible().catch(() => false)) {
+              await kt.click();
+              await page.mouse.move(w - 4, h - 4);
+              await page.waitForTimeout(900);
+            }
+            await page.screenshot({ path: path.join(OUT, `${praefix}-${disz}-karten-${w}.png`) });
+          }
           const mass = await page.evaluate(() => ({ scroll: document.scrollingElement?.scrollHeight ?? 0, fenster: window.innerHeight, ueberlappung: (() => {
             const k = Array.from(document.querySelectorAll<HTMLElement>(".elm-slot")).map((e) => e.getBoundingClientRect());
             let n = 0;

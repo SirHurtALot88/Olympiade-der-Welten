@@ -44,6 +44,7 @@ export function EinsatzlisteKartenHand({ w, colorLabel, primaryId, secondaryId, 
   const alle = w.spieler.reduce((x, s) => x + s.zerlegung.alle, 0);
   const farbe = w.spieler.reduce((x, s) => x + s.zerlegung.traeger, 0);
   const form = w.spieler.reduce((x, s) => x + s.zerlegung.form, 0);
+  const gegen = w.spieler.reduce((x, s) => x + (s.zerlegung.gegen ?? 0), 0);
 
   return (
     <div className="elm-hand" data-testid="elm-kartenhand">
@@ -52,7 +53,7 @@ export function EinsatzlisteKartenHand({ w, colorLabel, primaryId, secondaryId, 
         {w.buchung.gebucht ? (
           <span className="elm-hand__summe" data-testid="fm-leiste-team" title="Summe der gelegten Karten fürs Team in dieser Wertung">
             Karten fürs Team <strong className="bc-t">{vz(w.teamSumme, 1)}</strong>
-            <small>alle {vz(alle, 1)} · Farbe {vz(farbe, 1)} · Form {vz(form, 1)} · + Tagesform ±{w.tagesformSpanne} je Spieler</small>
+            <small>alle {vz(alle, 1)} · Farbe {vz(farbe, 1)} · Form {vz(form, 1)}{gegen !== 0 ? ` · Gegenfarbe ${vz(gegen, 1)}` : ""} · + Tagesform ±{w.tagesformSpanne} je Spieler</small>
             {w.farbHinweis ? <small data-testid="elm-farbhinweis">{w.farbHinweis}</small> : null}
           </span>
         ) : (

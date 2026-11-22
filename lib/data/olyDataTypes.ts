@@ -4241,6 +4241,11 @@ export type SeasonState = {
    */
   hockeyTorwart?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "alt" | "neu" }> } | null;
   /**
+   * FORMKARTEN-REGEL DIESER SAISON (22.11., lib/resolve/formkarten-regel.ts): "plusminus" (Gegenfarbe, Kartenwerte 2/4/6/8)
+   * oder "alt" (18.11.). Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel; gilt fuer die ganze Saison.
+   */
+  formkartenRegel?: { seasonId: string; regel: "alt" | "plusminus" } | null;
+  /**
    * BASKETBALL-PUSTE-REGEL DIESER SAISON (22.11., lib/resolve/basketball-puste.ts): Wechselliste "alt"/"neu" je Spieltag,
    * gesetzt beim Laden. Gebuchte Spieltage behalten ihre Regel.
    */
