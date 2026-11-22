@@ -47,6 +47,7 @@ import type { GameState, Player, PlayerPotentialRecord, RosterEntry, Team, TeamI
 import { GM_OPT_SENKUNG_MAX, getTeamGeneralManager, gmKaderOptAnpassung } from "@/lib/foundation/team-general-managers";
 import { istFensterAufOpt } from "@/lib/market/transferfenster-gemeinsam";
 import { resolvePlayerPotentialScoreFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
+import { baueKiSichtKontext, kiSichtAufSpieler, type KiSichtKontext } from "@/lib/ai/ki-nebel";
 import {
   istKiRuecklageV2Aktiv,
   resolveKiRuecklageFuerTeam,
@@ -190,17 +191,21 @@ export function toOrganicPlayerView(
   purchasePrice?: number | null,
   openBuyoutCost?: number | null,
   gameState?: { playerPotential?: PlayerPotentialRecord[] } | null,
+  /** KI-Nebel (21.11.): Wissensstand des kaufenden Teams. Nur fuer Kauf-/Draft-Kandidaten gesetzt; ohne (oder null) gelten die wahren Werte. */
+  kiSicht?: KiSichtKontext | null,
 ): OrganicPlayerView {
   const marketValue = Math.max(0, player.marketValue ?? player.displayMarketValue ?? 0);
   const buyoutCost =
     typeof openBuyoutCost === "number" && Number.isFinite(openBuyoutCost) ? Math.max(0, openBuyoutCost) : 0;
+  const wahresPotenzial = gameState ? resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id }) : null;
+  const sicht = kiSicht ? kiSichtAufSpieler(kiSicht, player, wahresPotenzial) : null;
   return {
     playerId: player.id,
     pow: player.coreStats?.pow ?? 0,
     spe: player.coreStats?.spe ?? 0,
     men: player.coreStats?.men ?? 0,
     soc: player.coreStats?.soc ?? 0,
-    disciplineRatings: player.disciplineRatings ?? {},
+    disciplineRatings: sicht ? sicht.disciplineRatings : (player.disciplineRatings ?? {}),
     marketValue,
     salary: Math.max(0, player.salaryDemand ?? player.displaySalary ?? 0),
     purchasePrice:
@@ -214,7 +219,7 @@ export function toOrganicPlayerView(
     // Modell ab (Median +16,1) und haette den wAsset-Term der Buy-Utility mit einer
     // anderen Zahl gefuettert, als Training/Anzeige fuehren. Ohne gameState (bzw.
     // ohne Record) bleibt das Signal null = unbekannt.
-    potential: gameState ? resolvePlayerPotentialScoreFromGameState({ gameState, playerId: player.id }) : null,
+    potential: sicht ? sicht.potential : wahresPotenzial,
     themeFit,
   };
 }
@@ -588,6 +593,8 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     draftSeed: input.draftSeed ?? null,
   });
   const startingSquad = input.startingSquad.map((player) => toOrganicPlayerView(player, undefined, undefined, undefined, input.gameState));
+  // KI-Nebel (21.11.): Kandidaten bewertet die KI nach ihrem Wissensstand (Scouting), eigene Spieler exakt.
+  const kiSicht = baueKiSichtKontext(input.gameState, input.team.teamId);
   const candidates = input.candidates
     .map((player) =>
       toOrganicPlayerView(
@@ -596,6 +603,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
         undefined,
         undefined,
         input.gameState,
+        kiSicht,
       ),
     )
     .filter((view) => view.marketValue > 0);
