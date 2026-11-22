@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wettessen – Ereignisse statt Zähler (Mockup 22.11.)</title>
+<!--
+  MOCKUP, kein Spielcode. Entwurf fuer das Wettessen-Rework (docs/design/wettessen-ereignisse-22-11.md):
+  zehn Gaenge, jeder Gang endet fuer jeden Esser in einem benannten Ereignis (Teller leer, raeumt ab,
+  Schluckauf, Krampf, Wuergen, Brennen, Zweite Luft, Strafe). Die Simulation unten ist eine Schau-Simulation
+  fuer die Regie des Mockups, NICHT der Arena-Motor: Startwerte aus dem Konzept, keine Messung.
+  Spielerwerte: data/generated/oly-player-attributes.json (Beispielkader). Figuren: vorhandene PixelLab-Posen
+  (south, treffer-south, angriff-south; Schiedsrichter pfiff-south) - keine neue Animation.
+  Kulisse: public/sprites/kulissen/wettessen/bierzelt.jpg. Tafel, Tellerstapel und Ereignis-Zeichen sind
+  CSS/SVG-Platzhalter, im Bau PixelLab-Requisiten (nur Vorschlag, nichts bestellt).
+  URL-Schalter: ?sprites=<Basis-URL zu public/sprites>, ?gang=<n> (n Gaenge sofort rechnen), ?pause=1,
+  ?tempo=1|3, ?saat=<n>, ?ende=1
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:800;src:url("../fonts/barlow-condensed-latin-800-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --hud-flaeche:rgba(9,12,18,.90); --hud-flaeche-2:#121824; --hud-flaeche-3:#1a2231;
+  --hud-linie:rgba(244,230,196,.16); --hud-linie-2:rgba(244,230,196,.34);
+  --hud-creme:#f4e6c4; --hud-gold:#f0c35a; --hud-tinte:#eef2f8; --hud-leise:#9aa7ba; --hud-stumm:#66738a;
+  --hud-heim:#F2A03D; --hud-gast:#45B0C9; --hud-gut:#62d394; --hud-warn:#ff6058;
+  --e-leer:#d9ccab; --e-abgeraeumt:#62d394; --e-schluckauf:#5fa8ff; --e-krampf:#f08a3c; --e-wuergen:#b58cf2; --e-brennen:#ff6058; --e-luft:#f0c35a; --e-strafe:#ff2d55;
+  --hud-haus:"RaniraSeason","Barlow Condensed",sans-serif; --hud-zahl:"Barlow Condensed","Arial Narrow",sans-serif;
+  --hud-r:8px; --hud-schraeg:-14deg;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;overflow:hidden;color:var(--hud-tinte);font-family:var(--hud-zahl)}
+#rahmen{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;background:#06080c}
+canvas#buehne{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+#schleier{position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,3,5,.6),rgba(2,3,5,0) 24%,rgba(2,3,5,0) 62%,rgba(2,3,5,.55));pointer-events:none}
+button{font:inherit;color:inherit;cursor:pointer}
+.glas{background:var(--hud-flaeche);border:1px solid var(--hud-linie);border-radius:var(--hud-r);backdrop-filter:blur(6px)}
+h3{margin:0 0 6px;font-size:14px;font-weight:700;letter-spacing:1.8px;color:var(--hud-gold);text-transform:uppercase;display:flex;justify-content:space-between}
+h3 em{font-style:normal;color:var(--hud-stumm);letter-spacing:.6px}
+svg.z{width:1em;height:1em;vertical-align:-.14em;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+
+/* Kopf */
+#kopf{position:absolute;left:50%;top:16px;transform:translateX(-50%);width:1040px;border-color:var(--hud-linie-2);overflow:hidden}
+.kopf-zeile{display:grid;grid-template-columns:1fr 290px 1fr;height:78px}
+.kopf-team{display:flex;align-items:center;gap:14px;padding:0 20px;position:relative}
+.kopf-team.gast{flex-direction:row-reverse;text-align:right}
+.kopf-team::before{content:"";position:absolute;top:0;bottom:0;width:6px;background:var(--tf)}
+.kopf-team.heim::before{left:0}.kopf-team.gast::before{right:0}
+.kopf-name{font-family:var(--hud-haus);font-size:24px;color:var(--hud-creme);line-height:1;white-space:nowrap}
+.kopf-sub{font-size:15px;color:var(--hud-leise);font-weight:600;letter-spacing:.6px;text-transform:uppercase;margin-top:4px;white-space:nowrap}
+.kopf-stand{margin-left:auto;font-size:58px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;color:var(--tf)}
+.kopf-team.gast .kopf-stand{margin-left:0;margin-right:auto}
+.kopf-stand small{font-size:17px;font-weight:700;color:var(--hud-leise);letter-spacing:1px;margin-left:5px}
+.kopf-mitte{display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0b0f16;border-left:1px solid var(--hud-linie);border-right:1px solid var(--hud-linie)}
+.kopf-titel{font-size:14px;font-weight:700;letter-spacing:2px;color:var(--hud-gold);text-transform:uppercase}
+.kopf-uhr{font-size:36px;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+.kopf-phase{font-size:14px;font-weight:700;letter-spacing:1.4px;color:var(--hud-leise);text-transform:uppercase}
+#gangleiste{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;padding:6px 10px 8px;background:#0b0f16;border-top:1px solid var(--hud-linie)}
+.gk{height:26px;border-radius:4px;background:var(--hud-flaeche-2);border:1px solid var(--hud-linie);display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--hud-stumm);white-space:nowrap}
+.gk.hoelle{color:var(--e-brennen);border-color:rgba(255,96,88,.5)}
+.gk.durch{color:var(--hud-leise);background:var(--hud-flaeche-3)}
+.gk.jetzt{background:var(--hud-gold);color:#141005;border-color:var(--hud-gold)}
+.gk.hoelle.jetzt{background:var(--e-brennen);color:#1a0705;border-color:var(--e-brennen)}
+
+/* Seitenkarten */
+#legende{position:absolute;left:22px;top:16px;width:404px;padding:10px 12px}
+.lz{display:grid;grid-template-columns:26px 112px 1fr;gap:6px;align-items:center;font-size:15px;font-weight:600;line-height:1.2;padding:2px 0;color:var(--hud-leise)}
+.lz i{font-style:normal;font-size:20px;color:var(--ef)}
+.lz b{color:var(--hud-creme);font-weight:700}
+.lz span em{font-style:normal;color:var(--hud-tinte)}
+#verlaufK{position:absolute;right:22px;top:16px;width:404px;padding:10px 12px}
+#verlauf{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;height:150px;overflow:hidden}
+#verlauf li{display:grid;grid-template-columns:44px 20px 1fr;gap:6px;font-size:15px;font-weight:600;line-height:1.15;padding:3px 6px;border-radius:4px;background:var(--hud-flaeche-2);border-left:3px solid var(--tf,var(--hud-stumm));white-space:nowrap;overflow:hidden}
+#verlauf li b{color:var(--hud-leise);font-variant-numeric:tabular-nums;font-weight:700}
+#verlauf li i{font-style:normal;color:var(--ef);font-size:17px}
+.regie{display:flex;gap:5px;align-items:center;margin-top:8px;flex-wrap:nowrap}
+.regie small{font-size:12px;color:var(--hud-stumm);letter-spacing:.8px;text-transform:uppercase;margin-right:auto}
+.regie button{background:var(--hud-flaeche-3);border:1px solid var(--hud-linie-2);border-radius:5px;padding:2px 9px;font-size:15px;font-weight:700}
+.regie button.an{background:var(--hud-gold);color:#141005;border-color:var(--hud-gold)}
+
+/* Tafel und Esser */
+#tafel{position:absolute;left:0;right:0;bottom:0;height:284px;pointer-events:none}
+#tafel .platte{position:absolute;left:0;right:0;top:0;height:74px;background:linear-gradient(180deg,#a8743f,#8b5a2b 70%,#5d3a1a);border-top:4px solid #c89456;border-bottom:5px solid #3d2410;z-index:2}
+#tafel .tuch{position:absolute;left:0;right:0;top:74px;bottom:0;background:repeating-linear-gradient(90deg,#e9e3d2 0 21px,#40689f 21px 42px);z-index:2}
+#tafel .tuch::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,.78))}
+.esser{position:absolute;bottom:240px;width:190px;height:190px;margin-left:-95px;background-repeat:no-repeat;image-rendering:pixelated;background-size:auto 100%;z-index:1}
+.esser.isst{animation:kau .5s steps(2) infinite}
+@keyframes kau{50%{translate:0 5px}}
+.esser.zuckt{animation:zuck .3s 2}
+@keyframes zuck{25%{translate:-7px 0}75%{translate:7px 0}}
+.esser.mauer{filter:saturate(.6) brightness(.82)}
+.esser.luft{filter:drop-shadow(0 0 10px rgba(240,195,90,.95))}
+.gedeck{position:absolute;bottom:214px;width:150px;height:70px;margin-left:-75px;z-index:3}
+#gedecke.hoelle .teller{filter:hue-rotate(-28deg) saturate(2.2) drop-shadow(0 0 6px rgba(255,96,88,.9))}
+.gedeck .teller{position:absolute;left:8px;bottom:6px;width:72px;height:45px;background:url() no-repeat center/contain;image-rendering:pixelated}
+.gedeck .stapel{position:absolute;right:10px;bottom:6px;width:46px}
+.gedeck .stapel i{display:block;height:5px;margin-top:-1px;border-radius:50%/60%;background:#f3efe4;border:1px solid #9a947f;box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.gedeck .stapel b{position:absolute;left:0;right:0;top:-22px;text-align:center;font-size:17px;font-weight:800;color:var(--hud-creme);text-shadow:0 1px 0 #000,0 0 6px #000}
+.blase{position:absolute;bottom:436px;width:150px;margin-left:-75px;text-align:center;z-index:4;opacity:0;transition:opacity .2s,translate .2s;translate:0 10px;pointer-events:none}
+.blase.an{opacity:1;translate:0 0}
+.blase span{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:14px;background:rgba(9,12,18,.92);border:2px solid var(--ef);color:var(--ef);font-size:18px;font-weight:800;letter-spacing:.4px;white-space:nowrap}
+.blase small{display:block;margin-top:2px;font-size:15px;font-weight:700;color:var(--hud-creme);text-shadow:0 1px 0 #000,0 0 6px #000;white-space:nowrap}
+#schiri{position:absolute;left:50%;bottom:252px;width:150px;height:150px;margin-left:-75px;background-repeat:no-repeat;image-rendering:pixelated;background-size:auto 100%;z-index:1}
+
+/* Dock: eine Karte je Esser, in der Spalte unter der Figur */
+#dock{position:absolute;left:0;right:0;bottom:14px;height:122px;z-index:5}
+.ek{position:absolute;bottom:0;width:144px;margin-left:-72px;padding:5px 7px 6px;border-top:3px solid var(--tf)}
+.ek-kopf{display:flex;align-items:baseline;gap:5px}
+.ek-name{font-size:17px;font-weight:700;color:var(--hud-creme);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;line-height:1.1}
+.ek-teller{font-size:30px;font-weight:800;line-height:.95;font-variant-numeric:tabular-nums}
+.ek-zeile{font-size:13px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--hud-leise);white-space:nowrap;height:16px;overflow:hidden}
+.ek-zeile.mauer{color:var(--e-krampf)}.ek-zeile.luft{color:var(--e-luft)}
+.magen{height:9px;border-radius:3px;background:#0b0f16;border:1px solid var(--hud-linie);position:relative;margin:3px 0 5px}
+.magen i{position:absolute;left:0;top:0;bottom:0;background:var(--hud-gut);border-radius:2px;max-width:100%}
+.magen i.voll{background:var(--e-krampf)}
+.magen u{position:absolute;top:-3px;bottom:-3px;left:78%;width:2px;background:var(--hud-creme)}
+.gpips{display:grid;grid-template-columns:repeat(10,1fr);gap:2px}
+.gpips i{height:11px;border-radius:2px;background:#0b0f16;border:1px solid var(--hud-linie)}
+.gpips i.voll{background:var(--ef);border-color:var(--ef)}
+#dockTitel{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:70px;text-align:center;font-size:12px;font-weight:700;letter-spacing:1px;color:var(--hud-stumm);text-transform:uppercase;line-height:1.3}
+
+/* Einblender */
+#einb{position:absolute;left:50%;top:176px;transform:translateX(-50%) skewX(var(--hud-schraeg));display:flex;align-items:center;gap:16px;padding:8px 28px 8px 12px;
+  background:linear-gradient(90deg,var(--tf,#f0c35a),rgba(9,12,18,.95) 36%);border-radius:6px;opacity:0;transition:opacity .25s,translate .25s;translate:-40px 0;pointer-events:none;z-index:6}
+#einb.an{opacity:1;translate:0 0}
+#einb>*{transform:skewX(14deg)}
+#einbPortrait{width:60px;height:60px;border-radius:6px;background:#0b0f16 no-repeat;image-rendering:pixelated;background-size:190% 190%;background-position:50% 22%}
+#einbWort{font-family:var(--hud-haus);font-size:38px;color:var(--hud-creme);line-height:1;white-space:nowrap}
+#einbZeile{font-size:18px;font-weight:700;color:var(--hud-leise);white-space:nowrap}
+
+/* Endstand */
+#ende{position:absolute;left:50%;top:50%;transform:translate(-50%,-54%);width:1280px;padding:16px 20px 18px;display:none;z-index:8;border-color:var(--hud-gold);background:rgba(9,12,18,.96)}
+#ende.an{display:block}
+#ende h2{margin:0;font-family:var(--hud-haus);font-size:40px;color:var(--hud-creme);line-height:1}
+#ende .unter{font-size:18px;font-weight:700;color:var(--hud-leise);margin:4px 0 10px}
+#ende .unter b{color:var(--hud-gold)}
+#ende table{width:100%;border-collapse:collapse;font-size:17px;font-weight:600}
+#ende th{font-size:13px;letter-spacing:1.2px;text-transform:uppercase;color:var(--hud-stumm);text-align:right;padding:3px 8px;border-bottom:1px solid var(--hud-linie-2)}
+#ende th:nth-child(-n+2),#ende td:nth-child(-n+2){text-align:left}
+#ende th:nth-child(3),#ende td:nth-child(3){text-align:left;width:250px}
+#ende td{padding:3px 8px;text-align:right;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--hud-linie)}
+#ende td.nm{color:var(--hud-creme);font-weight:700;border-left:4px solid var(--tf)}
+#ende .gpips{width:230px}#ende .gpips i{height:13px}
+#ende .hinweis{font-size:14px;color:var(--hud-stumm);margin-top:8px}
+</style>
+</head>
+<body>
+<div id="rahmen">
+  <canvas id="buehne" width="1920" height="1080"></canvas>
+  <div id="schleier"></div>
+  <div id="schiri"></div>
+  <div id="essende"></div>
+  <div id="tafel"><div class="platte"></div><div class="tuch"></div></div>
+  <div id="gedecke"></div>
+  <div id="blasen"></div>
+
+  <div class="glas" id="legende"><h3>Ereignisse und Wege <em>wer rettet was</em></h3><div id="legendeZeilen"></div></div>
+  <div class="glas" id="kopf">
+    <div class="kopf-zeile">
+      <div class="kopf-team heim" style="--tf:var(--hud-heim)"><div><div class="kopf-name">Death Peaches</div><div class="kopf-sub" id="sub0"></div></div><div class="kopf-stand"><span id="stand0">0</span><small>Teller</small></div></div>
+      <div class="kopf-mitte"><div class="kopf-titel">Wettessen · Bierzelt</div><div class="kopf-uhr" id="uhr">Gang 1 / 10</div><div class="kopf-phase" id="phase">Knödel-Platte</div></div>
+      <div class="kopf-team gast" style="--tf:var(--hud-gast)"><div><div class="kopf-name">Cold Steel</div><div class="kopf-sub" id="sub1"></div></div><div class="kopf-stand"><span id="stand1">0</span><small>Teller</small></div></div>
+    </div>
+    <div id="gangleiste"></div>
+  </div>
+  <div class="glas" id="verlaufK"><h3>Verlauf <em id="verlaufSub"></em></h3><ul id="verlauf"></ul>
+    <div class="regie"><small>Mockup-Regie</small><button id="bPlay">⏸</button><button id="bSchritt">Gang</button><button data-tempo="1">×1</button><button data-tempo="3">×3</button><button id="bNeu">Neu</button><button id="bEnde">Endstand</button></div></div>
+
+  <div id="einb"><div id="einbPortrait"></div><div><div id="einbWort"></div><div id="einbZeile"></div></div></div>
+  <div id="dock"></div>
+  <div class="glas" id="ende"></div>
+</div>
+
+<script>
+"use strict";
+const Q=new URLSearchParams(location.search);
+const SPR=Q.get("sprites")||"../sprites";
+const $=id=>document.getElementById(id);
+
+let RH=1080;
+function passeAn(){
+  const w=innerWidth,h=innerHeight;
+  RH=Math.max(1000,Math.min(1280,Math.round(1920*h/w)));
+  const s=Math.min(w/1920,h/RH), r=$("rahmen");
+  r.style.height=RH+"px"; r.style.transform=`scale(${s})`;
+  r.style.left=Math.round((w-1920*s)/2)+"px"; r.style.top=Math.round((h-RH*s)/2)+"px";
+  maleKulisse();
+}
+const kulisse=new Image(); kulisse.src=SPR+"/kulissen/wettessen/bierzelt.jpg"; kulisse.onload=()=>maleKulisse();
+function maleKulisse(){
+  const c=$("buehne"); c.height=RH; const x=c.getContext("2d"); x.imageSmoothingEnabled=false;
+  x.fillStyle="#06080c"; x.fillRect(0,0,1920,RH);
+  if(!kulisse.complete||!kulisse.naturalWidth)return;
+  // Kulisse an der Oberkante der Tafel ausrichten: die Theke steht hinter den Essern.
+  const s=Math.max(1920/kulisse.naturalWidth,(RH-250)/kulisse.naturalHeight);
+  const bw=kulisse.naturalWidth*s,bh=kulisse.naturalHeight*s;
+  x.drawImage(kulisse,(1920-bw)/2,RH-250-bh,bw,bh);
+}
+addEventListener("resize",passeAn);
+
+/* ---------- Ereignisse ---------- */
+const Z_=(d)=>`<svg class="z" viewBox="0 0 24 24">${d}</svg>`;
+const EREIGNIS={
+  leer:      {name:"Teller leer", f:"var(--e-leer)",       z:Z_('<ellipse cx="12" cy="13" rx="9" ry="5"/><ellipse cx="12" cy="13" rx="4.5" ry="2.2"/>')},
+  abgeraeumt:{name:"Räumt ab",    f:"var(--e-abgeraeumt)", z:Z_('<path d="M4 13l5 5L20 6"/>')},
+  schluckauf:{name:"Schluckauf",  f:"var(--e-schluckauf)", z:Z_('<path d="M3 15l4-7 4 7 4-7 4 7"/>'), kanal:"TECHNIK",  weg:"Technik",  attr:"Intelligenz", gut:"atmet ihn weg", schlecht:"verliert den Takt"},
+  krampf:    {name:"Krampf",      f:"var(--e-krampf)",     z:Z_('<path d="M13 2L5 14h6l-1 8 8-12h-6z"/>'),    kanal:"AUSDAUER", weg:"Ausdauer", attr:"Ausdauer",    gut:"läuft sich frei", schlecht:"muss absetzen"},
+  wuergen:   {name:"Würgen",      f:"var(--e-wuergen)",    z:Z_('<path d="M3 9c3-4 6 4 9 0s6 4 9 0M3 16c3-4 6 4 9 0s6 4 9 0"/>'), kanal:"NERVEN", weg:"Nerven", attr:"Wille", gut:"hält es drin", schlecht:"Strafe: Teller aberkannt"},
+  brennen:   {name:"Brennen",     f:"var(--e-brennen)",    z:Z_('<path d="M12 2c1 5 6 6 6 12a6 6 0 0 1-12 0c0-3 2-4 2-7 2 1 3 2 4-5z"/>'), kanal:"WAGNIS", weg:"Wagnis", attr:"Qual", gut:"isst durch", schlecht:"greift zum Wasser"},
+  luft:      {name:"Zweite Luft", f:"var(--e-luft)",       z:Z_('<path d="M12 20V5M5 11l7-7 7 7"/>')},
+  strafe:    {name:"Strafe",      f:"var(--e-strafe)",     z:Z_('<rect x="7" y="3" width="10" height="18" rx="2" fill="currentColor"/>')},
+};
+$("legendeZeilen").innerHTML=[
+  ["leer","Hauptweg: <em>Ausdauer, Gesundheit, Wille</em>"],
+  ["schluckauf","rettet <em>Technik</em> (Intelligenz)"],["krampf","hinter der Mauer · rettet <em>Ausdauer</em>"],
+  ["wuergen","rettet <em>Nerven</em> (Wille) · sonst Strafe"],["brennen","nur im Höllengang · rettet <em>Wagnis</em> (Qual)"],
+  ["luft","einmal je Esser · <em>Entschlossenheit, Wille</em>"]]
+  .map(([k,t])=>`<div class="lz" style="--ef:${EREIGNIS[k].f}"><i>${EREIGNIS[k].z}</i><b>${EREIGNIS[k].name}</b><span>${t}</span></div>`).join("");
+
+/* ---------- Daten ---------- */
+const P=(n,slug,pow,hea,det,sta,wil,tor,int)=>({n,slug,a:{pow,hea,det,sta,wil,tor,int}});
+const KADER=[
+ [P("Vorrak","vorrak",79,97,86,69,73,70,35),P("Blorgh","blorgh",85,93,86,78,39,76,7),P("Floralis","floralis",75,71,78,80,74,46,25),
+  P("Petra Brezelstein","petra-brezelstein",81,89,82,70,64,46,35),P("Mavra","mavra",81,81,76,81,66,35,32),P("Pestilence","pestilence",68,60,86,73,94,22,21)],
+ [P("Malagor","malagor",85,79,82,77,78,97,84),P("Brontar","brontar",90,95,89,60,63,41,42),P("Treantos","treantos",87,98,82,55,72,27,44),
+  P("Sunken Crown","sunken-crown",75,95,37,79,72,38,57),P("Varric Frankenstein","varric-frankenstein",86,94,91,90,19,72,52),P("Lizard","lizard",63,71,57,94,64,65,37)]
+];
+const TEAM=["Death Peaches","Cold Steel"], TF=["var(--hud-heim)","var(--hud-gast)"];
+const GAENGE=10, HOELLE=[4,8], TELLER=25;
+const GERICHT=["Knödel-Platte","Bratwurst","Schweinshaxe","Höllen-Chili","Brezn-Turm","Kraut-Berg","Leberkäs","Höllen-Chili","Kaiserschmarrn","Letzte Runde"];
+const spalteX=(s,i)=>s===0?22+72+i*147:1920-22-72-(5-i)*147;
+
+let rngZ=1; const rr=()=>{rngZ=(Math.imul(rngZ,1664525)+1013904223)>>>0; return (rngZ>>>8)/16777216;};
+const kl=(v,a,b)=>Math.max(a,Math.min(b,v));
+let Z=null;
+function neu(saat){
+  rngZ=(saat||5)>>>0;
+  const esser=KADER.flatMap((k,s)=>k.map((p,i)=>{const a=p.a; return {...p,s,i,
+    GRUNDLAGE:.40*a.sta+.35*a.hea+.25*a.wil, SPITZE:.45*a.tor+.30*a.wil+.25*a.det, TECHNIK:.45*a.int+.30*a.det+.25*a.hea,
+    PUBLIKUM:.5*a.wil+.5*a.det, NERVEN:.45*a.wil+.35*a.hea+.20*a.det, AUSDAUER:.5*a.sta+.3*a.hea+.2*a.wil, WAGNIS:.5*a.tor+.3*a.sta+.2*a.int,
+    punkte:0,fuell:0,mauerGang:0,luft:0,luftGang:0,strafen:0,stoerungen:0,gerettet:0,gaenge:[]};}));
+  for(const e of esser)e.K=65+5*e.AUSDAUER;
+  Z={esser,gang:0,log:[],ende:false};
+}
+function rechneGang(){
+  if(Z.gang>=GAENGE)return null;
+  Z.gang++; const g=Z.gang, hoelle=HOELLE.includes(g), erg=[];
+  for(const e of Z.esser){
+    const hinter=e.fuell>e.K; let neuMauer=false, neuLuft=false;
+    if(hinter&&!e.mauerGang){ e.mauerGang=g; neuMauer=true; }
+    // Zweite Luft: einmal je Esser, fruehestens im Gang nach der Mauer.
+    if(hinter&&!e.luftGeprueft&&e.mauerGang<g){ e.luftGeprueft=true; if(rr()<kl((e.PUBLIKUM-40)/70,.1,.7)){ e.luftGang=g; e.luft=2; neuLuft=true; } }
+    const gebremst=hinter&&e.luft<=0;
+    let basis=20+e.GRUNDLAGE*.7;
+    if(gebremst)basis*=kl(.45+e.NERVEN*.005,.4,.95);
+    if(hoelle)basis*=.75+e.WAGNIS*.005;
+    const erfolg=kl(.15+e.TECHNIK*.0055+e.NERVEN*.0035-(gebremst?.05:0)-(hoelle?.08:0),.05,.94);
+    const wurf=rr(); let typ,punkte,gerettet=null,wort="";
+    if(wurf<erfolg){
+      const gross=wurf<erfolg*.4;
+      punkte=basis+e.SPITZE*.35*.7*(gross?1.4:.75)*(gebremst?.5:1);
+      typ=neuLuft?"luft":gross?"abgeraeumt":"leer";
+    }else{
+      typ=hoelle?"brennen":(wurf-erfolg)>(1-erfolg)*.62?"wuergen":hinter?"krampf":"schluckauf";
+      const E=EREIGNIS[typ]; gerettet=rr()<kl(e[E.kanal]/100,.2,.9);
+      punkte=basis*(gerettet?.85:typ==="wuergen"?.2:.5);
+      wort=gerettet?E.gut:E.schlecht; e.stoerungen++; if(gerettet)e.gerettet++;
+      if(typ==="wuergen"&&!gerettet){ typ="strafe"; e.strafen++; }
+    }
+    punkte=Math.max(0,Math.round(punkte+e.PUBLIKUM*.12));
+    e.punkte+=punkte; e.fuell+=punkte; if(e.luft>0)e.luft--;
+    const r={e,typ,punkte,gerettet,wort,neuMauer,neuLuft,hinter}; e.gaenge.push(r); erg.push(r);
+    if(neuMauer)Z.log.unshift({g,s:e.s,typ:"krampf",text:e.n+" steht an der Mauer"});
+    if(neuLuft)Z.log.unshift({g,s:e.s,typ:"luft",text:e.n+" bekommt die zweite Luft"});
+    if(gerettet===false)Z.log.unshift({g,s:e.s,typ,text:e.n+": "+(typ==="strafe"?"würgt – Teller aberkannt":EREIGNIS[typ].name+", "+wort)});
+    else if(gerettet&&typ==="brennen")Z.log.unshift({g,s:e.s,typ,text:e.n+" isst durch den Höllengang"});
+  }
+  if(Z.gang>=GAENGE)Z.ende=true;
+  return erg;
+}
+const teller=e=>Math.floor(e.punkte/TELLER);
+const teamTeller=s=>Math.floor(Z.esser.filter(e=>e.s===s).reduce((x,e)=>x+e.punkte,0)/TELLER);
+
+/* ---------- Anzeige ---------- */
+function baueBuehne(){
+  let f="",g="",b="",d="";
+  Z.esser.forEach((e,k)=>{ const x=spalteX(e.s,e.i);
+    f+=`<div class="esser" id="es${k}" style="left:${x}px;background-image:url(${SPR}/figuren/${e.slug}/south.png)"></div>`;
+    g+=`<div class="gedeck" id="gd${k}" style="left:${x}px"></div>`;
+    b+=`<div class="blase" id="bl${k}" style="left:${x}px"></div>`;
+    d+=`<div class="glas ek" id="ek${k}" style="left:${x}px;--tf:${TF[e.s]}"></div>`;
+  });
+  $("essende").innerHTML=f; $("gedecke").innerHTML=g; $("blasen").innerHTML=b; $("dock").innerHTML=d;
+  $("schiri").style.backgroundImage=`url(${SPR}/figuren/__schiri/south.png)`;
+}
+const animZ={};
+function spieleAnim(el,slug,art,frames){
+  el.style.backgroundImage=`url(${SPR}/figuren/${slug}/${art}-south.png)`; el.style.backgroundPosition="0 0";
+  animZ[el.id]={el,slug,frame:0,frames};
+}
+setInterval(()=>{ for(const k in animZ){ const a=animZ[k]; a.frame++;
+  if(a.frame>=a.frames){ a.el.style.backgroundImage=`url(${SPR}/figuren/${a.slug}/south.png)`; a.el.style.backgroundPosition="0 0"; delete animZ[k]; continue; }
+  a.el.style.backgroundPosition=(a.frame/(a.frames-1)*100)+"% 0"; } },55);
+function maleEsser(k){
+  const e=Z.esser[k], t=teller(e), q=e.fuell/e.K;
+  const zust=e.luft>0?"luft":e.mauerGang?"mauer":"";
+  const el=$("es"+k); el.classList.toggle("mauer",zust==="mauer"); el.classList.toggle("luft",zust==="luft");
+  let st=""; for(let i=0;i<Math.min(t,16);i++)st+="<i></i>";
+  $("gd"+k).innerHTML=`<div class="teller" style="background-image:url(${SPR}/arena/wettessen_teller_normal.png)"></div><div class="stapel">${t?`<b>${t}</b>`:""}${st}</div>`;
+  $("ek"+k).innerHTML=`<div class="ek-kopf"><span class="ek-name">${e.n}</span><span class="ek-teller">${t}</span></div>
+    <div class="ek-zeile ${zust}">${zust==="luft"?"zweite Luft":zust==="mauer"?"Mauer seit Gang "+e.mauerGang:"Magen "+Math.min(99,Math.round(q*78))+" %"}</div>
+    <div class="magen"><i class="${q>=1?"voll":""}" style="width:${Math.min(100,q*78)}%"></i><u></u></div>
+    <div class="gpips">${Array.from({length:GAENGE},(_,i)=>{const r=e.gaenge[i];return `<i class="${r?"voll":""}" style="--ef:${r?EREIGNIS[r.typ].f:""}" title="${r?EREIGNIS[r.typ].name:""}"></i>`}).join("")}</div>`;
+}
+function zeigeBlase(k,r){
+  const E=EREIGNIS[r.typ], b=$("bl"+k);
+  b.style.setProperty("--ef",E.f);
+  b.innerHTML=`<span>${E.z}${E.name}</span><small>${r.typ==="strafe"?"Teller aberkannt":r.wort||("+"+(r.punkte/TELLER).toFixed(1).replace(".",",")+" Teller")}</small>`;
+  b.classList.add("an");
+}
+function maleKopf(){
+  const g=Math.max(1,Z.gang), hoelle=HOELLE.includes(g);
+  $("uhr").textContent=Z.ende?"Schluss":"Gang "+g+" / "+GAENGE;
+  $("phase").textContent=(hoelle?"Höllengang · ":"")+GERICHT[g-1];
+  $("phase").style.color=hoelle?"var(--e-brennen)":""; $("gedecke").classList.toggle("hoelle",hoelle&&!Z.ende);
+  $("gangleiste").innerHTML=Array.from({length:GAENGE},(_,i)=>{const n=i+1,h=HOELLE.includes(n);
+    return `<div class="gk ${h?"hoelle":""} ${n<g||Z.ende?"durch":""} ${n===g&&!Z.ende?"jetzt":""}">${h?EREIGNIS.brennen.z:""}${n}</div>`;}).join("");
+  for(const s of [0,1]){
+    $("stand"+s).textContent=teamTeller(s);
+    const es=Z.esser.filter(e=>e.s===s);
+    $("sub"+s).textContent=es.filter(e=>e.mauerGang&&e.luft<=0).length+" an der Mauer · "+es.reduce((x,e)=>x+e.strafen,0)+" Strafen";
+  }
+  $("verlauf").innerHTML=Z.log.slice(0,6).map(l=>`<li style="--tf:${TF[l.s]};--ef:${EREIGNIS[l.typ].f}"><b>G ${l.g}</b><i>${EREIGNIS[l.typ].z}</i><span>${l.text}</span></li>`).join("");
+  $("verlaufSub").textContent=Z.log.length+" Meldungen";
+}
+function maleAlles(mitBlasen){
+  Z.esser.forEach((e,k)=>{ maleEsser(k); const r=e.gaenge[e.gaenge.length-1]; if(mitBlasen&&r)zeigeBlase(k,r); else $("bl"+k).classList.remove("an"); });
+  maleKopf();
+}
+function einblender(s,e,wort,zeile,ms){
+  const el=$("einb"); el.style.setProperty("--tf",TF[s]); $("einbPortrait").style.backgroundImage=`url(${SPR}/figuren/${e.slug}/south.png)`;
+  $("einbWort").textContent=wort; $("einbZeile").textContent=zeile; el.classList.add("an");
+  clearTimeout(einblender.t); if(ms)einblender.t=setTimeout(()=>el.classList.remove("an"),ms);
+}
+function grossesEreignis(erg){
+  const r=erg.find(x=>x.typ==="strafe")||erg.find(x=>x.neuLuft)||erg.find(x=>x.neuMauer);
+  if(!r)return null;
+  return r.typ==="strafe"?[r,"STRAFE",r.e.n+" würgt – der Teller wird aberkannt"]:r.neuLuft?[r,"ZWEITE LUFT",r.e.n+" isst zwei Gänge ohne Mauer"]:[r,"AN DER MAUER",r.e.n+" ist voll – ab jetzt entscheidet der Wille"];
+}
+function zeigeEnde(){
+  const t=[teamTeller(0),teamTeller(1)], sieger=t[0]>=t[1]?0:1, alle=Z.esser.slice().sort((a,b)=>b.punkte-a.punkte), max=alle[0].punkte;
+  const d=Math.abs(t[0]-t[1]), e1=d>=25?[10,2]:d>=10?[8,4]:[7,5], erg=sieger===0?e1:[e1[1],e1[0]];
+  $("ende").innerHTML=`<h2>${TEAM[sieger]} gewinnt</h2>
+   <div class="unter">Teller <b>${t[0]} : ${t[1]}</b> → Ergebnis <b>${erg[0]} : ${erg[1]}</b> · ${Z.esser.reduce((x,e)=>x+e.stoerungen,0)} Störungen, davon ${Z.esser.reduce((x,e)=>x+e.gerettet,0)} gerettet · ${Z.esser.reduce((x,e)=>x+e.strafen,0)} Strafen</div>
+   <table><thead><tr><th>#</th><th>Esser</th><th>Die zehn Gänge</th><th>Teller</th><th>Mauer in Gang</th><th>Zweite Luft</th><th>Störungen</th><th>Gerettet</th><th>Strafen</th><th>PP</th></tr></thead><tbody>${
+   alle.map((e,i)=>`<tr><td>${i+1}</td><td class="nm" style="--tf:${TF[e.s]}">${e.n}</td><td><div class="gpips">${e.gaenge.map(r=>`<i class="voll" style="--ef:${EREIGNIS[r.typ].f}"></i>`).join("")}</div></td><td>${(e.punkte/TELLER).toFixed(1).replace(".",",")}</td><td>${e.mauerGang||"–"}</td><td>${e.luftGang?"Gang "+e.luftGang:"–"}</td><td>${e.stoerungen}</td><td>${e.gerettet}</td><td>${e.strafen}</td><td>${(5*e.punkte/max).toFixed(1).replace(".",",")}</td></tr>`).join("")}</tbody></table>
+   <div class="hinweis">Beispielwerte der Schau-Simulation. 1 Teller = 25 Wertungspunkte (gebucht wird die Punktsumme, gezeigt werden Teller). PP im Mockup linear auf 5 normiert, im Spiel über die C2-Referenz.</div>`;
+  $("ende").classList.add("an");
+}
+
+/* ---------- Regie ---------- */
+let tempo=+(Q.get("tempo")||1), laeuft=Q.get("pause")!=="1", timer=null;
+function spiele(){
+  clearTimeout(timer);
+  const erg=rechneGang(); if(!erg){ zeigeEnde(); return; }
+  maleKopf(); Z.esser.forEach((e,k)=>{ $("bl"+k).classList.remove("an"); $("es"+k).classList.add("isst"); });
+  const kau=1500/tempo, staffel=110/tempo;
+  erg.forEach((r,k)=>setTimeout(()=>{
+    const el=$("es"+k); el.classList.remove("isst","zuckt"); maleEsser(k); zeigeBlase(k,r);
+    if(r.gerettet!==null){ spieleAnim(el,r.e.slug,"treffer",9); if(!r.gerettet){ void el.offsetWidth; el.classList.add("zuckt"); } }
+    else if(r.typ==="luft"||r.typ==="abgeraeumt")spieleAnim(el,r.e.slug,"angriff",17);
+  },kau+k*staffel));
+  setTimeout(()=>{ maleKopf(); const gr=grossesEreignis(erg);
+    if(gr){ einblender(gr[0].e.s,gr[0].e,gr[1],gr[2],2400/tempo); if(gr[1]==="STRAFE")spieleAnim($("schiri"),"__schiri","pfiff",9); }
+    if(Z.ende){ setTimeout(zeigeEnde,2600/tempo); return; }
+    if(laeuft)timer=setTimeout(spiele,2800/tempo);
+  },kau+12*staffel+100);
+}
+function start(saat){
+  $("ende").classList.remove("an"); $("einb").classList.remove("an");
+  neu(saat); baueBuehne(); let letzter=null;
+  const n=Q.get("ende")==="1"?GAENGE:+(Q.get("gang")||0);
+  for(let i=0;i<n;i++)letzter=rechneGang()||letzter;
+  maleAlles(!!letzter);
+  if(letzter&&!Q.get("ende")){ const gr=grossesEreignis(letzter); if(gr)einblender(gr[0].e.s,gr[0].e,gr[1],gr[2],0); }
+  if(Z.ende){ zeigeEnde(); return; }
+  if(laeuft)timer=setTimeout(spiele,900);
+}
+function maleRegie(){ $("bPlay").textContent=laeuft?"⏸":"▶"; document.querySelectorAll("[data-tempo]").forEach(b=>b.classList.toggle("an",+b.dataset.tempo===tempo)); }
+$("bPlay").onclick=()=>{ laeuft=!laeuft; maleRegie(); clearTimeout(timer); if(laeuft)spiele(); };
+$("bSchritt").onclick=()=>{ laeuft=false; maleRegie(); spiele(); };
+$("bNeu").onclick=()=>{ clearTimeout(timer); laeuft=true; maleRegie(); Q.delete("gang"); Q.delete("ende"); start(1+Math.floor(Math.random()*9999)); };
+$("bEnde").onclick=()=>{ clearTimeout(timer); while(rechneGang()); maleAlles(false); zeigeEnde(); };
+document.querySelectorAll("[data-tempo]").forEach(b=>b.onclick=()=>{ tempo=+b.dataset.tempo; maleRegie(); });
+$("ende").onclick=()=>$("ende").classList.remove("an");
+passeAn(); maleRegie(); start(+(Q.get("saat")||5));
+</script>
+</body>
+</html>
