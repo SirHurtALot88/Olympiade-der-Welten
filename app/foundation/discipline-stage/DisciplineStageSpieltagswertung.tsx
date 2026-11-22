@@ -15,6 +15,7 @@
 import { useMemo, useState } from "react";
 
 import "./spieltagswertung-modern.css";
+import { mutatorAufloesung, mutatorTrefferSumme } from "@/lib/foundation/discipline-stage/mutator-aufloesung";
 import {
   beschreibeArenaAusfallGrund,
   type DisciplineStageMatchdayPanelProps,
@@ -194,6 +195,8 @@ function SeitenBlock({
   }
   const wort = beschreibeWertungsErgebnis(seite.ergebnis, nameVon, disziplinId, seite.anzeige);
   const hatCaptain = seite.captain != null;
+  // Mutator = Form (Chris, 22.11.): im Battle-Modus gibt ein Treffer keine Punkte, also stehen hier Treffer und Formschub.
+  const mutSeite = mutatorAufloesung(mutatorTrefferSumme(seite.spieler.map((sp) => sp.mutatorHits)));
   return (
     <div className="bl" data-testid={`spieltagswertung-blatt-${zeile.teamId}-${titel}`}>
       <div className="bh">
@@ -203,7 +206,7 @@ function SeitenBlock({
         </small>
         <strong className={`t${seite.punkte ? "" : " o"}`}>{seite.punkte ? `+${de(seite.punkte)}` : seite.punkte === 0 ? "0" : "–"} Pkt</strong>
       </div>
-      <div className="kette">
+      <div className={`kette${mutSeite ? " vier" : ""}`}>
         <div>
           <small>Formkarte{seite.formLabel ? ` ${seite.formLabel}` : ""}</small>
           <b className={`t ${seite.formLabel ? ton(seite.form ?? 0) : "null"}`}>{seite.formLabel ? vz(seite.form ?? 0) : "keine"}</b>
@@ -214,6 +217,15 @@ function SeitenBlock({
           <b className={`t ${hatCaptain ? ton(seite.captain ?? 0) : "null"}`}>{hatCaptain ? vz(seite.captain ?? 0) : "nicht gesetzt"}</b>
           {hatCaptain ? <i>Score</i> : null}
         </div>
+        {mutSeite ? (
+          <div data-testid="spieltagswertung-mutator-seite" title={mutSeite.lang}>
+            <small>Mutator-Treffer ◆</small>
+            <b className="t" style={{ color: "var(--drei)" }}>
+              {mutSeite.treffer}×
+            </b>
+            <i>Form +{de(mutSeite.form)}</i>
+          </div>
+        ) : null}
         <div data-testid="spieltagswertung-differenz">
           <small>{seite.anzeige ? "Differenz" : seite.gruppe ? "Wertung in der Gruppe" : "Differenz"}</small>
           {seite.anzeige?.diff ? (
@@ -242,7 +254,15 @@ function SeitenBlock({
                 {sp.name}
                 {sp.isCaptain ? <small>C</small> : null}
               </b>
-              {sp.mutatorPp ? <span className="mut">◆ +{de(sp.mutatorPp)}</span> : <span />}
+              {sp.mutatorPp ? (
+                <span className="mut">◆ +{de(sp.mutatorPp)}</span>
+              ) : mutatorAufloesung(sp.mutatorHits) ? (
+                <span className="mut" data-testid="spieltagswertung-mutator-spieler" title={mutatorAufloesung(sp.mutatorHits)!.lang}>
+                  {mutatorAufloesung(sp.mutatorHits)!.kurz}
+                </span>
+              ) : (
+                <span />
+              )}
               <span className="ppb t">{sp.pp != null ? de(sp.pp) : "–"}</span>
             </div>
           ))
