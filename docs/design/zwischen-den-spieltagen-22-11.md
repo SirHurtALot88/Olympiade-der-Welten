@@ -2071,64 +2071,84 @@ Spieltagen.
 
 ## 72. Verbrauchsgegenstände mit bekannten Namen
 
+*Fassung nach Runde 14 (Chris, 22.11.: „ein bisschen teurer, aber auch ein bisschen mehr Auswirkung, damit das sinnvoll
+ist und man das nicht jedes Mal zuspammt“). Ersetzt die erste Tabelle aus Runde 13.*
+
 Wie der Sponsoren-Katalog (`lib/sponsor/sponsor-brand-catalog.ts`) nutzt der Kiosk echte Namen. Jeder Artikel wirkt für
-**einen Einsatz**, liegt im Verbrauchsplatz des Spielers (einer je Spieler) und ist danach weg. Im Lager stapeln sie wie
-Materialien (bis 10 je Platz). Preise folgen dem Gegenwert (§48): ein Einsatz mit kleinem Bonus ist 0,02 bis 0,05 C wert.
+**einen Einsatz**, liegt im Verbrauchsplatz des Spielers und ist danach weg. Im Lager stapeln sie wie Materialien (bis 10
+je Platz).
+
+**Kalibrierung.** Ein Verbrauchsteil bringt in seinem Einsatz etwa so viel wie ein seltenes Ausrüstungsteil (zwei Affixe,
+zusammen rund +8 Attributpunkte), nur einmalig. Gesundes liegt etwas darunter und hat keinen Haken, Fast Food liegt darüber
+und trägt ein Risiko.
 
 | Kategorie | Artikel | Wirkung für einen Einsatz | Nebenwirkung | Preis | Zähler |
 |---|---|---|---|---:|---|
-| **Energy und Süßes** | Red Bull | +4 Speed, +3 Stamina | nächster Einsatz −2 Stamina | 0,04 C | Zucker +1 |
-| | Monster Energy | +6 Stamina | nächster Einsatz −3 Awareness | 0,04 C | Zucker +2 |
-| | Coca-Cola | +2 Speed, Moral +1 | – | 0,02 C | Zucker +1 |
-| | Pepsi | +2 Dexterity, Moral +1 | – | 0,02 C | Zucker +1 |
-| | Gatorade | +3 Stamina | – | 0,03 C | Zucker +1 |
-| | Club-Mate | +3 Awareness, +2 Stamina | – | 0,03 C | Zucker +1 |
-| | Haribo Goldbären | +3 Speed, Moral +2 | 30 %: −2 Awareness | 0,02 C | Zucker +2 |
-| | Snickers | +3 Stamina, Moral +1 | – | 0,02 C | Zucker +1 |
-| **Cocktails und Bier** | Aperol Spritz | +3 Charisma, Moral +2 | −2 Awareness | 0,04 C | Alkohol +1 |
-| | Mojito (Bacardí) | +4 Spirit | −2 Dexterity | 0,04 C | Alkohol +1 |
-| | Caipirinha (Pitú) | +4 Charisma, +2 Spirit | −3 Intelligence | 0,05 C | Alkohol +2 |
-| | Espresso Martini (Kahlúa) | +3 Charisma, +2 Awareness | −2 Stamina | 0,05 C | Alkohol +1 |
-| | Jägermeister | +5 Will, Moral +3 | −4 Awareness | 0,04 C | Alkohol +2 |
-| | Carlsberg | Moral +2 | −1 Speed | 0,03 C | Alkohol +1 |
-| **Gesund** | Poke Bowl | +2 Stamina, +1 Health | – | 0,05 C | Gesund +1 |
-| | Proteinriegel (PowerBar) | +2 Power | – | 0,04 C | Gesund +1 |
-| | Smoothie (innocent) | +2 Awareness | – | 0,04 C | Gesund +1 |
-| | Banane (Chiquita) | +2 Stamina | – | 0,03 C | Gesund +1 |
-| | Haferflocken (Kölln) | +1 Stamina, +1 Determination | – | 0,03 C | Gesund +1 |
-| | Wasser (Volvic) | Erschöpfung nach dem Einsatz −5 % | – | 0,03 C | Gesund +1 |
-| **Fast Food** | Döner | +5 Power, +3 Health, Moral +3 | 20 %: Magen, −4 Stamina in diesem Einsatz | 0,03 C | Fast Food +2 |
-| | Big Mac (McDonald's) | +6 Power, Moral +3 | 20 %: Magen, −4 Stamina | 0,03 C | Fast Food +2 |
-| | Whopper (Burger King) | +5 Health, +2 Power | 15 %: träge, −3 Speed | 0,03 C | Fast Food +2 |
-| | Pizza (Domino's) | +4 Determination, Moral +4 | 15 %: träge, −3 Speed | 0,03 C | Fast Food +2 |
-| | Currywurst | +5 Torment, +2 Power | 25 %: Magen, −4 Stamina | 0,02 C | Fast Food +2 |
-| | Bucket (KFC) | +4 Health, Moral +3 | 20 %: Magen, −4 Stamina | 0,03 C | Fast Food +2 |
+| **Energy und Süßes** | Red Bull | +8 Speed, +5 Stamina | nächster Einsatz −4 Stamina | 0,12 C | Zucker +1 |
+| | Monster Energy | +12 Stamina | nächster Einsatz −6 Awareness | 0,12 C | Zucker +2 |
+| | Coca-Cola | +5 Speed, Moral +2 | – | 0,10 C | Zucker +1 |
+| | Pepsi | +5 Dexterity, Moral +2 | – | 0,10 C | Zucker +1 |
+| | Gatorade | +7 Stamina | – | 0,11 C | Zucker +1 |
+| | Club-Mate | +6 Awareness, +4 Stamina | – | 0,12 C | Zucker +1 |
+| | Haribo Goldbären | +6 Speed, Moral +3 | 30 %: −4 Awareness | 0,10 C | Zucker +2 |
+| | Snickers | +6 Stamina, Moral +2 | – | 0,10 C | Zucker +1 |
+| **Cocktails und Bier** | Aperol Spritz | +7 Charisma, Moral +3 | −4 Awareness | 0,14 C | Alkohol +1 |
+| | Mojito (Bacardí) | +9 Spirit | −4 Dexterity | 0,14 C | Alkohol +1 |
+| | Caipirinha (Pitú) | +8 Charisma, +4 Spirit | −6 Intelligence | 0,16 C | Alkohol +2 |
+| | Espresso Martini (Kahlúa) | +6 Charisma, +5 Awareness | −4 Stamina | 0,16 C | Alkohol +1 |
+| | Jägermeister | +10 Will, Moral +4 | −8 Awareness | 0,14 C | Alkohol +2 |
+| | Carlsberg | +3 Spirit, Moral +4 | −2 Speed | 0,12 C | Alkohol +1 |
+| **Gesund** | Poke Bowl | +5 Stamina, +3 Health | – | 0,15 C | Gesund +1 |
+| | Proteinriegel (PowerBar) | +6 Power | – | 0,13 C | Gesund +1 |
+| | Smoothie (innocent) | +6 Awareness | – | 0,13 C | Gesund +1 |
+| | Banane (Chiquita) | +5 Stamina | – | 0,12 C | Gesund +1 |
+| | Haferflocken (Kölln) | +3 Stamina, +3 Determination | – | 0,12 C | Gesund +1 |
+| | Wasser (Volvic) | +2 Stamina, Erschöpfung nach dem Einsatz −10 % | – | 0,12 C | Gesund +1 |
+| **Fast Food** | Döner | +10 Power, +6 Health, Moral +3 | 20 %: Magen, −8 Stamina in diesem Einsatz | 0,10 C | Fast Food +2 |
+| | Big Mac (McDonald's) | +12 Power, Moral +3 | 20 %: Magen, −8 Stamina | 0,10 C | Fast Food +2 |
+| | Whopper (Burger King) | +10 Health, +4 Power | 15 %: träge, −6 Speed | 0,10 C | Fast Food +2 |
+| | Pizza (Domino's) | +9 Determination, Moral +4 | 15 %: träge, −6 Speed | 0,09 C | Fast Food +2 |
+| | Currywurst | +10 Torment, +4 Power | 25 %: Magen, −8 Stamina | 0,08 C | Fast Food +2 |
+| | Bucket (KFC) | +9 Health, Moral +3 | 20 %: Magen, −8 Stamina | 0,10 C | Fast Food +2 |
 
-- **Charakter der Kategorien:** Energy gibt Ausdauer und Tempo jetzt und nimmt beim nächsten Einsatz etwas zurück.
-  Cocktails heben Auftreten und Geist und kosten Konzentration, sie passen in SOC-Disziplinen. Gesund ist klein und ohne
-  Haken, dafür am teuersten. Fast Food ist billig, stark, macht kurz glücklich und trägt ein Risiko.
-- **Woher:** Kiosk beim Händler (mit Handelsposten immer offen), Holz- und Eisentruhe als Standard-Funde, Sponsor-Paket
-  (wer einen Getränke-Sponsor hat, bekommt dessen Artikel je Spieltag geschenkt, sofern der Sponsoren-Katalog die Marke
-  führt).
-- **Kosten im Blick:** wer jeden Verbrauchsplatz in jedem Einsatz füllt, zahlt rund 8 C je Saison (220 Einsätze × 0,035 C);
-  üblich sind 1 bis 2 C.
-- **KI-Regel:** Verbrauch nur in Derbys und in Duellen, die laut Vorschau eng sind. Stammspieler von Teams mit Finanzwert
-  ab 6 bekommen dauerhaft Gesundes. Fast Food nur, wenn die Moral des Spielers unter 40 liegt und sein Zähler höchstens 1
-  ist. Nie ein Artikel, der einen Zähler auf die Schwelle hebt. Cocktails nur in SOC-Disziplinen.
-- **Rechtlicher Hinweis:** echte Markennamen sind im privaten Spiel wie bei den Sponsoren unkritisch; im Mockup sind die
-  Logos Text in CSS, es gibt keine Markenbilder und es wird nichts bei PixelLab bestellt.
+**Warum diese Preise.** Der reine Gegenwert eines solchen Einsatzes wäre nach §48 rund 0,02 C. Der Kiosk verlangt das
+Fünf- bis Sechsfache, weil man den Moment wählt (genau das enge Duell), weil nichts verschleißt und kein Ausrüstungsplatz
+gebunden wird. Fast Food ist am billigsten, weil es das Risiko und den schnellsten Zähler trägt; Cocktails und Gesundes
+sind am teuersten, die einen wegen der hohen Einzelwerte in SOC-Disziplinen, die anderen, weil sie nichts kosten außer
+Geld.
+
+**Leitplanke gegen Zuspammen: höchstens 3 Verbrauchsteile je Team und Spieltag,** und höchstens eines je Spieler und
+Spieltag. Gewählt statt steigender Kosten, weil die Grenze für alle gleich ist (steigende Kosten bremsen nur arme Teams),
+weil man sie ohne Rechnen versteht und weil die KI dafür keine Preisabwägung braucht. Die Einsatzliste zeigt „2 von 3“.
+
+**Kosten.**
+- Höchstmaß, jede Woche alle drei: 60 Teile je Saison, je nach Mischung **6 bis 7 C** (mit Fast Food 5,7 C, mit Cocktails
+  8,6 C). Das liegt am oberen Rand des Ziels; wer das tut, läuft außerdem ständig in die Zähler-Ereignisse.
+- Üblich, ein Teil in engen Duellen und zwei bis drei in Derbys: 20 bis 25 Teile, **2,5 bis 3 C je Saison**.
+
+**Woher:** Kiosk beim Händler (mit Handelsposten immer offen), Holz- und Eisentruhe als Standard-Funde, Sponsor-Paket (wer
+einen Getränke-Sponsor hat, bekommt dessen Artikel geschenkt, sofern der Sponsoren-Katalog die Marke führt; offen).
+
+**KI-Regel:** nur, wenn die Vorschau ein Duell als knapp ausweist (Abstand unter 5 %) oder im Derby, und nie mehr als
+drei. Reihenfolge: der aufgestellte Spieler, bei dem `Bonus × Matrixgewicht` am größten ist. Nie ein Artikel, der einen
+Zähler auf die Schwelle hebt. Fast Food nur bei Moral unter 40 und Zähler höchstens 1. Cocktails nur in SOC-Disziplinen.
+Finanzwert unter 4: höchstens ein Teil je Spieltag. Steht kein enges Duell an und liegt der Finanzwert ab 6, geht ein Platz
+an etwas Gesundes für den müdesten Stammspieler.
+
+**Hinweis:** im Mockup sind die Logos Text in CSS, es gibt keine Markenbilder und es wird nichts bei PixelLab bestellt.
 
 ## 73. Ernährung mit Langzeitwirkung
 
-- **Vier Zähler je Spieler:** Fast Food, Zucker, Alkohol, Gesund. Jeder Artikel hebt seinen Zähler um 1 oder 2; jeder
-  Zähler sinkt je Spieltag um 1. Sichtbar im Spielerprofil und beim Anlegen, mit markierter Schwelle („noch eine Portion
+- **Vier Zähler je Spieler:** Fast Food, Zucker, Alkohol, Gesund. Jeder Artikel hebt seinen Zähler um 1 oder 2; ein
+  Zähler sinkt um 1 an jedem Spieltag, an dem der Spieler nichts aus dieser Kategorie nimmt (geändert in Runde 14, sonst
+  bliebe tägliches Cola-Trinken folgenlos). Sichtbar im Spielerprofil und beim Anlegen, mit markierter Schwelle („noch eine Portion
   bis zum verstimmten Magen“). Nichts ist verborgen.
 - **Schwellen lösen Ereignisse aus** (Nachricht im Postfach, bei Alkohol auch in der Kabine):
 
 | Ereignis | Auslöser | Wirkung |
 |---|---|---|
 | Verstimmter Magen | Fast Food 4 | die nächsten drei Einsätze −3 % Eignung, im Wettessen nicht einsetzbar; Zähler −2 |
-| Zuckerabsturz | Zucker 4 | nächster Einsatz −4 Stamina, −2 Awareness; Zähler −2 |
+| Zuckerabsturz | Zucker 4 | nächster Einsatz −8 Stamina, −4 Awareness; Zähler −2 |
 | Kater | Alkohol 3 | nächster Spieltag −3 % Eignung, Erschöpfung +5; ab Alkohol 5 sinkt das Vertrauen des Vorstands um 0,25 |
 | Gut im Saft | Gesund 5 und Fast Food 0 | drei Spieltage Erholung +10 %, Verletzungsrisiko −10 % |
 
@@ -2148,3 +2168,20 @@ Materialien (bis 10 je Platz). Preise folgen dem Gegenwert (§48): ein Einsatz m
 
 **Offen:** Sollen Getränke-Sponsoren ihre Artikel je Spieltag schenken (kleiner Vorteil, hübsche Verbindung), oder bleibt
 der Kiosk rein käuflich?
+
+## 74. Runde 14: Zähler geprüft
+
+Mit höchstens einem Artikel je Spieler und Spieltag und der neuen Abbauregel (ein Zähler sinkt nur an Spieltagen ohne
+Artikel dieser Art):
+
+| Dauer-Einsatz | Ereignis nach |
+|---|---|
+| jeden Spieltag Fast Food (+2) | 2 Spieltagen: verstimmter Magen, danach jeden zweiten Spieltag wieder |
+| jeden Spieltag Cola oder Gatorade (+1) | 4 Spieltagen: Zuckerabsturz |
+| jeden Spieltag Monster oder Haribo (+2) | 2 Spieltagen |
+| jeden Spieltag ein Cocktail (+1) | 3 Spieltagen: Kater; mit Caipirinha oder Jägermeister (+2) nach 2 |
+| jeden Spieltag Gesundes (+1) | 5 Spieltagen: „Gut im Saft“ (gewollt) |
+
+Dauer-Einsatz wird also in jeder ungesunden Kategorie bestraft. Mit der alten Regel (jeder Zähler sinkt je Spieltag um 1)
+wäre ein täglicher Artikel mit +1 nie an die Schwelle gekommen. Die Saison-Schwellen aus §73 (12 und 20 Fast-Food-Punkte)
+bleiben; bei einem Fast Food je Woche sind das sechs bzw. zehn Portionen eines Spielers.
