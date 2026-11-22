@@ -47,7 +47,7 @@
 
 /* TAFEL: eine Zeile = ein Slot */
 .oly-vst .tafel{display:grid;grid-template-rows:auto minmax(0,1fr);gap:calc(.5*var(--u));padding:0 calc(1.2*var(--u));min-height:0}
-.oly-vst .tafel.duell{--sp:minmax(0,1fr) calc(18*var(--u)) minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-columns:calc(19*var(--u)) minmax(0,1fr) calc(19*var(--u));gap:calc(.6*var(--u));padding-bottom:calc(.6*var(--u))}
+.oly-vst .tafel.duell{--sp:minmax(0,1fr) calc(16*var(--u)) minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-columns:calc(17.5*var(--u)) minmax(0,1fr) calc(17.5*var(--u));gap:calc(.6*var(--u));padding-bottom:calc(.6*var(--u))}
 .oly-vst .tafel.pod{--sp:calc(12.5*var(--u)) repeat(4,minmax(0,1fr))}
 .oly-vst .kz,.oly-vst .zeile{display:grid;grid-template-columns:var(--sp);gap:calc(.5*var(--u))}
 .oly-vst .zeilen{display:grid;grid-auto-rows:minmax(0,1fr);gap:calc(.4*var(--u));min-height:0;align-self:center;height:100%;max-height:calc(var(--k) * calc(15*var(--u)))}
@@ -172,7 +172,7 @@
 /* Feldplan je Slot (nur Feldspiele; Platz aus der Formations-Registry, Quelle der Zahlen ist der Arena-Motor) */
 .oly-vst .feld{position:relative;width:calc(6.4*var(--u));height:calc(2.9*var(--u));flex:none;border-radius:calc(.35*var(--u));overflow:hidden;background:#241a12}
 .oly-vst .feld svg{position:absolute;inset:0;width:100%;height:100%;display:block}
-.oly-vst .feld .pt{position:absolute;width:calc(.95*var(--u));height:calc(.95*var(--u));margin:calc(-.475*var(--u)) 0 0 calc(-.475*var(--u));border-radius:50%;background:var(--heim);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.oly-vst .feld .pt{position:absolute;width:calc(1.15*var(--u));height:calc(1.15*var(--u));margin:calc(-.575*var(--u)) 0 0 calc(-.575*var(--u));border-radius:50%;background:var(--heim);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
 .oly-vst .feld .pt.hohl{background:transparent;border:2px dashed var(--heim);box-shadow:none}
 .oly-vst .feld .pt.g{background:var(--gast);border-color:var(--gast)}
 .oly-vst .feld .pt.g.hohl{background:transparent}
@@ -181,7 +181,6 @@
 .oly-vst .kz .tk{align-self:stretch}
 .oly-vst .chip.aus img{width:calc(1.2*var(--u));height:calc(1.2*var(--u));border-radius:50%;object-fit:cover;filter:grayscale(1);opacity:.7}
 .oly-vst .ohne-aufst{font-size:calc(.8*var(--u));color:var(--warn)}
-.oly-vst .spz .fg img.p{background:#10151c}
 .oly-vst .fuss .hin{flex:1}
 .oly-vst .fuss .leg{flex:none}
 @media (prefers-reduced-motion:reduce){.oly-vst *{transition:none!important;animation:none!important}}
@@ -191,3 +190,5 @@
 .oly-vst .tp .wp .lgf{width:calc(4.6*var(--u));height:calc(4.6*var(--u))}
 .oly-vst .tafel.duell .tk.r>.lgf{grid-column:2;grid-row:1/span 2}
 .oly-vst .st-tag{font-size:calc(.74*var(--u));color:var(--leise);margin-left:calc(.25*var(--u));font-weight:500}
+.oly-vst .fg.ini::before{content:attr(data-ini);position:absolute;left:13%;bottom:10%;width:74%;height:74%;border-radius:50%;display:grid;place-items:center;z-index:0;
+  font:400 calc(1.5*var(--u))/1 var(--haus);color:var(--creme);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--tf) 35%,#10151c),#10151c);border:2px dashed var(--tf)}

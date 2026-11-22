@@ -2,7 +2,7 @@
 
 Mockup: `public/mockups/arena-vorstellung-rework-22-11.html` (klickbar, Tasten 1–4 wechseln die Variante, N schaltet den Nebel).
 Aufnahmen: `docs/design/arena-vorstellung-rework-22-11/` (1920×1080 und 2560×1440 je Variante, 1710×1112 für Hockey und Battlefield).
-Status: **nur Mockup**, kein App-Code. Gebaut wird erst nach Chris' „bau das“.
+Status: **gebaut (22.11.)**, siehe Abschnitt 7. Das Mockup bleibt als Vorlage.
 
 Auslöser, Chris am 22.11.: „Slot-Namen war gemeint im Screen bevor es losgeht, dass Leute mit gleichen Slots im Screen an
 derselben Stelle stehen. Der Screen muss eh noch ein Rework bekommen.“
@@ -102,3 +102,56 @@ Keine PixelLab-Bestellung nötig. Spieler ohne Figur zeigen die Porträt-Marke.
    weil die Einsatzlisten gesperrt sind? Die heutige Motor-Vorstellung zeigt beide Seiten exakt.
 2. **Gegnerische Formkarte:** verdeckt bis zum Anpfiff wie bisher (Mockup) — oder mit der Vorstellung aufdecken?
 3. **Feldplan in Feldspielen** (kleines Feld je Slot-Zeile): behalten oder weglassen?
+
+## 7. Umsetzung (22.11.)
+
+Gebaut: `lib/foundation/battle-arena/arena-vorstellung-tafel.ts` (reine Logik, `baueVorstellungsTafel`), `ArenaVorstellung` und
+`ArenaVorstellungAusSpielstand` in `app/foundation/battle-arena/ArenaVorraum.tsx`, CSS `app/foundation/battle-arena/arena-vorstellung.css`
+(Masse des Mockups, alle Laengen ein Vielfaches von `--u`, das der Buehne folgt statt dem Fenster), Verdrahtung im Host
+(`FoundationBattleArenaHost.tsx`, reicht `sheetsByPlayerId` und die gebuchte Kulissen-Variante durch). Der Motor ist unberuehrt;
+der Wertungs-Fingerabdruck bleibt `ea36f666cc71`. Tests: `tests/arena-vorstellung-tafel.test.ts`.
+
+### 7.1 Entscheidungen von Chris (22.11.) und wie sie umgesetzt sind
+
+1. **Gegnerwerte exakt, ohne Modifikatoren.** Gegner und eigenes Team zeigen dieselbe Zahl: rohe Eignung
+   (`player.disciplineRatings[disziplin]`) plus Slot-Bonus. Keine Form, Moral, Karte, Intensitaet, Muedigkeit. Der Slot-Bonus kommt aus
+   `berechneSlotAufschlag` (neu exportiert in `lib/lineups/matchday-slot-roles.ts`, Wrapper um `resolveProfileRoleModifier`): Slotprofil
+   gegen Grundprofil x 2,2, geklemmt auf +-8,5, dieselbe Formel wie `slotAufschlag()` im Motor (beide lesen `slotWeightProfile` /
+   `baseWeightProfile` derselben Rolle; `generiere-arena-daten.ts` fuettert den Motor daraus). Einziger Sonderfall des Motors, Football x 0,35,
+   steht als `VORSTELLUNG_FOOTBALL_SLOT_SKALA`; ein Test liest den Motor als Text und wird bei Drift rot. Die Zusammenfuehrung steht in
+   `eignungImSlot()`. Das eigene Team zeigt Form (`baueFormMoralAnzeige`), Moral (`BcMoralGesicht`) und Kartenwert je Spieler
+   (`berechneKartenWirkung` -> `calculateFormModifierForSide`) zusaetzlich als Marken, nicht in der Zahl. Der Scouting-Nebel-Balken des Mockups entfaellt.
+2. **Gegnerische Formkarte verdeckt:** die Struktur des Gegners traegt keine Karten (`eigenInfo` ist dort `null`).
+3. **Feldplan je Slot in Feldspielen:** Positionen aus `formationFuerSeite` (`lib/lineups/formation`, Anzeige-Kopie der Motor-Tabellen, Drift-Test
+   `tests/einsatzliste-formation.test.ts`). Gezeichnet nur fuer die Feldarten Halbfeld (Basketball), Eis (Hockey), Football; Marke gefuellt, wenn der Motor den
+   Platz haelt, sonst hohl gestrichelt (Hockey: nur Torwart gefuellt). Gegner-Marke nur, wo die Registry einen Gegnerplatz kennt (Basketball). Andere
+   Disziplinen: kein Feldplan.
+
+### 7.2 Geprueft und festgehalten
+
+- Fechten, Tennis, Speed-Schach, Gewichtheben, Breaking paaren nach Slot (`nachSlotgeordnet`: `mineGeordnet[i]` gegen `gegnerGeordnet[i]`): Zeile
+  heisst dort "Gefecht"/"Duell". Staffel: Zeile = Laufreihenfolge (`staffelNachSlot`). Bahn sonst "Laeufer", Climbing "Kletterer", sonst "Slot".
+- Zeile = `slotIndex` des Entwurfs, Rolle ueber `resolveSlotRoleShortId` mit Kopfzahl k (Battlefield je k); k aus dem Spielplan, sonst aus den Entwuerfen.
+- Verletzungsgesperrte (`ermittleVerletzungsgesperrteAmSpieltag`) stehen in keiner Zelle, beim eigenen Team unter "Nicht aufgestellt".
+  Wer heute verletzt antritt (50 %), wird hier nicht abgezogen: die Zahl ist roh. Kein Entwurf fuer ein Team: Hinweis "Motor stellt reihum auf", Zellen leer.
+- Eigenes Team = `ownTeamId` (Host: `spieltag.podTeamId` aus `activeManagerTeamId`), Manager-Chip aus `displayLabel`/`ownerId` der Team-Steuerung, sonst "KI".
+- Vergleich je Zeile ("vorn +n", "gleich"; Pod "Du: vorn gegen n von m") rechnet mit den gezeigten, gerundeten Zahlen.
+
+### 7.3 Abgleich Mockup gegen Bau (Bildpaare in `arena-vorstellung-rework-22-11/gebaut/`)
+
+drin: Kopf mit Disziplin, Spielart, Punkteschema und Marken; Duell-Raster (Teamtafel | Spieler | Slot | Spieler | Teamtafel) und Pod-Raster (Slot-Spalte + 4 Teamspalten, eigenes zuerst);
+Slot-Zelle mit Nummer, Name, zwei Schluesselattributen; Figur (PixelLab, Blick zur Mitte) oder Portraet-Marke; Klasse mit Icon in Klassenfarbe, Rasse; Eignung im Slot;
+Form, Moral-Gesicht, Captain, Kartenwert je Spieler; Teamtafel mit Saison-Rang, Disziplin-Rang, Punkten, Staerke; Formkarten-Block, Einsatz, "Nicht aufgestellt" mit Verletzten;
+verdeckte Gegnerkarte; Leerzelle; Klick auf Zeile zeigt den Rollentext im Fuss; Fuss mit Legende, Quick-Sim, Zur Arena.
+angepasst: Gegnerwerte exakt statt Nebel-Stufen (Chris); "offen" heisst jetzt "gleich" und zeigt den Abstand; Staerke fremder Teams als Balken, eigene exakt;
+Feldplan aus der Registry statt erfundener Punkte (Hockey nur eigene Marke); Seitentafeln 17,5 statt 19 Einheiten (laengere Namen bei 16:10); Regieleiste nicht doppelt, die Huelle der Arena traegt sie;
+Hintergrund = gebuchte Kulisse; Marke "Einsatzlisten gesperrt" nur, wenn alle Entwuerfe gesperrt/gewertet sind; Initialen-Marke, wenn weder Figur noch Portraet-Datei vorhanden.
+fehlt: Mockup-Leiste (Tasten 1-4, N, Nebel-Schalter) und das Enter-Kuerzel am Knopf (kein Tastenkuerzel im Host); Siegchancen (nie vorgesehen).
+
+### 7.4 Aufnahmen: ehrlicher Stand
+
+Der lokale Dev-Server der App wurde dreimal vom Speicherlimit beendet (Kompilieren von `/api/matchday/arena-base` ueber 11 GB), die Aufnahme aus der
+laufenden App (Arena-Reiter, Zur Arena) ist daher **nicht** gelungen. Stattdessen: die ECHTE Komponente `ArenaVorstellung` mit der ECHTEN Tafel aus einem Wegwerf-Spielstand (Battle, 32 Teams, KI-Aufstellungen ueber
+`applyAiLegacyLineupBatchLocally`), statisch gerendert in einer nachgebauten Huelle (Icon-Schiene 64 px, 40-px-Leiste). 1920x1080 und 2560x1440: Hockey (Feld), Fechten (Buehne), Staffel (Bahn),
+Battlefield (Pod); 1710x1112: Hockey, Battlefield; dazu Mini-DM, Basketball, Football und ein Hockey-Stand mit Form/Moral/Verletzung. Kein Seitenscroll, keine Ueberlappung, kein abgeschnittener Text gemessen.
+Offen: eine Aufnahme aus der laufenden App auf einem Rechner mit genug Speicher.

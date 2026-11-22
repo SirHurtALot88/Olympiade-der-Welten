@@ -596,16 +596,34 @@ function SlotZelle({ slot, tafel, vergleich }: { slot: VorstellungSlot; tafel: V
   );
 }
 
+function initialen(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+}
+
 function Figur({ zelle, blick, team }: { zelle: VorstellungZelle; blick: "east" | "west" | "south"; team: VorstellungTeam }) {
   const sprite = zelle.figurSlug ? getFigurSpriteBySlug(zelle.figurSlug) : null;
+  // Ohne PixelLab-Figur: Porträt-Marke wie in der Arena; fehlt auch das Porträt (Datei 404), stehen die Initialen darunter.
   return (
-    <div className="fg" style={{ ["--tf" as string]: team.farbe }}>
+    <div className={`fg${sprite ? "" : " ini"}`} data-ini={initialen(zelle.name)} style={{ ["--tf" as string]: team.farbe }}>
       {sprite ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img className="f" src={figurPoseUrl(sprite, blick)} alt="" />
       ) : zelle.portraitUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="p" src={zelle.portraitUrl} alt="" title="Noch keine PixelLab-Figur: Porträt-Marke wie in der Arena" />
+        <img
+          className="p"
+          src={zelle.portraitUrl}
+          alt=""
+          title="Noch keine PixelLab-Figur: Porträt-Marke wie in der Arena"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
       ) : null}
     </div>
   );
