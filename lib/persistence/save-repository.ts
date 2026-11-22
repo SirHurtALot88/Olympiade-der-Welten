@@ -29,6 +29,7 @@ import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-servic
 import { stelleLaufendeSaisonAufC2Um } from "@/lib/resolve/wertungs-skalen";
 import { stempleClimbingFormat } from "@/lib/resolve/climbing-format";
 import { stempleHockeyTorwart } from "@/lib/resolve/hockey-torwart";
+import { stempleBasketballPuste } from "@/lib/resolve/basketball-puste";
 import { stempleBattlefieldFormat } from "@/lib/resolve/battlefield-format";
 import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
 import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
@@ -1436,7 +1437,8 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // Spieltage behalten ihr Format, ab dem naechsten gilt der Schalter OLY_CLIMBING_FORMAT (Vorgabe Canyon).
   // BATTLEFIELD-FORMAT (Fuenf Punkte live, 22.11., lib/resolve/battlefield-format.ts): gleiches Muster.
   // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): gleiches Muster.
-  const gameStateWithoutBaseline = stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+  // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): gleiches Muster.
+  const gameStateWithoutBaseline = stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
@@ -1460,7 +1462,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  ))))));
+  )))))));
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),

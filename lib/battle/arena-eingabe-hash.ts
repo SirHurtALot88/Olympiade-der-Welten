@@ -14,6 +14,7 @@ import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
 import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
+import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
 
 /**
  * PP-SKALA IM EINGABE-HASH (18.11.): der Vorlauf rechnet die Spieler-PP mit (Boxscore -> PP). Wechselt
@@ -116,7 +117,9 @@ export function berechneArenaEingabeHash(input: {
       // Formatwechsel nach dem Vorlauf die Vorberechnung verwirft; jede andere Disziplin behaelt ihren Hash.
       ...(input.disciplineId === "climbing" ? { climbingFormat: climbingFormatFuer(input.gameState, input.matchdayId) } : {}),
       // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): nur fuer Hockey, aus demselben Grund.
-      ...(input.disciplineId === "hockey" ? { hockeyTorwart: hockeyTorwartFuer(input.gameState, input.matchdayId) } : {}) }))
+      ...(input.disciplineId === "hockey" ? { hockeyTorwart: hockeyTorwartFuer(input.gameState, input.matchdayId) } : {}),
+      // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): nur fuer Basketball, aus demselben Grund.
+      ...(input.disciplineId === "basketball" ? { basketballPuste: basketballPusteFuer(input.gameState, input.matchdayId) } : {}) }))
     .digest("hex");
 }
 

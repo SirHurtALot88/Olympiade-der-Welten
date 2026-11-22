@@ -4201,6 +4201,11 @@ export type SeasonState = {
    */
   hockeyTorwart?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "alt" | "neu" }> } | null;
   /**
+   * BASKETBALL-PUSTE-REGEL DIESER SAISON (22.11., lib/resolve/basketball-puste.ts): Wechselliste "alt"/"neu" je Spieltag,
+   * gesetzt beim Laden. Gebuchte Spieltage behalten ihre Regel.
+   */
+  basketballPuste?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "alt" | "neu" }> } | null;
+  /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.
    *
