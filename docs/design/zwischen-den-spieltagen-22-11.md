@@ -1788,3 +1788,129 @@ kleiner Kanal über Form, Moral und Erschöpfung.
   3. Zwei gleiche Legendäre in einer Aufstellung zünden beide. Die Messung prüft, ob das zu stark ist (Grenze 1,8-fach).
   4. Goldtruhe für Ruhm höchstens eine je fünf Spieltage: zu streng?
   5. Trait-Ereignisse: Größe ±2 % richtig, und soll „Transfergerüchte“ wirklich auf Gehaltsforderungen durchschlagen?
+
+---
+
+# Runde 11 (22.11.): Ein Lager, Gegenstands-Familien, Stufen-Optik, Affixe
+
+**Entschieden von Chris:** Lager 16 Plätze, kein eigener Materialbeutel. Zwei gleiche Legendäre wirken beide. Goldtruhe für
+Ruhm höchstens alle fünf Spieltage. Das ersetzt den Materialbeutel aus §41 und §50.
+
+## 58. Ein Lager für alles
+
+- **16 Plätze** für Ausrüstung **und** Materialien. Getragenes zählt nicht mit.
+- **Materialien stapeln bis 10 je Platz**, Signatur-Material bis 2 je Platz. Ein elfter Fund derselben Sorte wird zu
+  einem Teil. Acht Materialsorten können also bis zu acht Plätze binden: wer alles hortet, hat kaum Platz für Ausrüstung.
+- Volles Lager: ein Fund muss getauscht, verkauft oder zerlegt werden (bei Abwesenden und KI das wertloseste Teil).
+
+## 59. Acht Familien
+
+Die Attribute sind die zwölf aus `lib/player-generator/official-discipline-weights.ts` (`playerGeneratorAttributeKeys`):
+power, health, determination, stamina, speed, dexterity, awareness, intelligence, will, charisma, spirit, torment.
+Jede Familie bevorzugt zwei davon; zusammen decken sie alle zwölf ab.
+
+| Familie | bevorzugt | Material | Standard | Selten | Episch | Legendär |
+|---|---|---|---|---|---|---|
+| Lederrüstung | Dexterity, Speed | Leder | Einfache | Verstärkte | Verzierte | Schattenhaut |
+| Plattenpanzer | Health, Power | Eisen | Einfacher | Verstärkter | Verzierter | Bollwerk |
+| Robe | Intelligence, Will | Rauchkraut | Einfache | Verstärkte | Verzierte | Sternenrobe |
+| Handschuhe | Power, Dexterity | Leder | Einfache | Verstärkte | Verzierte | Titanenfäuste |
+| Schuhe | Speed, Stamina | Feder | Einfache | Verstärkte | Verzierte | Siebenmeiler |
+| Helm | Awareness, Determination | Linse | Einfacher | Verstärkter | Verzierter | Krone der Wachsamkeit |
+| Umhang | Charisma, Spirit | Banner | Einfacher | Verstärkter | Verzierter | Mantel des Phönix |
+| Amulett | Will, Torment | Kristall | Einfaches | Verstärktes | Verziertes | Herz der Qual |
+
+- **Bevorzugt** heißt: 60 % der Affixe fallen auf die zwei Attribute der Familie, 40 % auf die übrigen zehn.
+- **Kein Körperplatz-Zwang:** es bleibt bei zwei Ausrüstungsplätzen und einem Verbrauch je Spieler. Zwei Teile derselben
+  Familie am selben Spieler sind erlaubt, solange es nicht derselbe Gegenstand ist (Frage 2 unten).
+- Die Bauteile der Schmiede (Kletterseil, Eisenhaken …) und die 15 Legendären mit großem Effekt bleiben eigene, feste
+  Gegenstände; die Familien sind die gewöhnliche Ausrüstung aus Truhen und vom Händler.
+
+## 60. Stufen sehen anders aus
+
+| Stufe | Icon | Affixe | Wert je Affix | dazu |
+|---|---|---:|---:|---|
+| Standard | schlicht, gestrichelter Rand, grau | 1 | +2 bis +3 | – |
+| Selten | blauer Rand, Nieten in den Ecken | 2 | +3 bis +5 | – |
+| Episch | lila, doppelter Rand, Verzierung, leichtes Leuchten | 3 | +4 bis +6 | kleiner Effekt |
+| Legendär | gold, eigener Name, Strahlenkranz, starkes Leuchten | 4 | +5 bis +8 | großer Effekt |
+
+Die Stufen-Optik gilt für Lager, Ausrüstung, Vorraum-Karte und Truhe. In der Arena bleibt es beim Aufleuchten im Moment
+des Einsatzes. Im Mockup sind die Icons Skizzen aus Linien; die echten kämen aus PixelLab (§64).
+
+## 61. Affixe
+
+- **Aufbau:** ein Affix ist `+X auf ein Attribut`. Es läuft wie jeder Bonus durch die Matrix in die Eignung.
+- **Zweischneidig (20 % je Affix):** das Affix ist 1,5-mal so groß und zieht dafür ein anderes Attribut um ein Drittel
+  seines Werts herunter. Beispiel Episch: `+9 Health, −3 Stamina` statt `+6 Health`. Im Tooltip steht Positives grün,
+  Negatives rot.
+- **Eingeschränkt (15 % je Affix, ab Selten):** „nur in POW-Disziplinen“ oder „nur im Climbing“, dafür 1,5-mal so groß.
+  Damit gehen die drei Arten aus §19 (Disziplin, Farbe, allgemein) in den Affixen auf.
+- **Pflege-Affixe (10 %, ab Selten, zählen als Affix):** Robust (Verschleiß halbiert), Pflegeleicht (Reparatur −30 %),
+  Leicht (Erschöpfung −5 % in Einsätzen mit dem Teil).
+- **Name:** Stufenwort + Familie + Beiname nach dem größten Affix: „Verzierter Plattenpanzer des Ochsen“. Beinamen:
+  Power des Bären, Health des Ochsen, Determination des Dachses, Stamina des Wolfs, Speed des Falken, Dexterity der Katze,
+  Awareness des Luchses, Intelligence der Eule, Will des Mönchs, Charisma des Pfaus, Spirit des Phönix, Torment des
+  Henkers. Legendäre tragen ihren eigenen Namen.
+- **Würfeln:** beim Fund und beim Bauen, einmal, mit der Saat des Spielstands (kein Neuladen für bessere Werte). Ein Fund
+  kann mit einem Affix weniger als dem Höchstwert kommen (30 %), dann ist ein Platz frei für das Handwerk.
+- **Gegenwert:** die Summe der Affixe je Stufe ist so gewählt, dass der Mehrertrag im Korridor aus §48/§49 landen soll
+  (Standard rund +3, Selten +8, Episch +15, Legendär +26 Attributpunkte). Gemessen ist das nicht; der Messplan aus §49
+  bekommt je Stufe eine Zelle „typischer Wurf“ und eine Zelle „bester Wurf“.
+
+## 62. Legendäre wachsen über Stufen
+
+Die 15 Legendären mit großem Effekt haben drei Ausbaustufen. Beispiel Enterhaken:
+
+| Stufe | Bedingung | großer Effekt | passiv | Icon |
+|---|---|---|---|---|
+| I | gebaut (§42) | Sektion überspringen · einen Gegner heranziehen | – | gold |
+| II | 8 Zündungen + eine Ankerkette + 8 Teile | Wirkung +25 % (kürzere Flugzeit, mehr Schaden nach dem Zug) | erste Sektion 20 % schneller | gold, doppelter Rand |
+| III | 20 Zündungen + eine Ankerkette + 12 Teile | zieht zwei Gegner, auch in der letzten Sektion erlaubt | Verschleiß halbiert | gold, weißes Leuchten |
+
+- Die Zündungen zählt der Verlauf aus §54. Wer einen Gegenstand lange trägt, macht ihn besser; ein gekaufter oder
+  gefundener startet bei I.
+- Jede Stufe bewegt den Gegenwert und damit Reparatur und Preis (§48); II und III werden wie eigene Gegenstände gemessen.
+
+## 63. Affix-Handwerk in der Schmiede
+
+Ab Schmiede Stufe 3. Bezahlt wird mit dem Material der Familie und mit Teilen. Die Chancen stehen immer daneben.
+
+| Handgriff | was passiert | Kosten |
+|---|---|---|
+| **Neu würfeln** | ein zufälliges, nicht gesperrtes Affix wird ersetzt (60 % bevorzugtes Attribut, 20 % zweischneidig) | 1 Material + 2 Teile |
+| **Hinzufügen** | ein neues Affix, nur wenn ein Platz frei ist | 2 Material + 3 Teile |
+| **Sperren** | ein Affix je Gegenstand bleibt beim Würfeln erhalten; lösen kostet nichts | 3 Teile |
+
+- **Zahm:** nichts geht verloren außer dem einen Affix, das neu gewürfelt wird. Kein Zerstören, kein Stufenwechsel.
+- Der große und der kleine Effekt sind keine Affixe und lassen sich nicht würfeln.
+- KI: würfelt nur, wenn ein getragenes Teil ein Affix auf einem Attribut hat, das für den Träger in keiner seiner drei
+  besten Disziplinen zählt, und sperrt vorher das beste Affix. Höchstens ein Wurf je Spieltag.
+
+## 64. Auto-Ausrüsten, KI, PixelLab
+
+- **Bewertung, eine Summe:** `Wert(Teil, Spieler, Disziplin) = Summe über die Affixe (Wert × Matrixgewicht des Attributs
+  in der Disziplin)`, negative Affixe ziehen ab, eingeschränkte zählen nur in ihren Disziplinen. Dazu ein fester Zuschlag
+  für Effekte, wo sie wirken (klein 2, groß 5). Summiert über die zwei Disziplinen des Spieltags; danach die gierige
+  Zuteilung aus §55. Höchstens 58 Teile × 12 Spieler × 4 Affixe × 2 Disziplinen je Team, keine Suche.
+- Derselbe Wert steht im Tooltip („Wert für Zyra im Climbing heute“), sortiert das Lager und entscheidet bei der KI über
+  Verkaufen und Zerlegen.
+- **PixelLab-Schätzung (nichts bestellt):** 8 Familien × 4 Stufen = 32 Icons; 15 Legendäre × 3 Stufen = 45; 8 Materialien
+  und rund 6 Signatur-Materialien = 14. Zusammen 91, mit Fehlversuchen rund 105 Generationen (ein Bild = eine Generation,
+  wie in der Stilprobe). Verfügbar über der Reserve sind 156. Mit den Requisiten aus §53 (25 bis 40) wäre das Guthaben
+  damit fast aufgebraucht. Sparweg: Legendäre II und III als Code-Verzierung desselben Icons (Rand, Leuchten), dann 61
+  statt 91.
+
+## 65. Im Mockup, in der Demo, offen
+
+- `?ansicht=familien`: Familien-Tafel mit vier Stufen nebeneinander, Tooltip im PoE-Stil (Affix anklicken sperrt,
+  „würfeln“ und „hinzufügen“ arbeiten wirklich, Name und Wert rechnen mit), Lager mit 16 Plätzen samt Material-Stapeln,
+  Enterhaken I bis III.
+- Demo `public/mockups/kiste-demo-22-11.html` (27 KB): Funde aus Truhen sind Familien-Teile mit gewürfelten Affixen und
+  gebildetem Namen; Materialien liegen als Stapel im selben Lager und zählen zu den 16 Plätzen.
+- **Offen:**
+  1. Affix-Werte und die Quoten (60 % bevorzugt, 20 % zweischneidig, 15 % eingeschränkt): Startwerte, bis gemessen.
+  2. Zwei Teile derselben Familie an einem Spieler (zwei Plattenpanzer): erlaubt lassen oder „höchstens eines je
+     Familie“?
+  3. Legendäre II und III über Zündungen: gewünscht, oder lieber nur über Material?
+  4. Icons: volle 91 Generationen oder der Sparweg mit 61?

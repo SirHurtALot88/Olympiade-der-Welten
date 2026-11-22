@@ -82,9 +82,9 @@ main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:.8rem;
 <section class="pan" id="sKiste"><div class="pk"><h2 id="kT">Eisentruhe · 20 Ruhm</h2><small>Klick auf die Kiste · Bewegung ist CSS, Bilder aus PixelLab</small></div>
  <div class="buehne p0" id="buehne"><span class="strahl"></span><div class="fund" id="fund"></div>
   <div class="truhe" id="truhe"><img class="kranz" src="../sprites/beute/lichtkranz.png" alt=""><img class="zu" src="../sprites/beute/kiste-eisen-zu.png" alt="" id="bz"><img class="offen" src="../sprites/beute/kiste-eisen-offen.png" alt=""></div><span class="hinw">Klick auf die Kiste</span></div>
- <div class="leiste"><button class="btn g" id="nochmal">nochmal öffnen</button><span class="klein" id="kText">Drei Funde, Ausrüstung oder Material. Du wählst einen, die zwei anderen werden zu Teilen.</span></div></section>
+ <div class="leiste"><button class="btn g" id="nochmal">nochmal öffnen</button><span class="klein" id="kText">Drei Funde mit gewürfelten Affixen, oder Material. Du wählst einen, die zwei anderen werden zu Teilen.</span></div></section>
 <section class="pan" id="sSchmiede" style="display:none"><div class="pk"><h2>Lager · anklicken zum Auswählen</h2><small id="auswT">nichts gewählt</small></div>
- <div class="pb"><div class="klein" style="margin-bottom:.3rem"><b>Materialbeutel</b> (kein Lagerplatz)</div><div class="mat" id="mat"></div><div class="lager" id="lager"></div><div id="log">Baue den Enterhaken in drei Schritten: Materialien zu zwei Grundgegenständen, die zum Wurfanker, der mit dem Abzeichen zum Enterhaken. Was gerade geht, ist golden umrandet.</div></div></section>
+ <div class="pb"><div class="klein" style="margin-bottom:.3rem">Materialien liegen im selben Lager, bis 10 je Platz</div><div class="mat" id="mat"></div><div class="lager" id="lager"></div><div id="log">Baue den Enterhaken in drei Schritten: Materialien zu zwei Grundgegenständen, die zum Wurfanker, der mit dem Abzeichen zum Enterhaken. Was gerade geht, ist golden umrandet.</div></div></section>
 <aside class="pan"><div class="pk"><h2 id="rT">Chancen der Eisenkiste</h2><small id="rS">je Fund, immer sichtbar</small></div>
  <div class="pb" id="rechts"></div></aside>
 </main>
@@ -105,7 +105,14 @@ function istM(k){return k.charAt(0)==="#"}
 function bild(k){if(istM(k))return '<span class="ic mt">'+MN[k.slice(1)].slice(0,2)+'</span>';var b=K[k][4];return b.length>3?'<span class="ic"><img src="../sprites/beute/'+b+'" alt="" onerror="this.parentNode.className=\'ic sv\';this.parentNode.textContent=\''+K[k][1].slice(0,2)+'\'"></span>':'<span class="ic sv">'+b+'</span>'}
 function zahl(x){return x.toFixed(2).replace(".",",").replace(/0$/,"")}
 function wuerfel(ch){var r=Math.random()*100,s=0;for(var i=0;i<ch.length;i++){s+=ch[i];if(r<s)return i}return ch.length-1}
-function aus(st){var a=NACH[st];return a[Math.floor(Math.random()*a.length)]}
+/* Familien: [Name, Endung, bevorzugte Attribute, Kuerzel]; Affixe je Stufe 1/2/3, Werte je Stufe, 20 % zweischneidig */
+var AT=["Power","Health","Determination","Stamina","Speed","Dexterity","Awareness","Intelligence","Will","Charisma","Spirit","Torment"],SUF=["des Bären","des Ochsen","des Dachses","des Wolfs","des Falken","der Katze","des Luchses","der Eule","des Mönchs","des Pfaus","des Phönix","des Henkers"];
+var FAM=[["Lederrüstung","e",[5,4],"LR"],["Plattenpanzer","er",[1,0],"PP"],["Robe","e",[7,8],"RO"],["Handschuhe","e",[0,5],"HS"],["Schuhe","e",[4,3],"SU"],["Helm","er",[6,2],"HE"],["Umhang","er",[9,10],"UM"],["Amulett","es",[8,11],"AM"]],SW=["Einfach","Verstärkt","Verziert"],AB=[[2,3],[3,5],[4,6]],nr=0;
+function rnd(n){return Math.floor(Math.random()*n)}
+function wurf(st){var F=FAM[rnd(8)],z=[],top=0,ta=0;for(var i=0;i<=st;i++){var a=Math.random()<.6?F[2][rnd(2)]:rnd(12),v=AB[st][0]+rnd(AB[st][1]-AB[st][0]+1),t='<span style="color:#62d394">+'+v+' '+AT[a]+'</span>';
+  if(Math.random()<.2){v=Math.round(v*1.5);t='<span style="color:#62d394">+'+v+' '+AT[a]+'</span> <span style="color:#ff6058">−'+Math.round(v/3)+' '+AT[(a+1+rnd(11))%12]+'</span>'}if(v>top){top=v;ta=a}z.push(t)}
+ var k="g"+(nr++);K[k]=[st,SW[st]+F[1]+" "+F[0]+" "+SUF[ta],z.join("<br>"),(st+1)+(st?" Affixe":" Affix")+(st===2?" · kleiner Effekt":""),F[3]];return k}
+function aus(st){if(st<3)return wurf(st);var a=NACH[st];return a[rnd(a.length)]}
 function m(k){return Z.mat[k]||0}
 /* Haltbarkeit laeuft neben dem Lager mit; Reparatur voll = 0,07/0,13/0,26/0,52 C je Stufe (30 % vom Gegenwert je Einsatz), kaputt x 1,5 */
 function rein(k){Z.lager.push(k);Z.hb.push(100)}
@@ -113,7 +120,9 @@ function raus(i){Z.lager.splice(i,1);Z.hb.splice(i,1)}
 function rkost(i){var f=100-Z.hb[i];return REP[K[Z.lager[i]][0]]*f/100*(f===100?1.5:1)}
 function flick(l){var s=0;l.forEach(function(i){var c=rkost(i);if(c>0&&Z.kasse>=c){Z.kasse-=c;s+=c;Z.hb[i]=100}});return s}
 function alle(){return Z.lager.map(function(k,i){return i})}
-function stand(){$("vr").textContent=Z.ruhm;$("vt").textContent=Z.teile;$("vk").textContent=zahl(Z.kasse)+" C";$("vl").textContent=Z.lager.length+" / 16"}
+function stapel(){return Object.keys(Z.mat).filter(function(k){return Z.mat[k]>0})}
+function belegt(){return Z.lager.length+stapel().length}
+function stand(){$("vr").textContent=Z.ruhm;$("vt").textContent=Z.teile;$("vk").textContent=zahl(Z.kasse)+" C";$("vl").textContent=belegt()+" / 16"}
 /* ---------- Kiste: Material 30, Standard 28, Selten 28, Episch 12, Legendaer 2 ---------- */
 /* Truhen: [Name, Ruhm, Chancen Material/Standard/Selten/Episch/Legendaer/Signatur-Material, Bildfilter, woher] */
 var TR=[["Holz",10,[45,40,13,2,0,0],"sepia(.9) saturate(1.5) hue-rotate(-15deg) brightness(.9)","erster Disziplinsieg des Spieltags oder 10 Ruhm"],["Eisen",20,[30,28,28,12,2,0],"","20 Ruhm, Wochenziel, Wimpel"],["Gold",45,[15,10,35,28,7,5],"sepia(1) saturate(3.2) brightness(1.2)","Derby-Sieg, Saisonziel, Platz 1 bis 3; für Ruhm höchstens eine je fünf Spieltage"]],tr=1,CH=TR[1][2],CN=["Material","Standard","Selten","Episch","Legendär","Signatur-Material"],CF=["#f4e6c4"].concat(SF,["#ff9ad5"]),T=[];
@@ -124,7 +133,7 @@ function oeffne(){if(Z.offen)return;if(Z.ruhm<TR[tr][1]){Z.ruhm+=60;$("kText").i
  $("fund").innerHTML=Z.funde.map(function(k,i){var M=istM(k);return '<div class="fk" style="--sf:'+(M?"#f4e6c4":SF[K[k][0]])+'" data-i="'+i+'">'+bild(k)+'<em>'+(k==="#abz"?"Signatur-Material":M?"Material":SN[K[k][0]])+'</em><b>'+(M?MN[k.slice(1)]:K[k][1])+'</b><strong>'+(M?"zum Schmieden":K[k][2])+'</strong><small>'+(M?"kommt in den Beutel":K[k][3])+'</small></div>'}).join("");
  stand();rechtsKiste();setz(1);T.push(setTimeout(function(){setz(2)},1200));T.push(setTimeout(function(){setz(3);$("kText").innerHTML="Wähle <b>einen</b> Fund. Das Licht hat die beste Stufe verraten: <b style='color:"+SF[top]+"'>"+SN[top]+"</b>."},2000))}
 function nimm(i){if(!Z.offen||Z.funde.length<3)return;var k=Z.funde[i],t=0;Z.funde.forEach(function(f,j){if(j!==i)t+=istM(f)?1:TEILE[K[f][0]]});
- if(istM(k))Z.mat[k.slice(1)]=m(k.slice(1))+1;else if(Z.lager.length<16)rein(k);else t+=TEILE[K[k][0]];Z.teile+=t;Z.funde=[];
+ if(istM(k)){var mk=k.slice(1);if(m(mk)<10&&(m(mk)||belegt()<16))Z.mat[mk]=m(mk)+1;else t+=1}else if(belegt()<16)rein(k);else t+=TEILE[K[k][0]];Z.teile+=t;Z.funde=[];
  document.querySelectorAll(".fk").forEach(function(e,j){e.classList.add(j===i?"gew":"weg")});
  $("kText").innerHTML="<b>"+(istM(k)?MN[k.slice(1)]+"</b> liegt im Materialbeutel":K[k][1]+"</b> liegt im Lager")+". Die zwei anderen wurden zu <b>"+t+" Teilen</b>.";stand()}
 function neu(){T.forEach(clearTimeout);T=[];Z.offen=false;Z.funde=[];$("fund").innerHTML="";setz(0);$("kText").textContent="Drei Funde, Ausrüstung oder Material. Du wählst einen, die zwei anderen werden zu Teilen."}
@@ -155,10 +164,9 @@ function rezepte(){var g=gew(),n=g.length,st=n?K[g[0]][0]:0,gleich=n===3&&K[g[1]
 function weg(){Z.ausw.sort(function(a,b){return b-a}).forEach(function(i){raus(i)});Z.ausw=[]}
 function sag(t){$("log").innerHTML=t;zeig()}
 var R={};
-function zeig(){stand();var h="";for(var i=0;i<16;i++){var k=Z.lager[i];h+=k?'<div class="it'+(Z.ausw.indexOf(i)>=0?" gew":"")+'" style="--sf:'+SF[K[k][0]]+'" data-l="'+i+'">'+bild(k)+'<b>'+K[k][1]+'</b>'+K[k][2]+'<br><span style="color:'+(Z.hb[i]>50?"var(--gruen,#62d394)":Z.hb[i]>0?"#f3b54a":"#ff6058")+'">'+(Z.hb[i]?Z.hb[i]+" %":"kaputt")+'</span></div>':'<div class="it frei"></div>'}
+function zeig(){stand();var h="",S=stapel();for(var i=0;i<16;i++){var k=Z.lager[i],mi=i-Z.lager.length;if(!k&&mi<S.length){h+='<div class="it" style="--sf:'+(S[mi]==="abz"?"#f0c35a":"#f4e6c4")+'">'+bild("#"+S[mi])+'<b>'+MN[S[mi]]+'</b>Material × '+m(S[mi])+'</div>';continue}h+=k?'<div class="it'+(Z.ausw.indexOf(i)>=0?" gew":"")+'" style="--sf:'+SF[K[k][0]]+'" data-l="'+i+'">'+bild(k)+'<b>'+K[k][1]+'</b>'+K[k][2]+'<br><span style="color:'+(Z.hb[i]>50?"var(--gruen,#62d394)":Z.hb[i]>0?"#f3b54a":"#ff6058")+'">'+(Z.hb[i]?Z.hb[i]+" %":"kaputt")+'</span></div>':'<div class="it frei"></div>'}
  $("lager").innerHTML=h;$("auswT").textContent=Z.ausw.length?Z.ausw.length+" gewählt":"nichts gewählt";
- $("mat").innerHTML=MK.map(function(k){return '<span class="'+(m(k)?"":"null")+'">'+MN[k]+'<b>'+m(k)+'</b></span>'}).join("")+'<span class="sig'+(m("abz")?"":" null")+'">'+MN.abz+'<b>'+m("abz")+'</b></span>';
- R=rezepte();$("rT").textContent="Schmiede";$("rS").textContent="drei Schritte bis Legendär";$("rechts").innerHTML=R.h}
+ $("mat").innerHTML="";R=rezepte();$("rT").textContent="Schmiede";$("rS").textContent="drei Schritte bis Legendär";$("rechts").innerHTML=R.h}
 function tab(n){$("t0").className=n?"":"an";$("t1").className=n?"an":"";$("sKiste").style.display=n?"none":"";$("sSchmiede").style.display=n?"":"none";if(n)zeig();else rechtsKiste()}
 document.addEventListener("click",function(e){var t=e.target;
  if(t.id==="t0")return tab(0);if(t.id==="t1")return tab(1);
