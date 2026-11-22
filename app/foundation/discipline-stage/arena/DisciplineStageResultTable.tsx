@@ -2,6 +2,7 @@
 
 import { fmt1, ampel } from "../stage-format";
 import TeamMark from "./TeamMark";
+import { mutatorAufloesung, mutatorTrefferSumme } from "@/lib/foundation/discipline-stage/mutator-aufloesung";
 
 // Task #102 (Chris, 13.10.): „bei allen Diszis fehlt am Ende noch wie viele PPs welcher
 // Spieler mit seiner Leistung erhalten hat!" — diese Tabelle ist das gemeinsame Chassis
@@ -28,6 +29,11 @@ export type ResultSlotCell = {
    * Modus, gebuchte Altdaten ohne Zuteilung).
    */
   pp?: number | null;
+  /**
+   * Mutator-Treffer dieses Spielers (nur Battle-Modus, 22.11.). Im Battle-Modus gibt ein Treffer keine Punkte,
+   * sondern +3,5 Form je Treffer — die Zeile zeigt Treffer + Form, nie eine erfundene Punktzahl.
+   */
+  mutatorHits?: number | null;
 };
 export type ResultTableRow = {
   rank: number;
@@ -105,7 +111,7 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
         <span style={{ fontSize: 11, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--nl-mut)", fontWeight: 800 }}>
           Detail-Ergebnis
         </span>
-        <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>Netto je Etappe · Slot-Rang farbcodiert · ★ = Etappenbester · Gesamt = Summe · PP = erhaltene Player-Points</span>
+        <span style={{ fontSize: 12.5, color: "var(--nl-mut)" }}>Netto je Etappe · Slot-Rang farbcodiert · ★ = Etappenbester · Gesamt = Summe · PP = erhaltene Player-Points{rows.some((r) => r.slots.some((c) => (c.mutatorHits ?? 0) > 0)) ? " · ◆ = Mutator-Treffer (Form, keine Punkte)" : ""}</span>
       </div>
       <div style={{ overflowX: "auto", overscrollBehaviorX: "contain", maxHeight: "min(62vh, 640px)", overflowY: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", fontVariantNumeric: "tabular-nums", fontSize: 13 }}>
@@ -206,10 +212,25 @@ export default function DisciplineStageResultTable({ rows, slotLabels, onOpenPla
                         {c.pp != null ? (
                           <div style={{ fontSize: 10.5, fontWeight: 800, color: "var(--nl-accent)" }}>{fmt1(c.pp)} PP</div>
                         ) : null}
+                        {/* Mutator (Chris, 22.11.): im Battle-Modus Treffer + Formschub statt Punkte-Aufschlag. */}
+                        {mutatorAufloesung(c.mutatorHits) ? (
+                          <div data-testid="aufloesung-mutator" title={mutatorAufloesung(c.mutatorHits)!.lang} style={{ fontSize: 10.5, fontWeight: 800, color: "var(--nl-mutator, #b58be8)" }}>
+                            {mutatorAufloesung(c.mutatorHits)!.kurz}
+                          </div>
+                        ) : null}
                       </td>
                     );
                   })}
-                  <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 800, color: "var(--nl-accent)", fontSize: 14 }}>{fmt1(r.total)}</td>
+                  <td style={{ padding: "6px 8px", textAlign: "right", fontWeight: 800, color: "var(--nl-accent)", fontSize: 14 }}>{fmt1(r.total)}
+                    {(() => {
+                      const team = mutatorAufloesung(mutatorTrefferSumme(r.slots.map((c) => c.mutatorHits)));
+                      return team ? (
+                        <div data-testid="aufloesung-mutator-team" title={team.lang} style={{ fontSize: 10.5, fontWeight: 800, color: "var(--nl-mutator, #b58be8)", whiteSpace: "nowrap" }}>
+                          {team.kurz}
+                        </div>
+                      ) : null;
+                    })()}
+                  </td>
                 </tr>
               );
             })}
