@@ -270,7 +270,9 @@ function Uebersicht({ m, gew, setGew }: { m: FinanzSeiteModell; gew: number; set
       <BewegungsBalken verlauf={m.verlauf} gew={gew} onWahl={setGew} />
       <div className="fin-leg" style={{ paddingTop: 6 }}>
         <span>
-          Heute bucht das Spiel Sponsor, Gehalt, Gebäude und Kredit am Saisonende; Spieltags-Buchungen gibt es bisher nur für Transfers.
+          {m.jeSpieltag
+            ? "Gehalt, Sponsor-Basis und Gebäude werden je Spieltag gebucht (1/N), dazu ein Rang-Abschlag von 80 % der Rangprämie beim aktuellen Platz; der Schlussausgleich folgt am Saisonende. Sonderziel-Sponsor, Apron, Vorstandsziele und Kredit kommen am Saisonende."
+            : "Diese Saison bucht das Spiel Sponsor, Gehalt, Gebäude und Kredit am Saisonende; Spieltags-Buchungen gibt es nur für Transfers."}
         </span>
       </div>
     </>
@@ -285,6 +287,12 @@ const ART_TEXT: Record<string, string> = {
   vertragsende_abloese: "Vertragsende",
   sponsor: "Sponsor",
   gehalt_und_sponsor_saisonende: "Saisonabrechnung",
+  gehalt_spieltag: "Gehalt",
+  sponsor_basis_spieltag: "Sponsor-Basis",
+  rang_abschlag_spieltag: "Rangprämie Abschlag",
+  rang_schlussausgleich: "Rangprämie Schlussausgleich",
+  gebaeude_einnahme_spieltag: "Gebäude-Einnahme",
+  gebaeude_unterhalt_spieltag: "Gebäude-Unterhalt",
   apron: "Apron",
   vorstandsziele: "Vorstandsziele",
   notfall_kasse: "Notfall-Kasse",
@@ -1210,7 +1218,11 @@ function KontextQuelle({ m, gew }: { m: FinanzSeiteModell; gew: number }) {
           <span>Zeilen dieser Station</span>
         </div>
         {p.zeilen.length === 0 && !(p.prognosePosten?.length ?? 0) ? (
-          <div className="fin-txt">Keine Buchung. Die Kasse bleibt, wie sie ist.</div>
+          <div className="fin-txt">
+            {m.jeSpieltag && !p.gebucht && p.art === "spieltag"
+              ? `Erwartete Buchung dieses Spieltags: ${Cv(p.bewegung)} (Gehalt, Sponsor-Basis, Gebäude, Rang-Abschlag).`
+              : "Keine Buchung. Die Kasse bleibt, wie sie ist."}
+          </div>
         ) : null}
         {p.zeilen.map((z, i) => (
           <div className="fin-rek" key={i}>

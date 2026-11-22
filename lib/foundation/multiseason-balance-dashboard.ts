@@ -283,8 +283,15 @@ function buildEconomyRows(gameState: GameState, snapshots: SeasonSnapshotRecord[
     const transferSpend = sum(gameState.transferHistory.filter((entry) => entry.toTeamId === team.teamId && entry.transferType === "buy").map((entry) => entry.fee));
     const transferIncome = sum(gameState.transferHistory.filter((entry) => entry.fromTeamId === team.teamId && entry.transferType === "sell").map((entry) => entry.fee));
     const facilityEvents = gameState.seasonState.facilityEvents ?? [];
-    const facilityUpkeep = sum(facilityEvents.filter((entry) => entry.teamId === team.teamId && entry.source === "facility_upkeep_paid").map((entry) => entry.cost));
-    const facilityIncome = sum(facilityEvents.filter((entry) => entry.teamId === team.teamId && entry.source === "facility_income_collected").map((entry) => entry.cost));
+    // Finanzen je Spieltag (22.11.): Unterhalt und Einnahme je Spieltag stehen im Ledger, die Saisonende-Ereignisse tragen dann
+    // nur den ungebuchten Rest. Gleiche Vorzeichenkonvention wie die Ereigniskosten (Unterhalt +, Einnahme −).
+    const jeSpieltag = (gameState.seasonState.spieltagFinanzen ?? []).filter((entry) => entry.teamId === team.teamId);
+    const facilityUpkeep =
+      sum(facilityEvents.filter((entry) => entry.teamId === team.teamId && entry.source === "facility_upkeep_paid").map((entry) => entry.cost)) -
+      sum(jeSpieltag.map((entry) => entry.gebaeudeUnterhalt));
+    const facilityIncome =
+      sum(facilityEvents.filter((entry) => entry.teamId === team.teamId && entry.source === "facility_income_collected").map((entry) => entry.cost)) -
+      sum(jeSpieltag.map((entry) => entry.gebaeudeEinnahme));
     const salaryRatio = team.cash > 0 ? round(salaryCurrent / team.cash, 2) : null;
     const cashValues = snapshotRows.map((entry) => entry.cashEnd).filter(isNumber);
     const warning =

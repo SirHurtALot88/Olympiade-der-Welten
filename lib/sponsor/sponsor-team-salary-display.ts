@@ -1,5 +1,6 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { mischeSaisongehalt } from "@/lib/contracts/verlaengerung-in-saison";
+import { istJeSpieltagSaison, saisonGehaltJeSpieltag } from "@/lib/finance/finanzen-je-spieltag";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import {
   normalizeEconomyMoney,
@@ -42,6 +43,10 @@ export function getTeamDisplaySalaryTotal(gameState: GameState, teamId: string):
  * die Bemessungsgrundlage für Apron/Sponsor/KI.
  */
 export function getTeamActualSalaryTotal(gameState: GameState, teamId: string): number {
+  // FINANZEN JE SPIELTAG (22.11.): in dieser Saison ist das Gehalt je Spieltag gebucht. Das Saisongehalt ist dann das, was
+  // bis heute gebucht ist, plus der Rest zum heutigen Gehalt — Kauf, Verkauf und Verlaengerung stecken in der Historie
+  // (`gehaltAmSpieltag`), eine Mischrechnung ist nicht noetig. Ohne Stempel: unveraendert der alte Weg unten.
+  if (istJeSpieltagSaison(gameState)) return round1(saisonGehaltJeSpieltag(gameState, teamId));
   const playerById = new Map(gameState.players.map((player) => [player.id, player] as const));
   const total = gameState.rosters
     .filter((entry) => entry.teamId === teamId)

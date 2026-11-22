@@ -1,4 +1,5 @@
 import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
+import { istJeSpieltagSaison, ungebuchterAnteil } from "@/lib/finance/finanzen-je-spieltag";
 import type { GameFlowState, GameFlowStep } from "@/lib/foundation/game-flow-controller";
 import { buildTeamPlayerTrainingLoadPlans, type AiTeamTrainingIntensity } from "@/lib/ai/ai-player-training-load-service";
 import type {
@@ -1031,7 +1032,10 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
     const income = calculateFacilityIncome(facilities, {
       arenaPopularityFactor: computeTeamBeliebtheitFromGameState(input.gameState, team.teamId).value,
     });
-    if (upkeep > 0 && team.cash + income - upkeep < 0) {
+    // Finanzen je Spieltag (22.11.): ein Teil von Einnahme und Unterhalt ist schon je Spieltag gebucht und steckt in der Kasse.
+    const gebaeudeRestAnteil = istJeSpieltagSaison(input.gameState) ? ungebuchterAnteil(input.gameState, team.teamId) : 1;
+    const kasseNachGebaeuden = gebaeudeRestAnteil >= 1 ? team.cash + income - upkeep : team.cash + (income - upkeep) * gebaeudeRestAnteil;
+    if (upkeep > 0 && kasseNachGebaeuden < 0) {
       items.push(
         createItem({
           itemId: `facility_upkeep_risk:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,

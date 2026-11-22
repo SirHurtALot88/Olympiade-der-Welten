@@ -11,6 +11,7 @@ import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save"
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advancePlayerPotentialRevealTick } from "@/lib/progression/player-potential-service";
 import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
+import { bucheSpieltagFinanzen } from "@/lib/finance/finanzen-je-spieltag-buchung";
 import { aktualisiereKiMerkliste } from "@/lib/ai/ki-merkliste";
 import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
 import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
@@ -326,7 +327,7 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
     ],
   };
 
-  const nextGameState: GameState = maybeGenerateSponsorEvents(
+  const nextGameStateOhneFinanzen: GameState = maybeGenerateSponsorEvents(
     advancePlayerPotentialRevealTick(advanceScoutIntelTick({
       gameState: {
         ...save.gameState,
@@ -368,6 +369,9 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
     })),
     prepared.saveId,
   );
+  // FINANZEN JE SPIELTAG (22.11., docs/design/finanzen-je-spieltag-22-11.md): Gehalt, Sponsor-Basis, Gebaeude-Einnahme
+  // und -Unterhalt dieses Spieltags, fuer alle Teams gleich und idempotent je Spieltag. Ohne Saison-Stempel unveraendert.
+  const nextGameState: GameState = bucheSpieltagFinanzen(nextGameStateOhneFinanzen, prepared.currentMatchdayId);
 
   // Season-End (kein weiterer Matchday = MD10 abgeschlossen): OVR/MVS/PPs/MW + Sale-Factor-Bracket
   // über den vollen MD10-Kader-Pool EINFRIEREN. Der Snapshot wird auf dem eben gebauten
