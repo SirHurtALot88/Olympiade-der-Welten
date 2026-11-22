@@ -795,7 +795,7 @@ export function ArenaVorstellung({
               <div className="gk">
                 Disziplin {disziplinNr} von {disziplinAnzahl} · {art === "pod" ? "Vierergruppe · jeder gegen jeden" : "Duell"}
               </div>
-              <h1>{disziplinName}</h1>
+              <h2>{disziplinName}</h2>
             </div>
           </div>
           <div className="schema" data-testid="arena-vorstellung-schema">
