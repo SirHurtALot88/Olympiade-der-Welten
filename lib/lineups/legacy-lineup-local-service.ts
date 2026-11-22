@@ -945,7 +945,7 @@ function buildContextFromGameState(gameState: GameState, params: LegacyLineupKey
         teamId: params.teamId,
         lineupId: existingDraftLineupId,
       }),
-      formMoralRegeln: resolveFormMoralRegeln(),
+      formMoralRegeln: resolveFormMoralRegeln(undefined, normalizedGameState),
       formCardPlans: (normalizedGameState.seasonState.formCardPlans ?? []).filter(
         (plan) => plan.seasonId === params.seasonId && plan.teamId === params.teamId,
       ),

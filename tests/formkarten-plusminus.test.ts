@@ -1,10 +1,11 @@
 /**
- * FORMKARTEN PLUS/MINUS (22.11., Schalter OLY_FORMKARTEN_PLUSMINUS, Standard AUS).
+ * FORMKARTEN PLUS/MINUS (22.11., Spielstand-Stempel `seasonState.formkartenRegel`, lib/resolve/formkarten-regel.ts).
  * Konzept: docs/design/formkarten-plusminus-22-11.md.
- *  - Schalter aus: Werte, Zerlegung und Regelstand bit-identisch zu vorher (kein `gegen`-Feld, keine 0er-Aenderung).
- *  - Schalter an: Spieler der Gegenfarbe tragen den spiegelbildlichen Anteil; Karten ohne 0.
+ *  - Regel "alt" (kein/fremder Stempel): Werte, Zerlegung und Regelstand bit-identisch zu vorher (kein `gegen`-Feld, Werte 0/2/4/8).
+ *  - Regel "plusminus": Spieler der Gegenfarbe tragen den spiegelbildlichen Anteil; Karten 2/4/6/8 ohne 0.
+ *  - Stempel: neues Spiel / bestehender Spielstand / Saisonwechsel / Rueckweg / Notbremse.
  *  - Gezeigt = gebucht: Einsatzliste (berechneKartenWirkung), Arena-Adapter und Legacy-Funktion rechnen dieselbe Zahl.
- *  - KI-Plan deterministisch, Duell-Gewicht verschiebt den Slot, nie ohne Schalter.
+ *  - KI-Plan deterministisch, Duell-Gewicht verschiebt den Slot.
  */
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -17,7 +18,6 @@ import {
   GEGENFARBE,
   formkartenHinweis,
   formkartenZerlegungFuerSpieler,
-  isFormkartenPlusMinusEnabled,
   kartenWertFuerSpieler,
 } from "@/lib/lineups/formkarten-farbregel";
 import { berechneKartenWirkung, kartenEffekt, kartenEffektText } from "@/lib/lineups/formkarten-wirkung";
@@ -28,6 +28,12 @@ import {
   getTeamFormCardOptions,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { farbregelAusRegeln, resolveFormMoralRegeln } from "@/lib/morale/form-moral-regeln";
+import {
+  formkartenRegelFuer,
+  formkartenRegelFuerSpielmodus,
+  stempleFormkartenRegelBeimAnlegen,
+  stempleFormkartenRegelNachLaden,
+} from "@/lib/resolve/formkarten-regel";
 
 const SPIELER = [
   { id: "kati", name: "Kati", className: "Bard" },
@@ -36,13 +42,15 @@ const SPIELER = [
   { id: "dusk", name: "Duskwhisper", className: "Mage" },
 ];
 
-function spielstand(wert: number, farbe: string, aufgestellt: string[]) {
+function spielstand(wert: number, farbe: string, aufgestellt: string[], regel: "alt" | "plusminus" = "plusminus") {
   return {
     scenarioMeta: { gameMode: "battle" },
     players: SPIELER,
     rosters: SPIELER.map((s) => ({ id: `roster-${s.id}`, teamId: "t1", playerId: s.id })),
     disciplines: [{ id: "battlefield", name: "battlefield", category: "social" }],
     seasonState: {
+      seasonId: "season-1",
+      formkartenRegel: { seasonId: "season-1", regel },
       formCards: [{ id: "fc", saveId: "s1", seasonId: "season-1", teamId: "t1", playerId: "dusk", playerName: "Duskwhisper", cardColor: farbe, cardValue: wert, createdAt: "x" }],
       formCardPlans: [],
       lineupDrafts: [
@@ -66,11 +74,15 @@ function wirkung(gs: GameState, aufgestellt: string[], regeln?: ReturnType<typeo
 
 afterEach(() => { delete process.env.OLY_FORMKARTEN_PLUSMINUS; });
 
-describe("Plus/Minus: Schalter aus = unveraendert", () => {
-  it("Standard AUS, nur 1/an/on/true schalten ein", () => {
-    expect(isFormkartenPlusMinusEnabled({})).toBe(false);
-    expect(isFormkartenPlusMinusEnabled({ OLY_FORMKARTEN_PLUSMINUS: "0" })).toBe(false);
-    expect(isFormkartenPlusMinusEnabled({ OLY_FORMKARTEN_PLUSMINUS: "1" })).toBe(true);
+const PM = { scenarioMeta: { gameMode: "battle" }, seasonState: { seasonId: "season-1", formkartenRegel: { seasonId: "season-1", regel: "plusminus" as const } } };
+const ALT = { scenarioMeta: { gameMode: "battle" }, seasonState: { seasonId: "season-1", formkartenRegel: { seasonId: "season-1", regel: "alt" as const } } };
+
+describe("Plus/Minus: Regel alt = unveraendert", () => {
+  it("ohne Stempel, mit fremdem Stempel und mit alt gilt die Regel von 18.11.", () => {
+    expect(formkartenRegelFuer(undefined)).toBe("alt");
+    expect(formkartenRegelFuer({ seasonState: { seasonId: "season-1" } })).toBe("alt");
+    expect(formkartenRegelFuer({ seasonState: { seasonId: "season-2", formkartenRegel: { seasonId: "season-1", regel: "plusminus" } } })).toBe("alt");
+    expect(formkartenRegelFuer(ALT)).toBe("alt");
   });
 
   it("ohne Gegenfarb-Faktor keine Aenderung und kein neues Feld in der Zerlegung", () => {
@@ -79,37 +91,89 @@ describe("Plus/Minus: Schalter aus = unveraendert", () => {
     expect("gegen" in z).toBe(false);
   });
 
-  it("Regelstand ohne Schalter hat kein plusMinus-Feld", () => {
+  it("Regelstand ohne Stempel hat kein plusMinus-Feld, auch wenn der Schalter an ist", () => {
+    process.env.OLY_FORMKARTEN_PLUSMINUS = "an";
     expect(resolveFormMoralRegeln({})).not.toHaveProperty("plusMinus");
-    expect(farbregelAusRegeln(resolveFormMoralRegeln({}))).toBe(FARBREGEL_PM);
+    expect(resolveFormMoralRegeln({}, ALT)).not.toHaveProperty("plusMinus");
+    expect(farbregelAusRegeln(resolveFormMoralRegeln({}, ALT))).toBe(FARBREGEL_PM);
   });
 
-  it("Kartenwerte ohne Schalter weiter mit 0 (Bestand der Saves)", () => {
+  it("Kartenwerte der Regel alt weiter mit 0 (Bestand der Saves)", () => {
     const werte = new Set<number>();
     for (let i = 0; i < 400; i++) werte.add(computePositiveFormCardValueForTests("s", "season-1", "t", `p${i}`));
     expect([...werte].sort((a, b) => a - b)).toEqual([0, 2, 4, 8]);
   });
 });
 
-describe("Plus/Minus: Schalter an", () => {
+describe("Plus/Minus: Stempel im Spielstand", () => {
+  const neu = () => ({ scenarioMeta: { gameMode: "battle" }, season: { id: "season-1" }, seasonState: { seasonId: "season-1" } }) as unknown as GameState;
+
+  it("neues Spiel: plusminus ab Saison 1, idempotent", () => {
+    const gs = stempleFormkartenRegelBeimAnlegen(neu());
+    expect(gs.seasonState.formkartenRegel).toEqual({ seasonId: "season-1", regel: "plusminus" });
+    expect(formkartenRegelFuer(gs)).toBe("plusminus");
+    expect(stempleFormkartenRegelBeimAnlegen(gs)).toBe(gs);
+  });
+
+  it("Manager-Spielstand bekommt keinen Stempel und bleibt alt", () => {
+    const manager = { scenarioMeta: { gameMode: "manager" }, season: { id: "season-1" }, seasonState: { seasonId: "season-1" } } as unknown as GameState;
+    expect(stempleFormkartenRegelBeimAnlegen(manager)).toBe(manager);
+    expect(formkartenRegelFuerSpielmodus(manager, "season-2")).toBeUndefined();
+  });
+
+  it("bestehender Spielstand: Lade-Migration schreibt alt fest, naechster Saisonwechsel bringt plusminus", () => {
+    const geladen = stempleFormkartenRegelNachLaden(neu());
+    expect(geladen.seasonState.formkartenRegel).toEqual({ seasonId: "season-1", regel: "alt" });
+    expect(stempleFormkartenRegelNachLaden(geladen)).toBe(geladen);
+    expect(formkartenRegelFuer(geladen)).toBe("alt");
+    const saisonwechsel = {
+      ...geladen,
+      season: { id: "season-2" },
+      seasonState: { ...geladen.seasonState, seasonId: "season-2", formkartenRegel: formkartenRegelFuerSpielmodus(geladen, "season-2") },
+    } as GameState;
+    expect(formkartenRegelFuer(saisonwechsel)).toBe("plusminus");
+  });
+
+  it("Rueckweg aus: neue Saison bekommt alt; Notbremse aus-sofort uebersteuert jeden Stempel", () => {
+    process.env.OLY_FORMKARTEN_PLUSMINUS = "aus";
+    expect(formkartenRegelFuerSpielmodus(neu(), "season-2")).toEqual({ seasonId: "season-2", regel: "alt" });
+    expect(formkartenRegelFuer(PM)).toBe("plusminus");
+    process.env.OLY_FORMKARTEN_PLUSMINUS = "aus-sofort";
+    expect(formkartenRegelFuer(PM)).toBe("alt");
+    expect(resolveFormMoralRegeln({}, PM)).not.toHaveProperty("plusMinus");
+  });
+
+  it("Karten der Saison folgen dem Stempel, nicht der Umgebung", () => {
+    const basis = { players: [{ id: "a", name: "A", className: "Mage" }], rosters: [{ id: "r", teamId: "t", playerId: "a" }], teams: [{ teamId: "t" }] };
+    process.env.OLY_FORMKARTEN_PLUSMINUS = "an";
+    const alt = buildGeneratedFormCardRecordsForTeam({ ...basis, ...ALT } as unknown as GameState, "s", "season-1", "t");
+    expect(Math.abs(alt[0].cardValue)).toBe(computePositiveFormCardValueForTests("s", "season-1", "t", "a"));
+    process.env.OLY_FORMKARTEN_PLUSMINUS = "aus";
+    const pm = buildGeneratedFormCardRecordsForTeam({ ...basis, ...PM } as unknown as GameState, "s", "season-1", "t");
+    expect(pm.every((k) => [2, 4, 6, 8].includes(Math.abs(k.cardValue)))).toBe(true);
+  });
+});
+
+describe("Plus/Minus: Regel plusminus", () => {
   it("Regelstand traegt plusMinus und liefert die Gegenfarb-Regel", () => {
-    const r = resolveFormMoralRegeln({ OLY_FORMKARTEN_PLUSMINUS: "1" });
+    const r = resolveFormMoralRegeln({}, PM);
     expect(r.plusMinus).toBe(true);
     expect(farbregelAusRegeln(r)).toBe(FARBREGEL_PM_PLUSMINUS);
-    expect(resolveFormMoralRegeln({ OLY_FORMKARTEN_PLUSMINUS: "1", OLY_FORMKARTEN_FARBREGEL: "alt" })).not.toHaveProperty("plusMinus");
+    expect(resolveFormMoralRegeln({ OLY_FORMKARTEN_FARBREGEL: "alt" }, PM)).not.toHaveProperty("plusMinus");
   });
 
   it("Gegenfarben sind paarweise gespiegelt", () => {
     for (const [a, b] of Object.entries(GEGENFARBE)) expect(GEGENFARBE[b]).toBe(a);
   });
 
-  it("Pluskarte kostet die Gegenfarbe, Minuskarte bringt ihr etwas (v x 0,25)", () => {
+  it("Pluskarte kostet die Gegenfarbe, Minuskarte bringt ihr etwas (v x 0,25), die Farbe selbst bleibt negativ", () => {
     const plus = { wert: 8, farbe: "red" };
     expect(kartenWertFuerSpieler({ karte: plus, disziplinFarbe: "blue", spielerFarbe: "blue", regel: FARBREGEL_PM_PLUSMINUS })).toBe(4 - 2);
     expect(kartenWertFuerSpieler({ karte: plus, disziplinFarbe: "blue", spielerFarbe: "green", regel: FARBREGEL_PM_PLUSMINUS })).toBe(4);
     expect(kartenWertFuerSpieler({ karte: plus, disziplinFarbe: "blue", spielerFarbe: "red", regel: FARBREGEL_PM_PLUSMINUS })).toBe(8);
     const minus = { wert: -8, farbe: "red" };
     expect(kartenWertFuerSpieler({ karte: minus, disziplinFarbe: "blue", spielerFarbe: "blue", regel: FARBREGEL_PM_PLUSMINUS })).toBe(-4 + 2);
+    expect(kartenWertFuerSpieler({ karte: minus, disziplinFarbe: "blue", spielerFarbe: "red", regel: FARBREGEL_PM_PLUSMINUS })).toBe(-8);
   });
 
   it("Zerlegung nennt den Gegenfarb-Anteil getrennt und summiert ihn ein", () => {
@@ -119,17 +183,17 @@ describe("Plus/Minus: Schalter an", () => {
 
   it("Hinweis und Effekttext nennen den Abzug", () => {
     expect(formkartenHinweis({ karte: { wert: 8, farbe: "red" }, disziplinFarbe: "blue", traegerAnzahl: 1, regel: FARBREGEL_PM_PLUSMINUS })).toContain("-2 für Spieler der Gegenfarbe");
-    process.env.OLY_FORMKARTEN_PLUSMINUS = "1";
-    expect(kartenEffekt({ value: 8, color: "red" }, "blue").gegenZusatz).toBe(-2);
-    expect(kartenEffektText({ value: 8, color: "red" }, "blue")).toContain("-2 für MEN-Spieler");
+    const regeln = resolveFormMoralRegeln({}, PM);
+    expect(kartenEffekt({ value: 8, color: "red" }, "blue", regeln).gegenZusatz).toBe(-2);
+    expect(kartenEffektText({ value: 8, color: "red" }, "blue", regeln)).toContain("-2 für MEN-Spieler");
+    expect(kartenEffekt({ value: 8, color: "red" }, "blue").gegenZusatz).toBeUndefined();
   });
 
-  it("Karten ohne 0: jeder Wert aus [2,3,5,8], je Spieler zwei echte Karten", () => {
-    process.env.OLY_FORMKARTEN_PLUSMINUS = "1";
+  it("Karten ohne 0: jeder Wert aus [2,4,6,8], je Spieler zwei echte Karten", () => {
     const werte = new Set<number>();
-    for (let i = 0; i < 400; i++) werte.add(computePositiveFormCardValueForTests("s", "season-1", "t", `p${i}`));
-    expect([...werte].sort((a, b) => a - b)).toEqual([2, 3, 5, 8]);
-    const gs = { players: [{ id: "a", name: "A", className: "Mage" }], rosters: [{ id: "r", teamId: "t", playerId: "a" }], teams: [{ teamId: "t" }] } as unknown as GameState;
+    for (let i = 0; i < 400; i++) werte.add(computePositiveFormCardValueForTests("s", "season-1", "t", `p${i}`, true));
+    expect([...werte].sort((a, b) => a - b)).toEqual([2, 4, 6, 8]);
+    const gs = { players: [{ id: "a", name: "A", className: "Mage" }], rosters: [{ id: "r", teamId: "t", playerId: "a" }], teams: [{ teamId: "t" }], ...PM } as unknown as GameState;
     const karten = buildGeneratedFormCardRecordsForTeam(gs, "s", "season-1", "t");
     expect(karten).toHaveLength(2);
     expect(karten.every((k) => k.cardValue !== 0)).toBe(true);
@@ -138,10 +202,9 @@ describe("Plus/Minus: Schalter an", () => {
 
   for (const [wert, farbe] of [[8, "red"], [-4, "red"], [8, "blue"]] as const) {
     it(`gezeigt = gebucht (Einsatzliste = Arena-Adapter) fuer Karte ${wert} ${farbe}`, () => {
-      process.env.OLY_FORMKARTEN_PLUSMINUS = "1";
       const aufgestellt = ["kati", "ferdinand", "wildfire", "dusk"];
       const gs = spielstand(wert, farbe, aufgestellt);
-      const w = wirkung(gs, aufgestellt, resolveFormMoralRegeln({ OLY_FORMKARTEN_PLUSMINUS: "1" }));
+      const w = wirkung(gs, aufgestellt, resolveFormMoralRegeln({}, gs));
       const motor = buildArenaAufstellung(gs, "t1", "md-1");
       for (const s of w.spieler) {
         const name = SPIELER.find((x) => x.id === s.playerId)!.name;
@@ -154,6 +217,18 @@ describe("Plus/Minus: Schalter an", () => {
       }
     });
   }
+
+  it("Stempel alt: Einsatzliste und Arena-Adapter rechnen ohne Gegenfarbe, weiter gleich (auch bei Schalter an)", () => {
+    process.env.OLY_FORMKARTEN_PLUSMINUS = "an";
+    const aufgestellt = ["kati", "ferdinand", "wildfire", "dusk"];
+    const gs = spielstand(8, "red", aufgestellt, "alt");
+    const w = wirkung(gs, aufgestellt, resolveFormMoralRegeln({}, gs));
+    const motor = buildArenaAufstellung(gs, "t1", "md-1");
+    for (const s of w.spieler) {
+      expect(s.zerlegung.gegen).toBeUndefined();
+      expect(motor[SPIELER.find((x) => x.id === s.playerId)!.name]).toMatchObject({ form: s.zerlegung.summe });
+    }
+  });
 
   it("Vergleichsliste kappt nicht mehr die Minuskarten", () => {
     const liste = [9, 8, 7, 6, 5, 4, 3, 2, 1, -1, -2, -3, -4].map((teamSumme) => ({ teamSumme }));
@@ -195,6 +270,7 @@ describe("Plus/Minus: KI-Plan", () => {
     const b = buildAiFormCardSeasonPlan({ cards: [plus, minus], slots, farbregel: FARBREGEL_PM_PLUSMINUS });
     expect(a.entryByCardId.get("p")!.slot.matchdayIndex).toBe(1);
     expect(a.entryByCardId.get("m")!.slot.matchdayIndex).toBe(2);
+    expect(a.farbregel).toBe(FARBREGEL_PM_PLUSMINUS);
     expect([...a.entryByCardId.entries()].map(([id, e]) => [id, e.slot.matchdayIndex])).toEqual(
       [...b.entryByCardId.entries()].map(([id, e]) => [id, e.slot.matchdayIndex]),
     );

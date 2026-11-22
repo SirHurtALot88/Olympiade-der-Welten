@@ -116,6 +116,8 @@ export type FormCardSeasonPlan = {
   expectedTotalFormModifier: number;
   /** Farbanteile der Karten (nur bei Farbregel): der Einsatz-Wert der KI nimmt denselben erwarteten Traegeranteil wie der Plan. */
   farbAnteile?: Partial<Record<FormCardColor, number>>;
+  /** Die Farbregel, nach der geplant wurde (Plus/Minus: mit Gegenfarbe). Der Einsatz-Wert der KI rechnet mit derselben. */
+  farbregel?: FormkartenFarbregel;
 };
 
 /**
@@ -439,6 +441,7 @@ export function buildAiFormCardSeasonPlan(input: {
     unplacedCardIds: [...unplacedCardIds].sort((left, right) => left.localeCompare(right)),
     expectedTotalFormModifier,
     ...(farbAnteile ? { farbAnteile } : {}),
+    ...(input.farbregel ? { farbregel: input.farbregel } : {}),
   };
 }
 

@@ -1,7 +1,7 @@
 # Formkarten Plus/Minus (22.11., Arbeitsliste 21.11. Welle 4)
 
 Auftrag: „Formkarten: keine 0er, jede Karte ±; Karten-Wirkung zeigt negative; KI setzt Formpunkte gezielt (Siege, Rivalen, Reserve); Formpunkte im Saisonstand/Gegneranalyse."
-Stand: Prototyp hinter `OLY_FORMKARTEN_PLUSMINUS` (Standard AUS, ohne Schalter bit-identisch, Fingerabdruck `GESAMT eaafed96150e` unveraendert). Nicht gemergt, kein PR.
+Stand 22.11. (nach Chris' Entscheidungen, Abschnitt 6): gebaut mit Spielstand-Stempel `seasonState.formkartenRegel`, Kartenwerte **2/4/6/8**. Nicht gemergt, kein PR.
 
 ## 1. Ist-Stand
 
@@ -13,7 +13,7 @@ Stand: Prototyp hinter `OLY_FORMKARTEN_PLUSMINUS` (Standard AUS, ohne Schalter b
 
 ## 2. Konzept „jede Karte ±" (5 Saetze)
 
-1. Keine 0er: Kartenwerte `[2, 3, 5, 8]` (Mittel 4,5 statt der sichtbaren 4,7), jeder Spieler hat wirklich ein Plus- und ein Minuskartenpaar.
+1. Keine 0er: Kartenwerte `[2, 4, 6, 8]` (Mittel 5 statt der sichtbaren 4,7; Chris 22.11.), jeder Spieler hat wirklich ein Plus- und ein Minuskartenpaar.
 2. Jede Karte hat einen Plus- und einen Minus-Teil: die Gegenfarbe (POW gegen MEN, SPE gegen SOC) traegt `-v x 0,25`; eine Pluskarte kostet also Spieler der Gegenfarbe, eine Minuskarte entlastet sie.
 3. Damit wird jede Karte eine Aufstellungsentscheidung (wen stelle ich neben die Karte), nicht nur ein Bonus; die Farbregel (alle + Farbtraeger, Spitze 12) bleibt unveraendert, die Gegenfarbe zieht nur ab (Spitze fuer Gegenfarbe +6 bei v=8, passend).
 4. Die KI preist die Gegenfarbe mit dem Farbanteil des eigenen Kaders ein und gewichtet den heutigen Spieltag: knappes Duell 1,25, klar vorn 1,0 (Overkill-Bremse), klar hinten 0,8, je Top-8-Rivale +0,1 (hoechstens +0,2). Pluskarten wandern auf schwere Slots, Minuskarten auf billige. Zukunft bleibt 1,0 (kein Informationsvorsprung).
@@ -29,7 +29,7 @@ Stand: Prototyp hinter `OLY_FORMKARTEN_PLUSMINUS` (Standard AUS, ohne Schalter b
 | passende Disziplinfarbe, Traeger | +12 | -12 |
 | passende Disziplinfarbe, Gegenfarbe | +6 | -6 |
 
-Kartenwerte alt `[0,2,4,8]`, neu `[2,3,5,8]`. Gezeigt = gebucht: Legacy-Wertung, Einsatzliste, Arena-Adapter und KI lesen dieselbe Funktion (`kartenZerlegungFuerSpieler`); `tests/formkarten-plusminus.test.ts` prueft Einsatzliste = Motor-Eingabe je Spieler.
+Kartenwerte alt `[0,2,4,8]`, neu `[2,4,6,8]`. Gezeigt = gebucht: Legacy-Wertung, Einsatzliste, Arena-Adapter und KI lesen dieselbe Funktion (`kartenZerlegungFuerSpieler`); `tests/formkarten-plusminus.test.ts` prueft Einsatzliste = Motor-Eingabe je Spieler.
 
 ### Schalter und Stempel
 

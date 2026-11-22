@@ -4201,6 +4201,11 @@ export type SeasonState = {
    */
   hockeyTorwart?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "alt" | "neu" }> } | null;
   /**
+   * FORMKARTEN-REGEL DIESER SAISON (22.11., lib/resolve/formkarten-regel.ts): "plusminus" (Gegenfarbe, Kartenwerte 2/4/6/8)
+   * oder "alt" (18.11.). Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel; gilt fuer die ganze Saison.
+   */
+  formkartenRegel?: { seasonId: string; regel: "alt" | "plusminus" } | null;
+  /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.
    *

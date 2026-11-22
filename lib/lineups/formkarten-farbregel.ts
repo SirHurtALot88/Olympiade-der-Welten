@@ -26,7 +26,7 @@ export type FormkartenFarbregel = {
   allePassend: number;
   traeger: number;
   /**
-   * PLUS/MINUS (22.11., `docs/design/formkarten-plusminus-22-11.md`, Schalter `OLY_FORMKARTEN_PLUSMINUS`, Standard AUS):
+   * PLUS/MINUS (22.11., `docs/design/formkarten-plusminus-22-11.md`, Spielstand-Stempel `seasonState.formkartenRegel`, lib/resolve/formkarten-regel.ts):
    * Anteil des Kartenwerts, der Spieler der GEGENFARBE (`GEGENFARBE`) spiegelbildlich trifft: eine Pluskarte kostet sie
    * `v x gegen`, eine Minuskarte bringt ihnen `|v| x gegen`. Fehlt das Feld oder ist es 0, gilt die Regel von 18.11. unveraendert.
    */
@@ -47,12 +47,6 @@ export const FORM_TRAEGER_HEBEL = 0.125;
 
 export type FormkartePlay = { wert: number; farbe: string | null };
 
-/** `OLY_FORMKARTEN_PLUSMINUS=1` schaltet die Plus/Minus-Karten (Gegenfarbe + Kartenwerte ohne 0). Standard AUS. */
-export function isFormkartenPlusMinusEnabled(env: Record<string, string | undefined> = lieseUmgebung()): boolean {
-  const roh = (env.OLY_FORMKARTEN_PLUSMINUS ?? "").trim().toLowerCase();
-  return roh === "1" || roh === "an" || roh === "on" || roh === "true";
-}
-
 export function isFormkartenFarbregelEnabled(env: Record<string, string | undefined> = lieseUmgebung()): boolean {
   const roh = (env.OLY_FORMKARTEN_FARBREGEL ?? "").trim().toLowerCase();
   // SCHARF (18.11.): Standard = neue Regel. Zurueck zur alten "x2 fuer alle" mit OLY_FORMKARTEN_FARBREGEL=alt (oder 0/aus/off).
@@ -60,9 +54,13 @@ export function isFormkartenFarbregelEnabled(env: Record<string, string | undefi
 }
 
 /** `OLY_FORMKARTEN_FARBREGEL=schmal` wählt die schmale Variante, sonst die PM-Faktoren. */
-export function resolveFormkartenFarbregel(env: Record<string, string | undefined> = lieseUmgebung()): FormkartenFarbregel {
+export function resolveFormkartenFarbregel(
+  env: Record<string, string | undefined> = lieseUmgebung(),
+  /** Plus/Minus-Regel der Saison (aus dem Spielstand-Stempel `formkartenRegelFuer`, nie aus der Umgebung). */
+  plusMinus = false,
+): FormkartenFarbregel {
   if ((env.OLY_FORMKARTEN_FARBREGEL ?? "").trim().toLowerCase() === "schmal") return FARBREGEL_SCHMAL;
-  return isFormkartenPlusMinusEnabled(env) ? FARBREGEL_PM_PLUSMINUS : FARBREGEL_PM;
+  return plusMinus ? FARBREGEL_PM_PLUSMINUS : FARBREGEL_PM;
 }
 
 function lieseUmgebung(): Record<string, string | undefined> {

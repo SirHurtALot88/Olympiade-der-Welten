@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
+import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
 import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
 import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
@@ -665,6 +666,9 @@ function buildNextSeasonGameState(
     // einer laufenden Saison nie verrutscht. Bestehende Saves bekommen hier die neuen Skalen.
     // Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel (und verliert einen alten).
     wertungsSkalen: wertungsSkalenFuerSpielmodus(save.gameState, nextSeasonId),
+    // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
+    // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
+    formkartenRegel: formkartenRegelFuerSpielmodus(save.gameState, nextSeasonId),
     // BELASTUNGSREGEL (21.11., lib/fatigue/belastung-regel-stempel.ts): Chris: ab der FOLGENDEN Saison
     // gilt Belastung/Resistenz mit Pause nach Spieltag 10 — der Saisonwechsel ist der Ort, an dem ein
     // bestehender Spielstand umschaltet. Nur Battle-Doppelsaisons; die Pause der alten Saison verfaellt.

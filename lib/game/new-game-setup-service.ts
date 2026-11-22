@@ -13,6 +13,7 @@ import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/s
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
+import { stempleFormkartenRegelBeimAnlegen } from "@/lib/resolve/formkarten-regel";
 import { stempleBelastungsRegelBeimAnlegen } from "@/lib/fatigue/belastung-regel-stempel";
 import {
   LEAGUE_SIZE,
@@ -655,7 +656,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     // BELASTUNGSREGEL (21.11.): ein neues Battle-Spiel (20 Spieltage) rechnet ab Saison 1 mit Last je
     // Platz, Resistenz, Pause nach Spieltag 10 und aktiver Erholung 4,0.
     stempleBelastungsRegelBeimAnlegen(
-      stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)),
+      stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers))),
     ),
     input.saveId,
   );

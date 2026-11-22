@@ -242,8 +242,16 @@ export function kartenEffekt(
   disziplinFarbe: string | null | undefined,
   regeln?: FormMoralRegeln | null,
 ): { alle: number; traegerZusatz: number; passt: boolean; regelNeu: boolean; gegenZusatz?: number } {
-  if (!card) return { alle: 0, traegerZusatz: 0, passt: false, regelNeu: geltendeFarbregel(regeln) != null };
-  const regel = geltendeFarbregel(regeln);
+  return kartenEffektMitRegel(card, disziplinFarbe, geltendeFarbregel(regeln));
+}
+
+/** Wie `kartenEffekt`, mit schon aufgeloester Regel (`null` = alte "x2 fuer alle"), z. B. aus dem KI-Saisonplan. */
+export function kartenEffektMitRegel(
+  card: { value: number; color: string } | null,
+  disziplinFarbe: string | null | undefined,
+  regel: FormkartenFarbregel | null,
+): { alle: number; traegerZusatz: number; passt: boolean; regelNeu: boolean; gegenZusatz?: number } {
+  if (!card) return { alle: 0, traegerZusatz: 0, passt: false, regelNeu: regel != null };
   const passt = Boolean(disziplinFarbe) && card.color === disziplinFarbe;
   if (!regel) return { alle: card.value * (passt ? 2 : 1), traegerZusatz: 0, passt, regelNeu: false };
   const k = { wert: card.value, farbe: card.color };

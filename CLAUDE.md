@@ -204,6 +204,7 @@ Battlefield, Mini-DM-FFA und Bahn-Pod; Mini-DM über `FORM_POD` im Motor). Der W
 wird rot, wenn eine motor-gebuchte Disziplin (`wirdAusMotorGebucht`) fehlt. **Farbbonus = Klassenfarbe des Spielers gleich
 Kartenfarbe** (nicht Disziplinfarbe, nicht Rolle); die Disziplinfarbe entscheidet nur „alle“ voll oder halb. Messung und
 Erklärung: `docs/design/formkarten-alle-disziplinen-18-11.md`.
+**Formkarten Plus/Minus (Chris, 22.11.):** jeder Spieler hat eine positive Farbe (seine Klassenfarbe) und eine negative, die Gegenfarbe (POW↔MEN, SPE↔SOC, Faktor 0,25: Pluskarte kostet die Gegenfarbe, Minuskarte bleibt negativ), Kartenwerte 2/4/6/8 ohne 0, KI gewichtet knappe Duelle und Rivalen. Die Regel steht im Spielstand (`seasonState.formkartenRegel`, `lib/resolve/formkarten-regel.ts`): neues Spiel ab Saison 1, bestehender Spielstand ab dem nächsten Saisonwechsel; jeder Rechenweg fragt `formkartenRegelFuer(gameState)` bzw. `resolveFormMoralRegeln(env, gameState)`, nie die Variable. Rückweg `OLY_FORMKARTEN_PLUSMINUS=aus` (neue Saisons), Notbremse `=aus-sofort` (Browser: `NEXT_PUBLIC_…`). Doku: `docs/design/formkarten-plusminus-22-11.md`.
 **Mutator = Form, keine Punkte (Chris, 18.11.):** im Battle-Modus bucht ein Mutator-Treffer nie mehr Score (+6) oder PP (+0,3);
 Motor-Seiten tragen den Schub im Motor (+3,5 Attribut je Treffer), legacy-gewertete Battle-Seiten und die Vorschau bekommen
 +3,5 Form je Treffer über den Formkarten-Kanal (`mitMutatorForm`). Abschalten: `OLY_MUTATOR_ALS_FORM=0`. Manager-Modus unverändert.

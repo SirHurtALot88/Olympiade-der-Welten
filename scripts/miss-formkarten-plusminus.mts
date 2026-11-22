@@ -1,5 +1,5 @@
 // ===================================================================================
-// FORMKARTEN PLUS/MINUS (22.11.): pm (heute) gegen pm+gegen (nur Gegenfarbe) gegen pm± (Gegenfarbe, Kartenwerte ohne 0).
+// FORMKARTEN PLUS/MINUS (22.11.): pm (heute) gegen pm+gegen (nur Gegenfarbe) gegen pm± (Gegenfarbe, Kartenwerte 2/4/6/8 ohne 0).
 // Abgeleitet von miss-formkarten-farbregel.mts, laeuft ueber den Node-Motor (ohne Chromium).
 // Docs: docs/design/formkarten-plusminus-22-11.md
 //
@@ -66,7 +66,7 @@ const REGELN: Record<string, unknown> = {
   ohne: { regel: FARBREGEL_PM, stufe: stufeVon, K: [0, 0, 0, 0] },
   pm: { regel: FARBREGEL_PM, stufe: stufeVon },
   "pm+gegen": { regel: FARBREGEL_PM_PLUSMINUS, stufe: stufeVon },
-  "pm±": { regel: FARBREGEL_PM_PLUSMINUS, stufe: stufeVon, K: [2, 3, 5, 8] },
+  "pm±": { regel: FARBREGEL_PM_PLUSMINUS, stufe: stufeVon, K: [2, 4, 6, 8] },
 };
 
 const ergebnis: Record<string, Record<string, unknown>> = {};
@@ -81,6 +81,8 @@ try {
     const zeile: Record<string, unknown> = {};
     let ohneTops: string[] = [];
     for (const [name, def] of Object.entries(REGELN)) {
+      // OLY_REGELN=ohne,pm,pm± beschraenkt die Laeufe (z. B. nur pm und pm± fuer die Pp-Messung).
+      if (process.env.OLY_REGELN && !process.env.OLY_REGELN.split(",").includes(name)) continue;
       const cfg = {
         regel: (def as any).regel,
         stufe: (def as any).stufe ?? null,
@@ -120,7 +122,7 @@ try {
       zeile[name] = entry;
     }
     ergebnis[d] = zeile;
-    console.log(d.padEnd(18) + Object.keys(REGELN).map((k) => `${k}: ${((zeile[k] as any).rho ?? NaN).toFixed(3)}${(zeile[k] as any).dreher != null ? `(d${((zeile[k] as any).dreher * 100).toFixed(0)}%)` : ""}`).join("   "));
+    console.log(d.padEnd(18) + Object.keys(zeile).map((k) => `${k}: ${((zeile[k] as any).rho ?? NaN).toFixed(3)}${(zeile[k] as any).dreher != null ? `(d${((zeile[k] as any).dreher * 100).toFixed(0)}%)` : ""}`).join("   "));
   }
   if (fehler.length) console.log("Seitenfehler:", fehler.slice(0, 3).join(" | "));
 } finally {

@@ -1,5 +1,7 @@
 import { listBookedMatchdaySides, repairFrozenAiDraftsWithBlockedPlayers } from "@/lib/ai/ai-frozen-draft-blocked-repair";
-import { kartenEffekt } from "@/lib/lineups/formkarten-wirkung";
+import { kartenEffektMitRegel } from "@/lib/lineups/formkarten-wirkung";
+import { farbregelAusRegeln } from "@/lib/morale/form-moral-regeln";
+import type { FormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 import {
   buildAiFormCardSeasonPlan,
   duellGewicht,
@@ -37,7 +39,7 @@ import {
 import { isLegacyLineupDraftComplete } from "@/lib/lineups/legacy-matchday-readiness";
 import { calculateTeamPowerModifierForSide, ensureLocalTeamPowersForSeason } from "@/lib/lineups/team-powers";
 import { selectTeamCaptain } from "@/lib/morale/player-demands-service";
-import { GEGENFARBE, isFormkartenFarbregelEnabled, isFormkartenPlusMinusEnabled, resolveFormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
+import { GEGENFARBE, isFormkartenFarbregelEnabled, resolveFormkartenFarbregel } from "@/lib/lineups/formkarten-farbregel";
 import { findStaleAiLineupEntries, shouldSkipExistingAiDraft } from "@/lib/ai/ai-lineup-freshness";
 import { belastungsRegelFuer } from "@/lib/fatigue/belastung-regel-stempel";
 import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
@@ -408,10 +410,11 @@ function formCardDeploymentValue(
   color: FormCardColor | null,
   playerCount: number,
   farbAnteile?: Partial<Record<FormCardColor, number>>,
+  regel: FormkartenFarbregel | null = null,
 ) {
   // Eine Wahrheit (Review-Befund 9): alte Regel x2, neue Regel alle + Farbtraeger-Zusatz (erwarteter Traegeranteil 1/4,
   // wie `formCardSlotValue`), beides aus `kartenEffekt`.
-  const e = kartenEffekt(card, color);
+  const e = kartenEffektMitRegel(card, color, regel);
   const gegenFarbe = GEGENFARBE[card.color] as FormCardColor | undefined;
   const gegen = e.gegenZusatz && gegenFarbe ? e.gegenZusatz * (farbAnteile?.[gegenFarbe] ?? 0.25) : 0;
   return (e.alle + e.traegerZusatz * (farbAnteile?.[card.color] ?? 0.25) + gegen) * Math.max(1, playerCount);
@@ -471,7 +474,7 @@ function selectPositiveFormCardForSlot(input: {
   // ungeduldige erst bei deutlichem. (patience 0.85..1.2 → Faktor 1.35..1.0)
   const reserveFactor = Math.max(1, 2.2 - input.patience);
   const scored = candidates.map((card) => {
-    const nowValue = formCardDeploymentValue(card, input.color, input.playerCount, input.plan.farbAnteile);
+    const nowValue = formCardDeploymentValue(card, input.color, input.playerCount, input.plan.farbAnteile, input.plan.farbregel ?? null);
     // Der ANSPRUCH der Karte auf ihren Planplatz, abgezinst auf heute. Drei Fälle fallen daraus
     // ohne Sonderbehandlung heraus (s. getPlannedClaimValue): Plan will sie hier → Anspruch ==
     // Jetzt-Wert, sie fällt. Plan will sie heute NEBENAN → Anspruch ist der dortige, bessere Wert,
@@ -1003,9 +1006,10 @@ function takeCheapestNegativeFormCard(input: {
   cards: LegacyFormCardOption[];
   usedIds: Set<string>;
   color: FormCardColor | null;
+  regel?: FormkartenFarbregel | null;
 }) {
   const damage = (card: LegacyFormCardOption) => {
-    const e = kartenEffekt(card, input.color);
+    const e = kartenEffektMitRegel(card, input.color, input.regel ?? null);
     return Math.abs(e.alle + e.traegerZusatz * 0.25 + (e.gegenZusatz ?? 0) * 0.25);
   };
   const picked =
@@ -1144,6 +1148,7 @@ function pickPrimaryFormCardForSide(input: {
         cards: input.negativeCards,
         usedIds: input.usedIds,
         color: input.color,
+        regel: input.plan.farbregel ?? null,
       });
       if (cheapest) return cheapest;
     }
@@ -1563,7 +1568,7 @@ export function buildAiLegacyLineupModifiers(
       color: side.color,
       playerCount: side.playerCount,
       // Plus/Minus (22.11., Standard AUS): knappes Duell und Rivalen zaehlen am heutigen Spieltag mehr.
-      ...(isFormkartenPlusMinusEnabled()
+      ...(context.formMoralRegeln?.plusMinus
         ? {
             gewicht: duellGewicht({
               competitiveness: side.competitiveness,
@@ -1577,7 +1582,7 @@ export function buildAiLegacyLineupModifiers(
     cards: formCards.map((card) => ({ id: card.id, value: card.value, color: card.color })),
     slots: planSlots,
     // Farbregel-Prototyp (17.11., Standard AUS): ohne OLY_FORMKARTEN_FARBREGEL bleibt der Plan der alte.
-    ...(isFormkartenFarbregelEnabled() ? { farbregel: resolveFormkartenFarbregel() } : {}),
+    ...(isFormkartenFarbregelEnabled() ? { farbregel: farbregelAusRegeln(context.formMoralRegeln) ?? resolveFormkartenFarbregel() } : {}),
   });
   const plannedCardIdsBySide: Record<"d1" | "d2", Set<string>> = {
     d1: getPlannedCardIdsForSlot(formCardSeasonPlan, currentMatchdayIndex, "d1"),
@@ -1749,6 +1754,7 @@ export function resolveNegativeFormCardSides(
       disciplineColor: getFormCardColorForDisciplineCategory(contract?.category),
       playerCount: Math.max(1, playerCount),
       formCards: context.formCards ?? [],
+      farbregel: farbregelAusRegeln(context.formMoralRegeln),
     });
     if (formModifier < 0) {
       negativeSides.add(side);
