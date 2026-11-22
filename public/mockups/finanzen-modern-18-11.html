@@ -26,6 +26,9 @@
   NEU 22.11. Runde 2 (Entscheidungen von Chris): Reiter "Saisonwahl" (?ansicht=wahl &dk=0|1|2 &vers=0|1|2 &lager=0..4):
   Dauerkarten 25 % Rabatt, Arena-Auslastung mit Ausbau-Empfehlung und Amortisation, Verletzungs-Versicherung als Erstattung,
   Trainingslager der Winterpause, Farb-Meister (ersetzt die Disziplin-Krone), Kredite ab Saison 1.
+  NEU 22.11. Runde 3 (Chris): Arena mit Platzarten Stehplatz / Sitzplatz / Loge (?ansicht=wahl &bau=0|1|2), Stufe 0 = 4.000
+  Plaetze, Ausbau je Bauteil, Zuschauer-Ereignisse je Heimspiel (Derby, Unwetter, Saisonfinale; EREIG); Medaillenspiegel (Gold/Silber/Bronze je Disziplin) neben dem Farb-Meister.
+  docs/design/finanzen-posten-22-11.md Abschnitt (g).
   URL: ?ansicht=kasse|auszug|posten|wahl|hebel|budget|slots|angebote|bonus|fans|merch  &szen=normal|eng|dispo  &st=1..20  &tag=1..21 (Auszug, 21 = Saisonende)
        &preis=-20|0|20|40  &kader=0|1|2  &notv=1  &an=pow,spe,soc  &sel=<posten>  &ctab=lage|quelle|liga
        &phone=1  &still=1  &blatt=kontext
@@ -311,8 +314,19 @@ button.rek{width:100%} button.rek:hover{background:var(--flaeche-2)}
 
 /* ---------- Saisonwahl (22.11. Runde 2): Karten fuellen die Hoehe, Arena-Leiter nur auf hohen Schirmen ---------- */
 .gr.wahl{grid-template-rows:auto 1fr 1fr;align-content:stretch} .gr.wahl .sd .in{justify-content:space-between}
+.pa{display:grid;grid-template-columns:92px 54px minmax(0,1fr) 46px 62px;gap:8px;align-items:center;font-size:14.5px;color:var(--leise);line-height:1.2}
+.pa b{color:var(--tinte);font-weight:600;white-space:nowrap} .pa b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--pc);margin-right:6px}
+.pa>span,.pa>strong{text-align:right;white-space:nowrap} .pa strong{color:var(--creme);font-weight:700;font-size:16px}
+.pa.pk{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600;margin-bottom:-4px} .pa.pk>:first-child{text-align:left}
+.ms{display:grid;grid-template-columns:20px minmax(0,1fr) 24px 24px 24px 58px;gap:8px;align-items:center;font-size:14.5px;color:var(--leise);line-height:1.2}
+.ms>*{text-align:center;white-space:nowrap} .ms>:nth-child(2){text-align:left;overflow:hidden;text-overflow:ellipsis;color:var(--tinte);font-weight:600} .ms>:last-child{text-align:right}
+.ms strong{color:var(--creme);font-weight:700;font-size:16px} .ms.mk{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600;margin-bottom:-4px} .ms.mk>:nth-child(2){color:var(--stumm)}
+.ms.du{background:rgba(242,160,61,.14);box-shadow:inset 3px 0 0 var(--heim);margin:-3px -6px;padding:3px 6px;border-radius:4px}
+.md{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:11.5px;font-weight:700;color:#0b0d12;background:var(--gold)} .md.s{background:#c9d1dc} .md.b{background:#c98a54}
+.fch{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end} .fch .marke b{color:#0b0d12;font-weight:700;margin-left:4px}
+.sd.kom .in{gap:7px} @media (max-height:1180px){.artx{display:none}}
 .lei{display:none} .lei .in{gap:0!important;justify-content:flex-start!important}
-.lei .lz{display:grid;grid-template-columns:.6fr 1fr 1fr .8fr 1fr 1.3fr 1.3fr 1.3fr;gap:10px;align-items:center;min-height:30px;padding:0 4px;border-bottom:1px solid rgba(244,230,196,.06);font-size:15.5px;color:var(--leise)}
+.lei .lz{display:grid;grid-template-columns:1.5fr .7fr 1.1fr 1.2fr .7fr 1.1fr 1.1fr 1.2fr;gap:10px;align-items:center;min-height:30px;padding:0 4px;border-bottom:1px solid rgba(244,230,196,.06);font-size:15.5px;color:var(--leise)}
 .lei .lz>*{text-align:right;white-space:nowrap} .lei .lz>:first-child{text-align:left} .lei .lz b{color:var(--tinte);font-weight:600} .lei .lz strong{color:var(--creme);font-weight:700}
 .lei .lz.lk{min-height:24px;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600} .lei .lz.du{background:rgba(242,160,61,.14)} .lei .lz.nx{box-shadow:inset 3px 0 0 var(--gold)}
 @media (min-height:1250px){.gr.wahl{grid-template-rows:auto 1fr 1fr auto}.lei{display:flex}}
@@ -489,7 +503,7 @@ var ANG={pow:{n:"Hammerwerk Stahl",mo:"H",bonus:.45,chance:.46,ziel:"Vier Power-
 var STARS=[{n:"Com. Shepard",p:"com-shepard",kl:"Warlord",sp:92,ff:1,m:.15},{n:"The Dark Lady",p:"the-dark-lady",kl:"Badass",sp:81,ff:0,m:.1},{n:"Sterling",p:"sterling",kl:"Bard",sp:74,ff:1,m:.05}];
 var LEITER=[[1,3,18,1.3],[4,6,14,1.0],[7,9,11,.8],[10,12,8,.6],[13,16,5,.4]];
 var SZEN={normal:{n:"Normal",start:25.4},eng:{n:"Engpass",start:15.6},dispo:{n:"Im Minus",start:4.5}};
-var VERPJE=.25, GEHALT=3.4, RAHMEN=14, ZINS=.01, KAP=1.45, MARKE=1.04, STARTRANG=9, SIEGPR=.12, BETRIEB=.3, REISE=.1, FAKTOR=1.0;
+var VERPJE=.25, GEHALT=3.4, RAHMEN=14, ZINS=.01, KAP=1.68, MARKE=1.04, STARTRANG=9, SIEGPR=.12, BETRIEB=.3, REISE=.1, FAKTOR=1.0;
 var KADN=["keine","normal","hoch"], KADF=[0,.4,.8];
 var LIGA=[["D-L","Dire Legion",1,8.1,77,71],["M-S","Mortal Sin",3,26.4,82,58],["V-V","Vigorous Vikings",5,31.9,61,66],["R-C","Royal Court",6,22.7,68,63],["L-K","Lost Kingdom",7,35.2,55,69],["T-G","The Giants",9,40.6,49,74],["P-C","Pirate Crew",13,44.8,41,78],["A-A","Armageddon Aftermath",16,38.3,33,81]];
 var ANSICHTEN={kasse:["kasse","Übersicht","Stufe 0 Kontoauszug · Stufe 4 Taktung auf 20 Spieltage"],auszug:["kasse","Spieltags-Abrechnung","Stufe 0 Kontoauszug · neue Posten mit Stufe 4/5"],posten:["kasse","Aufschlüsselung","Stufe 0 Kontoauszug je Posten · neue Posten sind Vorschläge vom 22.11."],wahl:["kasse","Saisonwahl","Entscheidungen von Chris 22.11. · braucht Stufe 5 (Tickets), Winterpause und längere Verletzungen"],hebel:["kasse","Hebel","Stufe 7 Kassensturz · Stufe 8 Hebel"],budget:["kasse","Budgets","Stufe 2a bis 2d Budgets des Vorstands · Stufe 9 Quote nach Vertrauen"],
@@ -500,7 +514,7 @@ var Z={now:Math.min(N,Math.max(1,+q.get("st")||12)),szen:SZEN[q.get("szen")]?q.g
        ang:{pow:"offen",spe:"offen",soc:"offen",men:"laeuft"},tag:+q.get("tag")||0,sel:q.get("sel")||"tic",
        bq:({"100":1,"85":.85,"70":.7,"50":.5})[q.get("quote")]||.85,um:+q.get("um")||0,vk:q.get("vk")===null?12:+q.get("vk"),fen:q.get("fenster")!=="0",
        pper:q.get("per")==="saison"?"prog":"bisher",pfil:({ist:1,plan:1,neu:1})[q.get("fil")]?q.get("fil"):"alle",psel:q.get("psel")||"tic",pso:{e:["ges",-1],a:["ges",-1]},
-       dk:q.get("dk")===null?1:kl0(+q.get("dk"),2),vers:q.get("vers")===null?1:kl0(+q.get("vers"),2),lager:q.get("lager")===null?2:kl0(+q.get("lager"),4)};
+       dk:q.get("dk")===null?1:kl0(+q.get("dk"),2),vers:q.get("vers")===null?1:kl0(+q.get("vers"),2),lager:q.get("lager")===null?2:kl0(+q.get("lager"),4),bau:kl0(+q.get("bau"),2)};
 function kl0(x,b){return Math.max(0,Math.min(b,Math.round(x)||0))}
 (q.get("an")||"").split(",").forEach(function(f){if(ANG[f]&&f!=="men")Z.ang[f]="an"});
 if(q.get("still"))document.body.classList.add("still");
@@ -523,6 +537,10 @@ function preisFaktor(p){return p<=0?1-.5*p:p<=.2?1-.5*p:.9-.6*(p-.2)}
 function autoPreis(){var s=STIM[Z.now];return s>=83?20:s<35?-20:0}
 function preisName(p){return p<=-20?"günstig":p>=40?"Topzuschlag":p>=20?"teuer":"normal"}
 function ausl(stim,p){return kl((.30+.85*stim/100)*preisFaktor(p),.2,1)}
+/* Runde 3: Zuschauer-Ereignisse je Heimspiel (Faktor auf die Nachfrage, 0,5 bis 2,0). Derbys aus der Rivalitaet im Code
+   (lib/rivalries/team-rivalries.ts:109): V-W gegen D-L und T-C je -3/-3 (x1,7), gegen A-A -2/-2 (x1,5). Rest erfunden. */
+var EREIG={6:["Unwetter · ligaweit",.7,"UNWETTER"],9:["Derby gegen Dire Legion",1.7,"DERBY"],14:["Derby gegen Armageddon Aftermath",1.5,"DERBY"],18:["Derby gegen The Chantry",1.7,"DERBY"],20:["Saisonfinale",1.3,"FINALE"]};
+function fx(f){return "×"+String(f).replace(".",",")}
 function aktiv(f){return Z.ang[f]==="an"||Z.ang[f]==="laeuft"}
 function abTag(f){return f==="men"?2:Z.now+1}
 function pz(p){p=Math.round(p*100);return (p>0?"+":p<0?"−":"±")+Math.abs(p)+" %"}
@@ -537,7 +555,7 @@ function modell(){
     var geb=t<=Z.now,l=[],pp=geb?0:p,rang=geb?RANG[t]:RANG[Z.now],verl=geb&&VERLETZT[t],heim=HEIM[t];
     if(geb)stimF=STIM[t];else stimF=kl(stimF-(heim?pp*7.5:0),0,100);
     stim=Math.round(stimF);
-    var a=ausl(stim,pp),st=stufe(rang),ein=geb?IMEINSATZ[t]:4;
+    var ev=heim?EREIG[t]:null,nf=(.30+.85*stim/100)*preisFaktor(pp)*(ev?ev[1]:1),a=kl(nf,.2,1),zus=ev&&nf>1?Math.min(.25,.5*(nf-1)):0,st=stufe(rang),ein=geb?IMEINSATZ[t]:4;
     /* Einnahmen */
     P(l,"sockel","spo","Hauptsponsor · Sockelrate","Eisenross Fracht","Rate "+t+" von 20 · Sockel 30,0 C nach Startrang 9",1.5,"Sockel 30,0 C ÷ 20 Spieltage = 1,5 C\nfest laut Vertrag, unabhängig vom Ergebnis");
     P(l,"aermel","spo","Ärmelsponsor · Rate","Sattelfest Bräu","feste Rate je Spieltag",.25,"Ärmelvertrag 5,0 C ÷ 20 Spieltage = 0,25 C");
@@ -548,8 +566,8 @@ function modell(){
       if(geb)P(l,"dis-"+f,"spo","Disziplin-Sponsor "+FARBE[f][0],A.n,d[0]+(tr?" gewonnen":" verloren"),tr?A.bonus:0,"Bonus "+zahl(A.bonus)+" C, wenn das Duell einer "+FARBE[f][0]+"-Disziplin des Spieltags gewonnen wird\nSpieltag "+t+": "+d[0]+" → "+(tr?"Sieg, Bonus gebucht":"verloren, 0,0 C"));
       else P(l,"dis-"+f,"spo","Disziplin-Sponsor "+FARBE[f][0],A.n,d[0]+" · Erwartung "+Math.round(A.chance*100)+" % × "+zahl(A.bonus)+" C",A.bonus*A.chance,"Prognose, nicht gebucht:\nPapierform "+Math.round(A.chance*100)+" % × Bonus "+zahl(A.bonus)+" C = "+zahl(A.bonus*A.chance)+" C");
     });
-    if(heim)P(l,"tic","tic","Zuschauer / Ticketing","Heimspiel · Grundarena, 8.000 Plätze","Auslastung "+Math.round(a*100)+" % × Preis "+preisName(pp*100),KAP*a*(1+pp),
-      "Volles Haus zum Richtpreis = 1,45 C\nNachfrage = 30 % + 85 % × Stimmung "+stim+" ÷ 100, × Preisstufe „"+preisName(pp*100)+"“\nAuslastung "+Math.round(a*100)+" % · Ticketpreis "+pz(pp)+" zum Richtpreis\n1,45 × "+String(Math.round(a*100)/100).replace(".",",")+" × "+String(Math.round((1+pp)*100)/100).replace(".",",")+" = "+zahl(KAP*a*(1+pp))+" C");
+    if(heim)P(l,"tic","tic","Zuschauer / Ticketing",(ev?"Heim · "+ev[2].charAt(0)+ev[2].slice(1).toLowerCase()+" "+fx(ev[1]):"Heimspiel · 15.300 Plätze"),"Auslastung "+Math.round(a*100)+" % × Preis "+preisName(pp*100)+(zus?" · ausverkauft, Zuschlag +"+Math.round(zus*100)+" %":""),KAP*a*(1+pp)*(1+zus),
+      "Volles Haus zum Richtpreis = "+zahl(KAP)+" C (9.000 Steh + 5.500 Sitz + 800 Loge)\nNachfrage = 30 % + 85 % × Stimmung "+stim+" ÷ 100, × Preisstufe „"+preisName(pp*100)+"“\n"+(ev?"Ereignis: "+ev[0]+" "+fx(ev[1])+" auf die Nachfrage"+(zus?" → ausverkauft, Tageskarten +"+Math.round(zus*100)+" %":"")+"\n":"")+"Auslastung "+Math.round(a*100)+" % · Ticketpreis "+pz(pp)+" zum Richtpreis\n"+zahl(KAP)+" × "+String(Math.round(a*100)/100).replace(".",",")+" × "+String(Math.round((1+pp)*100)/100).replace(".",",")+(zus?" × "+String(1+zus).replace(".",","):"")+" = "+zahl(KAP*a*(1+pp)*(1+zus))+" C");
     else P(l,"tic","tic","Zuschauer / Ticketing","Auswärtsspiel","keine Ticket-Einnahme auswärts",0,"Tickets gibt es nur an den 10 Heimspielen der Saison.\nSpieltag "+t+" ist ein Auswärtsspiel: 0,0 C\n(steht hier auch bei 0, damit nichts fehlt)");
     STARS.forEach(function(s,i){
       var fehlt=i===0&&verl, weg=i===2&&Z.notv&&!geb, m=weg?0:s.m*stim/65*(heim?1.5:.5)*(fehlt?.3:1);
@@ -912,8 +930,16 @@ function vHebel(){
 /* ---------- Saisonwahl (22.11. Runde 2, Entscheidungen von Chris; docs/design/finanzen-posten-22-11.md Abschnitt f) ---------- */
 /* Beispielzahlen fuer ein Team der Liga 2. Dauerkarten und Auslastung rechnen mit dem Modell oben (KAP, Stimmung),
    alles andere sind feste Beispielwerte. */
-var DKN=["wenig","normal","viel"], DKA=[.2,.4,.6], DKRAB=.25, PLATZ=[8000,11000,14000,17500,21500,26000], PREIS1000=KAP/8,
-    ARENA=[[0,0],[13,.8],[24,1.4],[30,2.4],[46,3.6],[72,5.4]], ARSTUFE=0;
+var DKN=["wenig","normal","viel"], DKA=[.2,.4,.6], DKRAB=.25, ARSTUFE=3;
+/* Runde 3: Platzarten. p = C je 1.000 Plaetze und Heimspiel in Liga 2 (Liga 1: x 1,5). Beispielarena Stufe 4:
+   Grundarena (3.000 Steh + 1.000 Sitz) + Stehtribuene + Sitzrang + Logenring = 15.300 Plaetze, volles Haus 1,68 C.
+   Liga 1 = Liga 2 x 4/3 (0,08 / 0,16 / 0,80). Sponsor bleibt, wie er ist: Tickets kommen obendrauf. */
+var PA=[{n:"Stehplatz",n2:"Stehplätze",pl:9000,p:.06,v:"--p4"},{n:"Sitzplatz",n2:"Sitzplätze",pl:5500,p:.12,v:"--p5"},{n:"Loge",n2:"Logenplätze",pl:800,p:.6,v:"--gold"}],L1F=4/3;
+var BAU=[{n:"Stehtribüne",pl:6000,k:12,u:.8,hat:1,t:"<b>Stehplätze</b> füllen sich mit der Stimmung: ab Stimmung 70 voll, unter 40 halb leer. Billig im Bau, kleiner Preis."},
+         {n:"Sitzrang",pl:4500,k:20,u:1.2,hat:1,t:"<b>Sitzplätze</b> hängen an der Fanbasis und schwanken wenig. Doppelter Preis, teurer im Bau."},
+         {n:"Logenring",pl:800,k:26,u:1,hat:1,t:"<b>Logen</b> mieten Firmen: Auslastung 20 % + 40 % × Sponsor-Stufe + 40 % × Tabellenplatz. Zehnfacher Preis, die Stimmung ist egal."}];
+var LOGE_AUSL=.75;
+function paAusl(T){var si=kl(T.ausl-.04,.2,1),st=kl((KAP*T.ausl-PA[2].pl/1000*PA[2].p*LOGE_AUSL-PA[1].pl/1000*PA[1].p*si)/(PA[0].pl/1000*PA[0].p),.2,1);return [st,si,LOGE_AUSL]}
 var VERS=[["Keine",0,0,0],["Beste 6",.7,6,7.5],["Ganzer Kader",1.2,14,4.86]], VERSQ=.8;
 var LAGE={ersch:58,moral:64,verl:1,rot:3,ziel:"Top 4"};
 function heimAusl(){var l=[];M.tage.forEach(function(T){if(!T.ende&&HEIM[T.t])l.push(T)});return l}
@@ -938,24 +964,28 @@ function vWahl(){
   var so=dkSofort(),fe=dkFehlt(),net=r1(so-fe);
   var dk='<div class="sd"><div class="kopf">Dauerkarten<small>einmal je Saison · vor Spieltag 1</small></div><div class="in">'+
     '<div class="zl" style="align-items:center">'+seg("dk",["Wenig 20 %","Normal 40 %","Viel 60 %"],Z.dk)+'<span class="marke gold" data-tip="Entscheidung 22.11.: 25 % statt 10 %.\nBei 25 % liegt der Gleichstand bei 75 % Auslastung,\nalso bei Stimmung 53, nahe dem Liga-Mittel.">RABATT 25 %</span></div>'+
-    '<div class="zl"><span class="riesig t" style="font-size:34px">+'+zahl(so)+'<small>C sofort in die Kasse</small></span><span style="text-align:right">'+tz(PLATZ[ARSTUFE]*DKA[Z.dk])+' von '+tz(PLATZ[ARSTUFE])+'<br>Plätzen fest verkauft</span></div>'+
+    '<div class="zl"><span class="riesig t" style="font-size:34px">+'+zahl(so)+'<small>C sofort in die Kasse</small></span><span style="text-align:right">'+tz(15300*DKA[Z.dk])+' von 15.300 Plätzen<br>fest verkauft · alle drei Platzarten</span></div>'+
     '<div class="zl"><span>Fehlt an der Tageskasse <small>Auslastung im Saisonschnitt '+Math.round(schS*100)+' %</small></span><strong class="t minus">−'+zahl(fe)+' C</strong></div>'+
     '<div class="zl"><span><b>Netto über die Saison</b></span><strong class="t '+vz(net)+'">'+Cv(net)+'</strong></div>'+
     '<div class="zl"><span>Bei schwacher Saison <small>Auslastung 60 %</small></span><strong class="t plus">'+Cv(KAP*10*DKA[Z.dk]*(1-DKRAB-.6))+'</strong></div>'+
     '<div class="zl"><span>Sofort-Geld der drei Stufen</span><strong class="t">'+DKA.map(function(a){return zahl(KAP*10*a*(1-DKRAB))}).join(" · ")+' C</strong></div>'+
     '<div class="txt">Lohnt sich unter <b>75 % Auslastung</b> (Stimmung 53). Darüber kostet der Rabatt, dafür ist das Geld schon in der Kaufphase da und hängt nicht an der Stimmung.</div></div></div>';
-  /* 2 Arena */
-  var emp=l3.length>=3&&sch>=.9,nst=ARSTUFE+1,mehr=(PLATZ[nst]-PLATZ[ARSTUFE])/1000*PREIS1000*10,lauf=ARENA[nst][1]-ARENA[ARSTUFE][1]+.6,
-      s1=r1(Math.max(0,Math.min(PLATZ[nst],PLATZ[ARSTUFE]*1.15)-PLATZ[ARSTUFE])/1000*PREIS1000*10-lauf),voll=r1(mehr-lauf),jahre=1+(ARENA[nst][0]-s1)/voll;
-  var ar='<div class="sd'+(emp?" wir":"")+'"><div class="kopf">Arena · Auslastung<small>Stufe '+ARSTUFE+' · '+tz(PLATZ[ARSTUFE])+' Plätze</small></div><div class="in">'+
-    '<div class="zl" style="align-items:center"><span class="riesig t" style="font-size:34px">'+Math.round(sch*100)+'<small>% · letzte 3 Heimspiele</small></span><span class="marke '+(emp?"acht":"leer")+'">'+(emp?"VORSTAND EMPFIEHLT AUSBAU":"EMPFEHLUNG AB 90 %")+'</span></div>'+
-    '<div class="wb" style="--pc:var('+(emp?"--acht":"--p5")+')"><i style="width:'+kl(sch*100,0,100)+'%"></i><u style="left:90%;width:2px;background:var(--creme)"></u></div>'+
-    '<div class="zl"><span>'+l3.map(function(T){return "Spieltag "+T.t+": <b class=\"t\">"+tz(T.ausl*PLATZ[ARSTUFE])+"</b>"}).join(" · ")+'</span></div>'+
-    '<div class="zl"><span>Ausbau auf Stufe '+nst+' · '+tz(PLATZ[nst])+' Plätze <small>Investitionstopf</small></span><strong class="t minus">−'+zahl(ARENA[nst][0])+' C</strong></div>'+
-    '<div class="zl"><span>Mehr je Saison <small>erste Saison · bei vollem Haus</small></span><strong class="t plus">+'+e1(s1)+' · +'+e1(voll)+' C</strong></div>'+
-    '<div class="zl"><span><b>Bau bezahlt nach</b> <small>Unterhalt und Betrieb +'+zahl(lauf)+' C abgezogen</small></span><strong class="t">rund '+String(Math.round(jahre*2)/2).replace(".",",")+' Saisons</strong></div>'+
-    '<div class="txt">Die Fanbasis wächst um 2 % je Heimspiel ab 90 % Auslastung, aber nur bis zum <b>Fan-Maximum</b> von '+tz(PLATZ[ARSTUFE]*1.25)+' (1,25 × Plätze). Mehr Fans gibt es erst mit mehr Plätzen; auch das Dauerkarten-Kontingent wächst mit.</div>'+
-    '</div><div class="fuss"><small>'+(emp?"Postfach: Fans werden abgewiesen":"Unter 60 % rät der Vorstand ab")+'</small><span class="sp"></span><button class="btn klein'+(emp?" ja":"")+'" data-toast="Ausbau läuft über die Gebäude-Seite: 13 C aus dem Investitionstopf, hart gegen die Freigabe">Ausbauen</button></div></div>';
+  /* 2 Arena: Platzarten (Runde 3) */
+  var PAa=PA.map(function(a,i){var s=0;l3.forEach(function(T){s+=paAusl(T)[i]});return l3.length?s/l3.length:0}),plG=PA.reduce(function(s,a){return s+a.pl},0);
+  var empI=-1;PAa.forEach(function(a,i){if(a>=.9&&(empI<0||a>PAa[empI]))empI=i});
+  var emp=l3.length>=3&&empI>=0,nst=ARSTUFE+1,B=BAU[Z.bau],kost=r1(B.k*(1+.2*B.hat)),vollm=B.pl/1000*PA[Z.bau].p*10,
+      s1=r1(vollm*(Z.bau===2?PAa[2]:.6)-B.u),voll=r1(vollm-B.u),jahre=1+(kost-s1)/voll,jahre1=1+(kost-(vollm*L1F*(Z.bau===2?PAa[2]:.6)-B.u))/(vollm*L1F-B.u);
+  var nh=null;for(var _h=Z.now+1;_h<=N&&!nh;_h++)if(HEIM[_h])nh=_h;var nev=nh?EREIG[nh]:null;
+  function hs(x){return String(Math.round(x*2)/2).replace(".",",")}
+  var ar='<div class="sd kom'+(emp?" wir":"")+'"><div class="kopf">Arena · Platzarten<small>Stufe '+ARSTUFE+' von 5 · '+tz(plG)+' Plätze</small></div><div class="in">'+
+    '<div class="zl" style="align-items:center"><span class="riesig t" style="font-size:34px">'+Math.round(sch*100)+'<small>% · letzte 3 Heimspiele</small></span>'+(nh?'<span style="text-align:right;line-height:1.5">'+(nev?'<span class="marke '+(nev[1]<1?"rot":"gold")+'" data-tip="'+esc(nev[0])+'\nFaktor auf die Nachfrage. Über 100 % ist ausverkauft;\ndie Tageskarten bekommen dann bis +25 % Zuschlag.">'+nev[2]+' '+fx(nev[1])+' ZUSCHAUER</span>':'<span class="marke leer">KEIN EREIGNIS</span>')+'<br><small style="margin:0">Spieltag '+nh+' · '+GEGNER[nh]+'</small></span>':"")+'</div>'+
+    PA.map(function(a,i){return '<div class="pa" style="--pc:var('+a.v+')" data-tip="'+tz(a.pl)+' '+a.n2+' · Auslastung der letzten 3 Heimspiele · Ertrag je Heimspiel\nMarke bei 90 %: ab dort empfiehlt der Vorstand den Ausbau dieser Platzart"><b>'+a.n+'</b><span class="t">'+tz(a.pl)+'</span><div class="wb"><i style="width:'+kl(PAa[i]*100,0,100)+'%"></i><u style="left:90%;width:2px;background:var(--creme)"></u></div><span class="t">'+Math.round(PAa[i]*100)+' %</span><strong class="t">'+zahl(a.pl/1000*a.p*PAa[i])+' C</strong></div>'}).join("")+
+    '<div class="zl" style="align-items:center"><span>Ausbau auf Stufe '+nst+'</span>'+seg("bau",BAU.map(function(b){return b.n}),Z.bau)+'</div>'+
+    '<div class="zl"><span>+'+tz(B.pl)+' '+PA[Z.bau].n2+' <small>Investitionstopf · '+(B.hat+1)+'. dieser Art, +'+B.hat*20+' %</small></span><strong class="t minus">−'+zahl(kost)+' C</strong></div>'+
+    '<div class="zl"><span>Mehr je Saison <small>erste Saison · volles Haus · nach Unterhalt</small></span><strong class="t plus">+'+e1(s1)+' · +'+e1(voll)+' C</strong></div>'+
+    '<div class="zl"><span><b>Bau bezahlt nach</b> <small>Liga 1: rund '+hs(jahre1)+'</small></span><strong class="t">rund '+hs(jahre)+' Saisons</strong></div>'+
+    '<div class="txt artx">'+B.t+'</div>'+
+    '</div><div class="fuss"><small>'+(emp?"Vorstand empfiehlt: "+BAU[empI].n+" · "+PA[empI].n2+" zu "+Math.round(PAa[empI]*100)+" % voll":"Empfehlung ab 90 % je Platzart · unter 60 % rät der Vorstand ab")+'</small><span class="sp"></span><button class="btn klein'+(emp&&empI===Z.bau?" ja":"")+'" data-toast="Ausbau läuft über die Gebäude-Seite: '+zahl(kost)+' C aus dem Investitionstopf, hart gegen die Freigabe">'+B.n+' bauen</button></div></div>';
   /* 3 Versicherung */
   var V=VERS[Z.vers],tag=V[3]/20*VERSQ,ab=V[1]?Math.ceil(V[1]/tag):0,er=versErst();
   var ve='<div class="sd"><div class="kopf">Verletzungs-Versicherung<small>einmal je Saison · Gehaltstopf</small></div><div class="in">'+
@@ -976,11 +1006,15 @@ function vWahl(){
     '<div class="zl"><span>Bedingung</span><span style="text-align:right">'+L.bed+'</span></div>'+
     '<div class="txt">Preise: Training 2,0 · Fitness 1,5 · Moral 1,5 · Reha 1,0 + 0,3 C je Verletztem. Der Schub läuft über die Form, nie als Punkte. KI: Reha bei zwei Verletzten, Moral unter 55, Fitness ab Erschöpfung 60, Training nur ausgeruht und mit Ziel in Reichweite.</div>'+
     '</div><div class="fuss"><small>'+(vorbei?"Gewählt in der Pause · der Schub lief an Spieltag 11 bis 13":"Wahl in der Pause nach Spieltag 10 · ohne Wahl: kein Lager")+'</small></div></div>';
-  /* 5 Farb-Meister */
-  var FM=[["pow",4,"Mortal Sin",9,"TDM · Mini DM · Gewichtheben · Hockey · Breaking"],["spe",9,"Pirate Crew",17,"Staffel · Time Trial · Spurt · Climbing · Fechten"],["men",1,"du führst",-4,"Schach · Takeshi · Tennis · I Spy · Wettessen"],["soc",6,"Royal Court",11,"Football · Basketball · Battlefield · Eiskunst · Showcase"]];
-  var fm='<div class="sd"><div class="kopf">Farb-Meister<small>Saisonende · Liga 2: 2,5 C · Liga 1: 4,0 C</small></div><div class="in">'+
-    FM.map(function(x){var f=FARBE[x[0]],e=x[1]===1;return '<div class="zl" style="align-items:center"><span><span class="marke" style="--pc:var('+f[1]+');margin-right:8px">'+f[2]+'</span><b>'+f[0]+'</b> <small>'+(e?"Vorsprung "+(-x[3])+" Punkte":x[2]+" · "+x[3]+" Punkte vor dir")+'</small><small style="display:block;margin:2px 0 0">'+x[4]+'</small></span><strong class="t'+(e?" plus":"")+'">'+(e?"+2,5 C · ":"")+x[1]+'. von 16</strong></div>'}).join("")+
-    '<div class="txt">Je Farbe zählen die Ergebnispunkte aus ihren <b>fünf Disziplinen</b>, zehn Duelle je Saison. Ersetzt die Disziplin-Krone. Der Bonus kommt aus dem Rangprämien-Topf, nicht obendrauf.</div></div></div>';
+  /* 5 Medaillenspiegel und Farb-Meister (Runde 3) */
+  var MS=[["Mortal Sin",4,3,1],["Pirate Crew",3,3,2],["Vigilante Wranglers",3,2,2,1],["Royal Court",2,2,4],["The Giants",2,1,1]],MC=[.3,.2,.1];
+  var FM=[["pow",4],["spe",9],["men",1],["soc",6]];
+  var fm='<div class="sd kom"><div class="kopf">Medaillenspiegel<small>Gold 0,3 · Silber 0,2 · Bronze 0,1 C</small></div><div class="in">'+
+    '<div class="ms mk"><span>#</span><span>Liga 2 · 20 Disziplinen</span><span><i class="md">G</i></span><span><i class="md s">S</i></span><span><i class="md b">B</i></span><span>Bonus</span></div>'+
+    MS.map(function(x,i){return '<div class="ms'+(x[4]?" du":"")+'"><span class="t">'+(i+1)+'</span><span'+(x[4]?' data-tip="Gold: Schach · Takeshi · Tennis\nSilber: I Spy · Football\nBronze: TDM · Climbing"':"")+'>'+x[0]+(x[4]?" · du":"")+'</span><span class="t">'+x[1]+'</span><span class="t">'+x[2]+'</span><span class="t">'+x[3]+'</span><strong class="t'+(x[4]?" plus":"")+'">'+(x[4]?"+":"")+zahl(x[1]*MC[0]+x[2]*MC[1]+x[3]*MC[2])+' C</strong></div>'}).join("")+
+    '<div class="zl" style="align-items:center"><span>Farb-Meister <small>2,0 C je Farbe</small></span><span class="fch">'+FM.map(function(x){var f=FARBE[x[0]];return '<span class="marke'+(x[1]===1?"":" leer")+'" style="'+(x[1]===1?"--pc:var("+f[1]+")":"")+'">'+f[2]+'<b style="'+(x[1]===1?"":"color:var(--tinte)")+'">'+x[1]+'.</b></span>'}).join("")+'<strong class="t plus" style="margin-left:4px">+2,0 C</strong></span></div>'+
+    '<div class="zl"><span>Moral <small>eingesetzte Spieler mit Ehrgeiz-Trait</small></span><strong class="t">Gold +6 · Silber +4 · Bronze +2</strong></div>'+
+    '<div class="txt artx">Je Disziplin zählen die Ergebnispunkte aus <b>zwei Duellen</b> je Saison, Gleichstand teilt die Medaille. Liga 1 zahlt 0,5 · 0,3 · 0,2 C und 3,0 C je Farbe. Alles kommt aus dem Rangprämien-Topf, nicht obendrauf.</div></div></div>';
   /* 6 Kredite */
   var rahm=(Math.max(0,.15*Math.max(0,M.jetzt)+.3*BUD.kader-2.7));
   var kr='<div class="sd"><div class="kopf">Kredite<small>Bank und andere Teams</small></div><div class="in">'+
@@ -992,15 +1026,17 @@ function vWahl(){
     '<div class="zl"><span>KI in Saison 1</span><span style="text-align:right">nur Pflichtkader und Notfall, nie für den Draft</span></div>'+
     '<div class="txt">Freiwillig, nie automatisch. Unter 60 % Freigabe des Vorstands gibt es keinen freiwilligen Kredit; der Pflichtkredit am Kassensturz bleibt.</div>'+
     '</div><div class="fuss"><small>Auszahlung in den Transfertopf</small><span class="sp"></span><button class="btn klein" data-toast="Kreditangebote stehen auf der Seite Kredite: Bank und jedes Team mit freiem Geld">Angebote ansehen '+ic("r")+'</button></div></div>';
-  var P1=.265,lei='<div class="sd lei voll"><div class="kopf">Arena-Leiter<small>Vorschlag 22.11.: Plätze statt fester Einnahme · Baukosten und Unterhalt wie im Katalog · Preis je 1.000 Besucher 0,18 C (Liga 2) und 0,265 C (Liga 1)</small></div><div class="in">'+
-    '<div class="lz lk"><span>Stufe</span><span>Plätze</span><span>Fan-Maximum</span><span>Bau</span><span>Unterhalt je Saison</span><span>Volles Haus · Liga 2 · Liga 1</span><span>Mehr je Saison, netto · Liga 2 · Liga 1</span><span>Bau bezahlt nach · Liga 2 · Liga 1</span></div>'+
-    PLATZ.map(function(p,i){var dp=i?(p-PLATZ[i-1])/1000*10:0,du=i?ARENA[i][1]-ARENA[i-1][1]:0,n2=dp*PREIS1000-du-.6,n1=dp*P1-du-.9;
-      return '<div class="lz'+(i===ARSTUFE?" du":i===ARSTUFE+1?" nx":"")+'"><span><b>'+i+'</b>'+(i===ARSTUFE?" · du":"")+'</span><strong class="t">'+tz(p)+'</strong><span class="t">'+tz(p*1.25)+'</span><span class="t">'+(i?zahl(ARENA[i][0])+" C":"–")+'</span><span class="t">'+(i?zahl(ARENA[i][1])+" C":"–")+'</span><span class="t">'+e1(p/1000*PREIS1000)+' · '+e1(p/1000*P1)+' C</span><span class="t">'+(i?"+"+e1(n2)+" · +"+e1(n1)+" C":"–")+'</span><strong class="t">'+(i?e1(ARENA[i][0]/n2)+" · "+e1(ARENA[i][0]/n1)+" Saisons":"–")+'</strong></div>'}).join("")+
+  function lzr(k,a,b,c,d,e,f,g,h){return '<div class="lz'+(k?" "+k:"")+'"><span>'+a+'</span><strong class="t">'+b+'</strong><span class="t">'+c+'</span><span class="t">'+d+'</span><span class="t">'+e+'</span><span class="t">'+f+'</span><span class="t">'+g+'</span><strong class="t">'+h+'</strong></div>'}
+  var lei='<div class="sd lei voll"><div class="kopf">Arena-Bauteile<small>Runde 3: Stufe 0 = 4.000 Plätze, je Ausbaustufe ein Bauteil nach Wahl (höchstens fünf) · Werte Liga 2 · Liga 1 · Ziel: 1 % der Einnahmen eines Top-Teams je 1.000 Plätze, der Sponsor bleibt unverändert</small></div><div class="in">'+
+    '<div class="lz lk"><span>Bauteil</span><span>Plätze</span><span>Preis je 1.000 · Heimspiel</span><span>Bau · 1. · 2. · 3. der Art</span><span>Unterhalt</span><span>Volles Haus je Saison</span><span>Mehr je Saison, netto</span><span>Bau bezahlt nach (1. der Art)</span></div>'+
+    lzr("","<b>Grundarena</b> · Stufe 0","4.000","3.000 Steh · 1.000 Sitz","–","–","3,0 · 4,0 C","–","–")+
+    BAU.map(function(b,i){var v2=b.pl/1000*PA[i].p*10,v1=v2*L1F;return lzr(i===Z.bau?"nx":"","<b>"+b.n+"</b>","+"+tz(b.pl),zahl(PA[i].p)+" · "+zahl(PA[i].p*L1F)+" C",zahl(b.k)+" · "+zahl(b.k*1.2)+" · "+zahl(b.k*1.4)+" C",zahl(b.u)+" C",e1(v2)+" · "+e1(v1)+" C","+"+e1(v2-b.u)+" · +"+e1(v1-b.u)+" C",e1(b.k/(v2-b.u))+" · "+e1(b.k/(v1-b.u))+" Saisons")}).join("")+
+    lzr("du","<b>Beispiel Stufe 5</b> · 2 Steh, 2 Sitz, 1 Loge","25.800","15.000 · 10.000 · 800","96,4 C gesamt","5,0 C","25,8 · 34,4 C","+17,8 · +25,4 C","5,4 · 3,8 Saisons")+
     '</div></div>';
   var sum=r1(so-V[1]-L.k);
   var kopf='<div class="rech gross d4" style="margin:0"><div><small>Dauerkarten · sofort</small><strong class="t plus">'+Cv(so)+'</strong></div><div><small>Versicherung · Pauschale</small><strong class="t '+(V[1]?"minus":"")+'">'+(V[1]?Cv(-V[1]):"0,0 C")+'</strong></div>'+
     '<div><small>Trainingslager</small><strong class="t '+(L.k?"minus":"")+'">'+(L.k?Cv(-L.k):"0,0 C")+'</strong></div><div class="su"><small>Deine drei Wahlen · Kasse</small><strong class="t">'+Cv(sum)+'</strong></div></div>';
-  return ['<h2>Einmal je Saison entscheiden</h2><span class="hin">Drei Wahlen, dazu Arena, Farb-Meister und Kredit auf einen Blick.</span><span class="sp"></span>',
+  return ['<h2>Einmal je Saison entscheiden</h2><span class="hin">Drei Wahlen, dazu Arena, Medaillen und Kredit auf einen Blick.</span><span class="sp"></span>',
     '<div class="gr h3 wahl"><div class="voll">'+kopf+'</div>'+dk+ar+ve+la+fm+kr+lei+'</div>',
     '<span>Alle Beträge erfunden, Größenordnung Liga 2 · Wahlen sind je Team gespeichert und delegierbar, die KI nutzt dieselben Regeln</span><span class="sp"></span><button class="btn klein" data-ans="posten" data-pper="prog">Aufschlüsselung '+ic("r")+'</button>'];
 }
@@ -1026,7 +1062,7 @@ var POSTEN=[
  {id:"erg",s:"e",n:"Sponsor-Ereignisse",kat:"erg",topf:"l",st:"ist",ids:["erg"],w:"Je Ereignis, beim Spieltagswechsel.",r:"Würfel je Team und Spieltag: Aktionsbonus, Klausel, Reibung. Kann negativ sein.",d:"Annehmen oder ablehnen in der Inbox.",ki:"Nimmt an, wenn der Erwartungswert positiv ist.",c:"lib/sponsor/sponsor-event-service.ts:29"},
  {id:"aermel",s:"e",n:"Ärmelsponsor",kat:"spo",topf:"l",st:"plan",ids:["aermel","presence"],w:"Je Spieltag.",r:"Feste Rate plus Presence-Bonus, wenn 3 von 4 Stars im Einsatz sind.",d:"Zweiter Sponsor-Platz. Vorschlag vom 17.11., offen (Frage 10 im Finanzkonzept).",ki:"Nimmt das Angebot mit dem höchsten Erwartungswert.",c:"Nicht gebaut (Finanzkonzept V2, Frage 10)."},
  {id:"dis",s:"e",n:"Disziplin-Sponsoren",kat:"spo",topf:"l",st:"plan",ids:["dis-*"],w:"Je Spieltag mit passender Disziplin.",r:"Bonus je gewonnenem Duell einer Farbe. Vorschlag vom 17.11., offen.",d:"Angebote im Reiter Sponsoren annehmen (höchstens zwei).",ki:"Nach dem Disziplin-Profil des Kaders.",c:"Nicht gebaut (Finanzkonzept V2, Frage 10)."},
- {id:"tic",s:"e",n:"Tageskarten",kat:"tic",topf:"l",st:"plan",ids:["tic"],w:"Je Heimspiel (10 je Saison).",r:"Volles Haus × Auslastung × Preisstufe. Die Auslastung folgt der Fan-Stimmung.",d:"Ticketpreis in vier Stufen (Reiter Hebel). Arena ausbauen, wenn das Haus voll ist (Reiter Saisonwahl).",ki:"Preis nach Stimmung.",c:"Nicht gebaut (Finanzkonzept V2, Stufe 5). Vorschlag 22.11.: 0,18 C je 1.000 Besucher in Liga 2 (V2-Startwert + 25 %), Kapazität nach Arena-Stufe. Heute zahlt das Gebäude „Arena Upgrade“: lib/facilities/facility-season-end-service.ts:172"},
+ {id:"tic",s:"e",n:"Tageskarten",kat:"tic",topf:"l",st:"plan",ids:["tic"],w:"Je Heimspiel (10 je Saison).",r:"Volles Haus × Auslastung × Preisstufe. Die Auslastung folgt der Fan-Stimmung und dem Ereignis des Heimspiels: Derby gegen einen Rivalen ×1,5 bis ×2,0, Spitzenspiel ×1,4, Saisonfinale ×1,3, Unwetter ×0,7, Fan-Boykott ×0,5. In dieser Saison: Unwetter an Spieltag 6, Derbys an Spieltag 9, 14 und 18, Finale an Spieltag 20. Über 100 % ist ausverkauft; dann bis +25 % Zuschlag auf Tageskarten.",d:"Ticketpreis in vier Stufen (Reiter Hebel). Arena ausbauen, wenn das Haus voll ist (Reiter Saisonwahl).",ki:"Preis nach Stimmung.",c:"Nicht gebaut (Finanzkonzept V2, Stufe 5). Runde 3 vom 22.11.: Platzarten Stehplatz 0,06 · Sitzplatz 0,12 · Loge 0,60 C je 1.000 Plätze und Heimspiel in Liga 2 (Liga 1 × 1,33), Stufe 0 = 4.000 Plätze, je Ausbaustufe ein Bauteil. Der Sponsor bleibt unverändert, Tickets kommen obendrauf. Heute zahlt das Gebäude „Arena Upgrade“: lib/facilities/facility-season-end-service.ts:172"},
  {id:"mer",s:"e",n:"Merch (Fan-Shop)",kat:"mer",topf:"l",st:"plan",ids:["mer*"],w:"Je Spieltag, Heim × 1,5, Auswärts × 0,5.",r:"Grundwert je Star × Stimmung × Fan-Shop-Stufe.",d:"Stars halten oder verkaufen, Fan-Shop ausbauen.",ki:"Baut den Fan-Shop bei niedrigem Finanzwert zuerst.",c:"Nicht gebaut (Finanzkonzept V2, Stufe 5). Heute zahlt das Gebäude „Fan Shop“ flach je Spieltag: lib/facilities/facility-catalog.ts:166"},
  {id:"pra",s:"e",n:"Siegprämie der Liga",kat:"pra",topf:"l",st:"plan",ids:["pra"],w:"Je Spieltag, je gewonnenem Duell.",r:"0,12 C (Liga 2) bzw. 0,20 C (Liga 1) je gewonnenem Disziplin-Duell.",d:"Keine eigene. Belohnt Siege sofort.",ki:"Wie beim Menschen.",c:"Nicht gebaut (Finanzkonzept V2, Stufe 5). Preisgeld ist heute nur Benchmark: lib/season/cash-prize-benchmark-flag.ts:13"},
  {id:"board",s:"e",n:"Vorstandsziele",kat:"pra",topf:"l",st:"ist",ids:["board"],w:"Saisonende.",r:"Prämie je erfülltem Saisonziel. Der Vorstand verhängt keine Geldstrafen, er gibt nur weniger Budget frei.",d:"Ziele im Vorstandsgespräch, „Alles auf eine Karte“.",ki:"Dieselben Ziele und Regeln.",c:"lib/board/team-season-objectives-service.ts:2788"},
@@ -1034,9 +1070,9 @@ var POSTEN=[
  {id:"zins",s:"e",n:"Zinsen aus vergebenen Krediten",kat:"kre",topf:"l",st:"ist",f:an({21:.6}),w:"Saisonende, mit der Rate des Schuldners.",r:"Zinsanteil der Raten, die andere Teams auf deine Kredite zahlen. Beispiel: 5 C an Royal Court zu 12 %.",d:"Geld verleihen statt liegen lassen (Seite Kredite).",ki:"Verleiht nur, was über der Rücklage liegt.",c:"lib/finance/loan-service.ts:392 (Angebote), :811 (Abrechnung)"},
  {id:"verk",s:"e",n:"Spielerverkäufe",kat:"bil",topf:"t",st:"ist",ids:["notv"],w:"Sofort beim Verkauf; Vertragsende zum Saisonwechsel.",r:"Ablöse an den Klub. Der Erlös unterliegt der Vorstands-Quote, frei werdendes Gehalt geht zu 100 % in den Gehaltstopf. Zählt nicht zur GuV.",d:"Verkaufen, verlängern oder auslaufen lassen (ein Vertragsende ist ein ablösefreier Verkauf).",ki:"Verkauft bei Kassendruck und Kaderüberhang.",c:"transferHistory · lib/finance/kontoauszug.ts:84 · lib/contracts/contract-renewal-service.ts"},
  {id:"ausv",s:"e",n:"Ausrüstung · Verkauf",kat:"aus",topf:"t",st:"plan",f:an({11:.9}),w:"Sofort, beim Händler oder auf dem Markt der Winterpause.",r:"25 bis 40 % des Händlerpreises × Zustand. Beispiel: ein seltenes Teil, 0,9 C. Erlös unter der Vorstands-Quote.",d:"Verkaufen oder zerlegen.",ki:"Verkauft das schwächste Teil, wenn das Lager voll ist.",c:"Nicht gebaut (Zwischen den Spieltagen, §32)."},
- {id:"dauer",s:"e",n:"Dauerkarten",kat:"tic",topf:"l",st:"neu",f:function(t){return t===0?dkSofort():0},gg:function(){return -dkFehlt()},w:"Einmal vor Spieltag 1.",r:"Volles Haus 1,45 C × 10 Heimspiele × Anteil 40 % × 0,75 (Rabatt 25 %) = 4,35 C sofort, unabhängig von der Stimmung.",d:"Einmal je Saison: wenig (20 %), normal (40 %) oder viel (60 %). Viel heißt sicheres Geld schon in der Kaufphase, aber weniger Tageskarten, wenn die Saison gut läuft. Reiter Saisonwahl.",ki:"Erwartete Auslastung unter 70 %: viel. Über 80 %: wenig. Dazwischen normal; bei Kasse unter zwei Gehaltsraten eine Stufe höher.",g:"Die verkauften Plätze fehlen an der Tageskasse: Anteil × Auslastung × volles Haus. Lohnt sich unter 75 % Auslastung (Stimmung 53). Dieses Team hat eine gute Saison und zahlt drauf.",c:"Entschieden 22.11.: Rabatt 25 % statt 10 %. Bau zusammen mit den Tageskarten."},
+ {id:"dauer",s:"e",n:"Dauerkarten",kat:"tic",topf:"l",st:"neu",f:function(t){return t===0?dkSofort():0},gg:function(){return -dkFehlt()},w:"Einmal vor Spieltag 1.",r:"Volles Haus 1,68 C × 10 Heimspiele × Anteil 40 % × 0,75 (Rabatt 25 %) = 5,04 C sofort, unabhängig von der Stimmung. Der Anteil gilt für Stehplätze, Sitzplätze und Logen gleich.",d:"Einmal je Saison: wenig (20 %), normal (40 %) oder viel (60 %). Viel heißt sicheres Geld schon in der Kaufphase, aber weniger Tageskarten, wenn die Saison gut läuft. Reiter Saisonwahl.",ki:"Erwartete Auslastung unter 70 %: viel. Über 80 %: wenig. Dazwischen normal; bei Kasse unter zwei Gehaltsraten eine Stufe höher.",g:"Die verkauften Plätze fehlen an der Tageskasse: Anteil × Auslastung × volles Haus. Lohnt sich unter 75 % Auslastung (Stimmung 53). Dieses Team hat eine gute Saison und zahlt drauf.",c:"Entschieden 22.11.: Rabatt 25 % statt 10 %. Bau zusammen mit den Tageskarten."},
  {id:"tv",s:"e",n:"Übertragungsgeld · Topspiel",kat:"tv",topf:"l",st:"neu",f:an({6:.3,10:.3,16:.3}),gg:-.9,w:"Je Spieltag, an dem dein Duell das Topspiel der Sendung ist.",r:"0,3 C je Team im Topspiel (Derby, Erzfeind oder Tabellennachbarn). Erwartung: zwei bis vier Topspiele je Saison.",d:"Keine. Macht Rivalitäten und das Rennen oben sichtbar.",ki:"Wie beim Menschen.",g:"Aus dem Topf der Liga-Siegprämien geschnitten (0,12 → 0,11 C je Sieg), nicht obendrauf.",c:"Vorschlag. Empfehlung: später, mit der Sendung nach dem Spiel."},
- {id:"farb",s:"e",n:"Farb-Meister (Saisonbonus)",kat:"pra",topf:"l",st:"neu",f:an({21:2.5}),gg:-.8,w:"Saisonende.",r:"Das beste Team je Disziplinfarbe (Power, Speed, Mental, Social) bekommt 2,5 C (Liga 2) bzw. 4,0 C (Liga 1). Je Farbe zählen die Ergebnispunkte aus ihren fünf Disziplinen, zehn Duelle je Saison. Prognose hier: Mental.",d:"Keine eigene. Der Kader darf eine Farbe zuspitzen: auch ein Mittelfeld-Team kann eine Farbe gewinnen.",ki:"Liegt das Team zur Winterpause in einer Farbe unter den ersten drei, gewichtet es Kauf und Training in dieser Farbe leicht höher.",g:"Liga-Summe 16 + 10 = 26 C je Saison, aus dem Rangprämien-Topf des Sponsors geschnitten (1,25 %). Das kostet jedes Team im Mittel 0,8 C Rangprämie.",c:"Entschieden 22.11.: ersetzt die Disziplin-Krone. Farbzuordnung: lib/data/dataAdapter.ts:59 bis :78."},
+ {id:"farb",s:"e",n:"Medaillen · Farb-Meister",kat:"pra",topf:"l",st:"neu",f:an({21:3.5}),gg:-1.25,w:"Saisonende.",r:"Je Disziplin Gold 0,3 · Silber 0,2 · Bronze 0,1 C (Liga 2; Liga 1: 0,5 · 0,3 · 0,2 C). Dazu der Farb-Meister: bestes Team je Disziplinfarbe 2,0 C (Liga 2) bzw. 3,0 C (Liga 1). Prognose hier: 3 Gold, 2 Silber, 2 Bronze = 1,5 C und die Farbe Mental = 2,0 C.",d:"Keine eigene. Der Kader darf eine Disziplin oder eine Farbe zuspitzen: auch ein Mittelfeld-Team holt Medaillen.",ki:"Liegt das Team zur Winterpause in einer Farbe unter den ersten drei, gewichtet es Kauf und Training in dieser Farbe leicht höher.",g:"Liga-Summe 32 C Medaillen + 20 C Farb-Meister = 52 C je Saison, aus dem Rangprämien-Topf des Sponsors geschnitten. Das kostet ein Team der Liga 2 im Mittel 1,25 C Rangprämie.",c:"Runde 3 vom 22.11.: Medaillen zusätzlich zum Farb-Meister, der dafür von 2,5 auf 2,0 C sinkt. Moral für Spieler mit Ehrgeiz-Trait. Farbzuordnung: lib/data/dataAdapter.ts:59 bis :78."},
  {id:"versl",s:"e",n:"Versicherung · Erstattung",kat:"erg",topf:"g",st:"neu",f:function(t){return t===5?versErst():0},gg:0,w:"Je Spieltag, ab dem zweiten Ausfall-Spieltag einer Verletzung.",r:"80 % des Spieltagsgehalts eines verletzten, versicherten Spielers; der erste Ausfall-Spieltag bleibt beim Team. Com. Shepard (9,0 C je Saison) fehlte an Spieltag 4 und 5: 1 × 0,45 C × 0,8 = 0,36 C.",d:"Siehe Ausgabe „Versicherung · Pauschale“.",ki:"Siehe Pauschale.",g:"Gegenposten ist die Pauschale. Erwartet fließen rund 50 bis 60 % der Pauschalen zurück; der Rest geht in den Liga-Topf.",c:"Entschieden 22.11.: Erstattung gegen Pauschale. Braucht die längeren Verletzungen (bis 3 Spieltage)."},
  /* ---- Ausgaben ---- */
  {id:"geh",s:"a",n:"Spielergehälter",kat:"geh",topf:"g",st:"ist",ids:["geh"],w:"Je Spieltag, 1/20.",r:"Jahresgehalt des Kaders, wie er an diesem Spieltag im Kader steht. Verletzte zahlen weiter.",d:"Kaufen, verkaufen, verlängern.",ki:"Plant gegen den Gehaltstopf.",c:"lib/finance/finanzen-je-spieltag.ts:187 · lib/finance/finanzen-je-spieltag-buchung.ts:49"},
@@ -1294,7 +1330,7 @@ function gruppen(T){var g={},o=[];T.l.forEach(function(x){if(!x.b)return;if(!(x.
 /* ================= Bedienung ================= */
 function hebelNull(){Z.preis=0;Z.auto=false;Z.spar=0;Z.dispo=0;Z.bonus=0;Z.kader=1;Z.notv=false;Z.ang={pow:"offen",spe:"offen",soc:"offen",men:"laeuft"}}
 document.addEventListener("click",function(e){
-  var x=e.target.closest("[data-szen],[data-phone],[data-reset],[data-now],[data-ber],[data-ans],[data-tag],[data-sel],[data-ctab],[data-blatt],[data-ang],[data-auto],[data-spar],[data-kader],[data-bonus],[data-wer],[data-notv],[data-toast],[data-bq],[data-fen],[data-um0],[data-pso],[data-pper],[data-pfil],[data-psel],[data-dk],[data-vers],[data-lager]");
+  var x=e.target.closest("[data-szen],[data-phone],[data-reset],[data-now],[data-ber],[data-ans],[data-tag],[data-sel],[data-ctab],[data-blatt],[data-ang],[data-auto],[data-spar],[data-kader],[data-bonus],[data-wer],[data-notv],[data-toast],[data-bq],[data-fen],[data-um0],[data-pso],[data-pper],[data-pfil],[data-psel],[data-dk],[data-vers],[data-lager],[data-bau]");
   if(!x)return; var d=x.dataset;
   if(x.tagName==="A"&&x.getAttribute("href")==="#")e.preventDefault();
   if(d.szen){Z.szen=d.szen;hebelNull()}
@@ -1321,6 +1357,7 @@ document.addEventListener("click",function(e){
   if(d.um0){Z.um=0;toast("Umschichtung zurückgenommen")}
   if(d.pso){var ps=d.pso.split(":"),pc0=ps[1]==="ant"?"ges":ps[1],alt=Z.pso[ps[0]];Z.pso[ps[0]]=alt[0]===pc0?[pc0,-alt[1]]:[pc0,pc0==="n"||pc0==="tp"||pc0==="rg"?1:-1]}
   if(d.dk){Z.dk=+d.dk;toast("Dauerkarten: "+DKN[Z.dk]+" · gilt für die ganze Saison")}
+  if(d.bau){Z.bau=+d.bau}
   if(d.vers){Z.vers=+d.vers;toast("Versicherung: "+VERS[Z.vers][0])}
   if(d.lager){var lg=lagerLage()[+d.lager];if(!lg.ok){toast(lg.n+": Bedingung nicht erfüllt");return}Z.lager=+d.lager;toast("Winterpause: "+lg.n)}
   if(d.pper){Z.pper=d.pper}

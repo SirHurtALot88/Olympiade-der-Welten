@@ -11,6 +11,13 @@ rechnet ihre Wirkung auf die Balance (c) und stellt fünf Fragen (d). Das Mockup
 > Mehr Geld je Besucher, Arena-Ausbau hängt an der Auslastung. Versicherung als Erstattung gegen Pauschale. Trainingslager
 > in der Winterpause. Kredite ab Saison 1. Alles dazu steht in **Abschnitt (f)**; wo (b) und (f) sich widersprechen, gilt (f).
 > Die Balance-Tabelle in (c) ist auf diesen Stand gebracht.
+>
+> **Stand nach Runde 3 (Chris, 22.11.):** Disziplin-Medaillen (Gold, Silber, Bronze) zusätzlich zum Farb-Meister. Arena mit
+> Stehplatz, Sitzplatz und Loge, Stufe 0 = 4.000 Plätze, Tickets bis zu einem Viertel der Einnahmen. **Der Sponsor bleibt,
+> wie er ist**; die Senkung der Ausschüttung aus f.3 ist zurückgenommen. Zuschauer-Ereignisse je Heimspiel (Derby ×1,5 bis
+> ×2,0). Startbudget-Aufschlag als Messvariante. Alles in **Abschnitt (g)**; wo (f) und (g) sich widersprechen, gilt (g).
+> Die Zeilen „Mehr Geld je Besucher“ und „Arena“ der Tabelle in (c) gelten nicht mehr, siehe g.2. Marketing:
+> `docs/design/marketing-22-11.md`.
 
 **Kurzfassung** (Runde 1)
 
@@ -317,6 +324,9 @@ höher.
 
 ### f.3 Mehr Geld je Besucher, Arena-Ausbau hängt an der Auslastung
 
+> **Ersetzt durch g.2 und g.3 (Runde 3).** Die Leiter mit 8.000 Plätzen und der Gegenposten über den Sponsor gelten nicht
+> mehr. Fanbasis, Empfehlung des Vorstands und KI-Regel sind in g.2 übernommen.
+
 **Befund heute:** Besucher bringen fast nichts. Ohne Arena-Gebäude ist die Einnahme 0. Mit Stufe 1 sind es 2,4 C je Saison
 × Beliebtheit (0,5 bis 1,5) bei 0,8 C Unterhalt (`lib/facilities/facility-catalog.ts:186`, Rechnung
 `lib/facilities/facility-season-end-service.ts:172`), also rund 3 % der Einnahmen. Die Stufen amortisieren sich nach acht
@@ -467,3 +477,319 @@ Die Aufnahmen aus Runde 1 zeigen den alten Stand (Krone, Schaukampf, 10 % Rabatt
 | 1 | Farb-Meister aus dem Rangprämien-Topf oder obendrauf? Und ein Deckel, falls ein Team mehr als zwei Farben holt? | **Aus dem Topf**, Deckel erst nach dem Messlauf. |
 | 2 | Arena-Leiter: Reichen 3 bis 6 Saisons Amortisation für die ersten drei Stufen, oder soll die Arena schneller Geld bringen? | **So lassen.** Schneller heißt höherer Preis je Besucher, und dann fällt der Sponsor-Anteil unter 65 %. |
 | 3 | Kredit in Saison 1 schon im Draft oder erst danach? | **Mensch ja, KI nicht für den Draft**, damit die Startbudgets die Kalibrierung bleiben. |
+
+---
+
+## (g) Runde 3: Medaillen, Arena mit Platzarten, Zuschauer-Ereignisse, Startbudget (Chris 22.11.)
+
+Chris, 22.11., wörtlich: „oder mach als diszi krone quasi als medaille und gold silber bronze bekommen nen kleinen cash boost
+und ggf. moral wenn es die spieler interessiert / arena einnahmen können bei top teams 25% ausmachen wenn sie die arena voll
+bekommen ich hätte gesagt bei top voraussetzungen ca 1% pro 1k zuschauer? auf die saison gesehen. bei stufe 0 hat man dann halt
+4k stadion oder du machst es sogar detaillierter mit stehplatz sitzplatz loge. je besser desto teurer in der einrichtung aber
+desto mehr pro spieltag wirft es ab aber in der realität sind zb in der bundesliga die dauerkarten und generell kartenverkauf
+ein großer treiber der einnahmen / Was ist mit marketing? […] / und gemeint ist den sockelbetrag für startbudget von 20 …
+bekommt JEDES team platz 32 also +20 mio und platz 31 dann 22 mio platz 30 24 mio usw“
+
+Und danach: „Ne Tickets werden stärker und Sponsoren bleiben genau wie sie sind. Ereignisse können auch auf Zuschauerzahlen
+Einfluss nehmen, Derby gegen Rivalen, oder andere Dinge können die Einnahmen verdoppeln oder manches auch halbieren oder
+zumindest verringern und erhöhen.“
+
+Was sich gegenüber Runde 2 ändert:
+
+- **f.1** bleibt, der Farb-Meister bekommt die Medaillen an die Seite und sinkt dafür leicht (g.1).
+- **f.3 ist ersetzt** durch g.2 und g.3. Die Arena-Leiter mit 8.000 Plätzen und der Gegenposten „Sponsor-Ausschüttung
+  0,73 → 0,69“ sind **zurückgenommen**. Der Sponsor bleibt, wie er ist; Tickets kommen obendrauf.
+- **f.2** (Dauerkarten 25 %) bleibt und gilt je Platzart (g.2).
+- Das Marketing steht in einem eigenen Papier: `docs/design/marketing-22-11.md`.
+
+Alle Zahlen sind Startwerte für den Messlauf.
+
+### g.1 Disziplin-Medaillen, zusätzlich zum Farb-Meister
+
+**Regel.** Am Saisonende gibt es in jeder Liga je Disziplin Gold, Silber und Bronze: 20 Disziplinen × 3 Medaillen × 2 Ligen
+= 120 Medaillen je Saison.
+
+- **Wertung:** Summe der Ergebnispunkte (E1, 0 bis 10 je Begegnung) des Teams in dieser Disziplin. Jede Disziplin kommt je
+  Saison **zweimal** dran (20 Spieltage × 2 Disziplinen), die Tabelle hat also zwei Einträge je Team. Gleichstände sind
+  darum häufig. Reihenfolge bei Gleichstand: Summe der Rohwert-Abstände, dann die PP-Summe der eingesetzten Spieler; ist auch
+  das gleich, wird die Medaille geteilt (beide bekommen sie, das Geld wird halbiert).
+- **Geld:** Liga 1 Gold 0,5 · Silber 0,3 · Bronze 0,2 C. Liga 2 Gold 0,3 · Silber 0,2 · Bronze 0,1 C. Eine Goldmedaille ist
+  rund ein Zwanzigstel eines Spielergehalts. Das ist mit Absicht klein, weil zwei Begegnungen viel Zufall enthalten.
+- **Moral, nur für Spieler, die es interessiert.** Betroffen sind die Spieler, die in dieser Disziplin eingesetzt waren und
+  einen Ehrgeiz- oder Ruhm-Trait tragen: `Ambitious` (`lib/training/class-progression-config.ts:236`), `FanFavorite` (`:243`),
+  `FiredUp` (`:245`), `Motivated` (`:249`), `Diva` (`:260`), `Egomaniac` (`:261`). Sie bekommen Moral +6 (Gold), +4 (Silber),
+  +2 (Bronze), höchstens +10 je Spieler und Saison. Das sind dieselben Traits, die im Code schon Forderungen auslösen
+  (`DEMAND_TRAITS`, `lib/morale/player-demands-service.ts:59`). Alle anderen bekommen nichts. `Mercenary` (`:267`) und
+  `Gambler` interessiert nur Geld: Moral +2 je Medaille, aber nur, wenn die Siegprämie an den Kader eingeschaltet ist.
+  `Diva` und `Egomaniac` zählen nur die Medaillen, bei denen sie selbst der beste Spieler ihres Teams waren.
+  Die Moral wirkt als On-top-Effekt über die Form und zählt nicht gegen die Rangtreue-Schranke.
+
+**Zusätzlich oder statt des Farb-Meisters? Empfehlung: beides, der Farb-Meister sinkt.**
+
+| Variante | Medaillen | Farb-Meister | Summe je Saison | Anteil am Rangprämien-Topf (620 C) |
+|---|---:|---:|---:|---:|
+| A: nur Medaillen | 20 + 12 = 32 C | – | 32 C | 5,2 % |
+| **B: beides, Farb-Meister 3,0 / 2,0 C (Empfehlung)** | 32 C | 12 + 8 = 20 C | **52 C** | 8,4 % |
+| C: beides, Farb-Meister wie Runde 2 (4,0 / 2,5 C) | 32 C | 26 C | 58 C | 9,4 % |
+
+Begründung: Die zwei Preise belohnen Verschiedenes. Medaillen sind klein und breit, auch ein Team im Mittelfeld holt mit einer
+starken Disziplin eine. Der Farb-Meister ist groß und selten, er belohnt einen Kader mit Profil über zehn Begegnungen. Zusammen
+sind es im Mittel 1,6 C je Team (Liga 1: 2,0 C, Liga 2: 1,25 C).
+
+**Topf und Gegenposten:** Einnahme, läuft über die Kasse (L), gebucht am Saisonende. Die 52 C kommen aus dem
+**Rangprämien-Topf des Sponsors**: jede Rangprämie sinkt um 8,4 %. Die Auszahlung des Sponsors an die Liga bleibt damit auf
+den Cent gleich, sie wird nur anders verteilt (weniger nach Tabellenplatz, mehr nach Disziplin und Farbe). Das passt zu
+„Sponsoren bleiben genau wie sie sind“; wenn Chris auch die Verteilung nicht anfassen will, kommen die 52 C obendrauf und
+die Geldmenge wächst je Saison um 2,4 % der Einnahmen (Frage 1).
+
+**Risiko:** Ein überlegenes Team in Liga 1 könnte acht Gold, fünf Silber, drei Bronze (6,1 C) und alle vier Farben (12 C) holen,
+zusammen 18 C. Deckel wie in f.1: höchstens zwei Farben je Team; dann sind es 12 C.
+
+**KI:** keine eigene Regel für Medaillen. Die Farb-Regel aus f.1 bleibt.
+
+### g.2 Arena-Einnahmen neu: Platzarten, Stufe 0 mit 4.000 Plätzen
+
+**Ziel von Chris:** Bei Top-Voraussetzungen bringt die Arena rund 1 % der Saisoneinnahmen je 1.000 Zuschauer. Ein Top-Team mit
+voller Arena von rund 25.000 Plätzen holt so ein Viertel seiner Einnahmen aus Karten. **Der Sponsor bleibt unverändert.**
+
+**Eichung.** Ein Top-Team der Liga 1 bekommt heute rund 100 C vom Sponsor (Median 73 C, Maximum 121 C,
+`docs/design/finanzen-ist-messung-18-11.md` Zeile 116), ein Top-Team der Liga 2 rund 76 C. Damit 25.800 Plätze ein Viertel
+der Einnahmen bringen, muss das volle Haus über die Saison 34,4 C (Liga 1) bzw. 25,8 C (Liga 2) wert sein.
+
+**Platzarten.** Preise in C je 1.000 Plätze, Liga 1 = Liga 2 × 4/3.
+
+| Platzart | je Heimspiel, Liga 2 · Liga 1 | je Saison (10 Heimspiele) | Auslastung hängt an |
+|---|---:|---:|---|
+| **Stehplatz** | 0,06 · 0,08 C | 0,6 · 0,8 C | Fan-Stimmung, stark: ab Stimmung 70 voll, unter 40 halb leer |
+| **Sitzplatz** | 0,12 · 0,16 C | 1,2 · 1,6 C | Fanbasis, träge: schwankt halb so stark wie der Stehplatz |
+| **Loge** | 0,60 · 0,80 C | 6,0 · 8,0 C | Sponsor und Erfolg: 20 % + 40 % × Sponsor-Stufe + 40 % × Tabellenplatz, die Stimmung ist egal |
+
+„Sponsor-Stufe“ ist der Rang des gewählten Sponsors nach seiner Saisonbasis in der Liga, „Tabellenplatz“ der Rang der
+Vorsaison, ab Spieltag 5 der laufende Rang; beides als Anteil von 0 (letzter) bis 1 (erster). Ein Tabellenführer mit dem
+größten Sponsor hat volle Logen, ein Kellerteam mit kleinem Sponsor 20 %.
+
+**Stufe 0, die Grundarena:** 4.000 Plätze, davon 3.000 Stehplätze und 1.000 Sitzplätze, keine Logen. Volles Haus 3,0 C
+(Liga 2) bzw. 4,0 C (Liga 1) je Saison. Sie kostet nichts und hat keinen Unterhalt.
+
+**Ausbau: je Stufe ein Bauteil nach Wahl, höchstens fünf.** Der Manager entscheidet bei jedem Ausbau, welche Platzart wächst.
+
+| Bauteil | Plätze | Bau (1. · 2. · 3. dieser Art) | Unterhalt je Saison | volles Haus je Saison, Liga 2 · Liga 1 | je Heimspiel | mehr netto | Bau bezahlt nach (1. der Art) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **Stehtribüne** | +6.000 Steh | 12,0 · 14,4 · 16,8 C | 0,8 C | 3,6 · 4,8 C | 0,36 · 0,48 C | +2,8 · +4,0 C | 4,3 · 3,0 Saisons |
+| **Sitzrang** | +4.500 Sitz | 20,0 · 24,0 · 28,0 C | 1,2 C | 5,4 · 7,2 C | 0,54 · 0,72 C | +4,2 · +6,0 C | 4,8 · 3,3 Saisons |
+| **Logenring** | +800 Logen | 26,0 · 31,2 · 36,4 C | 1,0 C | 4,8 · 6,4 C | 0,48 · 0,64 C | +3,8 · +5,4 C | 6,8 · 4,8 Saisons |
+
+Jedes weitere Bauteil derselben Art kostet 20 % mehr als das erste. Das schiebt leicht zu einer gemischten Arena, ohne eine
+reine Stehplatz-Arena zu verbieten. „Bezahlt nach“ gilt bei vollem Haus; bei 80 % Auslastung dauert es ein Viertel länger,
+und im ersten Jahr füllen sich neue Steh- und Sitzplätze erst zu rund 60 %.
+
+**Beispiel-Leiter** (Stehtribüne, Sitzrang, Stehtribüne, Sitzrang, Logenring):
+
+| Stufe | Bauteil | Plätze (Steh · Sitz · Loge) | Bau | Bau gesamt | Unterhalt | volles Haus je Saison, Liga 2 · Liga 1 | je Heimspiel | Fan-Maximum |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 0 | – | 4.000 (3.000 · 1.000 · 0) | – | – | – | 3,0 · 4,0 C | 0,30 · 0,40 C | 6.000 |
+| 1 | Stehtribüne | 10.000 (9.000 · 1.000 · 0) | 12,0 C | 12,0 C | 0,8 C | 6,6 · 8,8 C | 0,66 · 0,88 C | 15.000 |
+| 2 | Sitzrang | 14.500 (9.000 · 5.500 · 0) | 20,0 C | 32,0 C | 2,0 C | 12,0 · 16,0 C | 1,20 · 1,60 C | 21.750 |
+| 3 | Stehtribüne | 20.500 (15.000 · 5.500 · 0) | 14,4 C | 46,4 C | 2,8 C | 15,6 · 20,8 C | 1,56 · 2,08 C | 30.750 |
+| 4 | Sitzrang | 25.000 (15.000 · 10.000 · 0) | 24,0 C | 70,4 C | 4,0 C | 21,0 · 28,0 C | 2,10 · 2,80 C | 37.500 |
+| 5 | Logenring | 25.800 (15.000 · 10.000 · 800) | 26,0 C | 96,4 C | 5,0 C | 25,8 · 34,4 C | 2,58 · 3,44 C | 37.500 |
+
+Die volle Leiter kostet 96,4 C (heute 185 C für fünf Stufen, die zusammen höchstens 28,5 C × Beliebtheit bringen). Bei
+vollem Haus ist sie nach 5,4 (Liga 2) bzw. 3,8 Saisons (Liga 1) bezahlt.
+
+**Was bleibt aus Runde 2:**
+
+- **Fanbasis** je Team, einzige neue Größe im Spielstand, wirkt nur auf Geld. Start 5.000 × Beliebtheit. Nachfrage =
+  Fanbasis × (0,30 + 0,85 × Stimmung ÷ 100) × Preisfaktor × Ereignis (g.3). Sie wächst um 2 % nach jedem Heimspiel mit
+  mindestens 90 % Auslastung, sinkt um 1 % unter 60 % und endet am **Fan-Maximum = 1,5 × (Steh- + Sitzplätze)**.
+- **Aufteilung der Nachfrage:** ein Anteil von 35 % + 30 % × Stimmung ÷ 100 will stehen, der Rest sitzen. Wer keinen
+  Stehplatz bekommt, kauft zu 50 % einen Sitzplatz; wer keinen Sitzplatz bekommt, zu 80 % einen Stehplatz. Logen laufen
+  getrennt.
+- **Empfehlung des Vorstands** je Platzart: liegt ihr Schnitt der letzten drei Heimspiele bei 90 % oder mehr, empfiehlt er
+  das passende Bauteil mit Amortisation. Unter 60 % rät er ab (Warnung, keine Sperre).
+- Der Ausbau bleibt ein Gebäude: Investitionstopf, hart gegen die Freigabe, wirkt ab dem nächsten Heimspiel. Die Einnahme des
+  heutigen Gebäudes „Arena Upgrade“ (`lib/facilities/facility-catalog.ts:186`, 2,4 bis 28,5 C × Beliebtheit) entfällt, der
+  Arena-Betrieb aus V2 bleibt auf seinem Grundwert und wächst nicht mehr mit der Stufe (der Unterhalt je Bauteil ersetzt das).
+- **KI:** baut nur bei aktiver Empfehlung, wählt das empfohlene Bauteil und nur, wenn es in höchstens sechs Saisons bezahlt
+  ist. In Liga 2 sind das Stehtribüne und Sitzrang, der Logenring erst mit Erfolg.
+- **Mehrspieler:** Bauteil-Wahl je Team, delegierbar im Bereich Gebäude.
+
+**Dauerkarten je Platzart (f.2 bleibt).** Der gewählte Anteil (20, 40 oder 60 %) gilt für Stehplätze, Sitzplätze und Logen
+gleich, Rabatt 25 %, Geld vor Spieltag 1. Die Wirkung ist je Platzart verschieden, weil der Gleichstand bei 75 % Auslastung
+liegt: Stehplätze schwanken am stärksten, dort ist die Dauerkarte die größte Wette. Logen sind planbar, ihre Auslastung steht
+vor der Saison fast fest; liegt sie unter 75 %, ist die Logen-Dauerkarte sicheres Geld. Eine eigene Stufe je Platzart wäre
+genauer, aber drei Regler statt einem (Frage 2). Dauerkarten sind von Ereignissen nicht betroffen: Ein Derby hebt nur die
+Tageskasse, ein Unwetter trifft Dauerkarten-Geld nicht. Beispiel des Mockups (15.300 Plätze, volles Haus 1,68 C): 2,52 ·
+5,04 · 7,56 C sofort.
+
+**Der Sponsor bleibt, wie er ist: Was die Tickets mit der Geldmenge machen.** Es gibt keinen Gegenposten. Die Einnahmen der
+Liga steigen um die Tickets:
+
+| Lage der Liga | Tickets Liga 1 · Liga 2 je Team | Tickets Liga-Summe | Unterhalt Liga | netto mehr je Saison | je Team | in % der heutigen Einnahmen (2182 C) |
+|---|---:|---:|---:|---:|---:|---:|
+| Start: alle Stufe 0, ausverkauft | 4,0 · 3,0 C | 112 C | 0 | +112 C | +3,5 C | 5 % |
+| Schnitt Stufe 1, 80 % Auslastung | 7,0 · 5,3 C | 197 C | 26 C | +172 C | +5,4 C | 9 % |
+| Schnitt Stufe 2 | 12,8 · 9,6 C | 358 C | 64 C | +294 C | +9,2 C | 16 % |
+| Schnitt Stufe 3 | 16,6 · 12,5 C | 466 C | 90 C | +376 C | +11,8 C | 21 % |
+| alle Stufe 5 (Logen 60 %) | 26,2 · 19,7 C | 735 C | 160 C | +575 C | +18,0 C | 34 % |
+
+Je Team-Typ, Sponsor wie heute gemessen:
+
+| Team-Typ | Arena | Sponsor | Tickets | Unterhalt | Einnahmen | Ticket-Anteil | Sponsor-Anteil |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Top, Liga 1, volle Arena | Stufe 5, 25.800 | 100 C | 34,4 C | 5,0 C | 138 C | **25 %** | 73 % |
+| Top, Liga 1, größter Sponsor (121 C) | Stufe 5, 25.800 | 121 C | 34,4 C | 5,0 C | 159 C | 22 % | 76 % |
+| Mittelfeld, Liga 1 | Stufe 3, 20.500, 80 bis 85 % | 76 C | 17,2 C | 2,8 C | 96 C | 18 % | 79 % |
+| Top, Liga 2, volle Arena | Stufe 5, 25.800 | 76 C | 25,8 C | 5,0 C | 105 C | **25 %** | 73 % |
+| Mittelfeld, Liga 2 | Stufe 2, 14.500, 75 bis 80 % | 52 C | 9,3 C | 2,0 C | 64 C | 14 % | 81 % |
+| Kleiner, Liga 2 | Stufe 1, 10.000, 65 bis 70 % | 43 C | 4,6 C | 0,8 C | 50 C | 9 % | 87 % |
+
+Das trifft Chris' Regel: je 1.000 Plätze 0,84 bis 0,99 % der Einnahmen, mit voller Top-Arena ein Viertel. (Rest zu 100 %
+sind die Vorstandsziele.)
+
+**Wer fängt das Mehr auf, und wachsen die Kassen?**
+
+- **In der Aufbauphase der Bau selbst.** Bis zum Schnitt von Stufe 2 gibt jedes Team im Mittel 32 C aus, 1.024 C in der
+  Liga. Bei einem Ausbau je Saison sind das rund 500 C je Saison, mehr als die Tickets in dieser Zeit bringen (197 bis
+  358 C). Die Kassen sinken in den ersten zwei bis drei Saisons eher.
+- **Danach die schon geplanten Ausgaben.** Ausrüstung (Reparatur typisch 6,7 C, voll 19 C, dazu Händler) und Verpflegung
+  (3,5 C) kosten zusammen 10 bis 25 C je Team und Saison, in der Liga 320 bis 800 C
+  (`docs/design/zwischen-den-spieltagen-22-11.md`). Das war in Runde 1 die offene Balance-Frage (Abschnitt c, Frage 4), weil
+  dem keine Einnahme gegenüberstand. Die Tickets sind diese Einnahme: 294 bis 575 C netto gegen 320 bis 800 C.
+- **Gehälter** fangen nichts von selbst auf. Sie folgen dem Marktwert und dem Saison-Faktor, nicht der Kasse.
+- **Ohne Ausrüstung und Verpflegung wachsen die Kassen** um 9 bis 18 C je Team und Saison (Schnitt Stufe 2 bis 5). Das Geld
+  landet in der Kaufphase: höhere Gebote, vollere Kader. Darum gehören die Platzarten in dieselbe Baustufe wie Ausrüstung
+  und Verpflegung, oder die Ticketpreise starten bei 70 % und steigen mit deren Bau.
+- **Die Spreizung wächst.** Ein Top-Team der Liga 1 gewinnt netto 29 C je Saison, ein kleines Team der Liga 2 knapp 4 C.
+  Erfolg füllt die Arena, die Arena bezahlt den nächsten Erfolg. Bremse: Auf- und Abstieg ändern die Preise (× 4/3 bzw.
+  × 3/4) sofort, die Baukosten sind für alle gleich, und der Apron schöpft den Gehaltsüberhang ab.
+
+Messplan: drei Saisons mit 32 KI-Teams (`scripts/miss-teamfinanzen-saison.ts`), je Saison Σ GuV, Kassen-Median, Verhältnis
+reichstes zu ärmstem Team und der Ticket-Anteil je Team-Typ gegen die Tabelle oben.
+
+### g.3 Zuschauer-Ereignisse je Heimspiel
+
+Jedes Heimspiel kann einen Anlass haben, der die **Nachfrage** multipliziert. Mehrere Anlässe multiplizieren sich, das
+Produkt ist auf 0,5 bis 2,0 begrenzt.
+
+**Rivalen gibt es im Code:** `buildTeamRivalryLedger` (`lib/rivalries/team-rivalries.ts:109`) liest die Beziehungsmatrix der
+32 Teams (`TEAM_RELATIONSHIP_CSV`, ab `:26`). Eine Rivalität zählt ab Intensität 4, bei beidseitig −2 oder schlechter, oder
+wenn die Summe −5 oder schlechter ist (`:120` bis `:122`); die Intensität 0 bis 5 steht im Feld `intensity`. Den Erzrivalen
+liefert `getPrimaryTeamRivalry` (`:200`). Beispiele: Golden Gladiators gegen Last Ride (−5/−5), Hell Raisers gegen The
+Chantry (−4/−4), Vigilante Wranglers gegen Dire Legion (−3/−3).
+
+| Ereignis | Faktor Nachfrage | Wann | Häufigkeit je Team und Saison |
+|---|---:|---|---|
+| **Derby gegen einen Rivalen** | ×1,5 (Intensität 2) · ×1,7 (3) · ×1,8 (4) · ×2,0 (5) | fest: Heimspiel gegen ein Team aus der Rivalen-Liste | 1 bis 3, je nach Spielplan |
+| Spitzenspiel | ×1,4 | fest: Gegner auf Rang 1 bis 3 oder direkter Tabellennachbar, ab Spieltag 8 | rund 2 |
+| Tabellenführer zu Gast | ×1,5 (ersetzt Spitzenspiel) | fest | 0 bis 1 |
+| Saisoneröffnung, Saisonfinale | ×1,3; Finale ×1,6, wenn es um Titel, Aufstieg oder Abstieg geht | fest: erstes und letztes Heimspiel | 2 |
+| Star-Debüt | ×1,3 | fest: erstes Heimspiel eines Neuzugangs mit Marketability ab 75 (`docs/design/marketing-22-11.md`) | 0 bis 2 |
+| Abstiegskampf-Mobilisierung | ×1,25 | fest: letzte vier Heimspiele, Team höchstens zwei Ränge vom Abstiegsplatz | 0 bis 4 |
+| Siegesserie · Niederlagenserie | ×1,15 · ×0,85 | fest: vier Siege bzw. vier Niederlagen in Folge (kürzere Serien stecken schon in der Stimmung) | 0 bis 2 |
+| Feiertag, Volksfest | ×1,3 | **ligaweit**, einmal je Saison, vor der Saison im Kalender | 1 |
+| Unwetter | Stehplatz ×0,6 · Sitzplatz ×0,8 · Loge ×1,0 | **ligaweit**, Würfel 6 % je Spieltag | rund 1 |
+| Streik im Nahverkehr | ×0,7 | **ligaweit**, Würfel 3 % je Spieltag | rund 0,5 |
+| Skandal, Fan-Boykott | Stehplatz ×0,5 · Sitzplatz ×0,8 für zwei Heimspiele | Team: Skandal eines Spielers mit `Scandalous` oder Verkauf des Aushängeschilds mitten in der Saison | 0 bis 1 |
+
+**Regeln:**
+
+- **Deckel nach oben ist die Arena.** Mehr Nachfrage als Plätze heißt ausverkauft. Der Überhang hebt dann den Preis der
+  Tageskarten automatisch: Zuschlag = halber Überhang, höchstens +25 % (Tageslogen höchstens +50 %). Ein Derby ×2,0 kann
+  die Einnahme in einer halb leeren Arena **verdoppeln**; in einer vollen bringt es höchstens +25 %. Das ist ein Grund mehr
+  für den Ausbau. Dauerkarten bleiben beim festen Preis.
+- **Deckel nach unten** ist das Produkt 0,5. Dauerkarten-Geld ist schon da und bleibt.
+- **Ligaweite Ereignisse treffen alle Teams gleich:** Sie gelten für das **nächste Heimspiel jedes Teams**, nicht für einen
+  Spieltag (sonst träfe es nur die 16 Heimteams). Sie stehen als befristeter Regel-Stempel im Spielstand.
+- **Fan-Boykott hängt am Fanprofil.** Bei Teams mit Bösewicht-Fans (Ton unter −0,5, zum Beispiel Hell Raisers) löst ein
+  Skandal keinen Boykott aus, sondern ×1,2 für ein Heimspiel.
+- Feste Ereignisse stehen ab Saisonbeginn im Kalender und in der Arena-Karte („Nächstes Heimspiel: Derby ×1,5“). Gewürfelte
+  Ereignisse kommen aus dem Saat-Strom des Spielstands, nie aus der Uhr.
+- **Wirkung im Mittel:** Bei rund zwei Derbys, zwei Spitzenspielen, Eröffnung, Finale, einem Feiertag und einem Unwetter liegt
+  der mittlere Faktor bei 1,2. Weil volle Arenen gedeckelt sind, steigen die Ticket-Einnahmen der Liga um rund 10 %. Wer das
+  nicht will, senkt die Grundnachfrage von 0,30 auf 0,27.
+- **KI, Mehrspieler:** keine Entscheidung nötig. Die KI hebt vor einem Derby nicht eigens den Preis, das macht der Zuschlag.
+  Jeder Manager sieht die Ereignisse seines Teams; sie halten keinen Spieltag an.
+- Sie wirken nur auf Geld und Fanbasis, nie auf die Wertung.
+
+### g.4 Startbudget-Aufschlag (Messvariante, nicht scharf)
+
+Chris' Lesart ist jetzt eindeutig: **jedes** Team bekommt einen Aufschlag, der letzte der Budget-Rangliste +20 C, je Platz
+besser +2 C mehr (Platz 31 +22, Platz 30 +24, … Platz 1 +82).
+
+Die Startbudgets stehen in `references/sheets/season-management.json` (Feld `startBudget`, 32 Einträge) und werden in
+`lib/data/dataAdapter.ts:258` bis `:268` auf die Teams gelegt (`loadSourceTeams`). Sie laufen in 5er-Schritten von 325 C
+(Mayhem Mavericks) bis 170 C (Riptide Rivers); Golden Gladiators haben 310 C (Platz 4), Hell Raisers 285 C (Platz 9).
+
+| | heute | mit Aufschlag | Änderung |
+|---|---:|---:|---:|
+| Platz 1 (Mayhem Mavericks) | 325 C | 407 C | +82 C |
+| Platz 16 (Vicious & Delicious) | 250 C | 302 C | +52 C |
+| Platz 32 (Riptide Rivers) | 170 C | 190 C | +20 C |
+| Summe der Liga | 7.920 C | 9.552 C | +1.632 C (+20,6 %) |
+| Mittel je Team | 247,5 C | 298,5 C | +51 C |
+| Abstand Platz 1 zu Platz 32 | 155 C | 217 C | +62 C |
+| Verhältnis reich zu arm | 1,91 | 2,14 | |
+| Schritt je Platz | 5 C | 7 C | |
+
+**Wirkung:**
+
+- **Die Spreizung wächst.** Der Aufschlag ist für den Reichsten viermal so hoch wie für den Ärmsten. Das Verhältnis steigt
+  von 1,91 auf 2,14, der Abstand um 40 %.
+- **Ein Fünftel mehr Geld im Draft.** Die Startbudgets fließen zu 97 % in Spieler. Der Pool wird nicht größer, also steigen
+  die Preise der umkämpften Spieler. Zum Vergleich: 1.632 C sind 89 % der Gehaltssumme einer ganzen Saison (1.838 C).
+- **Abhängige Größen:** Draft-Rücklage nach Finanzwert (halb in Saison 1), Kreditrahmen (15 % der Kasse, f.6), die
+  Kalibrierung „Σ GuV = 0“ des Finanzkonzepts V2 und die KI-Kaufregeln rechnen mit dem Startbudget. Mit den stärkeren Tickets
+  (g.2) käme ein zweiter Schub für dieselben Teams dazu.
+
+**Vorschlag:** als Messvariante hinter einem Schalter laufen lassen (drei Saaten, 32 KI-Teams von Anfang an) und gegen heute
+vergleichen: Kadergrößen, Gehaltssummen, Anteil der Teams unter Linie 1, Rangtreue der Tabelle zur Budget-Rangliste. Erst
+danach entscheiden. Nichts davon ist gebaut oder scharf.
+
+### g.5 Mockup, Runde 3
+
+`public/mockups/finanzen-modern-18-11.html?ansicht=wahl` (neuer Schalter `&bau=0|1|2` für Stehtribüne, Sitzrang, Logenring):
+
+- **Karte „Arena · Platzarten“:** je Platzart Plätze, Auslastung der letzten drei Heimspiele mit der 90-%-Marke und Ertrag je
+  Heimspiel. Darunter die Wahl des nächsten Bauteils mit Kosten, Mehrertrag (erste Saison und volles Haus) und Amortisation
+  für Liga 2 und Liga 1. Oben rechts das **Ereignis des nächsten Heimspiels** („DERBY ×1,5 ZUSCHAUER · Spieltag 14 ·
+  Armageddon Aftermath“). Der Fuß nennt die Empfehlung des Vorstands.
+- **Karte „Medaillenspiegel“:** die ersten fünf der Liga 2 mit Gold, Silber, Bronze und Bonus, das eigene Team markiert;
+  darunter die vier Farben mit Rang und die Moral-Regel. Sie ersetzt die Farb-Meister-Karte.
+- **Tabelle „Arena-Bauteile“** (ab 1250 px Höhe): Grundarena, drei Bauteile und die Beispiel-Arena der Stufe 5.
+- **Aufschlüsselung und Spieltags-Abrechnung:** Die Ticketzeile nennt das Ereignis („Heim · Derby ×1,7“, die Rechnung
+  rechts mit Gegner) und den Zuschlag bei ausverkauftem Haus. Der Posten „Tageskarten“ erklärt die Ereignisse, der Posten
+  „Medaillen · Farb-Meister“ ersetzt „Farb-Meister“.
+
+Das Beispielteam (Vigilante Wranglers, Liga 2) steht jetzt auf Stufe 3 mit 15.300 Plätzen (9.000 Steh, 5.500 Sitz, 800
+Logen), volles Haus 1,68 C statt 1,45 C. Seine Ereignisse: Unwetter an Spieltag 6, Derbys an Spieltag 9 (Dire Legion), 14
+(Armageddon Aftermath) und 18 (The Chantry), Saisonfinale an Spieltag 20. Die drei Derbys sind echte Rivalitäten aus der
+Beziehungsmatrix; alles andere ist erfunden. Die Auslastung je Platzart ist im Mockup aus der Gesamtauslastung abgeleitet
+(Logen fest 75 %), nicht mit der vollen Regel gerechnet. Die Kennzahlen aller Reiter haben sich dadurch leicht verschoben
+(höhere Tickets): „Neue Posten netto“ steht jetzt bei −1,97 C statt −2,26 C, der Sponsor-Anteil des Beispielteams bei
+58 %. Die Aufnahmen aus Runde 1 und 2 zeigen den alten Stand.
+
+| Datei (`docs/design/finanzen-posten-22-11/`) | Zeigt |
+|---|---|
+| `runde3-saisonwahl-1920x1080.png` | Saisonwahl nach Spieltag 12: Platzarten, Derby als nächstes Heimspiel, Medaillenspiegel |
+| `runde3-saisonwahl-logenring-2560x1440.png` | nach Spieltag 13, Logenring gewählt, Tabelle der Bauteile sichtbar |
+| `runde3-saisonwahl-sitzrang-1710x1112.png` | Sitzrang gewählt, MacBook-Format |
+| `runde3-aufschluesselung-tageskarten-1920x1080.png` | Aufschlüsselung, Posten Tageskarten mit Ereignis-Hinweis in der Quelle |
+| `runde3-aufschluesselung-medaillen-2560x1440.png` | Aufschlüsselung, Filter Neu, Posten Medaillen · Farb-Meister |
+| `runde3-abrechnung-derby-1920x1080.png` | Spieltags-Abrechnung Spieltag 9: Ticketzeile mit Derby ×1,7 und Zuschlag |
+| `runde3-phone-412x900.png` | Nebenprobe Phone |
+
+Geprüft in Chromium unter `flock /tmp/oly-aufnahme.lock`: keine JS-Fehler in allen Aufnahmen und in den übrigen Reitern
+(Übersicht, Hebel, Budgets, Stimmung & Tickets, Merch); kein Seitenscroll und kein inneres Scrollen in Saisonwahl,
+Aufschlüsselung und Abrechnung bei 2560×1440, 1920×1080 und 1710×1112; kein abgeschnittener Text in den neuen Karten. Bei
+1080 und 1112 px Höhe entfällt in den Karten Arena und Medaillen der erklärende Fußtext. Unverändert aus den Vorrunden: der
+Reiter Budgets scrollt bei 1920×1080 innen, und die Herkunfts-Marke der Abrechnung kürzt lange Texte.
+
+### g.6 Offene Fragen an Chris
+
+| # | Frage | Empfehlung |
+|---:|---|---|
+| 1 | Medaillen und Farb-Meister aus dem Rangprämien-Topf (Sponsor zahlt gleich viel, verteilt anders) oder obendrauf (+52 C je Saison)? | **Aus dem Topf.** Die Auszahlung bleibt gleich; nur wer sie bekommt, ändert sich leicht. |
+| 2 | Dauerkarten: eine Stufe für alle Platzarten oder je Platzart eine? | **Eine.** Drei Regler für dieselbe Wette wären Mikromanagement. |
+| 3 | Tickets ohne Gegenposten lassen die Kassen um 9 bis 18 C je Team und Saison wachsen, solange Ausrüstung und Verpflegung nicht gebaut sind. Zusammen bauen oder die Preise bei 70 % starten? | **Zusammen bauen.** Sonst zuerst 70 % und mit dem Bau der Ausgaben auf 100 %. |
+| 4 | Startbudget-Aufschlag: Die Spreizung steigt von 1,91 auf 2,14, zusammen mit den Tickets doppelt. Erst messen? | **Ja, Messvariante.** Wenn es nur um mehr Geld im Draft geht: +51 C für alle hätte dieselbe Summe und senkt das Verhältnis auf 1,70. |

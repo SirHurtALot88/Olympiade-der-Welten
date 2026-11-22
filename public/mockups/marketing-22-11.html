@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Marketing – Marketability und Fanprofile (Mockup 22.11.)</title>
+<!--
+  MARKETING, STAND 22.11.: Marketability je Spieler und Fanprofil je Team. Konzept: docs/design/marketing-22-11.md.
+  Gleiche Tokens, gleiche Schiene, gleicher Hero-Kopf, gleiche Tafel wie finanzen-modern-18-11.html (Stilblock von dort
+  uebernommen). Kein App-Code, kein PixelLab (0 Generationen), alles CSS/SVG.
+  ECHT: Spieler (Name, Rasse, Klasse, Traits, Gesinnung, Rating) aus data/generated/oly-player-stats.json, Kader aus
+        data/generated/oly-rosters.json, Portraits und Wappen aus public/, Teamwerte "manners" und "popularity" und die
+        Farbgewichte aus data/source/team-identities.json, Themen aus lib/ai/team-theme-composition-service.ts.
+  VORSCHLAG: jede Formel und jedes Gewicht (Reichweite, Ton, Passung, Werbewert). Die Zahlen rechnet das Skript unten aus
+        den echten Stammdaten nach genau der Formel des Konzepts.
+  URL: ?team=H-R|G-G  &sel=<slug>  &so=<spalte>  &phone=1
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche:rgba(9,12,18,.90); --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --p1:#e0637a; --p2:#e89a4c; --p3:#c3cf5e; --p4:#4fc7b2; --p5:#62a0f4; --p6:#ac8af2;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:10px; --r-s:6px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;color:var(--tinte);font-family:var(--zahl);font-size:16px;-webkit-font-smoothing:antialiased}
+button,a{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,[tabindex]:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .null{color:var(--stumm)}
+
+/* ---------- Mockup-Steuerung (gehoert NICHT zum UI) ---------- */
+.demo{height:38px;display:flex;align-items:center;gap:8px;padding:0 14px;background:#0d1016;border-bottom:1px solid #222a38;font-size:14px;color:var(--leise);white-space:nowrap;overflow-x:auto}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:12px;margin-right:4px}
+.demo button{padding:3px 10px;border:1px solid #2b3445;border-radius:999px;color:var(--tinte);font-weight:600}
+.demo button:hover{border-color:var(--gold)} .demo button[aria-pressed=true]{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.demo .welle{margin-left:auto;color:var(--gold);font-weight:600}
+body.still .demo{display:none}
+
+/* ---------- Geruest ---------- */
+.app{display:grid;grid-template-columns:64px minmax(0,1fr);height:calc(100vh - 38px);min-height:760px;background:var(--grund)}
+body.still .app{height:100vh}
+.rail{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0;background:#080b11;border-right:1px solid var(--linie)}
+.rail .logo{width:40px;height:40px;border-radius:9px;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:10px}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail a{position:relative;width:44px;height:44px;border-radius:9px;display:grid;place-items:center;font-size:20px;color:var(--stumm)}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:2px;background:var(--gold)}
+.rail .zahl{position:absolute;right:3px;top:3px;min-width:16px;height:16px;border-radius:8px;background:var(--warn);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 3px}
+.rail .luecke{flex:1}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+
+/* Tooltip (ein Muster fuer alles) */
+[data-tip]{position:relative}
+[data-tip]:hover::after,[data-tip]:focus-visible::after{content:attr(data-tip);position:absolute;z-index:90;left:50%;top:calc(100% + 7px);transform:translateX(-50%);width:max-content;max-width:320px;white-space:pre-line;
+  padding:6px 9px;border-radius:6px;background:#020305;border:1px solid var(--linie-2);color:var(--tinte);font:500 13.5px/1.3 var(--zahl);letter-spacing:0;text-transform:none;text-align:left;pointer-events:none;box-shadow:0 8px 22px rgba(0,0,0,.6)}
+[data-tip].tr::after{left:calc(100% + 8px);top:50%;transform:translateY(-50%)}
+[data-tip].tl::after{left:auto;right:0;transform:none}
+[data-tip].tll::after{left:0;transform:none}
+[data-tip].to::after{top:auto;bottom:calc(100% + 7px)}
+body.phone [data-tip]::after{display:none}
+
+/* ---------- Hero-Kopf ---------- */
+.hero{position:relative;flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;gap:22px;padding:14px 20px 0;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero .kul{position:absolute;inset:-30px;z-index:-2;background:url("../szenen/basketball/parkett.jpg") center 40%/cover;filter:blur(14px) saturate(1.15);opacity:.5}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.94) 0%,rgba(6,8,12,.72) 38%,rgba(6,8,12,.62) 62%,rgba(6,8,12,.93) 100%),linear-gradient(180deg,transparent 40%,var(--grund) 100%)}
+.hk{display:flex;align-items:center;gap:14px;padding-bottom:14px}
+.hk .crest{width:62px;height:62px;border-radius:10px;overflow:hidden;border:2px solid var(--heim);box-shadow:0 6px 18px rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk h1{margin:0;font:400 34px/1 var(--haus);color:#fff;letter-spacing:.01em}
+.hk .sub{margin-top:5px;font-size:15px;color:var(--leise);font-weight:500;white-space:nowrap}
+.hk .sub b{color:var(--creme);font-weight:600}
+.mdw{display:inline-flex;align-items:center;gap:2px;margin-bottom:5px}
+.mdw button{width:24px;height:24px;border-radius:5px;border:1px solid var(--linie);display:grid;place-items:center;color:var(--leise)}
+.mdw button:hover{border-color:var(--gold);color:var(--gold)} .mdw button[disabled]{opacity:.3;cursor:default}
+.mdw span{padding:0 8px;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--gold);white-space:nowrap}
+.tabs{display:flex;align-items:flex-end;gap:10px;min-width:0}
+.dtab{position:relative;flex:1 1 0;min-width:0;max-width:340px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:11px 20px 12px 18px;
+  background:rgba(18,24,36,.72);border:1px solid var(--linie);border-bottom:0;clip-path:polygon(14px 0,100% 0,calc(100% - 14px) 100%,0 100%);color:var(--leise);transition:background .15s}
+.dtab:hover{background:rgba(26,34,49,.9)}
+.dtab.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(18,24,36,.92) 70%);color:var(--tinte)}
+.dtab.an::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--gold)}
+.dtab .ic{width:38px;height:38px;border-radius:8px;overflow:hidden;display:grid;place-items:center;font-size:22px;background:rgba(0,0,0,.35);border:1px solid var(--linie);color:var(--creme)}
+.dtab.an .ic{color:var(--gold);border-color:rgba(240,195,90,.5)}
+.dtab em{display:block;font-style:normal;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab b{display:block;font:400 22px/1.1 var(--haus);color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab .erw{text-align:right}
+.dtab .erw strong{display:block;font-size:28px;line-height:1;font-weight:700;color:var(--creme)}
+.dtab .erw span{font-size:12px;color:var(--stumm);letter-spacing:.06em;white-space:nowrap}
+.dtab .mein{position:absolute;right:20px;top:-1px;height:15px;padding:0 6px;background:var(--warn);color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.1em;border-radius:0 0 3px 3px}
+.hr{display:flex;align-items:center;gap:16px;padding-bottom:14px}
+.frist{text-align:right;white-space:nowrap}
+.frist strong{display:block;font-size:22px;line-height:1.1;font-weight:700;color:var(--creme);max-width:250px;overflow:hidden;text-overflow:ellipsis}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 13px;border-radius:7px;border:1px solid var(--linie-2);background:var(--flaeche-2);font-weight:600;font-size:15px;letter-spacing:.02em;white-space:nowrap}
+.btn:hover{background:var(--flaeche-3);border-color:var(--creme)}
+.btn.klein{height:30px;padding:0 10px;font-size:14px}
+.btn.ja{background:var(--gold);border-color:var(--gold);color:#17120a} .btn.ja:hover{background:#ffd578}
+.btn[disabled]{opacity:.4;cursor:default}
+
+/* ---------- Arbeitsflaeche ---------- */
+.work{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:12px;padding:12px 14px}
+.pan{min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden}
+.pk{flex:none;display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--linie);min-height:46px}
+.pk h2{margin:0;font:400 19px/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1}
+.pk .hin{font-size:13.5px;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ktabs{flex:none;display:flex;border-bottom:1px solid var(--linie)}
+.ktabs button{flex:1;height:42px;font-weight:600;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--stumm);border-bottom:3px solid transparent;display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;padding:0 10px}
+.ktabs button:hover{color:var(--tinte)} .ktabs button.an{color:var(--gold);border-bottom-color:var(--gold)}
+.kb{flex:1;overflow-y:auto;min-height:0;padding:12px}
+.seg{display:inline-flex;border:1px solid var(--linie-2);border-radius:7px;overflow:hidden;flex:none}
+.seg button{text-align:center;height:30px;padding:0 11px;font-weight:600;font-size:14px;color:var(--leise);border-right:1px solid var(--linie);white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--flaeche-2);color:var(--tinte)}
+.seg button[aria-pressed=true]{background:var(--creme);color:#17120a}
+.seg button.prog{color:var(--stumm);font-weight:500}
+.marke{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.06em;color:#0b0d12;background:var(--pc,var(--leise));flex:none;white-space:nowrap}
+.marke.rot{background:var(--warn);color:#fff} .marke.leer{background:none;border:1px solid var(--linie-2);color:var(--leise)}
+.marke.wir{background:var(--heim)} .marke.gold{background:var(--gold)} .marke.gut{background:var(--gut)} .marke.acht{background:var(--acht)}
+.kf{flex:none;padding:7px 12px;border-top:1px solid var(--linie);font-size:13px;color:var(--stumm);display:flex;gap:14px;align-items:center;white-space:nowrap;overflow:hidden}
+.kf i{display:inline-block;width:4px;height:13px;border-radius:2px;vertical-align:-2px;margin-right:5px}
+.kf .sp{flex:1}
+.kf b{color:var(--gut);font-weight:600}
+
+/* ---------- Zeilen-Raster (derselbe Baustein wie die Saisontabelle) ---------- */
+.tl{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+.th,.tz{display:grid;gap:10px;align-items:center;padding:0 14px 0 0;width:100%}
+.aus .th,.aus .tz{grid-template-columns:22px minmax(170px,1.05fr) 150px minmax(0,1.7fr) 86px 92px}
+.mer .th,.mer .tz{grid-template-columns:22px minmax(190px,1.2fr) 70px 110px 120px minmax(150px,1fr) 80px 86px}
+.bon .th,.bon .tz{grid-template-columns:22px minmax(170px,1.1fr) repeat(20,minmax(24px,1fr)) 62px 74px;gap:4px}
+.bon .z{font-size:13.5px}
+.th{flex:none;height:28px;border-bottom:1px solid var(--linie);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:600;position:sticky;top:0;background:var(--flaeche-1);z-index:5;text-align:right}
+.th span.li{text-align:left} .th span.mi{text-align:center}
+.tz{position:relative;flex:none;min-height:31px;border-bottom:1px solid rgba(244,230,196,.06);font-size:16px;text-align:right}
+button.tz:hover{background:var(--flaeche-2)}
+.tz.gew{box-shadow:inset 0 0 0 2px var(--gold);background:rgba(240,195,90,.08)}
+.tz.su{background:var(--flaeche-2);font-weight:700;min-height:36px} .tz.su strong{font-size:20px;color:var(--creme)}
+.tz .fb{width:4px;height:17px;border-radius:2px;background:var(--pc);margin-left:10px}
+.tz .fb.hohl{background:none;border:1px solid var(--leise)}
+.tz .nm{text-align:left;font-weight:600;color:var(--tinte);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px;min-width:0}
+.tz .nm img{width:24px;height:24px;border-radius:5px;object-fit:cover;flex:none}
+.tz .hk2{text-align:left;display:flex;min-width:0} .tz .hk2 .marke{display:block;line-height:15px;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tz .qu{text-align:left;font-size:14px;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tz .bt{font-weight:700;font-size:17px}
+.tz .ks{color:var(--leise)}
+.tz.prog .bt,.tz.prog .nm{font-weight:500}
+.tz .z{font-size:14.5px;color:var(--tinte);text-align:center} .tz .z.p{color:var(--stumm)} .tz .z.o{color:rgba(255,255,255,.14)}
+.lgtr{flex:none;display:flex;align-items:center;gap:10px;height:28px;padding:0 14px 0 12px;background:var(--flaeche-2);border-bottom:1px solid var(--linie)}
+.lgtr .sp{flex:1} .lgtr strong{font-size:16px}
+.leerh{flex:none;display:flex;gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--linie);font-size:14.5px;color:var(--leise);background:linear-gradient(90deg,rgba(240,195,90,.12),transparent)}
+.leerh.rot{background:linear-gradient(90deg,rgba(255,96,88,.18),transparent)} .leerh.acht{background:linear-gradient(90deg,rgba(243,181,74,.16),transparent)}
+.leerh b{color:var(--creme);font-weight:600} .leerh .sp{flex:1}
+
+/* ---------- Kennzahl-Leiste (Baustein .rech der Teamkarte) ---------- */
+.rech{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--linie);border:1px solid var(--linie);border-radius:7px;overflow:hidden}
+.rech.d3{grid-template-columns:repeat(3,minmax(0,1fr))} .rech.d4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.rech div{background:var(--flaeche-1);padding:5px 4px;text-align:center;min-width:0}
+.rech small{display:block;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rech strong{font-size:18px;font-weight:700;white-space:nowrap}
+.rech .su{background:var(--flaeche-3)} .rech .su strong{color:var(--gold)}
+.rech.gross{margin:12px 12px 0;flex:none} .rech.gross div{padding:8px 6px} .rech.gross strong{font-size:26px;line-height:1.1} .rech.gross small{font-size:11px}
+
+/* ---------- Kassenverlauf ---------- */
+.ch{flex:1;min-height:300px;position:relative;margin:10px 12px 4px 50px}
+.ch svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.ch .ax{position:absolute;left:-46px;width:40px;text-align:right;font-size:12.5px;color:var(--stumm);transform:translateY(-50%);white-space:nowrap}
+.ch .lb{position:absolute;right:4px;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;transform:translateY(-115%);white-space:nowrap}
+.ch .sp2{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;border-radius:5px;padding-bottom:2px}
+.ch .sp2:hover{background:rgba(244,230,196,.06)} .ch .sp2.jetzt{background:linear-gradient(180deg,rgba(240,195,90,.10),rgba(240,195,90,.02))}
+.ch .sp2 small{font-size:11.5px;letter-spacing:.1em;font-weight:700;color:var(--stumm);text-transform:uppercase}
+.ch .sp2.jetzt small{color:var(--gold)} .ch .sp2.prog small{font-weight:500}
+.ch .pt{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--heim);border:2px solid var(--flaeche-1);transform:translate(-50%,-50%);pointer-events:none}
+.ch .pt.prog{background:var(--flaeche-1);border-color:var(--creme)}
+.ch .wt{position:absolute;transform:translate(-50%,-150%);font-size:14.5px;font-weight:700;color:var(--creme);pointer-events:none;white-space:nowrap;text-shadow:0 0 6px var(--flaeche-1),0 0 6px var(--flaeche-1)}
+.ch .wt.prog{color:var(--leise);font-weight:500} .ch .wt.rot{color:var(--warn)}
+.ch .nt{position:absolute;transform:translate(-50%,0);font-size:13px;font-weight:600;pointer-events:none;white-space:nowrap}
+.leg{flex:none;display:flex;flex-wrap:wrap;gap:4px 14px;padding:2px 14px 8px 50px;font-size:13px;color:var(--leise)}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--pc);margin-right:5px;vertical-align:-1px}
+.leg i.hohl{background:none;border:1px solid var(--leise)}
+.mix{flex:none;margin:0 12px 10px;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-size:13.5px;color:var(--leise)}
+.mixb{display:flex;height:12px;border-radius:2px;overflow:hidden;transform:skewX(-14deg);gap:1px;background:var(--flaeche-1)}
+.mixb i{background:var(--pc);min-width:2px}
+
+/* ---------- Karten (Baustein .sd / .mc) ---------- */
+.gr{flex:1;min-height:0;overflow-y:auto;padding:12px;display:grid;gap:10px;align-content:start;grid-auto-rows:max-content}
+.gr.s3{grid-template-columns:1.25fr 1fr 1fr} .gr.s4{grid-template-columns:repeat(4,minmax(0,1fr))} .gr.h3{grid-template-columns:repeat(3,minmax(0,1fr))} .gr.f2{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr)}
+.gr .voll{grid-column:1/-1}
+.sd{border-radius:8px;border:1px solid var(--linie);background:var(--flaeche-2);overflow:hidden;min-width:0;display:flex;flex-direction:column}
+.sd.wir{border-color:rgba(242,160,61,.7)} .sd.farbe{border-top:3px solid var(--pc)} .sd.aus2{opacity:.5}
+.sd .kopf{flex:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5px 10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--gold);border-bottom:1px solid rgba(244,230,196,.07);white-space:nowrap}
+.sd .kopf small{color:var(--stumm);letter-spacing:.04em;text-transform:none;font-weight:500;font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
+.sd .in{padding:10px;display:flex;flex-direction:column;gap:9px;flex:1;min-width:0}
+.sd .fuss{flex:none;display:flex;gap:6px;padding:8px 10px;border-top:1px solid rgba(244,230,196,.07);align-items:center}
+.sd .fuss .sp{flex:1} .sd .fuss small{font-size:12.5px;color:var(--stumm)}
+.spo{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:11px;align-items:center}
+.spo .mono{width:52px;height:52px;border-radius:9px;display:grid;place-items:center;font:400 22px/1 var(--haus);color:#0b0d12;background:linear-gradient(140deg,var(--pc),color-mix(in srgb,var(--pc) 55%,#000));border:1px solid rgba(255,255,255,.2)}
+.spo b{display:block;font:400 20px/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spo span{font-size:13.5px;color:var(--leise);display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:3px}
+.spo span .marke{color:#0b0d12;margin:0}
+.spo strong{font-size:26px;line-height:1;font-weight:700;color:var(--creme);text-align:right;white-space:nowrap}
+.spo strong small{display:block;font-size:11.5px;font-weight:500;color:var(--stumm);letter-spacing:.04em}
+.zl strong small.sj{display:block;text-align:right;font:600 12px/1.1 var(--zahl);color:var(--stumm);letter-spacing:.02em;margin-top:2px}
+.zl{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14.5px;color:var(--leise);line-height:1.25}
+.zl b{color:var(--tinte);font-weight:600} .zl strong{font-size:17px;font-weight:700;color:var(--creme);white-space:nowrap}
+.txt{font-size:14.5px;line-height:1.3;color:var(--leise)} .txt b{color:var(--tinte);font-weight:600}
+.pips{display:flex;gap:3px;align-items:center}
+.pips i{flex:1;max-width:26px;height:13px;transform:skewX(-14deg);border-radius:1px;background:rgba(255,255,255,.1);font-style:normal}
+.pips i.j{background:var(--pc,var(--gut))} .pips i.n{background:var(--warn)} .pips i.w{background:none;box-shadow:inset 0 0 0 1px var(--pc,var(--leise))} .pips i.heute{outline:1px solid var(--gold);outline-offset:1px}
+.pips.zahl i{height:auto;transform:none;background:none;font-size:10.5px;color:var(--stumm);text-align:center;font-weight:600}
+.wb{position:relative;height:10px;background:#3c4658;transform:skewX(-14deg);overflow:hidden;border-radius:2px}
+.wb i{position:absolute;left:0;top:0;bottom:0;background:var(--pc,var(--creme))}
+.wb u{position:absolute;top:0;bottom:0;background:rgba(255,255,255,.16)}
+.leiter{display:flex;flex-direction:column;gap:3px}
+.leiter div{display:grid;grid-template-columns:76px minmax(0,1fr) 62px;gap:8px;align-items:center;height:23px;padding:0 9px;border-radius:5px;background:var(--flaeche-1);font-size:14.5px;color:var(--leise)}
+.leiter div b{height:9px;transform:skewX(-14deg);border-radius:1px;background:#3c4658;justify-self:start}
+.leiter div strong{text-align:right;font-weight:700;color:var(--tinte)}
+.leiter div.du{background:linear-gradient(90deg,rgba(242,160,61,.26),rgba(242,160,61,.05));color:#fff;box-shadow:inset 3px 0 0 var(--heim)} .leiter div.du b{background:var(--heim)} .leiter div.du strong{color:var(--creme);font-size:17px}
+.leiter div.ziel{box-shadow:inset 0 0 0 1px rgba(98,211,148,.5)}
+
+/* ---------- Budgets: zwei Toepfe ---------- */
+.topf{position:relative;display:flex;height:16px;transform:skewX(-14deg);border-radius:2px;background:rgba(255,255,255,.06)}
+.topf i{height:100%;min-width:0} .topf u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--creme)}
+.topf .aus,.legz .aus{background:var(--stumm)} .topf .frei,.legz .frei{background:var(--gut)} .topf .geh,.legz .geh{background:var(--p1)} .topf .rot{background:var(--warn)}
+.topf .gesp,.legz .gesp{background:repeating-linear-gradient(135deg,rgba(243,181,74,.75) 0 5px,rgba(243,181,74,.25) 5px 10px)}
+.legz{display:flex;gap:12px;font-size:12.5px;color:var(--leise);white-space:nowrap;flex-wrap:wrap}
+.legz i{display:inline-block;width:10px;height:10px;margin-right:5px;transform:skewX(-14deg)}
+.herl{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:6px;background:#06080c;border:1px solid var(--linie)}
+.herl .zl{font-size:14px} .herl .zl strong{font-size:15.5px} .herl .zl small{display:block;color:var(--stumm);font-size:12px;line-height:1.15}
+.herl .zl.sum{border-top:1px solid var(--linie-2);padding-top:3px;color:var(--tinte)} .herl .zl.sum strong{color:var(--gold);font-size:17px}
+.sd .in>.zl small{color:var(--stumm);font-size:12.5px;margin-left:4px}
+.sd .in>.zl .riesig small{font-size:16px;color:var(--leise);margin-left:6px}
+input[type=range].um::-webkit-slider-runnable-track{background:linear-gradient(90deg,var(--gut),#3c4658 50%,var(--p1))}
+input[type=range].um::-moz-range-track{background:linear-gradient(90deg,var(--gut),#3c4658 50%,var(--p1))}
+.mreg{padding:6px 8px;border:1px dashed #2b3445;border-radius:6px;background:#0d1016}
+
+/* ---------- Regler ---------- */
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:26px;background:none;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:2px;background:linear-gradient(90deg,var(--gast),#3c4658 50%,var(--heim));transform:skewX(-14deg)}
+input[type=range]::-moz-range-track{height:8px;border-radius:2px;background:linear-gradient(90deg,var(--gast),#3c4658 50%,var(--heim))}
+input[type=range].ein::-webkit-slider-runnable-track{background:linear-gradient(90deg,#3c4658,var(--warn))}
+input[type=range].ein::-moz-range-track{background:linear-gradient(90deg,#3c4658,var(--warn))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:24px;margin-top:-8px;border-radius:3px;background:var(--gold);border:2px solid #17120a;box-shadow:0 2px 8px rgba(0,0,0,.6)}
+input[type=range]::-moz-range-thumb{width:13px;height:21px;border-radius:3px;background:var(--gold);border:2px solid #17120a}
+input[type=range][disabled]{opacity:.45;cursor:default}
+.skl{display:flex;justify-content:space-between;font-size:12.5px;color:var(--stumm);margin-top:-4px}
+.riesig{font-size:44px;line-height:1;font-weight:700;color:var(--creme)} .riesig small{font-size:16px;font-weight:500;color:var(--leise);margin-left:6px}
+.sitze{display:grid;grid-template-columns:repeat(20,1fr);gap:3px}
+.sitze i{height:9px;transform:skewX(-14deg);border-radius:1px;background:rgba(255,255,255,.09)} .sitze i.j{background:var(--heim)}
+.kv{position:relative;height:120px;margin-bottom:16px}
+.kv svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.kv .pt{position:absolute;width:12px;height:12px;border-radius:50%;background:var(--gold);border:2px solid #17120a;transform:translate(-50%,-50%)}
+.kv .lb{position:absolute;font-size:12px;color:var(--stumm);white-space:nowrap}
+.sv{display:flex;align-items:flex-end;gap:3px;height:74px}
+.sv button.aw i{opacity:.55} .ch .sp2.heim small{color:var(--heim)} .ch .sp2.jetzt.heim small{color:var(--gold)}
+.sv button{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:2px;font-size:12px;color:var(--stumm);font-weight:600}
+.sv button i{display:block;width:100%;background:var(--heim);border-radius:2px 2px 0 0;transform:skewX(-6deg)} .sv button.prog i{background:none;box-shadow:inset 0 0 0 1px var(--leise)} .sv button.jetzt{color:var(--gold)}
+.sv button b{font-size:13px;color:var(--tinte);font-weight:600}
+.rek{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:6px 2px;border-bottom:1px solid rgba(244,230,196,.06);font-size:14.5px;line-height:1.25}
+.rek small{display:block;color:var(--stumm);font-size:13px} .rek strong{font-size:18px;color:var(--creme);white-space:nowrap}
+button.rek{width:100%} button.rek:hover{background:var(--flaeche-2)}
+.geg{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:center;padding:10px;border-radius:8px;background:linear-gradient(100deg,color-mix(in srgb,var(--pc) 22%,transparent),transparent 70%);border:1px solid var(--linie);border-left:3px solid var(--pc);--pc:var(--gold)}
+.geg .ic{width:52px;height:52px;border-radius:9px;display:grid;place-items:center;font-size:28px;color:var(--pc);background:rgba(0,0,0,.35);border:1px solid var(--linie)}
+.geg b{display:block;font:400 23px/1.05 var(--haus);color:#fff}
+.geg div>span{font-size:13.5px;color:var(--leise);display:block;margin-top:4px;line-height:1.25}
+.ab2{margin-top:14px}
+.ab2>.gk{display:flex;justify-content:space-between;margin-bottom:6px}
+.ab2>.gk em{font-style:normal;color:var(--stumm);letter-spacing:.04em;text-transform:none;font-weight:500;font-size:12.5px}
+.formel{padding:8px 10px;border-radius:6px;background:#06080c;border:1px solid var(--linie);font-size:15px;line-height:1.35;color:var(--creme);white-space:pre-line}
+.akt{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.kand{display:grid;grid-template-columns:18px 26px minmax(0,1fr) 54px 46px;gap:8px;align-items:center;width:100%;height:34px;padding:0 6px;border-radius:6px;font-size:14.5px}
+.kand.wir{background:rgba(242,160,61,.18)}
+.kand img{width:26px;height:26px;border-radius:5px;object-fit:cover}
+.kand b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .kand em{font-style:normal;color:var(--stumm);font-weight:700} .kand strong{text-align:right} .kand span{text-align:right;color:var(--leise)}
+.star{display:flex;gap:6px}
+.star button{flex:1;position:relative;border-radius:7px;overflow:hidden;border:1px solid var(--linie-2);background:#111;aspect-ratio:1/1;min-width:0;max-height:96px}
+.star button img{width:100%;height:100%;object-fit:cover}
+.star button::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 35%,rgba(4,6,10,.96) 85%)}
+.star button b{position:absolute;z-index:1;left:5px;right:5px;bottom:4px;font:400 13px/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.star button[aria-pressed=true]{border-color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold)}
+#toast{position:fixed;z-index:95;left:50%;bottom:84px;transform:translate(-50%,20px);padding:9px 16px;border-radius:8px;background:#020305;border:1px solid var(--linie-2);font-size:15.5px;font-weight:500;opacity:0;pointer-events:none;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.6);max-width:90vw}
+#toast.an{opacity:1;transform:translate(-50%,0)}
+.nurphone{display:none!important}
+#schleier{display:none}
+
+/* ---------- Saisonwahl (22.11. Runde 2): Karten fuellen die Hoehe, Arena-Leiter nur auf hohen Schirmen ---------- */
+.gr.wahl{grid-template-rows:auto 1fr 1fr;align-content:stretch} .gr.wahl .sd .in{justify-content:space-between}
+.pa{display:grid;grid-template-columns:92px 54px minmax(0,1fr) 46px 62px;gap:8px;align-items:center;font-size:14.5px;color:var(--leise);line-height:1.2}
+.pa b{color:var(--tinte);font-weight:600;white-space:nowrap} .pa b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--pc);margin-right:6px}
+.pa>span,.pa>strong{text-align:right;white-space:nowrap} .pa strong{color:var(--creme);font-weight:700;font-size:16px}
+.pa.pk{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600;margin-bottom:-4px} .pa.pk>:first-child{text-align:left}
+.ms{display:grid;grid-template-columns:20px minmax(0,1fr) 24px 24px 24px 58px;gap:8px;align-items:center;font-size:14.5px;color:var(--leise);line-height:1.2}
+.ms>*{text-align:center;white-space:nowrap} .ms>:nth-child(2){text-align:left;overflow:hidden;text-overflow:ellipsis;color:var(--tinte);font-weight:600} .ms>:last-child{text-align:right}
+.ms strong{color:var(--creme);font-weight:700;font-size:16px} .ms.mk{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600;margin-bottom:-4px} .ms.mk>:nth-child(2){color:var(--stumm)}
+.ms.du{background:rgba(242,160,61,.14);box-shadow:inset 3px 0 0 var(--heim);margin:-3px -6px;padding:3px 6px;border-radius:4px}
+.md{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:11.5px;font-weight:700;color:#0b0d12;background:var(--gold)} .md.s{background:#c9d1dc} .md.b{background:#c98a54}
+.fch{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end} .fch .marke b{color:#0b0d12;font-weight:700;margin-left:4px}
+.sd.kom .in{gap:7px} @media (max-height:1180px){.artx{display:none}}
+.lei{display:none} .lei .in{gap:0!important;justify-content:flex-start!important}
+.lei .lz{display:grid;grid-template-columns:1.5fr .7fr 1.1fr 1.2fr .7fr 1.1fr 1.1fr 1.2fr;gap:10px;align-items:center;min-height:30px;padding:0 4px;border-bottom:1px solid rgba(244,230,196,.06);font-size:15.5px;color:var(--leise)}
+.lei .lz>*{text-align:right;white-space:nowrap} .lei .lz>:first-child{text-align:left} .lei .lz b{color:var(--tinte);font-weight:600} .lei .lz strong{color:var(--creme);font-weight:700}
+.lei .lz.lk{min-height:24px;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600} .lei .lz.du{background:rgba(242,160,61,.14)} .lei .lz.nx{box-shadow:inset 3px 0 0 var(--gold)}
+@media (min-height:1250px){.gr.wahl{grid-template-rows:auto 1fr 1fr auto}.lei{display:flex}}
+body.phone .gr.wahl{grid-template-rows:none} body.phone .lei{display:none}
+/* ---------- Aufschluesselung (22.11.): Einnahmen links, Ausgaben rechts, Verlauf darueber ---------- */
+.ch.pch{flex:1 1 150px;min-height:150px;margin:8px 14px 2px 46px}
+.ch.pch .pl{position:absolute;font-size:13.5px;font-weight:700;white-space:nowrap;pointer-events:none;text-shadow:0 0 6px var(--flaeche-1),0 0 6px var(--flaeche-1),0 0 3px var(--flaeche-1)}
+.pzw{flex:0 1 auto;min-height:190px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr);border-top:1px solid var(--linie)}
+.pzw>.tl{flex:none;min-height:0}
+.pzw>.tl+.tl{border-left:1px solid var(--linie)}
+.pos .th,.pos .tz{grid-template-columns:14px minmax(150px,1fr) 62px 78px minmax(64px,.42fr) 92px 38px;gap:8px;padding-right:12px}
+.pos .th button{display:flex;align-items:center;justify-content:flex-end;gap:2px;height:100%;min-width:0;font:inherit;letter-spacing:inherit;text-transform:inherit;color:var(--stumm);white-space:nowrap}
+.pos .th button.li{justify-content:flex-start}
+.pos .th button.tl{flex:none;flex-direction:row;overflow:visible} .rech>div.tl{display:block;overflow:visible}
+.pos .th button:hover{color:var(--tinte)} .pos .th button.an{color:var(--gold)}
+.pos .th button svg.i{font-size:11px;stroke-width:3}
+.pos .tz{min-height:30px}
+.pos .tz .fb{margin-left:8px;height:15px} .pos .tz .fb.hohl{border-color:var(--leise)}
+.pos .tz .nm .nmt{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pos .tz .tp{display:flex;justify-content:flex-start}
+.pos .tz .bt{font-size:17px}
+.pos .tz .an{display:flex;align-items:center;gap:8px;min-width:0}
+.pos .tz .an i{flex:1;min-width:0;height:8px;background:rgba(255,255,255,.07);transform:skewX(-14deg);border-radius:1px;overflow:hidden}
+.pos .tz .an u{display:block;height:100%;background:var(--leise)}
+.pos .tz .an b{flex:none;width:50px;font-weight:600;font-size:14.5px;color:var(--leise)}
+.pos .tz .lt{font-size:14.5px;color:var(--leise);white-space:nowrap}
+.pos .tz .lt em{display:inline-block;width:16px;margin-left:3px;font-size:12px;text-align:center} .pos .tz .lt em svg.i{stroke-width:3}
+.pos .tz .lt.sj{font-size:12.5px;color:var(--stumm);font-weight:500}
+.pos .tz .rg{font-size:14.5px;color:var(--leise)}
+.pos .tz.su{position:sticky;bottom:0;z-index:4;border-top:1px solid var(--linie-2)}
+.kf .btn.klein{height:26px;color:var(--tinte)} .kf:has(.btn){padding-top:5px;padding-bottom:5px}
+@media (max-height:1180px){.rech.gross:has(+.pch){margin-top:8px}.rech.gross:has(+.pch) div{padding:5px 6px}.pos .tz{min-height:25px;font-size:15px}.pos .tz .bt{font-size:16px}.pos .tz.su{min-height:30px}.pos .th{height:24px}}
+@media (max-width:2100px){.pos .th,.pos .tz{grid-template-columns:14px minmax(150px,1fr) 62px 74px 52px 88px 34px;gap:6px}.pos .tz .an i{display:none}.pos .tz .an{justify-content:flex-end}.pos .tz .an b{width:auto}}
+@media (max-width:1500px){.pos .th,.pos .tz{grid-template-columns:12px minmax(120px,1fr) 60px 70px 82px}.pos .xs2,.pos .rg,.kf .xs2{display:none}}
+body.phone .pzw{display:block;min-height:0} body.phone .pzw>.tl+.tl{border-left:0;border-top:1px solid var(--linie)}
+body.phone .pos .th,body.phone .pos .tz{grid-template-columns:10px minmax(0,1fr) 70px 78px;gap:6px;padding-right:10px}
+body.phone .pos .tp,body.phone .pos .xs2,body.phone .pos .rg{display:none}
+body.phone .ch.pch{height:260px;flex:none}
+
+@media (max-width:1760px){.frist{display:none}}
+@media (max-width:1500px){.aus .th,.aus .tz{grid-template-columns:22px minmax(160px,1.1fr) 124px minmax(0,1.3fr) 80px 86px}.frist{display:none}}
+@media (max-width:1320px){.work{grid-template-columns:minmax(0,1fr) 330px}.hk h1{font-size:28px}.dtab .ic{display:none}.dtab{grid-template-columns:minmax(0,1fr) auto}.gr.s4{grid-template-columns:repeat(2,minmax(0,1fr))}.gr.h3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---------- Phone ---------- */
+body.phone{background:var(--grund)}
+body.phone .app{display:block;height:auto;min-height:100vh;padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+body.phone .rail{position:fixed;z-index:50;left:0;right:0;bottom:0;top:auto;height:auto;flex-direction:row;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--linie)}
+body.phone .rail .logo,body.phone .rail .luecke,body.phone .rail .x{display:none}
+body.phone .rail a.an::before{left:9px;right:9px;top:-7px;bottom:auto;width:auto;height:3px}
+body.phone .hero{position:sticky;top:0;z-index:30;grid-template-columns:minmax(0,1fr);gap:8px;padding:8px 10px 0;background:var(--grund)}
+body.phone .hk{padding:0;gap:10px} body.phone .hk .crest{width:40px;height:40px;border-width:1px}
+body.phone .hk>div:not(.crest){display:flex;flex-wrap:wrap;align-items:center;gap:1px 8px;flex:1;min-width:0}
+body.phone .hk h1{font-size:20px;order:-1} body.phone .hk .sub{font-size:13px;margin:0;overflow:hidden;text-overflow:ellipsis;width:100%}
+body.phone .mdw{margin:0 0 0 auto} body.phone .mdw span{padding:0 5px;font-size:11.5px;letter-spacing:.1em} body.phone .mdw .sai{display:none}
+body.phone .hr{display:none}
+body.phone .tabs{gap:4px}
+body.phone .dtab{padding:6px 10px 7px 10px;gap:5px;grid-template-columns:minmax(0,1fr) auto;clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%)}
+body.phone .dtab{flex:1 1 auto} body.phone .rech.d4{grid-template-columns:repeat(2,minmax(0,1fr))}
+body.phone .dtab .ic{display:none} body.phone .dtab b{font-size:14px} body.phone .dtab em{display:none}
+body.phone .dtab .erw strong{font-size:19px} body.phone .dtab .erw span{display:none} body.phone .dtab .mein{display:none}
+body.phone .work{display:block;padding:8px}
+body.phone .haupt{overflow:visible}
+body.phone .ktabs button{font-size:13px;letter-spacing:.04em;padding:0 4px;height:40px}
+body.phone .pk{flex-wrap:wrap;padding:7px 10px} body.phone .pk h2{font-size:17px} body.phone .pk .hin{display:none}
+body.phone .nurphone{display:inline-flex!important}
+body.phone .xs{display:none!important}
+body.phone .tl,body.phone .gr{overflow-y:visible;flex:none}
+body.phone .rech.gross{grid-template-columns:repeat(2,minmax(0,1fr));margin:8px 8px 0} body.phone .rech.gross .su{grid-column:1/-1} body.phone .rech.gross.d4 .su{grid-column:auto} body.phone .rech.gross strong{font-size:22px}
+body.phone .ch{height:380px;flex:none;margin:10px 8px 4px 40px} body.phone .ch .ax{left:-38px;width:34px;font-size:11.5px}
+body.phone .ch .wt{font-size:11.5px} body.phone .ch .wt.xs3,body.phone .ch .nt{display:none} body.phone .ch .sp2 small{font-size:10px;letter-spacing:0}
+body.phone .leg{padding:2px 10px 8px} body.phone .mix{grid-template-columns:minmax(0,1fr);gap:4px;margin:0 10px 10px}
+body.phone .aus .th,body.phone .aus .tz{grid-template-columns:14px minmax(0,1fr) 70px;gap:8px;padding-right:10px}
+body.phone .mer .th,body.phone .mer .tz{grid-template-columns:14px minmax(0,1fr) 84px 62px;gap:8px;padding-right:10px}
+body.phone .bon{overflow-x:auto} body.phone .bon .th,body.phone .bon .tz{grid-template-columns:14px 150px repeat(20,30px) 54px 62px;width:max-content;gap:6px}
+body.phone .tz{min-height:38px;font-size:15px} body.phone .tz .fb{margin-left:6px}
+body.phone .gr,body.phone .gr.s3,body.phone .gr.s4,body.phone .gr.h3,body.phone .gr.f2{grid-template-columns:minmax(0,1fr);padding:8px}
+body.phone .kf{flex-wrap:wrap;white-space:normal;gap:4px 12px}
+body.phone .leerh{flex-wrap:wrap;padding:8px 10px}
+body.phone .kontext{position:fixed;z-index:70;left:0;right:0;bottom:0;height:80vh;border-radius:14px 14px 0 0;border-bottom:0;transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -16px 40px rgba(0,0,0,.6)}
+body.phone:not([data-blatt]) .kontext{visibility:hidden;transition:transform .28s cubic-bezier(.2,.8,.2,1),visibility 0s .28s}
+body.phone[data-blatt=kontext] .kontext{transform:none}
+body.phone #schleier{display:block;position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .2s}
+body.phone[data-blatt] #schleier{opacity:1;pointer-events:auto}
+body.phone .kontext .ktabs button:last-child{flex:none;width:44px}
+/* ---------- Marketing ---------- */
+.mkt .th,.mkt .tz{grid-template-columns:22px minmax(200px,1.5fr) 124px 54px minmax(110px,1fr) minmax(120px,1fr) 62px 76px 92px}
+.mkt .tz{min-height:40px;cursor:pointer} .mkt .tz.sel{background:rgba(240,195,90,.10);box-shadow:inset 3px 0 0 var(--gold)}
+.mkt .tz:hover{background:rgba(255,255,255,.03)}
+.mkt .th button{font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;text-align:inherit;white-space:nowrap} .mkt .th button.an{color:var(--gold)} .mkt .th .li{text-align:left}
+.mkt .nm{align-items:center} .mkt .nm img{width:30px;height:30px}
+.mkt .nm .n2{display:flex;flex-direction:column;min-width:0;line-height:1.15} .mkt .nm .n2 small{font-size:12px;font-weight:500;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mkt .nm .n2 small i{font-style:normal} .mkt .nm .n2 small i.an{color:var(--acht)} .mkt .nm .n2 small i.lb{color:var(--gut)} .mkt .nm .n2 small i.fl{color:var(--stumm);opacity:.7}
+.mkt .kl{text-align:left;font-size:14px;font-weight:600;color:var(--pc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .mkt .kl small{display:block;color:var(--stumm);font-weight:500;font-size:12px}
+.mkt .rw{display:grid;grid-template-columns:minmax(0,1fr) 28px;gap:8px;align-items:center}
+.mkt .big{font-size:22px;font-weight:700;color:var(--creme)} .mkt .big.top{color:var(--gold)}
+.mkt .grp{flex:none;display:flex;align-items:center;gap:10px;height:26px;padding:0 14px 0 22px;background:var(--flaeche-2);border-bottom:1px solid var(--linie);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.mkt .grp small{letter-spacing:.02em;text-transform:none;color:var(--stumm);font-size:12.5px;font-weight:500}
+.ton{position:relative;height:16px}
+.ton::before{content:"";position:absolute;left:0;right:0;top:7px;height:2px;border-radius:1px;background:linear-gradient(90deg,var(--warn),#3c4658 50%,var(--gut))}
+.ton::after{content:"";position:absolute;left:50%;top:3px;width:1px;height:10px;background:var(--linie-2)}
+.ton i{position:absolute;top:3px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--creme);border:2px solid #0b0d12;z-index:2}
+.ton u{position:absolute;top:-1px;margin-left:-5px;border:5px solid transparent;border-top:7px solid var(--heim);z-index:1}
+.ton.gross{height:26px;margin:4px 6px 0} .ton.gross::before{top:12px;height:3px} .ton.gross::after{top:6px;height:15px} .ton.gross u{top:0;border-width:7px;border-top-width:10px;margin-left:-7px}
+.tonl{display:flex;justify-content:space-between;font-size:12px;color:var(--stumm);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.fbar{display:grid;grid-template-columns:38px minmax(0,1fr) 22px;gap:8px;align-items:center;font-size:13.5px;color:var(--leise)} .fbar b{text-align:right;color:var(--tinte);font-weight:600}
+.lg{display:grid;grid-template-columns:minmax(0,1fr) 110px 40px;gap:8px;align-items:center;font-size:14.5px;color:var(--leise);line-height:1.2} .lg>:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tinte);font-weight:600} .lg strong{text-align:right;color:var(--creme);font-weight:700}
+.lg.du>:first-child{color:var(--heim)}
+.mgr{flex:none;overflow:visible;grid-template-columns:repeat(3,minmax(0,1fr));padding:10px 12px 12px;border-top:1px solid var(--linie)}
+.kb .herl+.herl{margin-top:8px} .kb .pkopf{display:flex;gap:10px;align-items:center;margin-bottom:8px} .kb .pkopf img{width:54px;height:54px;border-radius:8px;object-fit:cover;border:1px solid var(--linie-2)}
+.kb .pkopf b{font:400 22px/1.05 var(--haus);color:#fff;display:block} .kb .pkopf small{color:var(--leise);font-size:13.5px}
+.dtab{cursor:pointer;max-width:430px} .mkt .tz>.xs:has(.ton){padding-left:10px}
+@media (max-width:1500px){.mkt .th,.mkt .tz{grid-template-columns:22px minmax(170px,1.4fr) 100px 48px minmax(90px,1fr) minmax(90px,1fr) 56px 70px 84px}}
+@media (min-height:1250px){.mkt .tz{min-height:52px;font-size:18px} .mkt .nm img{width:38px;height:38px} .mkt .nm .n2 small{font-size:13.5px} .mkt .big{font-size:27px} .mkt .kl{font-size:15.5px} .mkt .kl small{font-size:13px}}
+@media (max-width:1800px){.mkt .nm .n2 small{font-size:11px;letter-spacing:-.01em}}
+@media (max-height:1180px){.mkt .tz{min-height:38px;font-size:15px} .mkt .nm img{width:26px;height:26px} .mkt .nm .n2{line-height:1.08} .mkt .grp{height:22px} .mgr .txt.lang{display:none} .mgr .sd .in{gap:6px} .lg.opt{display:none}}
+body.phone .mkt .th,body.phone .mkt .tz{grid-template-columns:8px minmax(0,1fr) 54px 64px} body.phone .mkt .xs{display:none} body.phone .mgr{grid-template-columns:minmax(0,1fr)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-arena" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 4l16 16M4 10V4h6"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-train" viewBox="0 0 24 24"><path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-scout" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12"/></symbol>
+  <symbol id="i-l" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-r" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
+  <symbol id="i-blitz" viewBox="0 0 24 24"><path d="M13 2L5 14h6l-1 8 9-13h-6z"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-acht" viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M3 12l4-4 4 3 3-3 7 5-4 5-4-2-3 2z"/></symbol>
+  <symbol id="i-auf" viewBox="0 0 24 24"><path d="M6 15l6-7 6 7"/></symbol>
+  <symbol id="i-ab" viewBox="0 0 24 24"><path d="M6 9l6 7 6-7"/></symbol>
+  <symbol id="i-gleich" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-fans" viewBox="0 0 24 24"><path d="M3 20c2-9 16-9 18 0"/><path d="M6 20c1.500-5 10.500-5 12 0"/><circle cx="12" cy="6" r="3"/></symbol>
+</defs></svg>
+<div class="demo" id="demo"><b>Mockup</b></div>
+<div class="app">
+  <nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img id="rlogo" src="../team-logos/H-R.jpg" alt=""></div>
+    <a class="tr" data-tip="Start" href="oly-start-modern-17-11.html"><svg class="i"><use href="#i-home"/></svg></a>
+    <a class="tr" data-tip="Einsatzliste" href="einsatzliste-modern-17-11.html"><svg class="i"><use href="#i-liste"/></svg></a>
+    <a class="tr" data-tip="Saisonstand" href="saisonstand-modern-17-11.html"><svg class="i"><use href="#i-tab"/></svg></a>
+    <a class="an tr" data-tip="Kader · Marketing" href="#"><svg class="i"><use href="#i-team"/></svg></a>
+    <a class="x tr" data-tip="Transfermarkt" href="#"><svg class="i"><use href="#i-markt"/></svg></a>
+    <span class="luecke"></span>
+    <a class="tr" data-tip="Finanzen" href="finanzen-modern-18-11.html?ansicht=wahl"><svg class="i"><use href="#i-geld"/></svg></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="kul"></div>
+      <div class="hk" id="hk"></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Team"></div>
+      <div class="hr" id="hr"></div>
+    </header>
+    <div class="work">
+      <section class="pan haupt" aria-label="Marketing">
+        <div class="pk" id="vk"></div>
+        <div id="vb" style="display:contents"></div>
+        <div class="kf" id="vf"></div>
+      </section>
+      <aside class="pan kontext" aria-label="Fanprofil und Spieler">
+        <div class="ktabs" id="ctabs"></div>
+        <div class="kb" id="cb"></div>
+      </aside>
+    </div>
+  </main>
+</div>
+<div id="toast" role="status"></div>
+<script>
+"use strict";
+var q=new URLSearchParams(location.search);
+/* ---------- Vorschlag: Gewichte (docs/design/marketing-22-11.md Abschnitt 2) ---------- */
+/* Trait: [Reichweite, Ton]. Ton +1 = Liebling, -1 = Boesewicht. Traits echt: lib/training/class-progression-config.ts:234-274 */
+var TR={FanFavorite:[12,1],Sexy:[9,.2],Eloquent:[7,.6],Cool:[6,.3],Fearless:[5,.2],FiredUp:[5,0],Ambitious:[3,0],Loyal:[3,.6],Caring:[3,.9],Altruistic:[3,1],Fair:[3,.9],Motivated:[2,.3],Healthy:[1,.2],Resourceful:[1,0],Flexible:[0,0],Diligent:[0,.2],Disciplined:[0,.3],Relaxed:[-1,.2],
+        Scandalous:[10,-1],Diva:[8,-.5],Renegade:[7,-.8],Egomaniac:[6,-.6],Feisty:[5,-.5],Cruel:[5,-1],Gambler:[4,-.4],Cheater:[4,-1],Vindictive:[3,-.7],Devious:[3,-.8],ColdBlooded:[3,-.6],Manipulative:[2,-.7],Obsessive:[1,-.1],Mercenary:[-2,-.4],Paranoid:[-2,-.2],Lazy:[-4,-.2],FaintHearted:[-4,0],Timid:[-6,.1]};
+var KLT={Bard:8,Hero:8,Badass:8,Warlord:5,Berserker:4,Mage:3,Rogue:3,Sprinter:3,Templar:2,Charger:2,Tank:1,Tactician:0,Overseer:0};
+var RAT={Dragon:6,Voidborn:5,Divine:4,Demon:3,Alien:3,Mutant:3,Tauren:2,Aqua:2,Lizard:2};
+/* Klassenfarbe: lib/lineups/legacy-lineup-modifiers.ts:31 (rot POW, gruen SPE, blau MEN, gelb SOC) in den Farben des Finanz-Mockups */
+var KLF={Berserker:"--p1",Warlord:"--p1",Tank:"--p1",Sprinter:"--p4",Rogue:"--p4",Charger:"--p4",Mage:"--p5",Overseer:"--p5",Templar:"--p5",Bard:"--p6",Hero:"--p6",Badass:"--p6",Tactician:"--p6"};
+var BASIS=6.0, NORM=1.2;
+/* ---------- Echte Stammdaten ---------- */
+/* Team: manners/popularity/Farbgewichte aus data/source/team-identities.json, Themen aus team-theme-composition-service.ts (H-R :202, G-G :235) */
+var TEAMS={"H-R":{n:"Hell Raisers",manners:1,pop:5.5,f:[7,8,5,0],mag:["Demon","Hell","Infernal","Devil","Succubus"],meidet:["Divine","Holy","Angel"],profil:"Bösewicht-Fans",satz:"Die Kurve will Schurken. Ein Skandal ist hier Werbung, ein Musterschüler verkauft keine Trikots."},
+           "G-G":{n:"Golden Gladiators",manners:9,pop:8,f:[0,6,6,8],mag:["Divine","Angel","Paladin","Holy","Guardian"],meidet:["Demon","Undead","Infernal"],profil:"Heldenfans",satz:"Die Tribüne will Vorbilder. Ein Liebling verkauft doppelt, ein Skandal kostet Fans."}};
+var LIGA=[["Cold Steel",10],["Golden Gladiators",9],["The Chantry",8.5,1],["Mortal Sin",7.5],["Royal Court",6],["Mayhem Mavericks",2.5,1],["Pirate Crew",1.5],["Hell Raisers",1],["Zero Heroes",1,1]];
+/* Spieler: [Name, Portrait, Rasse, Klasse, Rating, Perzentil im Pool (2.984 Spieler), Traits +, Traits -, Gesinnung, Kader] */
+var SP=[["Mazzikin","mazzikin","Demon","Charger",54,83,["Loyal","Diligent","Eloquent"],["Scandalous","ColdBlooded"],"C-B","H-R"],
+ ["Bloodseeker","bloodseeker","Human","Rogue",54,83,["FiredUp","Fearless"],["Cruel","Scandalous","Obsessive"],"C-B","H-R"],
+ ["Vixen","vixen","Demon","Mage",44,56,["Eloquent","Sexy","FiredUp"],["Diva","Vindictive","Obsessive"],"N-B","H-R"],
+ ["Passion","passion","Demon","Overseer",52,80,["Sexy","Altruistic"],["FaintHearted","Diva"],"C-N","H-R"],
+ ["Szel","szel","Demon","Charger",40,45,["FiredUp","Fearless"],["Scandalous","ColdBlooded"],"C-B","H-R"],
+ ["Rocky","rocky","Construct","Berserker",46,63,["FiredUp"],["Vindictive","Renegade","ColdBlooded"],"Neutral","H-R"],
+ ["Rasca Blutbeere","rasca-blutbeere","Demon","Warlord",44,56,["FiredUp"],["Cruel"],"C-N","H-R"],
+ ["Kadis","kadis","Divine","Badass",50,76,["Loyal","Diligent","Caring"],[],"N-G","G-G"],
+ ["Auza","auza","Divine","Sprinter",49,72,["Diligent"],["Devious","Feisty","Scandalous"],"C-G","G-G"],
+ ["Zhyrak","zhyrak","Divine","Rogue",50,76,["Caring","Motivated","Altruistic"],["FaintHearted"],"N-G","G-G"],
+ ["Kayle","kayle","Divine","Rogue",47,67,["Diligent"],["Feisty"],"N-G","G-G"],
+ ["Vertessa","vertessa","Human","Templar",49,73,["FiredUp","Cool"],[],"R-N","G-G"],
+ ["Elda","elda","Human","Mage",22,2,["Caring","Loyal"],["FaintHearted"],"N-G","G-G"],
+ ["Sir Ruckus","sir-ruckus","Animal","Rogue",22,2,["Diligent","Caring","Loyal"],["FaintHearted"],"R-N","G-G"],
+ ["Mauler","mauler","Demon","Templar",68,98,["Eloquent","Ambitious","Fearless"],["Egomaniac","Scandalous","Obsessive"],"C-B",""],
+ ["Aurelia Rosethorn","aurelia-rosethorn","Divine","Hero",67,97,["Eloquent","FanFavorite"],["Diva"],"N",""],
+ ["Zephiroth","zephiroth","Dragon","Warlord",63,95,["Ambitious","FanFavorite","Healthy"],["Feisty","Scandalous"],"Neutral",""],
+ ["Com Shepard","com-shepard","Human","Hero",56,88,["Eloquent","FanFavorite","Loyal"],["Devious","Renegade"],"N-G",""],
+ ["Luxariel","luxariel","Demon","Bard",36,32,["Sexy","Eloquent"],["Egomaniac","Scandalous","Renegade"],"C-B",""],
+ ["King Arthur","king-arthur","Human","Templar",76,100,["Loyal","Ambitious"],["FaintHearted"],"R-G",""],
+ ["Jasper Kane","jasper-kane","Alien","Warlord",71,99,["Loyal","Relaxed"],["Timid"],"N-G",""]];
+var Z={team:TEAMS[q.get("team")]?q.get("team"):"H-R",sel:q.get("sel")||"",so:[q.get("so")||"m",-1]};
+var phoneFest=q.get("phone")==="1";
+function phone(){return phoneFest||innerWidth<760}
+function kl(x,a,b){return Math.max(a,Math.min(b,x))}
+function zahl(x){var a=Math.abs(Math.round(x*100)/100);return a.toFixed(Math.abs(a*10-Math.round(a*10))>.001?2:1).replace(".",",")}
+function e1(x){x=Math.round(x*10)/10;return (x<0?"−":"")+Math.abs(x).toFixed(1).replace(".",",")}
+function e2(x){return (x<0?"−":"")+Math.abs(x).toFixed(2).replace(".",",")}
+function vzt(x){return (x>0?"+":x<0?"−":"±")+Math.abs(Math.round(x*100)/100).toString().replace(".",",")}
+function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>'}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}
+function toast(t){var e=document.getElementById("toast");e.textContent=t;e.classList.add("an");clearTimeout(toast.z);toast.z=setTimeout(function(){e.classList.remove("an")},2200)}
+function tonTeam(t){return kl((TEAMS[t].manners-5.5)/4.5,-1,1)}
+function thema(p,t){var T=TEAMS[t];return T.mag.indexOf(p[2])>=0?1:T.meidet.indexOf(p[2])>=0?-1:0}
+/* Formel des Konzepts: Reichweite = 0,30 x Leistungsperzentil + Ausstrahlung (0..46) + Typ (0..14); Passung 0,6..1,4 */
+function rechne(p,t){
+  var tr=p[6].concat(p[7]),sr=0,st=0;tr.forEach(function(k){sr+=TR[k][0];st+=TR[k][1]*Math.max(TR[k][0],1)});
+  var aus=kl(10+1.2*sr,0,46),typ=Math.min(14,(KLT[p[3]]||0)+(RAT[p[2]]||0)),lei=.30*p[5];
+  var ges=/-G$/.test(p[8])?.4:/-B$/.test(p[8])?-.4:0,ton=kl(st/12+ges,-1,1),tt=tonTeam(t),th=thema(p,t);
+  var m0=Math.min(100,lei+aus+typ),pas=kl(1+.25*ton*tt+.15*th,.6,1.4),m=Math.min(100,m0*pas);
+  return {p:p,lei:lei,aus:aus,typ:typ,sr:sr,ton:ton,ges:ges,th:th,tp:ton*tt,m0:m0,pas:pas,m:m,w:BASIS*m/100/NORM};
+}
+function merch(l){l=l.slice().sort(function(a,b){return b.m-a.m});return BASIS*((l[0]?l[0].m:0)+.6*(l[1]?l[1].m:0)+.4*(l[2]?l[2].m:0))/100/NORM}
+function trTxt(p){return p[6].concat(p[7]).map(function(k){var r=TR[k];return '<i class="'+(r[0]<0?"fl":r[1]<=-.4&&r[0]>=4?"an":r[1]>=.5&&r[0]>=3?"lb":"")+'">'+k+'</i>'}).join(" · ")}
+function tonAchse(ton,tt,gross){return '<div class="ton'+(gross?" gross":"")+'"><u style="left:'+(50+tt*50)+'%"></u>'+(ton===null?"":'<i style="left:'+(50+ton*50)+'%"></i>')+'</div>'}
+function zeichne(){
+  document.body.classList.toggle("phone",phone());
+  var T=TEAMS[Z.team],tt=tonTeam(Z.team);
+  var alle=SP.map(function(p){return rechne(p,Z.team)}),kader=alle.filter(function(x){return x.p[9]===Z.team}),markt=alle.filter(function(x){return x.p[9]===""});
+  if(!alle.some(function(x){return x.p[1]===Z.sel}))Z.sel=markt[0].p[1];
+  var S=alle.filter(function(x){return x.p[1]===Z.sel})[0];
+  var mk=merch(kader),top=kader.slice().sort(function(a,b){return b.m-a.m}),mit=S.p[9]===""?merch(kader.concat([S])):mk;
+  var schnitt=kader.reduce(function(s,x){return s+x.pas},0)/kader.length;
+  document.getElementById("rlogo").src="../team-logos/"+Z.team+".jpg";
+  document.getElementById("demo").innerHTML='<b>Mockup</b>Team:'+Object.keys(TEAMS).map(function(t){return '<button data-team="'+t+'" aria-pressed="'+(Z.team===t)+'">'+TEAMS[t].n+'</button>'}).join("")+'<span>·</span><button data-phone="1" aria-pressed="'+phone()+'">Phone</button><span class="welle">Vorschlag 22.11. · Spieler, Traits, Kader und Teamwerte echt, Formel und Gewichte sind der Vorschlag</span>';
+  document.getElementById("hk").innerHTML='<div class="crest"><img src="../team-logos/'+Z.team+'.jpg" alt=""></div><div><div class="mdw"><span><span class="sai">Saison 2 · </span>Kader · Marketing</span></div><h1>Marketing</h1><div class="sub"><span class="xs">'+T.n+' · </span>Fanprofil <b>'+T.profil+'</b> · Merch <b>'+e1(mk)+' C</b> je Saison</div></div>';
+  document.getElementById("tabs").innerHTML=Object.keys(TEAMS).map(function(t){var X=TEAMS[t],l=SP.filter(function(p){return p[9]===t}).map(function(p){return rechne(p,t)});
+    return '<button class="dtab'+(Z.team===t?" an":"")+'" role="tab" data-team="'+t+'"><span class="ic">'+ic("fans")+'</span><span><em>'+X.profil+' · Ton '+vzt(tonTeam(t))+'</em><b>'+X.n+'</b></span><span class="erw"><strong class="t">'+e1(merch(l))+'</strong><span>C Merch</span></span></button>'}).join("");
+  document.getElementById("hr").innerHTML='<div class="frist"><span class="gk">Aushängeschild der Saison</span><strong>'+top[0].p[0]+' · '+Math.round(top[0].m)+'</strong></div>';
+  document.getElementById("vk").innerHTML='<h2>Wer verkauft Trikots?</h2><span class="hin">Marketability = Reichweite × Passung zum Fanprofil. Nicht die Stärke allein.</span><span class="sp"></span>';
+  /* Tabelle */
+  var SO={n:function(x){return x.p[0]},st:function(x){return x.p[4]},r:function(x){return x.m0},ton:function(x){return x.ton},pas:function(x){return x.pas},m:function(x){return x.m},w:function(x){return x.w},kl:function(x){return x.p[3]}};
+  function sort(l){var f=SO[Z.so[0]]||SO.m,d=Z.so[1];return l.slice().sort(function(a,b){var A=f(a),B=f(b);return (A<B?-1:A>B?1:0)*d||a.p[0].localeCompare(b.p[0])})}
+  function kopf(c,t,cls,tip){return '<button class="'+(cls||"")+(Z.so[0]===c?" an":"")+'" data-so="'+c+'"'+(tip?' data-tip="'+tip+'"':"")+'>'+t+(Z.so[0]===c?(Z.so[1]<0?" ↓":" ↑"):"")+'</button>'}
+  function zeile(x){var p=x.p,gut=x.tp>.15,schl=x.tp<-.15;
+    return '<div class="tz'+(p[1]===Z.sel?" sel":"")+'" data-sel="'+p[1]+'" role="button" tabindex="0"><span></span><span class="nm"><img src="../portraits/'+p[1]+'.jpg" alt=""><span class="n2"><span>'+p[0]+'</span><small>'+trTxt(p)+'</small></span></span>'+
+      '<span class="kl xs" style="--pc:var('+(KLF[p[3]]||"--leise")+')">'+p[3]+'<small>'+p[2]+' · '+p[8]+'</small></span>'+
+      '<span class="t xs">'+p[4]+'</span>'+
+      '<span class="rw xs"><div class="wb" style="--pc:var(--p5)"><i style="width:'+x.m0+'%"></i></div><b class="t" style="color:var(--tinte)">'+Math.round(x.m0)+'</b></span>'+
+      '<span class="xs">'+tonAchse(x.ton,tt)+'</span>'+
+      '<span class="t '+(x.pas>1.05?"plus":x.pas<.95?"minus":"")+'">×'+e2(x.pas)+'</span>'+
+      '<span class="t big'+(x.m>=85?" top":"")+'">'+Math.round(x.m)+'</span>'+
+      '<span class="t xs" style="color:var(--creme);font-weight:700">'+e1(x.w)+' C</span></div>'}
+  var h='<div class="tl mkt"><div class="th"><span></span>'+kopf("n","Spieler · Traits","li")+kopf("kl","Klasse · Rasse","li xs")+kopf("st","Stärke","xs","Rating des Spielers (echt). Zählt über das Perzentil nur zu 30 Punkten von 100.")+
+      kopf("r","Reichweite","xs","Wie viel Aufmerksamkeit der Spieler überall bekommt, 0 bis 100:\n0,30 × Leistungsperzentil + Ausstrahlung aus den Traits + Typ aus Klasse und Rasse")+
+      kopf("ton","Ton · Bösewicht ↔ Liebling","xs","Punkt = Spieler, Dreieck = Fanprofil des Teams.\nGleiche Seite hebt die Passung, die andere senkt sie.")+kopf("pas","Passung","","Faktor 0,6 bis 1,4:\n1 + 0,25 × Ton Spieler × Ton Team + 0,15 × Thema")+kopf("m","Market.","","Marketability bei diesem Team = Reichweite × Passung, höchstens 100")+kopf("w","Werbewert","xs","C je Saison als bester Verkäufer des Teams (Liga-1-Basis 6,0 C).\nDer zweite zählt zu 60 %, der dritte zu 40 %.")+'</div>'+
+    '<div class="grp">Kader<small>'+kader.length+' Spieler aus dem Referenzkader · Merch '+e1(mk)+' C je Saison aus den drei besten</small></div>'+sort(kader).map(zeile).join("")+
+    '<div class="grp">Auf dem Markt<small>Beispiele aus dem Spielerpool · dieselben Spieler, andere Fans, andere Zahl</small></div>'+sort(markt).map(zeile).join("")+'</div>';
+  /* Karten unten */
+  var k1='<div class="sd"><div class="kopf">Wohin es wirkt<small>nur Geld, nie die Wertung</small></div><div class="in">'+
+    '<div class="zl"><span><b>Merch</b> <small>Nr. 1 voll · Nr. 2 zu 60 % · Nr. 3 zu 40 %</small></span><strong class="t plus">'+e1(mk)+' C je Saison</strong></div>'+
+    '<div class="zl"><span><b>Tickets</b> <small>Star-Debüt ab Marketability 75</small></span><strong class="t">×1,3 im ersten Heimspiel</strong></div>'+
+    '<div class="zl"><span><b>Sponsor</b> <small>bleibt, wie er ist</small></span><strong class="t">nur Sonderziel „Gesicht“</strong></div>'+
+    '<div class="zl"><span><b>Marktwert</b> <small>bleibt exakt und unverändert</small></span><strong class="t">Werbewert steht daneben</strong></div>'+
+    '<div class="txt lang">Die Liga-Summe des Merch bleibt gleich: die Zugkraft wird je Saison auf das Liga-Mittel 1,0 geeicht. Marketing verteilt um, es druckt kein Geld.</div></div></div>';
+  var k2='<div class="sd"><div class="kopf">Aushängeschild<small>eine Wahl je Saison · delegierbar</small></div><div class="in">'+
+    '<div class="zl" style="align-items:center"><span class="nm" style="display:flex;gap:8px;align-items:center;color:var(--tinte);font-weight:600"><img src="../portraits/'+top[0].p[1]+'.jpg" alt="" style="width:34px;height:34px;border-radius:6px;object-fit:cover">'+top[0].p[0]+'</span><span class="marke gold">GESICHT DER SAISON</span></div>'+
+    '<div class="zl"><span>Sein Werbewert <small>+25 % als Aushängeschild</small></span><strong class="t plus">'+e1(top[0].w)+' → '+e1(top[0].w*1.25)+' C</strong></div>'+
+    '<div class="zl"><span>Verkauf in der Saison</span><strong class="t minus">Stimmung −8</strong></div>'+
+    '<div class="txt lang">Die KI nimmt den Spieler mit der höchsten Marketability unter den besten sechs. Ohne Wahl gilt dasselbe; kein Spieltag wartet.</div></div></div>';
+  var k3='<div class="sd"><div class="kopf">Fanprofile der Liga<small>Ton aus dem Teamwert „manners“</small></div><div class="in" style="gap:5px">'+
+    LIGA.map(function(x){var t=kl((x[1]-5.5)/4.5,-1,1);return '<div class="lg'+(x[0]===T.n?" du":"")+(x[2]?" opt":"")+'"><span>'+x[0]+'</span>'+tonAchse(null,t)+'<strong class="t">'+vzt(Math.round(t*100)/100)+'</strong></div>'}).join("")+'</div></div>';
+  document.getElementById("vb").innerHTML=h+'<div class="gr mgr">'+k1+k2+k3+'</div>';
+  document.getElementById("vf").innerHTML='<span>Grün = Liebling-Trait · Orange = Anecker-Trait · Grau = farblos</span><span class="sp" style="flex:1"></span><span>Ungescoutet zeigt die App nur eine von fünf Stufen (Scouting-Nebel)</span>';
+  /* Kontext */
+  document.getElementById("ctabs").innerHTML='<button class="an">Fanprofil</button><button data-toast="Der Verlauf über die Saison kommt mit dem Bau">Verlauf</button>';
+  var F=["POW","SPE","MEN","SOC"],FV=["--p1","--p4","--p5","--p6"],p=S.p,tr=p[6].concat(p[7]);
+  function z(l,w,k,sm){return '<div class="zl'+(sm?" sum":"")+'"><span>'+l+'</span><strong class="t '+(k||"")+'">'+w+'</strong></div>'}
+  var c='<div class="gk" style="display:flex;justify-content:space-between"><span>'+T.n+'</span><span style="color:var(--heim)">'+T.profil+'</span></div>'+
+    tonAchse(null,tt,true)+'<div class="tonl"><span>Bösewicht</span><span>Ton '+vzt(Math.round(tt*100)/100)+'</span><span>Liebling</span></div>'+
+    '<div class="txt" style="margin-top:8px">'+T.satz+'</div>'+
+    '<div class="ab2"><div class="gk"><span>Fans mögen</span><em>+15 % Passung</em></div><div class="chips">'+T.mag.map(function(m){return '<span class="marke gut">'+m.toUpperCase()+'</span>'}).join("")+'</div></div>'+
+    '<div class="ab2"><div class="gk"><span>Fans meiden</span><em>−15 % Passung</em></div><div class="chips">'+T.meidet.map(function(m){return '<span class="marke rot">'+m.toUpperCase()+'</span>'}).join("")+'</div></div>'+
+    '<div class="ab2"><div class="gk"><span>Farbe der Fans</span><em>Beliebtheit '+String(T.pop).replace(".",",")+' von 10</em></div>'+F.map(function(f,i){return '<div class="fbar"><span>'+f+'</span><div class="wb" style="--pc:var('+FV[i]+')"><i style="width:'+T.f[i]/20*100+'%"></i></div><b class="t">'+T.f[i]+'</b></div>'}).join("")+'</div>'+
+    '<div class="ab2"><div class="gk"><span>Gewählter Spieler</span><em>'+(p[9]?"im Kader":"auf dem Markt")+'</em></div>'+
+    '<div class="pkopf"><img src="../portraits/'+p[1]+'.jpg" alt=""><div><b>'+p[0]+'</b><small><span style="color:var('+(KLF[p[3]]||"--leise")+');font-weight:600">'+p[3]+'</span> · '+p[2]+' · Stärke '+p[4]+'</small></div></div>'+
+    '<div class="herl">'+z("Leistung <small>0,30 × Perzentil "+p[5]+"</small>",e1(S.lei))+
+      z("Ausstrahlung <small>10 + 1,2 × ("+tr.map(function(k){return k+" "+vzt(TR[k][0])}).join(", ")+")</small>",e1(S.aus))+
+      z("Typ <small>"+p[3]+" +"+(KLT[p[3]]||0)+" · "+p[2]+" +"+(RAT[p[2]]||0)+"</small>",e1(S.typ))+
+      z("<b>Reichweite</b>",String(Math.round(S.m0)),"",1)+'</div>'+
+    '<div class="herl">'+z("Ton des Spielers <small>Traits"+(S.ges?" und Gesinnung "+p[8]:"")+"</small>",vzt(Math.round(S.ton*100)/100))+
+      z("Ton-Passung <small>0,25 × "+vzt(Math.round(S.ton*100)/100)+" × "+vzt(Math.round(tt*100)/100)+"</small>",vzt(Math.round(.25*S.tp*100))+" %",S.tp>0?"plus":S.tp<0?"minus":"")+
+      z("Thema <small>"+p[2]+(S.th>0?" gehört zum Thema":S.th<0?" wird gemieden":" ist neutral")+"</small>",vzt(S.th*15)+" %",S.th>0?"plus":S.th<0?"minus":"")+
+      z("<b>Marketability hier</b> <small>"+Math.round(S.m0)+" × "+e2(S.pas)+"</small>",String(Math.round(S.m)),"",1)+'</div>'+
+    '<div class="herl">'+z("Werbewert als Nr. 1 <small>6,0 C × "+Math.round(S.m)+" ÷ 120</small>",e1(S.w)+" C")+
+      (p[9]===""?z("Merch mit ihm im Kader",e1(mk)+" → "+e1(mit)+" C",mit>mk+.05?"plus":""):z("Merch des Kaders",e1(mk)+" C"))+'</div></div>';
+  document.getElementById("cb").innerHTML=c;
+}
+document.addEventListener("click",function(e){
+  var x=e.target.closest("[data-team],[data-sel],[data-so],[data-phone],[data-toast]");if(!x)return;var d=x.dataset;
+  if(x.tagName==="A"&&x.getAttribute("href")==="#")e.preventDefault();
+  if(d.team){Z.team=d.team}
+  if(d.sel){Z.sel=d.sel}
+  if(d.so){Z.so=Z.so[0]===d.so?[d.so,-Z.so[1]]:[d.so,d.so==="n"||d.so==="kl"?1:-1]}
+  if(d.phone){phoneFest=!document.body.classList.contains("phone")}
+  if(d.toast){toast(d.toast)}
+  zeichne();
+});
+document.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target.matches(".tz[data-sel]")){e.preventDefault();Z.sel=e.target.dataset.sel;zeichne()}});
+addEventListener("resize",zeichne);
+zeichne();
+</script>
+</body>
+</html>
