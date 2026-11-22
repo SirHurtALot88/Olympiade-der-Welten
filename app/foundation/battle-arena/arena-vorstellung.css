@@ -1,0 +1,196 @@
+/*
+ * ARENA-VORSTELLUNG (Rework 22.11.) -- Stil und Masse aus public/mockups/arena-vorstellung-rework-22-11.html.
+ * Alle Laengen sind Vielfache von --u (= 1 "rem" des Mockups, Entwurfsmass 120 x 67,5 u = 1920 x 1080 px);
+ * --u folgt der Groesse der Buehne (Container-Einheiten), nicht dem Fenster, damit die Tafel mit der
+ * Arena-Vollflaeche waechst und schrumpft (4K-Monitor 16:9 zuerst, danach MacBook 16:10).
+ * Schriften: nur die zwei Tokens der App (--schrift-haus, --schrift-zahl), keine eigene Schrift.
+ */
+.oly-vst-huelle{position:absolute;inset:0;z-index:1;container-type:size;overflow:hidden;background:#06080c}
+.oly-arena-buehne[data-voll="0"] .oly-vst-huelle{position:relative;min-height:520px;height:62vh}
+.oly-arena-buehne[data-voll="0"] .oly-vst-huelle ~ div{display:none}
+.oly-vst{--u:clamp(9px,min(0.8333cqw,1.4815cqh),34px);
+  --grund:#06080c;--flaeche-1:#0c1017;--flaeche-2:#121824;--flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13);--linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4;--gold:#f0c35a;--tinte:#eef2f8;--leise:#9aa7ba;--stumm:#66738a;
+  --heim:#F2A03D;--gast:#45B0C9;--drei:#B58BE8;--vier:#EC7AA6;--gut:#62d394;--warn:#ff6058;
+  --k-red:#ea6a5c;--k-green:#5fcf86;--k-blue:#62a8f2;--k-yellow:#f0c35a;
+  --haus:var(--schrift-haus,"RaniraSeason",Georgia,serif);
+  --zahl:var(--schrift-zahl,"Barlow Condensed","Roboto Condensed","Arial Narrow",Arial,sans-serif);
+  --glas:rgba(8,11,17,.84);
+  position:absolute;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) calc(4.6*var(--u));
+  padding-top:calc(2.6*var(--u));isolation:isolate;color:var(--tinte);font-family:var(--zahl);font-size:calc(1*var(--u));
+  -webkit-font-smoothing:antialiased;text-align:left}
+/* Die Arena-Leiste (Vollflaeche) ist fest 56 px hoch; bei 16:10 ist 2,6 u kleiner und schnitt die Kopfzeile ab (Aufnahme 22.11.). */
+.oly-arena-buehne[data-voll="1"] .oly-vst{padding-top:max(57px,calc(2.6*var(--u)))}
+.oly-vst *{box-sizing:border-box}
+.oly-vst img{display:block}
+.oly-vst button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+.oly-vst button:focus-visible,.oly-vst [tabindex]:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:4px}
+.oly-vst svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.oly-vst .t{font-variant-numeric:tabular-nums}
+.oly-vst .gk{font-size:calc(.74*var(--u));letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.oly-vst .sp{flex:1}
+.oly-vst kbd{font:600 calc(.7*var(--u))/1 var(--zahl);padding:calc(.15*var(--u)) calc(.3*var(--u));border:1px solid var(--linie-2);border-radius:calc(.2*var(--u))}
+.oly-vst .bild{position:absolute;inset:0;z-index:-2;background:var(--bild,none) center/cover;image-rendering:pixelated}
+.oly-vst .bild::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,8,12,.86),rgba(6,8,12,.9) 35%,rgba(6,8,12,.95))}
+/* KOPF: Disziplin, Spielart, Punkteschema */
+.oly-vst .kopf{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:calc(1.5*var(--u));padding:calc(.7*var(--u)) calc(1.2*var(--u)) calc(.6*var(--u))}
+.oly-vst .kopf .dz{display:flex;align-items:center;gap:calc(.9*var(--u));min-width:0}
+.oly-vst .kopf .dz img{width:calc(3.4*var(--u));height:calc(3.4*var(--u));object-fit:contain;filter:drop-shadow(0 0 calc(.5*var(--u)) rgba(240,195,90,.35))}
+.oly-vst .kopf h2{margin:0;font:400 calc(2.7*var(--u))/1 var(--haus);color:#fff;letter-spacing:.01em}
+.oly-vst .schema{display:flex;gap:calc(.4*var(--u))}
+.oly-vst .schema div{min-width:calc(5.2*var(--u));padding:calc(.3*var(--u)) calc(.8*var(--u));border:1px solid var(--linie);border-radius:calc(.4*var(--u));background:var(--glas);text-align:center}
+.oly-vst .schema small{display:block;font-size:calc(.68*var(--u));letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.oly-vst .schema b{font-size:calc(1.35*var(--u));font-weight:700}
+.oly-vst .kopf .re{display:flex;justify-content:flex-end;align-items:center;gap:calc(.5*var(--u));flex-wrap:wrap}
+.oly-vst .marke{display:inline-flex;align-items:center;gap:calc(.4*var(--u));height:calc(1.9*var(--u));padding:0 calc(.7*var(--u));border-radius:calc(1*var(--u));border:1px solid var(--linie-2);background:var(--glas);font-size:calc(.88*var(--u));color:var(--creme);white-space:nowrap}
+.oly-vst .marke.gold{border-color:var(--gold);color:var(--gold);background:rgba(240,195,90,.1);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.oly-vst .marke.zu{color:var(--leise)}
+
+/* TAFEL: eine Zeile = ein Slot */
+.oly-vst .tafel{display:grid;grid-template-rows:auto minmax(0,1fr);gap:calc(.5*var(--u));padding:0 calc(1.2*var(--u));min-height:0}
+.oly-vst .tafel.duell{--sp:minmax(0,1fr) calc(16*var(--u)) minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-template-columns:calc(17.5*var(--u)) minmax(0,1fr) calc(17.5*var(--u));gap:calc(.6*var(--u));padding-bottom:calc(.6*var(--u))}
+.oly-vst .tafel.pod{--sp:calc(12.5*var(--u)) repeat(4,minmax(0,1fr))}
+.oly-vst .kz,.oly-vst .zeile{display:grid;grid-template-columns:var(--sp);gap:calc(.5*var(--u))}
+.oly-vst .zeilen{display:grid;grid-auto-rows:minmax(0,1fr);gap:calc(.4*var(--u));min-height:0;align-self:center;height:100%;max-height:calc(var(--k) * calc(15*var(--u)))}
+.oly-vst .tafel.pod .zeilen{padding-bottom:calc(.6*var(--u))}
+.oly-vst .zeile{position:relative;min-height:0;border-radius:calc(.55*var(--u));cursor:pointer}
+.oly-vst .zeile::before{content:"";position:absolute;inset:0;border-radius:calc(.55*var(--u));background:rgba(255,255,255,.028);border:1px solid transparent;pointer-events:none}
+.oly-vst .zeile:hover::before{background:rgba(255,255,255,.055)}
+.oly-vst .zeile.wahl{outline:2px solid var(--gold);outline-offset:1px}
+
+/* Teamkopf */
+.oly-vst .tk{--tf:var(--gast);display:grid;grid-template-columns:auto minmax(0,1fr);gap:calc(.2*var(--u)) calc(.8*var(--u));align-items:center;padding:calc(.55*var(--u)) calc(.8*var(--u));border-radius:calc(.55*var(--u));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--tf) 16%,rgba(8,11,17,.9)),rgba(8,11,17,.88));border:1px solid color-mix(in srgb,var(--tf) 55%,transparent);border-top:calc(.22*var(--u)) solid var(--tf);min-width:0}
+.oly-vst .tk.eigen{border-color:var(--heim);box-shadow:0 0 0 1px var(--heim) inset}
+.oly-vst .tk>img{width:calc(3.6*var(--u));height:calc(3.6*var(--u));border-radius:calc(.45*var(--u));object-fit:cover;grid-row:span 2}
+.oly-vst .tk .nm{display:flex;align-items:baseline;gap:calc(.5*var(--u));min-width:0}
+.oly-vst .tk h2{margin:0;font:400 calc(1.55*var(--u))/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.oly-vst .du{padding:calc(.08*var(--u)) calc(.45*var(--u));border-radius:calc(.25*var(--u));background:var(--heim);color:#17120a;font-size:calc(.68*var(--u));font-weight:700;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.oly-vst .mg{padding:calc(.05*var(--u)) calc(.45*var(--u));border-radius:calc(1*var(--u));border:1px solid var(--linie-2);font-size:calc(.74*var(--u));color:var(--creme);white-space:nowrap}
+.oly-vst .mg.ki{color:var(--stumm);border-color:var(--linie)}
+.oly-vst .tk dl{display:flex;gap:calc(1.1*var(--u));margin:0;min-width:0}
+.oly-vst .tk dl div{min-width:0} .tk dt{font-size:calc(.66*var(--u));letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.oly-vst .tk dd{margin:0;font-size:calc(1.3*var(--u));font-weight:700;line-height:1.1;white-space:nowrap} .tk dd small{font-size:calc(.74*var(--u));font-weight:500;color:var(--leise);margin-left:calc(.25*var(--u))}
+.oly-vst .tk .zus{grid-column:1/-1;display:flex;gap:calc(.4*var(--u));flex-wrap:wrap;align-items:center;margin-top:calc(.15*var(--u))}
+.oly-vst .tafel.duell .tk.r{grid-template-columns:minmax(0,1fr) auto;text-align:right}
+.oly-vst .tafel.duell .tk.r>img{grid-column:2;grid-row:1/span 2} .tafel.duell .tk.r .nm,.tafel.duell .tk.r dl,.tafel.duell .tk.r .zus{justify-content:flex-end;grid-column:1}
+.oly-vst .tafel.duell .tk.r .nm{grid-row:1} .tafel.duell .tk.r dl{grid-row:2} .tafel.duell .tk.r .zus{grid-column:1/-1}
+.oly-vst .tafel.pod .tk>img{width:calc(2.9*var(--u));height:calc(2.9*var(--u))} .tafel.pod .tk h2{font-size:calc(1.25*var(--u))} .tafel.pod .tk dl{gap:calc(.8*var(--u))} .tafel.pod .tk dd{font-size:calc(1.12*var(--u))}
+.oly-vst .balken{display:inline-flex;gap:calc(.15*var(--u));vertical-align:.1em} .balken i{width:calc(.85*var(--u));height:calc(.42*var(--u));border-radius:calc(.1*var(--u));background:var(--tf)} .balken i.o{opacity:.22}
+.oly-vst .chip{display:inline-flex;align-items:center;gap:calc(.3*var(--u));height:calc(1.5*var(--u));padding:0 calc(.5*var(--u));border-radius:calc(.3*var(--u));border:1px solid var(--linie);background:rgba(8,11,17,.6);font-size:calc(.8*var(--u));color:var(--creme);white-space:nowrap}
+.oly-vst .chip.karte{border-color:var(--kf);color:var(--kf);font-weight:700}
+.oly-vst .chip.zu{color:var(--stumm)} .chip.aus{border-color:rgba(255,96,88,.5);color:var(--warn)}
+.oly-vst .mitte-kopf{display:grid;place-items:center;align-content:center;gap:calc(.2*var(--u));text-align:center}
+.oly-vst .mitte-kopf b{font:400 calc(2*var(--u))/1 var(--haus);color:var(--gold)}
+.oly-vst .slot-kopf{display:flex;flex-direction:column;justify-content:flex-end;padding:calc(.4*var(--u)) calc(.6*var(--u))}
+.oly-vst .slot-kopf b{font:400 calc(1.2*var(--u))/1.1 var(--haus);color:var(--creme)}
+
+/* Slot-Spalte */
+.oly-vst .slot{position:relative;display:grid;align-content:center;justify-items:center;gap:calc(.25*var(--u));padding:calc(.3*var(--u)) calc(.5*var(--u));text-align:center;min-width:0;
+  background:rgba(8,11,17,.82);border:1px solid var(--linie-2);border-radius:calc(.45*var(--u))}
+.oly-vst .tafel.pod .slot{justify-items:start;text-align:left;padding:calc(.4*var(--u)) calc(.7*var(--u))}
+.oly-vst .slot .nr{font-size:calc(.7*var(--u));letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.oly-vst .slot b{font:400 calc(1.3*var(--u))/1.02 var(--haus);color:#fff}
+.oly-vst .attr{display:flex;gap:calc(.25*var(--u));flex-wrap:wrap;justify-content:inherit}
+.oly-vst .tafel.duell .attr{justify-content:center}
+.oly-vst .attr i{font-style:normal;font-size:calc(.7*var(--u));letter-spacing:.06em;text-transform:uppercase;padding:calc(.05*var(--u)) calc(.35*var(--u));border-radius:calc(.2*var(--u));background:rgba(244,230,196,.1);color:var(--creme)}
+.oly-vst .vgl{display:flex;align-items:center;gap:calc(.3*var(--u));font-size:calc(.8*var(--u));font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--stumm)}
+.oly-vst .vgl.vorn{color:var(--heim)} .vgl.hinten{color:var(--gast)}
+.oly-vst .feld{width:calc(6.4*var(--u));height:calc(2.5*var(--u));flex:none}
+.oly-vst .unten{display:flex;align-items:center;justify-content:center;gap:calc(.6*var(--u))}
+
+/* Spielerzelle */
+.oly-vst .spz{--kl:var(--stumm);--tf:var(--gast);position:relative;display:grid;align-items:center;gap:calc(.6*var(--u));min-width:0;min-height:0;padding:calc(.3*var(--u)) calc(.7*var(--u));
+  background:linear-gradient(90deg,color-mix(in srgb,var(--tf) 9%,rgba(8,11,17,.82)),rgba(8,11,17,.82));border:1px solid var(--linie);border-radius:calc(.45*var(--u));overflow:hidden}
+.oly-vst .spz.eigen{border-color:color-mix(in srgb,var(--heim) 60%,transparent)}
+.oly-vst .spz::before{content:"";position:absolute;top:0;bottom:0;left:0;width:calc(.28*var(--u));background:var(--kl)}
+.oly-vst .tafel.duell .spz.l{grid-template-columns:minmax(0,1fr) auto auto;text-align:right}
+.oly-vst .tafel.duell .spz.l::before{left:0}
+.oly-vst .tafel.duell .spz.r{grid-template-columns:auto auto minmax(0,1fr);background:linear-gradient(270deg,color-mix(in srgb,var(--tf) 9%,rgba(8,11,17,.82)),rgba(8,11,17,.82))}
+.oly-vst .tafel.duell .spz.r::before{left:auto;right:0}
+.oly-vst .tafel.duell .spz.r .info{order:3} .tafel.duell .spz.r .fg{order:2} .tafel.duell .spz.r .wert{order:1}
+.oly-vst .tafel.pod .spz{grid-template-columns:auto minmax(0,1fr) auto;padding-left:calc(.8*var(--u))}
+.oly-vst .spz.leer{display:grid;place-items:center;grid-template-columns:1fr!important;border-style:dashed;color:var(--stumm);font-size:calc(.95*var(--u));background:rgba(8,11,17,.5)}
+.oly-vst .spz.leer::before{display:none}
+.oly-vst .info{min-width:0;display:grid;gap:calc(.22*var(--u))}
+.oly-vst .info .n{font:400 calc(1.55*var(--u))/1.1 var(--haus);color:#fff;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere;padding:0 .2em}
+.oly-vst .tafel.pod .info .n,.oly-vst .tafel.duell .spz.r .info .n{padding-left:0}.tafel.duell .spz.l .info .n{padding-right:.2em}
+.oly-vst .tafel.pod .info .n{font-size:calc(1.2*var(--u))}
+.oly-vst .kl{display:flex;align-items:center;gap:calc(.35*var(--u));font-size:calc(.92*var(--u));font-weight:600;color:var(--kl);white-space:nowrap}
+.oly-vst .kl img{width:calc(1.15*var(--u));height:calc(1.15*var(--u));object-fit:contain}
+.oly-vst .kl small{font-size:calc(.8*var(--u));font-weight:500;color:var(--stumm)}
+.oly-vst .tafel.duell .spz.l .kl,.oly-vst .tafel.duell .spz.l .chips{justify-content:flex-end}
+.oly-vst .chips{display:flex;gap:calc(.3*var(--u));flex-wrap:wrap;align-items:center}
+.oly-vst .cap{display:inline-grid;place-items:center;width:calc(1.45*var(--u));height:calc(1.45*var(--u));border-radius:50%;background:var(--gold);color:#17120a;font-weight:700;font-size:calc(.82*var(--u))}
+.oly-vst .form{display:inline-flex;align-items:center;gap:calc(.2*var(--u));font-size:calc(.82*var(--u));font-weight:600}
+.oly-vst .moral{display:inline-flex;align-items:center;gap:calc(.2*var(--u));font-size:calc(.86*var(--u));font-weight:700} .moral svg{width:calc(1.25*var(--u));height:calc(1.25*var(--u))}
+.oly-vst .fg{position:relative;height:100%;aspect-ratio:1;max-height:calc(10.5*var(--u));min-height:calc(3.2*var(--u));display:grid;place-items:end center}
+.oly-vst .tafel.pod .fg{max-height:calc(5.4*var(--u))}
+.oly-vst .fg::after{content:"";position:absolute;left:12%;right:12%;bottom:4%;height:16%;border-radius:50%;background:color-mix(in srgb,var(--tf) 45%,transparent);filter:blur(calc(.25*var(--u)));z-index:0}
+.oly-vst .fg img.f{position:relative;z-index:1;height:100%;width:100%;object-fit:contain;image-rendering:pixelated}
+.oly-vst .fg img.p{position:relative;z-index:1;width:74%;height:74%;margin-bottom:10%;border-radius:50%;object-fit:cover;border:2px dashed var(--tf)}
+.oly-vst .wert{display:grid;justify-items:center;min-width:calc(4.6*var(--u))}
+.oly-vst .wert small{font-size:calc(.64*var(--u));letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.oly-vst .wert b{font-size:calc(2.8*var(--u));font-weight:700;line-height:.95}
+.oly-vst .wert b.sp2{font-size:calc(1.75*var(--u));color:var(--creme)} .wert u{text-decoration:none;font-size:calc(.74*var(--u));color:var(--stumm);white-space:nowrap}
+.oly-vst .tafel.pod .wert{min-width:calc(3.8*var(--u))} .tafel.pod .wert b{font-size:calc(1.95*var(--u))} .tafel.pod .wert b.sp2{font-size:calc(1.4*var(--u))}
+.oly-vst .spz.eigen .wert b{color:var(--heim)}
+
+/* Teamtafel am Rand (Duell): nutzt die Breite, die Zeilen bekommen die ganze Hoehe */
+.oly-vst .tp{--tf:var(--gast);display:flex;flex-direction:column;gap:calc(.7*var(--u));padding:calc(.9*var(--u)) calc(.9*var(--u)) calc(1*var(--u));min-height:0;overflow:hidden;border-radius:calc(.55*var(--u));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--tf) 18%,rgba(8,11,17,.9)),rgba(8,11,17,.88) 45%);border:1px solid color-mix(in srgb,var(--tf) 55%,transparent);border-top:calc(.25*var(--u)) solid var(--tf)}
+.oly-vst .tp.eigen{border-color:var(--heim);box-shadow:0 0 0 1px var(--heim) inset}
+.oly-vst .tp .wp{display:flex;align-items:center;gap:calc(.7*var(--u))} .tp .wp img{width:calc(4.6*var(--u));height:calc(4.6*var(--u));border-radius:calc(.5*var(--u));object-fit:cover;flex:none}
+.oly-vst .tp h2{margin:calc(.15*var(--u)) 0 calc(.2*var(--u));font:400 calc(1.6*var(--u))/1.05 var(--haus);color:#fff}
+.oly-vst .tp dl{display:grid;grid-template-columns:1fr 1fr;gap:calc(.6*var(--u)) calc(.8*var(--u));margin:0;padding:calc(.7*var(--u)) 0;border-top:1px solid var(--linie);border-bottom:1px solid var(--linie)}
+.oly-vst .tp dt{font-size:calc(.68*var(--u));letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.oly-vst .tp dd{margin:0;font-size:calc(1.7*var(--u));font-weight:700;line-height:1.05} .tp dd small{display:block;font-size:calc(.78*var(--u));font-weight:500;color:var(--leise);line-height:1.2}
+.oly-vst .tp dd .balken i{width:calc(1.1*var(--u));height:calc(.5*var(--u))}
+.oly-vst .fk{display:grid;grid-template-columns:auto minmax(0,1fr);gap:calc(.7*var(--u));align-items:center}
+.oly-vst .fk .k{--kf:var(--stumm);width:calc(3.6*var(--u));height:calc(4.9*var(--u));border-radius:calc(.4*var(--u));display:grid;place-items:center;align-content:center;border:2px solid var(--kf);background:linear-gradient(160deg,color-mix(in srgb,var(--kf) 38%,#0c1017),#0c1017);color:#fff;font-size:calc(1.7*var(--u));font-weight:700;line-height:1}
+.oly-vst .fk .k small{font-size:calc(.62*var(--u));letter-spacing:.12em;color:var(--kf);font-weight:700}
+.oly-vst .fk .k.zu{background:repeating-linear-gradient(135deg,#161d29 0 calc(.35*var(--u)),#0f141d calc(.35*var(--u)) calc(.7*var(--u)));color:var(--stumm);font-size:calc(1.3*var(--u))}
+.oly-vst .fk p{margin:0;font-size:calc(.9*var(--u));line-height:1.25;color:var(--leise)} .fk p b{display:block;color:var(--creme);font-weight:600;font-size:calc(1*var(--u))}
+.oly-vst .tp .lst{display:grid;gap:calc(.3*var(--u))} .tp .lst .chip{height:auto;min-height:calc(1.6*var(--u));white-space:normal;padding:calc(.2*var(--u)) calc(.5*var(--u));line-height:1.2}
+.oly-vst .tp .fussn{margin-top:auto;font-size:calc(.82*var(--u));color:var(--stumm);line-height:1.3}
+
+.oly-vst .tp h3{margin:calc(.2*var(--u)) 0 0;font-size:calc(.68*var(--u));letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.oly-vst .bank{display:grid;gap:calc(.3*var(--u))} .bank div{display:flex;align-items:center;gap:calc(.5*var(--u));font-size:calc(.95*var(--u));color:var(--creme)} .bank img{width:calc(1.9*var(--u));height:calc(1.9*var(--u));border-radius:50%;object-fit:cover}
+.oly-vst .bank small{margin-left:auto;white-space:nowrap;font-size:calc(.78*var(--u));color:var(--stumm)} .bank .v{color:var(--warn)} .bank .v img{filter:grayscale(1);opacity:.6}
+.oly-vst .sct{display:flex;height:calc(.6*var(--u));border-radius:calc(.3*var(--u));overflow:hidden;gap:2px} .sct i{display:block;background:var(--tf)} .sct i.b{opacity:.55} .sct i.u{opacity:.2}
+.oly-vst .sctl{display:flex;justify-content:space-between;font-size:calc(.8*var(--u));color:var(--leise)}
+
+/* FUSS */
+.oly-vst .fuss{display:flex;align-items:center;gap:calc(1*var(--u));padding:0 calc(1.2*var(--u));background:rgba(6,8,12,.92);border-top:1px solid var(--linie)}
+.oly-vst .fuss .hin{font-size:calc(1*var(--u));color:var(--leise);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oly-vst .fuss .hin b{color:var(--creme);font-weight:600}
+.oly-vst .leg{display:flex;gap:calc(.8*var(--u));font-size:calc(.82*var(--u));color:var(--leise);white-space:nowrap}
+.oly-vst .leg span{display:inline-flex;align-items:center;gap:calc(.3*var(--u))} .leg i{width:calc(.6*var(--u));height:calc(.6*var(--u));border-radius:calc(.12*var(--u))}
+.oly-vst .btn{display:inline-flex;align-items:center;justify-content:center;gap:calc(.45*var(--u));font-weight:700;white-space:nowrap}
+.oly-vst .btn.haupt{height:calc(3.1*var(--u));padding:0 calc(1.8*var(--u));font-size:calc(1.12*var(--u));letter-spacing:.06em;text-transform:uppercase;background:var(--gold);color:#17120a;clip-path:polygon(calc(.6*var(--u)) 0,100% 0,calc(100% - calc(.6*var(--u))) 100%,0 100%)}
+.oly-vst .btn.neben{height:calc(3.1*var(--u));padding:0 calc(1.3*var(--u));font-size:calc(1*var(--u));letter-spacing:.05em;text-transform:uppercase;border:1px solid var(--linie-2);background:var(--glas);color:var(--creme);clip-path:polygon(calc(.6*var(--u)) 0,100% 0,calc(100% - calc(.6*var(--u))) 100%,0 100%)}
+.oly-vst .btn:hover{filter:brightness(1.1)}
+/* Feldplan je Slot (nur Feldspiele; Platz aus der Formations-Registry, Quelle der Zahlen ist der Arena-Motor) */
+.oly-vst .feld{position:relative;width:calc(6.4*var(--u));height:calc(2.9*var(--u));flex:none;border-radius:calc(.35*var(--u));overflow:hidden;background:#241a12}
+.oly-vst .feld svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.oly-vst .feld .pt{position:absolute;width:calc(1.15*var(--u));height:calc(1.15*var(--u));margin:calc(-.575*var(--u)) 0 0 calc(-.575*var(--u));border-radius:50%;background:var(--heim);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.oly-vst .feld .pt.hohl{background:transparent;border:2px dashed var(--heim);box-shadow:none}
+.oly-vst .feld .pt.g{background:var(--gast);border-color:var(--gast)}
+.oly-vst .feld .pt.g.hohl{background:transparent}
+.oly-vst .spz.leer small{display:block;margin-top:calc(.2*var(--u));font-size:calc(.72*var(--u));color:var(--stumm)}
+.oly-vst .tafel.pod .spz.leer{font-size:calc(.85*var(--u));text-align:center;line-height:1.2}
+.oly-vst .kz .tk{align-self:stretch}
+.oly-vst .chip.aus img{width:calc(1.2*var(--u));height:calc(1.2*var(--u));border-radius:50%;object-fit:cover;filter:grayscale(1);opacity:.7}
+.oly-vst .ohne-aufst{font-size:calc(.8*var(--u));color:var(--warn)}
+.oly-vst .fuss .hin{flex:1}
+.oly-vst .fuss .leg{flex:none}
+@media (prefers-reduced-motion:reduce){.oly-vst *{transition:none!important;animation:none!important}}
+.oly-vst .lgf{display:grid;place-items:center;border-radius:calc(.45*var(--u));background:var(--tf);color:#10151c;font-weight:900;font-size:calc(1.2*var(--u));flex:none}
+.oly-vst .tk>.lgf{width:calc(3.6*var(--u));height:calc(3.6*var(--u));grid-row:span 2}
+.oly-vst .tafel.pod .tk>.lgf{width:calc(2.9*var(--u));height:calc(2.9*var(--u))}
+.oly-vst .tp .wp .lgf{width:calc(4.6*var(--u));height:calc(4.6*var(--u))}
+.oly-vst .tafel.duell .tk.r>.lgf{grid-column:2;grid-row:1/span 2}
+.oly-vst .st-tag{font-size:calc(.74*var(--u));color:var(--leise);margin-left:calc(.25*var(--u));font-weight:500}
+.oly-vst .fg.ini::before{content:attr(data-ini);position:absolute;left:13%;bottom:10%;width:74%;height:74%;border-radius:50%;display:grid;place-items:center;z-index:0;
+  font:400 calc(1.5*var(--u))/1 var(--haus);color:var(--creme);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--tf) 35%,#10151c),#10151c);border:2px dashed var(--tf)}
