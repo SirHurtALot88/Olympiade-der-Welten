@@ -7,43 +7,120 @@ import {
   PP_TAGESANKER_KNIE,
   PP_TAGESANKER_MAX,
   PP_TAGESANKER_ZIEL,
-  ppTagesankerAktiv,
-  ppTagesankerSchalter,
+  ppTagesankerFuer,
   ppTagesankerWert,
   verteilePpNachTagesanker,
   weicheKappe,
-  wendePpTagesankerAn,
 } from "@/lib/resolve/pp-tagesanker";
+import type { GameState } from "@/lib/data/olyDataTypes";
+import { compactFoundationInitialGameState, rehydrateGameStateAfterCompactPut } from "@/lib/persistence/foundation-initial-compact-state";
+import {
+  stelleLaufendeSaisonAufC2Um,
+  stempleWertungsSkalen,
+  stempleWertungsSkalenBeimAnlegen,
+  wertungsSkalenFuerNeueSaison,
+} from "@/lib/resolve/wertungs-skalen";
 
-// PP-TAGESANKER (Prototyp 21.11., docs/design/pp-analyse-21-11.md): Standard AUS. Geprueft wird, dass
-// der Schalter ohne Wert nichts aendert, dass die Verteilung die Reihenfolge haelt, unter 5 bleibt und
-// keinen Klumpen bildet, und dass der Tagesbeste unabhaengig von der Staerke des Feldes um 5 landet.
+// PP-TAGESANKER (scharf 22.11., docs/design/pp-tagesanker-live-22-11.md): die Schaltung liegt im Saison-Stempel
+// `seasonState.wertungsSkalen.ppTagesanker`. Geprueft wird: neues Spiel an, laufender Save aus bis zum
+// Saisonwechsel, Rueckweg, Notbremse; dazu die Verteilung selbst (Reihenfolge, unter 5, kein Klumpen,
+// Tagesbester unabhaengig von der Feldstaerke) und die Rechenstelle der Arena-Boxscore-PP.
 
-function stelleSchalter(wert: string) {
-  vi.stubEnv("OLY_PP_TAGESANKER", wert);
-  vi.stubEnv("NEXT_PUBLIC_OLY_PP_TAGESANKER", "");
+const battle = (seasonId: string, stempel?: Record<string, unknown>) =>
+  ({
+    scenarioMeta: { gameMode: "battle" },
+    season: { id: seasonId, matchdayIds: ["md-1", "md-2", "md-3", "md-4"] },
+    seasonState: { seasonId, matchdayResults: [], ...(stempel ? { wertungsSkalen: stempel } : {}) },
+  }) as unknown as GameState;
+
+function leereSchalter() {
+  for (const k of ["OLY_PP_TAGESANKER", "NEXT_PUBLIC_OLY_PP_TAGESANKER", "OLY_PP_SKALA", "NEXT_PUBLIC_OLY_PP_SKALA", "OLY_ERGEBNIS_SKALA", "NEXT_PUBLIC_OLY_ERGEBNIS_SKALA"]) vi.stubEnv(k, "");
 }
 
-describe("PP-Tagesanker: Schalter", () => {
+describe("PP-Tagesanker: Stempel und Schalter", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it("ist ohne Wert aus und wirkt nur zusammen mit der PP-Skala C2", () => {
-    stelleSchalter("");
-    expect(ppTagesankerSchalter()).toBe("aus");
-    expect(ppTagesankerAktiv("an")).toBe(false);
-    stelleSchalter("an");
-    expect(ppTagesankerAktiv("an")).toBe(true);
-    expect(ppTagesankerAktiv("aus")).toBe(false);
-    expect(ppTagesankerAktiv("roh")).toBe(false);
-    expect(ppTagesankerAktiv(null)).toBe(false);
-    stelleSchalter("vielleicht");
-    expect(ppTagesankerAktiv("an")).toBe(false);
+  it("neues Spiel: ab Saison 1 an (Stempel beim Anlegen), nur zusammen mit C2", () => {
+    leereSchalter();
+    const neu = stempleWertungsSkalenBeimAnlegen(battle("season-1"));
+    expect(neu.seasonState.wertungsSkalen?.ppTagesanker).toBe(true);
+    expect(ppTagesankerFuer(neu, "md-1")).toBe(true);
+    // Manager-Modus bekommt keinen Stempel und damit nie den Tagesanker.
+    const manager = { ...battle("season-1"), scenarioMeta: { gameMode: "manager" } } as unknown as GameState;
+    expect(ppTagesankerFuer(stempleWertungsSkalenBeimAnlegen(manager), "md-1")).toBe(false);
+    // Stempel mit alter PP-Skala: nie Tagesanker, selbst wenn das Feld gesetzt waere.
+    expect(ppTagesankerFuer(battle("season-1", { seasonId: "season-1", pp: "alt", ergebnis: "alt", ppTagesanker: true }))).toBe(false);
+    expect(ppTagesankerFuer(null)).toBe(false);
   });
 
-  it("ohne Schalter gibt wendePpTagesankerAn() dieselbe Map zurueck", () => {
-    stelleSchalter("");
-    const pps = new Map([["a", 5], ["b", 5], ["c", 2.1]]);
-    expect(wendePpTagesankerAn("an", pps)).toBe(pps);
+  it("bestehender Save: laufende Saison bleibt aus (kein Stempel, Stempel ohne Feld, Umstellung mitten in der Saison)", () => {
+    leereSchalter();
+    expect(ppTagesankerFuer(battle("season-4"))).toBe(false);
+    expect(ppTagesankerFuer(battle("season-4", { seasonId: "season-4", pp: "c2", ergebnis: "e1" }))).toBe(false);
+    const mitten = stelleLaufendeSaisonAufC2Um(battle("season-4"));
+    expect(mitten.seasonState.wertungsSkalen?.pp).toBe("c2");
+    expect(ppTagesankerFuer(mitten, "md-2")).toBe(false);
+  });
+
+  it("Saisonwechsel: die naechste Saison bekommt den Tagesanker, die alte Saison behaelt ihren Stempel", () => {
+    leereSchalter();
+    const laufend = battle("season-4", { seasonId: "season-4", pp: "c2", ergebnis: "e1" });
+    const naechste = stempleWertungsSkalen({ ...laufend.seasonState, seasonId: "season-5" });
+    expect(naechste.wertungsSkalen).toEqual({ seasonId: "season-5", pp: "c2", ergebnis: "e1", ppTagesanker: true });
+    expect(ppTagesankerFuer({ ...laufend, seasonState: naechste } as GameState)).toBe(true);
+    expect(ppTagesankerFuer(laufend)).toBe(false);
+    // Ein Stempel einer anderen Saison zaehlt nicht.
+    expect(ppTagesankerFuer({ ...laufend, seasonState: { ...naechste, seasonId: "season-6" } } as GameState)).toBe(false);
+  });
+
+  it("Rueckweg OLY_PP_TAGESANKER=aus: neue Saisons ohne, gestempelte Saison rechnet wie gestempelt weiter", () => {
+    leereSchalter();
+    const gestempelt = battle("season-1", wertungsSkalenFuerNeueSaison("season-1"));
+    vi.stubEnv("OLY_PP_TAGESANKER", "aus");
+    expect(wertungsSkalenFuerNeueSaison("season-2")).toEqual({ seasonId: "season-2", pp: "c2", ergebnis: "e1", ppTagesanker: false });
+    expect(ppTagesankerFuer(gestempelt)).toBe(true);
+    expect(ppTagesankerFuer(battle("season-2", wertungsSkalenFuerNeueSaison("season-2")))).toBe(false);
+  });
+
+  it("Notbremse aus-sofort ignoriert den Stempel, auch fuer den Browser-Schalter", () => {
+    leereSchalter();
+    const gestempelt = battle("season-1", wertungsSkalenFuerNeueSaison("season-1"));
+    vi.stubEnv("OLY_PP_TAGESANKER", "aus-sofort");
+    expect(ppTagesankerFuer(gestempelt)).toBe(false);
+    vi.stubEnv("OLY_PP_TAGESANKER", "");
+    vi.stubEnv("NEXT_PUBLIC_OLY_PP_TAGESANKER", "aus-sofort");
+    expect(ppTagesankerFuer(gestempelt)).toBe(false);
+  });
+
+  it("C2 ist Voraussetzung: PP-Notbremse und Messmodus roh schalten den Tagesanker mit ab", () => {
+    leereSchalter();
+    const gestempelt = battle("season-1", wertungsSkalenFuerNeueSaison("season-1"));
+    vi.stubEnv("OLY_PP_SKALA", "aus-sofort");
+    expect(ppTagesankerFuer(gestempelt)).toBe(false);
+    vi.stubEnv("OLY_PP_SKALA", "roh");
+    expect(ppTagesankerFuer(gestempelt)).toBe(false);
+  });
+
+  it("kompakte Anfangsladung und Rueckschreiben behalten das Stempelfeld (Browser = Server)", () => {
+    leereSchalter();
+    const voll = {
+      ...battle("season-1", wertungsSkalenFuerNeueSaison("season-1")),
+      players: [],
+      playerBaselines: [],
+      teams: [],
+    } as unknown as GameState;
+    const kompakt = compactFoundationInitialGameState(voll);
+    expect(kompakt.seasonState.wertungsSkalen?.ppTagesanker).toBe(true);
+    expect(ppTagesankerFuer(kompakt, "md-1")).toBe(true);
+    const zurueck = rehydrateGameStateAfterCompactPut(voll, kompakt);
+    expect(zurueck.seasonState.wertungsSkalen).toEqual(voll.seasonState.wertungsSkalen);
+  });
+
+  it("Eingabe-Hash: nur mit gestempeltem Tagesanker ein eigener Schluessel", () => {
+    // (arena-eingabe-hash.ts ruft ppTagesankerFuer; der Schluessel haengt damit ausschliesslich am Stempel.)
+    leereSchalter();
+    expect(ppTagesankerFuer(battle("season-1", wertungsSkalenFuerNeueSaison("season-1")))).toBe(true);
+    expect(ppTagesankerFuer(battle("season-1", { seasonId: "season-1", pp: "c2", ergebnis: "e1" }))).toBe(false);
   });
 });
 
@@ -106,8 +183,6 @@ describe("PP-Tagesanker: Verteilung ueber alle Spieler eines Spieltags", () => {
 });
 
 describe("PP-Tagesanker: an der Rechenstelle der Arena-Boxscore-PP", () => {
-  afterEach(() => vi.unstubAllEnvs());
-
   // Eiskunst, Feldgroesse 6: zwei Paarungen, mehrere Spieler weit ueber dem festen Anker.
   const disziplin = "eiskunstlauf";
   const { referenz } = resolveArenaPpsReferenz(disziplin, 6, "feld");
@@ -120,8 +195,7 @@ describe("PP-Tagesanker: an der Rechenstelle der Arena-Boxscore-PP", () => {
   }));
 
   it("aus: bit-identisch zur C2-Kurve mit Deckel 5 (mehrere Spieler gleichauf bei 5)", () => {
-    stelleSchalter("");
-    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtures, 6, disziplin, "an");
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtures, 6, disziplin, "an", "neu", false);
     for (const f of fixtures) {
       for (const e of f.boxscore) {
         expect(pps.get(e.playerId!)).toBe(
@@ -133,14 +207,13 @@ describe("PP-Tagesanker: an der Rechenstelle der Arena-Boxscore-PP", () => {
   });
 
   it("an: Tagesanker ueber BEIDE Paarungen, kein Spieler gleichauf am Deckel, Reihenfolge = Impact", () => {
-    stelleSchalter("an");
-    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtures, 6, disziplin, "an");
+    const pps = computeIndividualBoxscorePpsFromFixtureResults(fixtures, 6, disziplin, "an", "neu", true);
     const nachImpact = fixtures.flatMap((f) => f.boxscore).sort((a, b) => a.wert - b.wert).map((e) => pps.get(e.playerId!)!);
     for (let i = 1; i < nachImpact.length; i += 1) expect(nachImpact[i]).toBeGreaterThan(nachImpact[i - 1]);
     expect(Math.max(...nachImpact)).toBeLessThan(PP_SKALA_MAX);
     expect(Math.max(...nachImpact)).toBeGreaterThan(4.7);
     // Im Messmodus "roh" und in einer alten Saison ("aus") wirkt der Schalter nicht.
-    const roh = computeIndividualBoxscorePpsFromFixtureResults(fixtures, 6, disziplin, "roh");
+    const roh = computeIndividualBoxscorePpsFromFixtureResults(fixtures, 6, disziplin, "roh", "neu", true);
     expect(Math.max(...roh.values())).toBeGreaterThan(PP_SKALA_MAX);
   });
 

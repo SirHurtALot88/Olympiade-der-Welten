@@ -3669,7 +3669,7 @@ export type SeasonSnapshotRecord = {
    * Ergebnisskala diese Saison gerechnet wurde. Fehlt = vor dem 18.11. archiviert (alte Skalen).
    * Saisonuebergreifende Summen (ewige Tabelle, Laufbahn) koennen daran ablesen, ab wann die neue Skala gilt.
    */
-  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string } | null;
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string; ppTagesanker?: boolean } | null;
   /** Top-6 discipline strength ranks per team at season end (for Ranks archive). */
   teamDisciplineRankSnapshots?: TeamDisciplineRankSnapshotRecord[];
   /** Woher `teamDisciplineRankSnapshots` stammt — fehlt bei Altständen (dann: Live-Kader beim Abschluss). */
@@ -4201,7 +4201,7 @@ export type SeasonState = {
    * Saison rechnet. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der
    * Stempel (bestehender Spielstand) oder gehoert er zu einer anderen Saison, gilt "alt".
    */
-  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string };
+  wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string; ppTagesanker?: boolean };
   /**
    * FINANZEN JE SPIELTAG (22.11., lib/finance/finanzen-je-spieltag.ts): "v1" = Gehalt, Sponsor-Basis, Gebaeude-Einnahme
    * und -Unterhalt werden je Spieltag zu 1/N gebucht (`spieltagFinanzen`), nur Rang-/Sonderziel-Sponsor, Apron, Ziele

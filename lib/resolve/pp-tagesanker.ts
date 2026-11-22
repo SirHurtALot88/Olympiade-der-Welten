@@ -1,5 +1,5 @@
 /**
- * PP-TAGESANKER (Prototyp 21.11., docs/design/pp-analyse-21-11.md) -- STANDARD AUS.
+ * PP-TAGESANKER (Prototyp 21.11., scharf 22.11.; docs/design/pp-analyse-21-11.md).
  *
  * Chris 21.11. zu "Top-Spieler · Player-Points des Spieltags": Eiskunst Platz 1-9 alle glatt 5 PP
  * (Scores 140,9 ... 66,9), Hockey und Spurt erreicht niemand 5. Grundsatz: "PP werden je Spieltag ueber
@@ -25,12 +25,15 @@
  * Ein Faktor je Spieltag ist ein reiner Massstab -- Rangtreue (rho) und Pp-Abweichung sind Eigenschaften
  * des Motors und bleiben unberuehrt; der Wertungs-Fingerabdruck laeuft nur ueber den Motor.
  *
- * SCHALTER: `OLY_PP_TAGESANKER=an` (Server) bzw. `NEXT_PUBLIC_OLY_PP_TAGESANKER=an` (Browser-Build).
- * Wirkt nur, wo die PP-Skala C2 aktiv ist (`ppSkalaModus === "an"`), also nie im Manager-Modus, nie in
- * einer alten Saison und nie im Messmodus "roh". Ohne Schalter ist jeder Pfad bit-identisch zu vorher.
- * Fuer eine Scharfschaltung waere -- wie bei C2 -- ein Saison-Stempel statt des Serverschalters der
- * richtige Weg (gezeigt == gebucht, keine rueckwirkende Umrechnung), s. Dokument Abschnitt 5.
+ * SCHARF seit 22.11. (docs/design/pp-tagesanker-live-22-11.md): die Schaltung liegt im Spielstand-Stempel
+ * `seasonState.wertungsSkalen.ppTagesanker` (lib/resolve/wertungs-skalen.ts), nicht im Serverstart. Neues Spiel:
+ * an ab Saison 1; bestehender Spielstand: ab dem naechsten Saisonwechsel (die laufende Saison rechnet zu Ende,
+ * gebuchte Spieltage bleiben). Rueckweg `OLY_PP_TAGESANKER=aus` (neue Saisons), Notbremse `=aus-sofort`.
+ * Jeder Rechenweg fragt `ppTagesankerFuer(gameState, matchdayId)`.
  */
+
+import { ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { gueltigerStempel, ppTagesankerSchalter } from "@/lib/resolve/wertungs-skalen";
 
 /** Ziel fuer das Mittel der besten drei des Spieltags, VOR der weichen Kappe. */
 export const PP_TAGESANKER_ZIEL = 5.5;
@@ -41,22 +44,17 @@ export const PP_TAGESANKER_KNIE = 4;
 /** Asymptote der weichen Kappe -- wird nie erreicht. */
 export const PP_TAGESANKER_MAX = 5;
 
-export type PpTagesankerModus = "aus" | "an";
-
-function leseSchalter(wert: string | undefined): PpTagesankerModus | null {
-  const w = (wert ?? "").trim().toLowerCase();
-  if (w === "") return null;
-  return w === "an" || w === "1" || w === "true" || w === "ja" || w === "on" ? "an" : "aus";
-}
-
-/** Browser-Variante zuerst (Next.js ersetzt nur den woertlichen Zugriff), dann Server. Standard: aus. */
-export function ppTagesankerSchalter(): PpTagesankerModus {
-  return leseSchalter(process.env.NEXT_PUBLIC_OLY_PP_TAGESANKER) ?? leseSchalter(process.env.OLY_PP_TAGESANKER) ?? "aus";
-}
-
-/** Aktiv nur mit Schalter UND aktiver PP-Skala C2 ("an"); "aus"/"roh" bleiben immer unberuehrt. */
-export function ppTagesankerAktiv(ppSkala: string | null | undefined): boolean {
-  return ppSkala === "an" && ppTagesankerSchalter() === "an";
+/**
+ * Rechnet DIESER Spieltag mit dem Tagesanker? Ja nur, wenn (1) die PP-Skala C2 fuer ihn gilt
+ * (`ppSkalaModus === "an"`: nie Manager-Modus, nie ein Spieltag vor einer Umstellung mitten in der Saison,
+ * nie Messmodus "roh"), (2) der Saison-Stempel `ppTagesanker: true` traegt und (3) die Notbremse
+ * `OLY_PP_TAGESANKER=aus-sofort` nicht steht. Die Antwort kommt IMMER aus dem Spielstand, nie aus dem
+ * Prozess: Server und Browser lesen denselben Stempel (gezeigt = gebucht).
+ */
+export function ppTagesankerFuer(gameState: Parameters<typeof ppSkalaModus>[0], matchdayId?: string | null): boolean {
+  if (ppTagesankerSchalter() === "aus-sofort") return false;
+  if (ppSkalaModus(gameState, matchdayId) !== "an") return false;
+  return gueltigerStempel(gameState)?.ppTagesanker === true;
 }
 
 /** Die weiche Kappe (s. Kopfkommentar). Unter dem Knie unveraendert, darueber gegen `max` gestaucht. */
@@ -100,12 +98,4 @@ export function verteilePpNachTagesanker(
     ergebnis.set(spielerId, runde2(weicheKappe(Math.max(0, wert) * faktor, knie, max)));
   }
   return ergebnis;
-}
-
-/**
- * Bequeme Weiche fuer die vier PP-Rechenstellen (Arena-Boxscore, Bahn-Pod, Battlefield-Pod, Mini-DM-FFA):
- * aktiv -> Tagesanker auf die ungedeckelte Map, sonst die Map unveraendert zurueck.
- */
-export function wendePpTagesankerAn(ppSkala: string | null | undefined, pps: Map<string, number>): Map<string, number> {
-  return ppTagesankerAktiv(ppSkala) ? verteilePpNachTagesanker(pps) : pps;
 }

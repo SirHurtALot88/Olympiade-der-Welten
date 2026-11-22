@@ -12,7 +12,7 @@ import { buildArenaMatchSeed, buildBahnPodMatchSeed, buildBattlefieldPodMatchSee
 import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-dm-pod-schedule";
 import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { ppSkalaModus } from "@/lib/resolve/pp-skala";
-import { ppTagesankerAktiv } from "@/lib/resolve/pp-tagesanker";
+import { ppTagesankerFuer } from "@/lib/resolve/pp-tagesanker";
 import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
 import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
@@ -27,9 +27,9 @@ import { breakingFormatFuer } from "@/lib/resolve/breaking-format";
 function ppSkalaTeil(gameState: GameState, matchdayId: string): { ppSkala?: "c2"; ppTagesanker?: "t1" } {
   const modus = ppSkalaModus(gameState, matchdayId);
   if (modus !== "an") return {};
-  // PP-TAGESANKER (Prototyp 21.11., Standard AUS, lib/resolve/pp-tagesanker.ts): nur bei aktivem Schalter
-  // ein eigener Schluessel -- ohne Schalter bleibt der Hash Zeichen fuer Zeichen der bisherige.
-  return ppTagesankerAktiv(modus) ? { ppSkala: "c2", ppTagesanker: "t1" } : { ppSkala: "c2" };
+  // PP-TAGESANKER (scharf 22.11., lib/resolve/pp-tagesanker.ts): nur bei gestempeltem Tagesanker
+  // ein eigener Schluessel -- ohne Stempel bleibt der Hash Zeichen fuer Zeichen der bisherige.
+  return ppTagesankerFuer(gameState, matchdayId) ? { ppSkala: "c2", ppTagesanker: "t1" } : { ppSkala: "c2" };
 }
 
 /**

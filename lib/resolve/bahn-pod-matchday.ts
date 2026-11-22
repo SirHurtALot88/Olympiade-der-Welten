@@ -14,7 +14,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
-import { ppTagesankerAktiv, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
+import { ppTagesankerFuer, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 import {
   runBahnPodFixtures,
   type BahnPodFixtureInput,
@@ -131,8 +131,8 @@ export async function runBahnPodMatchday(input: RunBahnPodMatchdayInput): Promis
 
   const referenz = resolveBahnPodSpielerPpReferenz(input.disciplineId, k);
   const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
-  // PP-TAGESANKER (Prototyp 21.11., Standard AUS): ueber alle Pods des Spieltags, s. pp-tagesanker.ts.
-  const tagesanker = ppTagesankerAktiv(ppSkala);
+  // PP-TAGESANKER (scharf 22.11., Saison-Stempel): ueber alle Pods des Spieltags, s. pp-tagesanker.ts.
+  const tagesanker = ppTagesankerFuer(input.gameState, input.matchdayId);
   const rohdatenByPodId = new Map<string, BahnPodRohdaten>();
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];

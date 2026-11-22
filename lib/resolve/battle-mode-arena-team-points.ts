@@ -195,7 +195,7 @@ import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
 import { breakingFormatFuer } from "@/lib/resolve/breaking-format";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
-import { ppTagesankerAktiv, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
+import { ppTagesankerFuer, verteilePpNachTagesanker } from "@/lib/resolve/pp-tagesanker";
 
 /**
  * ARENA_RESOLVED_DISCIPLINE_IDS lebt seit A3 (docs/pm-briefings/projektmanager-plan-kampfmodell-
@@ -1308,6 +1308,8 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   ppSkala: PpSkalaModus = "aus",
   /** Regel dieses Spieltags (Hockey-Torwart bzw. Basketball-Puste); "alt" -> alte Torwart-Referenz bzw. alte Anker (gezeigt = gebucht). */
   regel: "alt" | "neu" = "neu",
+  /** PP-Tagesanker dieses Spieltags (`ppTagesankerFuer(gameState, matchdayId)`, Saison-Stempel): ungedeckelt rechnen, dann ueber alle Spieler verteilen. */
+  tagesanker: boolean = false,
 ): Map<string, number> {
   const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld", regel);
   // TORWART-EIGENE REFERENZ (Hockey-Produktivierung): nur aufgeloest, wenn irgendein Eintrag sie
@@ -1317,9 +1319,8 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   let torwartReferenz: ArenaPpsReferenzFeldgroesse | null = null;
   const konfig = loeseArenaImpactKonfigAuf(disciplineId);
   const ppsByPlayerId = new Map<string, number>();
-  // PP-TAGESANKER (Prototyp 21.11., Standard AUS, lib/resolve/pp-tagesanker.ts): ungedeckelt rechnen und
-  // danach ueber ALLE Spieler beider Ligen dieses Spieltags verteilen. Aus = bit-identisch zu vorher.
-  const tagesanker = ppTagesankerAktiv(ppSkala);
+  // PP-TAGESANKER (scharf 22.11., lib/resolve/pp-tagesanker.ts): ungedeckelt rechnen und danach ueber ALLE
+  // Spieler beider Ligen dieses Spieltags verteilen. Ohne Stempel = bit-identisch zu vorher.
   for (const result of fixtureResults) {
     for (const eintrag of result.boxscore) {
       if (eintrag.playerId === null) continue;
@@ -1349,7 +1350,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
                   : disciplineId === "breaking" && regel === "alt"
                     ? "gauntletAlt"
                     : undefined,
-            ...(tagesanker ? { deckel: false } : {}),
+            ...(tagesanker && ppSkala === "an" ? { deckel: false } : {}),
           }),
         );
         continue;
@@ -1366,7 +1367,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
       }
     }
   }
-  return tagesanker ? verteilePpNachTagesanker(ppsByPlayerId) : ppsByPlayerId;
+  return tagesanker && ppSkala === "an" ? verteilePpNachTagesanker(ppsByPlayerId) : ppsByPlayerId;
 }
 
 /**
@@ -1704,6 +1705,7 @@ export async function runBattleModeArenaMatchday(
             ? "alt"
             : "neu"
           : "neu",
+    ppTagesankerFuer(gameState, matchdayId),
   );
 
   // Ein Team ohne Fixture an diesem Spieltag (z. B. unvollstaendige `leagueTeamIds`) bekommt
