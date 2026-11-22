@@ -19,8 +19,9 @@ Aufnahmen: `docs/design/gm-portraets-22-11/galerie-1920.png`, `galerie-2560.png`
 - Es gibt **100 GM-Profile**, nicht 200: `TEAM_GENERAL_MANAGER_PROFILES` in `lib/foundation/team-general-managers.ts`,
   gebaut aus **10 Archetypen × 10 Varianten** (`gmId = gm-<archetyp>-<01..10>`). Die 200 sind die Sponsoren-Dachmarken
   (`lib/sponsor/sponsor-brand-parents.ts`).
-- Die zehn Varianten teilen sich **zehn Vornamen** (Ada Vale, Noah Crest, Mara Voss, Ivo Kade, Nia Solen, Bren Vale,
-  Tessa Rune, Jaro Finch, Kira Morrow, Oren Slate); der Archetyp hängt als Nachname dran („Ada Vale Bargain Hunter“).
+- **Bis 22.11.** teilten sich die zehn Varianten **zehn Namen** (Ada Vale, Noah Crest, Mara Voss, Ivo Kade, Nia Solen,
+  Bren Vale, Tessa Rune, Jaro Finch, Kira Morrow, Oren Slate); der Archetyp hing als Nachname dran („Ada Vale Bargain
+  Hunter“) — dieselbe Person tauchte so zehnmal auf. Das ist behoben, siehe Abschnitt 8.
   Zwei Profile sind für Menschen reserviert (Chris `gm-systems-tinkerer-01`, Franky `gm-risk-gambler-02`).
 - **Rasse und Aussehen gab es bisher nicht.** Ein Profil trägt nur Werte (Achsen, Vorlieben, Doktrin).
 - Im Live-Spielstand (`live-save`, Stand 22.11. 20:40 UTC; aktiver Spielstand von `user_local`:
@@ -38,10 +39,10 @@ Neu: `data/gm-aussehen.json` (erzeugt von `scripts/gm-aussehen-erzeugen.py`, kei
 | Feld | Woher | Regel |
 |---|---|---|
 | Rasse | die 18 echten Rassen aus `data/generated/oly-player-stats.json` | Index `(5·Archetyp + 7·Variante) mod 18`: je Archetyp zehn verschiedene Rassen, je Rasse 5 oder 6 GMs. **Menschen: 6 von 100**, bei den 32 aktiven 3 |
-| Geschlecht | Vorname der Variante | Ada, Mara, Nia, Tessa, Kira weiblich; Noah, Ivo, Bren, Jaro, Oren männlich |
+| Geschlecht | Variantennummer | ungerade weiblich, gerade männlich (Namen in `data/gm-namen.json` passen dazu) |
 | Alters-Anmutung, Ausdruck | Varianten-Profil | Prime gefasst, Wild jung und ungestüm, Patient alt und geduldig, Clinical kühl mit Brille, Popular gewinnend, Hardline alt und hart, Agile jung und wach, Builder zupackend, Showcase eitel, Lean hager |
 | Kleidung, Beiwerk („Vorlieben“) | Archetyp | Bargain Hunter geflickter Tweed mit Monokel · Talent Builder Trainingsjacke mit Pfeife · Star Chaser weißer Anzug, Goldkette, Sonnenbrille · Depth Spammer Weste mit Klemmbrett · Elite Curator Samtjackett, weiße Handschuhe · Facility Architect Helm, Warnweste, Baupläne · Risk Gambler lila Nadelstreifen, Hut, Karten · Culture Keeper Strickjacke, Vereinsschal, Becher · Rivalry Hawk Uniformmantel mit Orden · Systems Tinkerer Laborkittel, Schutzbrille, Tablet |
-| Tierwesen | Archetyp | Fuchs, Wolf, Löwe, Bär, Panther, Dachs, Rabe, Eule, Falke, Waschbär |
+| Animal | Archetyp | Fuchs, Wolf, Löwe, Bär, Panther, Dachs, Rabe, Eule, Falke, Waschbär |
 
 Die Rassenmerkmale stehen im Prompt **vorn und ausführlich** (Hautfarbe, Hörner, Hauer, Schuppen, Fell, Metallkopf),
 die Kleidung danach. Ähnliche GMs gibt es absichtlich: zehn Archetypen teilen sich je ein Kostüm, 18 Rassen je eine
@@ -55,7 +56,7 @@ im Skript geprüft. Stil-Baustein wie `public/portraits/vorstand` (192×224, Bü
 
 | Posten | Bilder | Größe | Generationen | Konto vorher → nachher |
 |---|---:|---|---:|---|
-| GM-Porträts, Stilprobe (Taure, Leerengeborener, Wolf) | 3 | 192×224 | 3,0 | 303,54 → 300,54 |
+| GM-Porträts, Stilprobe (Tauren, Voidborn, Wolf) | 3 | 192×224 | 3,0 | 303,54 → 300,54 |
 | GM-Porträts, Rest der aktiven Teams | 29 | 192×224 | 29,0 | 300,54 → 271,54 |
 | Icons Ausrüstung | 3 | 64×64 | 3,0 | 271,54 → 268,54 |
 | Icons Essen/Trinken | 3 | 64×64 | 3,0 | 268,54 → 265,54 |
@@ -69,25 +70,25 @@ Saat und Kontostand: `public/portraits/gm/quellen.json`, `public/sprites/ausrues
 
 ## 4. Ergebnis der Porträts, selbst angesehen
 
-32 von 32 sind im Stil der Vorstands-Porträts angekommen. Eindeutig nicht-menschlich und gut: Gnom, Konstrukt, Alien,
-Dämon, Tierwesen (Wolf, Falke, Fuchs), Ork, Göttlich, Taure, Drache, Elf, Wasserwesen, Goblin.
+32 von 32 sind im Stil der Vorstands-Porträts angekommen. Eindeutig nicht-menschlich und gut: Gnom, Construct, Alien,
+Demon, Animal (Wolf, Falke, Fuchs), Orc, Divine, Tauren, Dragon, Elf, Aqua, Goblin.
 
 **Nicht nachbestellt, zur Entscheidung markiert** (in der Galerie mit „zu menschlich?“, in `quellen.json` Feld `pruefen`):
 
 | GM | Team | Rasse | Was stört |
 |---|---|---|---|
-| `gm-elite-curator-08` | Black Panthers | Leerengeborener | grauhäutiger Mensch im Smoking (erster Prompt; danach verschärft, der zweite Leerengeborene `gm-depth-spammer-01` ist gelungen) |
-| `gm-systems-tinkerer-07` | Riptide Rivers | Leerengeborener | Mensch mit violettem Haar, die Schutzbrille verdeckt die leuchtenden Augen |
+| `gm-elite-curator-08` | Black Panthers | Voidborn | grauhäutiger Mensch im Smoking (erster Prompt; danach verschärft, der zweite Voidborn `gm-depth-spammer-01` ist gelungen) |
+| `gm-systems-tinkerer-07` | Riptide Rivers | Voidborn | Mensch mit violettem Haar, die Schutzbrille verdeckt die leuchtenden Augen |
 | `gm-talent-builder-10` | Silver Soldiers | Mutant | Mensch mit violetten Flecken |
 | `gm-risk-gambler-09` | Zero Heroes | Mutant | Mensch mit violetten Flecken |
-| `gm-star-chaser-06` | Hell Raisers | Zwerg | bärtiger Mensch mit Sonnenbrille |
-| `gm-culture-keeper-05` | Mortal Sin | Zwerg | Menschenfrau mit Zöpfen |
-| `gm-facility-architect-09` | Cold Steel | Zwerg | Menschenfrau mit Bauhelm |
+| `gm-star-chaser-06` | Hell Raisers | Dwarf | bärtiger Mensch mit Sonnenbrille |
+| `gm-culture-keeper-05` | Mortal Sin | Dwarf | Menschenfrau mit Zöpfen |
+| `gm-facility-architect-09` | Cold Steel | Dwarf | Menschenfrau mit Bauhelm |
 
 Dazu eine Stilabweichung: `gm-star-chaser-02` (Armageddon Aftermath, Gnom) ist eine Ganzkörper-Figur statt eines
 Brustbilds. Zusammen mit den drei echten Menschen wirken damit 10 von 32 menschlich; gewollt wären 3.
 
-Die Prompt-Bausteine für Leerengeborene, Zwerge, Gnome und Mutanten sind in `scripts/gm-aussehen-erzeugen.py` bereits
+Die Prompt-Bausteine für Voidborn, Dwarf, Gnom und Mutant sind in `scripts/gm-aussehen-erzeugen.py` bereits
 verschärft (gesichtslose Rauchwolke; spitze Ohren, Runenhaut; Tentakel und drei Augen). Die tatsächlich geschickten
 Prompts stehen unverändert in `quellen.json`.
 
@@ -139,4 +140,32 @@ mit dem Namen.
 4. **Wo sollen die GM-Porträts erscheinen?** Vorschlag: Team-Seite (Kader & Teams), Vorstands-/Budget-Gespräch und Inbox
    bei GM-Wechsel. Das wäre ein eigener Bau nach Mockup.
 5. **Chris und Franky** haben reservierte GM-Profile (`gm-systems-tinkerer-01`, `gm-risk-gambler-02`); die Formel gibt
-   ihnen Zwerg und Dämon. Sollen die beiden ein eigenes, selbst gewähltes Porträt bekommen statt des errechneten?
+   ihnen Dwarf und Demon. Sollen die beiden ein eigenes, selbst gewähltes Porträt bekommen statt des errechneten?
+
+## 8. Eindeutige GMs und Rassennamen (Chris, 22.11.)
+
+Wörtlich: „nenn die Leerengeborenen dann auch wie die Rasse Voidborn bei uns auch heißt damit das konsistent ist. Pass nur
+auf, Mara Voss hab ich z. B. 2x gesehen, prüfe dass KEIN GM 2x vorkommt! jeder GM darf es nur 1x geben und kein Team darf
+einen 2x haben, die sind EINZIGARTIG, also wenn was doppelt ist muss ein Team den GM austauschen.“
+
+- **Rassennamen wie im Spiel:** `data/gm-aussehen.json` führt nur noch `rasse` (Human, Orc, Mutant, Elf, Lizard, Gnom, Alien,
+  Plant, Construct, Dwarf, Divine, Tauren, Demon, Aqua, Voidborn, Animal, Dragon, Goblin); das Feld `rasseDe` ist weg, Galerie
+  und Doku nennen dieselben Namen. Ein Test gleicht die Rassen mit `data/generated/oly-player-stats.json` ab.
+- **100 eindeutige Namen:** `data/gm-namen.json` (gmId → Vor- und Nachname, ohne Archetyp-Suffix, passend zu Rasse und
+  Geschlecht, auch die Vornamen sind alle verschieden). `buildProfile` in `lib/foundation/team-general-managers.ts` liest sie,
+  das Erzeuger-Skript ebenfalls. Chris und Franky heißen weiter so. Die gmIds und damit die Porträt-Pfade sind unverändert.
+  Beispiele: Odile Marwick (Human, Bargain Hunter), Vorax Nihil (Voidborn, Elite Curator), Thrain Gildhammer (Dwarf, Star
+  Chaser), Corvina Blackwing (Animal, Risk Gambler).
+- **Im Spielstand steht nur die gmId** (`seasonState.teamGeneralManagers[teamId].gmId`), der Name wird beim Anzeigen aus dem
+  Profil gelesen. Eine Lade-Migration für Namen ist deshalb nicht nötig; alte Spielstände zeigen die neuen Namen sofort.
+- **Einzigartigkeit im Code:** `buildTeamGeneralManagerAssignments` läuft bei jedem Laden (`withNormalizedTeamGeneralManagers`),
+  Spielstart, Saisonwechsel und Board-Ersetzung und vergibt jeden GM höchstens einmal: behalten wird zuerst von menschlichen
+  Teams, dann in Listenreihenfolge; ein Team mit schon vergebenem GM bekommt deterministisch einen freien, bevorzugt vom
+  selben Archetyp (`previousGmId` hält den alten fest, die Team-Seite erzählt das als GM-Wechsel); sind alle 98 KI-Profile
+  vergeben, werden vor einem Duplikat erst die reservierten freien Profile genommen. Wächter: `tests/gm-eindeutig.test.ts`
+  (100 Namen und Vornamen eindeutig, Rassen gegen den Spielbestand, 80 Saaten mit 32 und 40 Teams, acht Saisons mit
+  Board-Ersetzungen, Altstand mit Duplikat).
+- **Live-Spielstand geprüft (22.11.):** alle sechs Spielstände im `live-save`-Abbild haben 32 Teams mit 32 verschiedenen GM-IDs,
+  **keine Duplikate**. „Mara Voss 2x“ war derselbe Vorname bei zwei verschiedenen GM-IDs (gm-talent-builder-03 und
+  gm-rivalry-hawk-03), also ein Namensproblem, kein Zuweisungsfehler. Ein Postfach-Hinweis beim Austausch ist nicht gebaut;
+  die Team-Seite zeigt den Wechsel über `previousGmId`.

@@ -13,8 +13,8 @@ export type GmAussehen = {
   name: string;
   archetyp: string;
   profil: string;
+  /** Rassenname wie im Spiel (Human, Voidborn, Gnom ...), nicht übersetzt. */
   rasse: string;
-  rasseDe: string;
   tier?: string;
   geschlecht: "w" | "m";
   anmutung: string;

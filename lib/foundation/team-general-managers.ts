@@ -1,3 +1,4 @@
+import gmNamenDaten from "@/data/gm-namen.json";
 import type {
   GameState,
   Team,
@@ -356,18 +357,8 @@ const archetypeSeeds: GmSeed[] = [
   },
 ];
 
-const variantNames = [
-  "Ada Vale",
-  "Noah Crest",
-  "Mara Voss",
-  "Ivo Kade",
-  "Nia Solen",
-  "Bren Vale",
-  "Tessa Rune",
-  "Jaro Finch",
-  "Kira Morrow",
-  "Oren Slate",
-] as const;
+/** Eindeutige Namen je gmId (`data/gm-namen.json`, Chris 22.11.: jeder GM nur einmal). */
+const gmNamenById = gmNamenDaten.namen as Record<string, string>;
 
 type GmVariantTilt = {
   label: string;
@@ -541,13 +532,11 @@ export function getAxisSharePercentages(profile: Pick<TeamGeneralManagerProfile,
 
 function buildProfile(seed: GmSeed, variantIndex: number): TeamGeneralManagerProfile {
   const tilt = variantTilt[variantIndex];
-  const name =
-    seed.archetype === "systems_tinkerer" && variantIndex === 0
-      ? "Chris"
-      : seed.archetype === "risk_gambler" && variantIndex === 1
-        ? "Franky"
-        : `${variantNames[variantIndex]} ${seed.nameRoot}`;
   const gmId = `gm-${slug(seed.archetype)}-${String(variantIndex + 1).padStart(2, "0")}`;
+  const name = gmNamenById[gmId];
+  if (!name) {
+    throw new Error(`GM-Name fehlt in data/gm-namen.json: ${gmId}`);
+  }
   return {
     ...seed,
     gmId,
@@ -847,6 +836,8 @@ function pickBestUnusedGeneralManager(input: {
   excludedArchetypes?: Iterable<TeamGeneralManagerArchetype>;
   assignedArchetypeCounts?: Map<TeamGeneralManagerArchetype, number> | null;
   seedSalt?: string | null;
+  /** Doppelte Zuweisung auflösen: bevorzugt einen freien GM dieses Archetyps. */
+  preferArchetype?: TeamGeneralManagerArchetype | null;
 }): PickedGeneralManager {
   if (input.team.humanControlled) {
     // Human-GM nach OWNERSHIP zuweisen (Chris/Franky), nicht nach positionalem teamIndex.
@@ -859,12 +850,22 @@ function pickBestUnusedGeneralManager(input: {
   const excludedArchetypeSet = new Set(input.excludedArchetypes ?? []);
   // AI-Zuweisung zieht nur aus dem Pool ohne die menschlich reservierten Profile,
   // damit kein AI-Team "Chris"/"Franky" als GM erhält.
-  const availableProfiles = AI_ASSIGNABLE_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
+  let availableProfiles = AI_ASSIGNABLE_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
+  if (availableProfiles.length === 0) {
+    // Einzigartigkeit (Chris 22.11.): lieber einen freien, menschlich reservierten GM als einen doppelten.
+    availableProfiles = TEAM_GENERAL_MANAGER_PROFILES.filter((profile) => !input.usedGmIds.has(profile.gmId));
+  }
   const candidates =
     excludedArchetypeSet.size > 0
       ? availableProfiles.filter((profile) => !excludedArchetypeSet.has(profile.archetype))
       : availableProfiles;
-  const candidatePool = candidates.length > 0 ? candidates : availableProfiles;
+  let candidatePool = candidates.length > 0 ? candidates : availableProfiles;
+  if (input.preferArchetype) {
+    const sameArchetype = candidatePool.filter((profile) => profile.archetype === input.preferArchetype);
+    if (sameArchetype.length > 0) {
+      candidatePool = sameArchetype;
+    }
+  }
   const scoredCandidates = candidatePool
     .map((profile) => ({
       profile,
@@ -950,8 +951,11 @@ export function buildTeamGeneralManagerAssignments(
   const usedGmIds = new Set<string>();
   const assignedArchetypeCounts = new Map<TeamGeneralManagerArchetype, number>();
   const assignments: Record<string, TeamGeneralManagerAssignment> = {};
+  // Jeder GM gehört höchstens einem Team. Beim Behalten gewinnen menschliche Teams, dann die Listenreihenfolge;
+  // wer einen schon vergebenen GM trägt, bekommt unten einen freien (bevorzugt gleicher Archetyp).
+  const claimOrder = [...teams].sort((a, b) => Number(b.humanControlled) - Number(a.humanControlled));
 
-  teams.forEach((team) => {
+  claimOrder.forEach((team) => {
     const current = existing?.[team.teamId] ?? null;
     const currentProfile = getTeamGeneralManagerProfile(current?.gmId);
     const identity = identityByTeamId.get(team.teamId) ?? null;
@@ -991,6 +995,7 @@ export function buildTeamGeneralManagerAssignments(
     };
   });
 
+  const assignedGmOwner = new Map(Object.values(assignments).map((a) => [a.gmId, a.teamId] as const));
   teams.forEach((team, index) => {
     if (assignments[team.teamId]) {
       return;
@@ -1013,6 +1018,8 @@ export function buildTeamGeneralManagerAssignments(
     }
     const hotSeatRoll = (hashString(`${seasonId}:${team.teamId}:gm-hotseat-v2`) % 1000) / 1000;
     const isFired = boardReplacementProbability > 0 && hotSeatRoll < boardReplacementProbability && !team.humanControlled;
+    const duplicateOf =
+      currentProfile && !isFired && assignedGmOwner.get(currentProfile.gmId) !== team.teamId ? currentProfile : null;
     // Determine dismissal reason only if the team is actually being replaced
     const boardReplacementReason = isFired
       ? getBoardReplacementReason(boardConfidenceByTeamId?.[team.teamId])
@@ -1028,6 +1035,7 @@ export function buildTeamGeneralManagerAssignments(
         isFired && currentProfile ? [currentProfile.archetype] : undefined,
       assignedArchetypeCounts,
       seedSalt: effectiveSeedSalt,
+      preferArchetype: duplicateOf?.archetype ?? null,
     });
     const profile = picked.profile;
     usedGmIds.add(profile.gmId);
@@ -1038,7 +1046,7 @@ export function buildTeamGeneralManagerAssignments(
       assignedSeasonId: seasonId,
       influencePct: resolveGmInfluencePct(identity, isFired),
       source: isFired && currentProfile ? "board_replacement" : (existing?.[team.teamId]?.source ?? picked.source),
-      previousGmId: isFired && currentProfile ? currentProfile.gmId : undefined,
+      previousGmId: (isFired || duplicateOf) && currentProfile ? currentProfile.gmId : undefined,
       dismissalReason: boardReplacementReason ?? undefined,
     };
   });

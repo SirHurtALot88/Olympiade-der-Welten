@@ -14,6 +14,7 @@ describe("GM-Aussehen", () => {
       const aussehen = getGmAussehen(profil.gmId);
       expect(aussehen?.name).toBe(profil.name);
       expect(aussehen?.archetyp).toBe(profil.archetype);
+      expect(aussehen).not.toHaveProperty("rasseDe");
     }
   });
 
