@@ -2071,48 +2071,56 @@ Spieltagen.
 
 ## 72. Verbrauchsgegenstände mit bekannten Namen
 
-*Fassung nach Runde 14 (Chris, 22.11.: „ein bisschen teurer, aber auch ein bisschen mehr Auswirkung, damit das sinnvoll
+*Seit Runde 16 (§76) ist der Kiosk kein Pflichteinkauf mehr: Getränke kommen zu zwei je Spieltag gratis vom Getränke-Partner,
+Einzelartikel nur noch als Truhen-Fund oder seltene Gelegenheit beim Händler. Die Artikelwerte unten bleiben der Rahmen für
+Partner-Linien und Funde.*
+
+*Fassung nach Runde 15 (Chris, 22.11.: „bitte getränke und food nicht op machen im vergleich zu gegenständen, das soll nur
+ein nice to have sein!“). Wirkung, Moral-Boni, Nebenwirkungen und Preise sind etwa halbiert, siehe §75.*
+
+*Vorherige Fassung nach Runde 14 (Chris, 22.11.: „ein bisschen teurer, aber auch ein bisschen mehr Auswirkung, damit das sinnvoll
 ist und man das nicht jedes Mal zuspammt“). Ersetzt die erste Tabelle aus Runde 13.*
 
 Wie der Sponsoren-Katalog (`lib/sponsor/sponsor-brand-catalog.ts`) nutzt der Kiosk echte Namen. Jeder Artikel wirkt für
 **einen Einsatz**, liegt im Verbrauchsplatz des Spielers und ist danach weg. Im Lager stapeln sie wie Materialien (bis 10
 je Platz).
 
-**Kalibrierung.** Ein Verbrauchsteil bringt in seinem Einsatz etwa so viel wie ein seltenes Ausrüstungsteil (zwei Affixe,
-zusammen rund +8 Attributpunkte), nur einmalig. Gesundes liegt etwas darunter und hat keinen Haken, Fast Food liegt darüber
-und trägt ein Risiko.
+**Kalibrierung.** Ein Verbrauchsteil bringt in seinem Einsatz etwa so viel wie ein Standard-Ausrüstungsteil (+3), nur
+einmalig — nice to have, kein Ersatz für Ausrüstung. Selbst der stärkste Artikel bleibt deutlich unter einem seltenen Teil
+(+8). Regeln: ein Attribut +2 bis +4, zwei Attribute zusammen höchstens +5; nur Fast Food darf mit Risiko bis +5 auf einem
+Attribut. Moral-Boni +1 bis +2. Gesundes liegt etwas darunter und hat keinen Haken.
 
 | Kategorie | Artikel | Wirkung für einen Einsatz | Nebenwirkung | Preis | Zähler |
 |---|---|---|---|---:|---|
-| **Energy und Süßes** | Red Bull | +8 Speed, +5 Stamina | nächster Einsatz −4 Stamina | 0,12 C | Zucker +1 |
-| | Monster Energy | +12 Stamina | nächster Einsatz −6 Awareness | 0,12 C | Zucker +2 |
-| | Coca-Cola | +5 Speed, Moral +2 | – | 0,10 C | Zucker +1 |
-| | Pepsi | +5 Dexterity, Moral +2 | – | 0,10 C | Zucker +1 |
-| | Gatorade | +7 Stamina | – | 0,11 C | Zucker +1 |
-| | Club-Mate | +6 Awareness, +4 Stamina | – | 0,12 C | Zucker +1 |
-| | Haribo Goldbären | +6 Speed, Moral +3 | 30 %: −4 Awareness | 0,10 C | Zucker +2 |
-| | Snickers | +6 Stamina, Moral +2 | – | 0,10 C | Zucker +1 |
-| **Cocktails und Bier** | Aperol Spritz | +7 Charisma, Moral +3 | −4 Awareness | 0,14 C | Alkohol +1 |
-| | Mojito (Bacardí) | +9 Spirit | −4 Dexterity | 0,14 C | Alkohol +1 |
-| | Caipirinha (Pitú) | +8 Charisma, +4 Spirit | −6 Intelligence | 0,16 C | Alkohol +2 |
-| | Espresso Martini (Kahlúa) | +6 Charisma, +5 Awareness | −4 Stamina | 0,16 C | Alkohol +1 |
-| | Jägermeister | +10 Will, Moral +4 | −8 Awareness | 0,14 C | Alkohol +2 |
-| | Carlsberg | +3 Spirit, Moral +4 | −2 Speed | 0,12 C | Alkohol +1 |
-| **Gesund** | Poke Bowl | +5 Stamina, +3 Health | – | 0,15 C | Gesund +1 |
-| | Proteinriegel (PowerBar) | +6 Power | – | 0,13 C | Gesund +1 |
-| | Smoothie (innocent) | +6 Awareness | – | 0,13 C | Gesund +1 |
-| | Banane (Chiquita) | +5 Stamina | – | 0,12 C | Gesund +1 |
-| | Haferflocken (Kölln) | +3 Stamina, +3 Determination | – | 0,12 C | Gesund +1 |
-| | Wasser (Volvic) | +2 Stamina, Erschöpfung nach dem Einsatz −10 % | – | 0,12 C | Gesund +1 |
-| **Fast Food** | Döner | +10 Power, +6 Health, Moral +3 | 20 %: Magen, −8 Stamina in diesem Einsatz | 0,10 C | Fast Food +2 |
-| | Big Mac (McDonald's) | +12 Power, Moral +3 | 20 %: Magen, −8 Stamina | 0,10 C | Fast Food +2 |
-| | Whopper (Burger King) | +10 Health, +4 Power | 15 %: träge, −6 Speed | 0,10 C | Fast Food +2 |
-| | Pizza (Domino's) | +9 Determination, Moral +4 | 15 %: träge, −6 Speed | 0,09 C | Fast Food +2 |
-| | Currywurst | +10 Torment, +4 Power | 25 %: Magen, −8 Stamina | 0,08 C | Fast Food +2 |
-| | Bucket (KFC) | +9 Health, Moral +3 | 20 %: Magen, −8 Stamina | 0,10 C | Fast Food +2 |
+| **Energy und Süßes** | Red Bull | +3 Speed, +2 Stamina | nächster Einsatz −2 Stamina | 0,06 C | Zucker +1 |
+| | Monster Energy | +4 Stamina | nächster Einsatz −3 Awareness | 0,06 C | Zucker +2 |
+| | Coca-Cola | +3 Speed, Moral +1 | – | 0,05 C | Zucker +1 |
+| | Pepsi | +3 Dexterity, Moral +1 | – | 0,05 C | Zucker +1 |
+| | Gatorade | +4 Stamina | – | 0,06 C | Zucker +1 |
+| | Club-Mate | +3 Awareness, +2 Stamina | – | 0,06 C | Zucker +1 |
+| | Haribo Goldbären | +3 Speed, Moral +2 | 30 %: −2 Awareness | 0,05 C | Zucker +2 |
+| | Snickers | +3 Stamina, Moral +1 | – | 0,05 C | Zucker +1 |
+| **Cocktails und Bier** | Aperol Spritz | +4 Charisma, Moral +2 | −2 Awareness | 0,07 C | Alkohol +1 |
+| | Mojito (Bacardí) | +4 Spirit | −2 Dexterity | 0,07 C | Alkohol +1 |
+| | Caipirinha (Pitú) | +3 Charisma, +2 Spirit | −3 Intelligence | 0,08 C | Alkohol +2 |
+| | Espresso Martini (Kahlúa) | +3 Charisma, +2 Awareness | −2 Stamina | 0,08 C | Alkohol +1 |
+| | Jägermeister | +4 Will, Moral +2 | −4 Awareness | 0,07 C | Alkohol +2 |
+| | Carlsberg | +2 Spirit, Moral +2 | −1 Speed | 0,06 C | Alkohol +1 |
+| **Gesund** | Poke Bowl | +3 Stamina, +2 Health | – | 0,07 C | Gesund +1 |
+| | Proteinriegel (PowerBar) | +3 Power | – | 0,07 C | Gesund +1 |
+| | Smoothie (innocent) | +3 Awareness | – | 0,07 C | Gesund +1 |
+| | Banane (Chiquita) | +3 Stamina | – | 0,06 C | Gesund +1 |
+| | Haferflocken (Kölln) | +2 Stamina, +2 Determination | – | 0,06 C | Gesund +1 |
+| | Wasser (Volvic) | +1 Stamina, Erschöpfung nach dem Einsatz −5 % | – | 0,06 C | Gesund +1 |
+| **Fast Food** | Döner | +3 Power, +2 Health, Moral +2 | 20 %: Magen, −4 Stamina in diesem Einsatz | 0,05 C | Fast Food +2 |
+| | Big Mac (McDonald's) | +5 Power, Moral +2 | 20 %: Magen, −4 Stamina | 0,05 C | Fast Food +2 |
+| | Whopper (Burger King) | +3 Health, +2 Power | 15 %: träge, −3 Speed | 0,05 C | Fast Food +2 |
+| | Pizza (Domino's) | +5 Determination, Moral +2 | 15 %: träge, −3 Speed | 0,04 C | Fast Food +2 |
+| | Currywurst | +3 Torment, +2 Power | 25 %: Magen, −4 Stamina | 0,04 C | Fast Food +2 |
+| | Bucket (KFC) | +5 Health, Moral +2 | 20 %: Magen, −4 Stamina | 0,05 C | Fast Food +2 |
 
-**Warum diese Preise.** Der reine Gegenwert eines solchen Einsatzes wäre nach §48 rund 0,02 C. Der Kiosk verlangt das
-Fünf- bis Sechsfache, weil man den Moment wählt (genau das enge Duell), weil nichts verschleißt und kein Ausrüstungsplatz
+**Warum diese Preise.** Der reine Gegenwert eines solchen Einsatzes (+3 für einen Einsatz) wäre nach §48 rund 0,01 C. Der
+Kiosk verlangt das Fünf- bis Sechsfache (0,04 bis 0,08 C), weil man den Moment wählt (genau das enge Duell), weil nichts verschleißt und kein Ausrüstungsplatz
 gebunden wird. Fast Food ist am billigsten, weil es das Risiko und den schnellsten Zähler trägt; Cocktails und Gesundes
 sind am teuersten, die einen wegen der hohen Einzelwerte in SOC-Disziplinen, die anderen, weil sie nichts kosten außer
 Geld.
@@ -2122,9 +2130,10 @@ Spieltag. Gewählt statt steigender Kosten, weil die Grenze für alle gleich ist
 weil man sie ohne Rechnen versteht und weil die KI dafür keine Preisabwägung braucht. Die Einsatzliste zeigt „2 von 3“.
 
 **Kosten.**
-- Höchstmaß, jede Woche alle drei: 60 Teile je Saison, je nach Mischung **6 bis 7 C** (mit Fast Food 5,7 C, mit Cocktails
-  8,6 C). Das liegt am oberen Rand des Ziels; wer das tut, läuft außerdem ständig in die Zähler-Ereignisse.
-- Üblich, ein Teil in engen Duellen und zwei bis drei in Derbys: 20 bis 25 Teile, **2,5 bis 3 C je Saison**.
+- Höchstmaß, jede Woche alle drei: 60 Teile je Saison, je nach Mischung **3 bis 3,6 C** (nur Fast Food 2,8 C, nur
+  Cocktails 4,3 C, ganzer Katalog im Schnitt 0,059 C je Teil). Das ist eine Randnotiz neben den Ausrüstungskosten; wer das
+  tut, läuft außerdem ständig in die Zähler-Ereignisse.
+- Üblich, ein Teil in engen Duellen und zwei bis drei in Derbys: 20 bis 25 Teile, **1,2 bis 1,5 C je Saison**.
 
 **Woher:** Kiosk beim Händler (mit Handelsposten immer offen), Holz- und Eisentruhe als Standard-Funde, Sponsor-Paket (wer
 einen Getränke-Sponsor hat, bekommt dessen Artikel geschenkt, sofern der Sponsoren-Katalog die Marke führt; offen).
@@ -2138,6 +2147,9 @@ an etwas Gesundes für den müdesten Stammspieler.
 **Hinweis:** im Mockup sind die Logos Text in CSS, es gibt keine Markenbilder und es wird nichts bei PixelLab bestellt.
 
 ## 73. Ernährung mit Langzeitwirkung
+
+*Abgelöst durch §76 (Runde 16): statt vier Zählern je Spieler gibt es ein Essens-Abo für das Team und nur noch die zwei
+sichtbaren Zähler „Magen“ und „Alkohol“. Der Rest dieses Abschnitts gilt als Vorstufe und für die beibehaltenen Ereignisse.*
 
 - **Vier Zähler je Spieler:** Fast Food, Zucker, Alkohol, Gesund. Jeder Artikel hebt seinen Zähler um 1 oder 2; ein
   Zähler sinkt um 1 an jedem Spieltag, an dem der Spieler nichts aus dieser Kategorie nimmt (geändert in Runde 14, sonst
@@ -2155,7 +2167,7 @@ an etwas Gesundes für den müdesten Stammspieler.
 - **Über die Saison:** ab 12 Fast-Food-Punkten in einer Saison sinkt das Stamina-Potential um 1, ab 20 um 2 (mehr nie).
   Fünf Spieltage in Folge ohne Fast Food und mit Gesundem holen je einen Punkt zurück. Ab 15 Gesund-Punkten steigt das
   Regenerationstempo für den Rest der Saison um 5 %. **Kein Spieler wird dauerhaft beschädigt;** alles ist umkehrbar.
-- **Moral:** Fast Food gibt sofort +3 bis +4 für einen Spieltag. Ein verstimmter Magen oder Kater kostet −2.
+- **Moral:** Fast Food gibt sofort +2 für einen Spieltag (Moral-Boni der Artikel insgesamt +1 bis +2). Ein verstimmter Magen oder Kater kostet −2.
 - **Traits (nur echte):** Healthy verträgt zwei Punkte mehr je Schwelle und bekommt den gesunden Bonus doppelt.
   FaintHearted hat das Magen-Risiko um 10 Punkte höher. Disciplined nimmt Fast Food und Alkohol nur, wenn der Manager es
   anlegt, und verliert dann 1 Moral. Lazy bekommt von Fast Food 1 Moral mehr.
@@ -2166,8 +2178,7 @@ an etwas Gesundes für den müdesten Stammspieler.
   verstimmte Magen in der Spalte „Belastung“.
 - Im Mockup: `?ansicht=verbrauch` (Katalog in vier Spalten, Zähler für sechs Spieler, Beispiel-Ereignis).
 
-**Offen:** Sollen Getränke-Sponsoren ihre Artikel je Spieltag schenken (kleiner Vorteil, hübsche Verbindung), oder bleibt
-der Kiosk rein käuflich?
+**Entschieden in Runde 16 (§76):** Getränke-Partner liefern gratis, zwei je Spieltag; der Kiosk ist kein Pflichteinkauf mehr.
 
 ## 74. Runde 14: Zähler geprüft
 
@@ -2185,3 +2196,113 @@ Artikel dieser Art):
 Dauer-Einsatz wird also in jeder ungesunden Kategorie bestraft. Mit der alten Regel (jeder Zähler sinkt je Spieltag um 1)
 wäre ein täglicher Artikel mit +1 nie an die Schwelle gekommen. Die Saison-Schwellen aus §73 (12 und 20 Fast-Food-Punkte)
 bleiben; bei einem Fast Food je Woche sind das sechs bzw. zehn Portionen eines Spielers.
+
+## 75. Runde 15: Verbrauch als nice to have
+
+Chris, 22.11.: „bitte getränke und food nicht op machen im vergleich zu gegenständen, das soll nur ein nice to have sein!“
+Zähler, Schwellen, Ereignisse (§73, §74) und die Leitplanke 3 je Team und Spieltag, 1 je Spieler bleiben unverändert.
+
+| | Runde 14 | Runde 15 |
+|---|---|---|
+| Wirkung je Artikel | +8 bis +12 (seltenes Teil und mehr) | ein Attribut +2 bis +4, zwei zusammen höchstens +5, Fast Food bis +5 |
+| Moral-Bonus, Nebenwirkungen | Moral +2 bis +4, Abzüge −2 bis −8 | Moral +1 bis +2, Abzüge etwa halbiert (Wasser: Erschöpfung −5 %) |
+| Preis je Stück | 0,08 bis 0,16 C | 0,04 bis 0,08 C (Fast Food am billigsten, Cocktails und Gesundes am teuersten) |
+| Kosten, Höchstmaß 60 Teile | 6 bis 7 C | 3 bis 3,6 C |
+| Kosten, üblich 20 bis 25 Teile | 2,5 bis 3 C | 1,2 bis 1,5 C |
+| Vergleich Ausrüstung | wie ein seltenes Teil (+8) | wie ein Standard-Teil (+3), nur einmalig |
+
+Im Mockup mitgezogen: Ansicht `?ansicht=verbrauch` und der Verbrauchsplatz „Kreideblock“ der Ausrüstung (+8 → +4 Power).
+
+## 76. Runde 16: Getränke-Partner und Essens-Abo
+
+Chris, 22.11., wörtlich: „Getränke-Sponsoren liefern gratis, 2 pro Spieltag immer unterschiedlich? oder soll man nen getränke
+partner wählen können? und je nach marke haben die unterschiedliche boosts? nicht zu viel micromanagement / food könnte man als abo
+machen wo man eins von 5 stufen wählen muss je teurer desto schonender und ggf. performance boost und je günstiger desto eher mal
+magenverstimmung vs kurzfristigen boost und in der mitte wenig vor oder nachteile“. Rahmen aus Runde 15 bleibt: Verbrauch ist nur
+nice to have, nie stärker als ein Standard-Ausrüstungsteil (+3; Selten +8, Episch +15, Legendär +26). Entscheidung der
+Projektleitung, damit gebaut werden kann; die Zahlen sind Startwerte zum Messen.
+
+Mockup: `public/mockups/zwischen-den-spieltagen-22-11.html?ansicht=verbrauch` (umgebaut), Aufnahmen aus der echten Seite:
+![Verbrauch 1920](zwischen-den-spieltagen-22-11/verbrauch-1920.png)
+![Verbrauch 2560](zwischen-den-spieltagen-22-11/verbrauch-2560.png)
+(Dateien `docs/design/zwischen-den-spieltagen-22-11/verbrauch-1920.png` und `verbrauch-2560.png`; selbst angesehen: kein Überlauf, kein
+Seitenscroll, keine Überlappung, keine JS-Fehler.)
+
+### 76.1 Getränke-Partner (ersetzt den Kiosk-Einzelkauf als Hauptweg)
+
+- **Ein Partner je Saison,** gewählt beim Saisonstart, Wechsel nur zum Saisonwechsel. Kostet nichts, zahlt nichts. Delegierbar
+  wie der Sponsor; die KI wählt nach dem Disziplin-Profil des Kaders.
+- **Zwei gratis Getränke je Spieltag** aus der Linie des Partners, rotierend (nie zweimal dasselbe hintereinander).
+- **Automatische Vergabe:** an die zwei knappsten Duelle des Spieltags, je an den aufgestellten Spieler mit dem größten
+  `Bonus × Matrixgewicht`. Der Mensch kann umlegen, muss nicht. Kein Mikromanagement.
+- **Grenze:** die zwei zählen in die Grenze 3 je Team und Spieltag (§72); der dritte Platz bleibt für Funde aus Truhen.
+- **Kiosk:** Einzelartikel nur noch als Truhen-Fund und beim Händler als seltene Gelegenheit.
+
+Werte im Rahmen der Runde 15: ein Attribut +2 bis +4, zwei zusammen höchstens +5, Moral +1 bis +2.
+
+| Partner | Profil | Artikel (Wirkung für einen Einsatz) | Passt zu |
+|---|---|---|---|
+| Red Bull | Tempo: Speed | Original +3 Speed; Sugarfree +2 Speed, +2 Dexterity; Summer +3 Speed, Moral +1 | Bahn, Spurt, Staffel, Climbing |
+| Monster | Ausdauer: Stamina, kleiner Haken | Original +4 Stamina (nächster Einsatz −2 Awareness); Ultra +3 Stamina | lange Läufe, Wettessen, Hockey |
+| Coca-Cola | Stimmung: Moral + Speed klein | Classic Moral +2, +1 Speed; Cherry Moral +1, +2 Speed | Teams mit Moral unter 60, Derbys |
+| Gatorade | Erholung: Stamina + Erholung | Cool Blue +3 Stamina, Erholung +5 %; Lemon +2 Stamina, Erholung +5 %; Orange +4 Stamina | Doppelspieltage, müde Stammspieler |
+| Club-Mate | Köpfchen: Awareness, Intelligence | Original +3 Awareness; Granat +2 Awareness, +2 Intelligence; Winter +3 Intelligence | Schießen, Taktik, Bühne, Rätsel |
+| Carlsberg | Geselligkeit: Spirit, Charisma, Moral | Pilsner +2 Spirit, Moral +2 (Alkohol +1); Elephant +3 Charisma, Moral +1 (Alkohol +2); 0,0 % +2 Charisma, Moral +1 | Showdisziplinen, Teams mit Charisma |
+
+**KI-Wahl des Partners:** Disziplin-Profil des Kaders (welche Attribute in den kommenden Disziplinen am schwersten zählen)
+gegen das Profil der Marke; bei Gleichstand der mit dem geringsten Alkohol-Risiko. Carlsberg nur bei Kaderanteil SOC über 40 %.
+
+### 76.2 Essens-Abo (ersetzt Einzel-Essen und den Großteil der Ernährungs-Zähler)
+
+Team-weit **eine von fünf Stufen,** Wahl zum Saisonstart und in der Winterpause (sonst fest), Standard Stufe 3, delegierbar,
+die KI wählt nach Finanzwert (unter 4 Stufe 1 bis 2, 4 bis 6 Stufe 3, ab 7 Stufe 4, ab 9 Stufe 5). Kosten je Saison für das ganze
+Team, Wirkung je Spieler und Spieltag. Aus dem Gehaltstopf ist es nicht, sondern wie ein Gebäude-Unterhalt aus dem Investitionstopf.
+
+| Stufe | Name | Kosten je Saison | Vorteil | Nachteil |
+|---|---|---:|---|---|
+| 1 | Imbissbude | 0,5 C | Moral +1, +1 Power im Einsatz | 10 % je Spieler und Spieltag verstimmter Magen (−3 % Eignung an diesem Spieltag); zählt für die Fast-Food-Saisonschwelle |
+| 2 | Kantine | 1,0 C | Moral +1 | 4 % Magen-Risiko |
+| 3 | Hausmannskost | 1,5 C | neutral | kein Risiko, keine Boni |
+| 4 | Sportküche | 2,5 C | Erholung +5 % | kein Risiko |
+| 5 | Ernährungsteam | 3,5 C | Erholung +8 %, Verletzungsrisiko −5 %, +1 Stamina im Einsatz | Lazy-Spieler −1 Moral (Gemecker) |
+
+**Traits:** Healthy bekommt Stufe 4 und 5 doppelt und hat das halbe Magen-Risiko; FaintHearted +5 Punkte Magen-Risiko; Lazy
++1 Moral bei Stufe 1 und 2. Nichts liegt über +3 im Einsatz; die Erholungs- und Verletzungswerte sind Dauerwerte und klein.
+
+**Zähler (nur noch zwei sichtbar, je Spieler):**
+- **Magen:** +1 je verstimmtem Magen (aus Abo 1 und 2) und je Fast-Food-Fund, −1 je Spieltag ohne Auslöser. Bei 4 das Ereignis
+  **Verstimmter Magen** (drei Einsätze −3 % Eignung, im Wettessen nicht einsetzbar, Zähler −2).
+- **Alkohol:** +1 oder +2 je Carlsberg oder Cocktail-Fund, −1 je Spieltag ohne. Bei 3 das Ereignis **Kater** (nächster Spieltag
+  −3 % Eignung, Erschöpfung +5; ab Alkohol 5 sinkt das Vertrauen des Vorstands um 0,25).
+- **Saisonschwelle:** ab 12 Magen-Punkten in einer Saison sinkt das Stamina-Potential um 1 (höchstens −1, umkehrbar nach fünf
+  Spieltagen ohne Magen-Auslöser). **Festlegung der Projektleitung:** Abo 1 zählt zusätzlich 0,5 Punkte je Spieltag (20 Spieltage
+  ergeben 10) und kommt mit den ohnehin anfallenden verstimmten Mägen knapp an die 12; Abo 2 zählt nicht mit.
+- **Entfallen:** Zucker, Fast Food und Gesund als eigene Zähler sowie das Ereignis Zuckerabsturz. **„Gut im Saft“** wird durch
+  Abo 4 und 5 ersetzt (Erholung und Verletzungsrisiko dauerhaft, kein Zähler).
+- Kein Spieler wird dauerhaft beschädigt. On top, zählt nicht gegen die Schranke 0,75; Wirkung nur über bestehende Kanäle
+  (Attribut im Einsatz, Eignung des Tages, Erholung, Verletzungsrisiko, Moral). In der Zerlegung (§54) läuft der Partner-Schub in
+  der Spalte „Gegenstand“, ein verstimmter Magen in „Belastung“.
+
+### 76.3 Kosten je Saison
+
+Partner 0 C. Funde: etwa fünf Händler-Artikel je Saison à 0,06 C, rund 0,3 C (Truhen-Funde kosten nichts).
+
+| Abo-Stufe | Abo | Funde | Summe je Saison | Anteil an der Reparatur voll (~19 C) |
+|---|---:|---:|---:|---:|
+| 1 | 0,5 C | 0,3 C | 0,8 C | 4 % |
+| 2 | 1,0 C | 0,3 C | 1,3 C | 7 % |
+| 3 (Standard) | 1,5 C | 0,3 C | 1,8 C | 9 % |
+| 4 | 2,5 C | 0,3 C | 2,8 C | 15 % |
+| 5 | 3,5 C | 0,3 C | 3,8 C | 20 % |
+
+Vergleich: ein Legendäres im Dauereinsatz kostet etwa 2 C Reparatur je Saison (§67), Stufe 5 also knapp zwei Legendäre für das
+ganze Team (0,25 C je Spieler bei 14). Runde 15 lag bei 1,2 bis 1,5 C üblich und bis 3,6 C im Höchstmaß, Runde 16 ist damit im
+selben Bereich, aber ohne Pflichteinkauf und ohne Mikromanagement. Die Wahl ist eine Teamentscheidung zwischen Geld und
+Risiko, nicht ein Wochenspiel.
+
+### 76.4 Offen und Prüfung
+
+- Messen mit `einflussVon`: Partner-Schub darf die Pp-Abweichung (Pflicht ≤ 25) und rho je Spiel nicht berühren (on top).
+- Anzeige im Spiel: Partner und „liefert heute“ in der Einsatzliste, Abo in der Woche und im Verein; Vergabe zeigt = bucht.
+- Mehrspieler: Partner und Abo je Team, delegierbar mit Voll selbst, Halbautomatik und Voll KI.
+- Mockup: Abo-Karten haben bei wenigen Chips viel Leerraum, im Bau kann dort die Wirkung je Spieler als Beispielzeile stehen.
