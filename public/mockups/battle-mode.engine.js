@@ -47121,14 +47121,66 @@
     ctx.fillText(bahnZeitText(bahnRealSek(rennT)),1126,118);
     ctx.restore();
   }
+  // BODEN-CACHE TAKESHI (Welle 4, 22.11., Chris' Livebefund "ruckelt"): die Karte (Wiese, Zonen, Route,
+  // Bauten, Wald, Tor, Burg) ist waehrend eines Rennens unveraenderlich, wurde aber bei JEDEM Bild neu
+  // gezeichnet -- ueber 2000 Pfadpunkte allein fuer die Route, dazu Absperrbaender, Steine, 200 Baumkandidaten.
+  // Sie wird jetzt einmal in eine Offscreen-Leinwand (Weltkoordinaten, Aufloesung S je nach Zoom und
+  // Pixeldichte der Leinwand, hoechstens 3x) gezeichnet und je Bild nur noch als EIN Bild aufgelegt.
+  // Neu gebaut wird bei: anderer Route/Breite/Zonenliste, neu geladenen Kulissenbildern oder wenn der Zoom
+  // eine groessere Aufloesung braucht (nur aufwaerts, hoechstens zwei Mal je Rennen). Gibt false zurueck,
+  // wenn der Weg nicht moeglich ist (kein Offscreen-Canvas, z.B. Node-Motor) -- dann zeichnet der Aufrufer
+  // wie bisher direkt. Reine Anzeige: liest keine Simulation, rr() und Boxscore bleiben unberuehrt.
+  let bodenCacheT=null;
+  function takeshiBodenZeichnen(R,breite,Z,zeichne){
+    try{
+      if(typeof document==="undefined"||bodenCacheT===false)return false;
+      const dW=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,"width");
+      const kx=(dW&&dW.get)?(dW.get.call(cv)/W):1;
+      const brauch=Math.min(3,Math.max(1,Math.ceil(Math.max(1,cam.zoom*kx)*2)/2));
+      let geladen=0; for(const k in aBild)if(aDa(k))geladen++;
+      const c=bodenCacheT;
+      const ok=c&&c.R===R&&c.breite===breite&&c.Z===Z&&c.geladen===geladen&&c.W===W&&c.H===H&&c.S>=brauch;
+      if(!ok){
+        const S=Math.max(brauch,c&&c.R===R?c.S:0,2);
+        const x0=-W*0.03, y0=-H*0.03, bw=W*1.06, bh=H*1.06;
+        const lw=document.createElement("canvas"); lw.width=Math.ceil(bw*S); lw.height=Math.ceil(bh*S);
+        const g=lw.getContext("2d");
+        if(!g){ bodenCacheT=false; return false; }
+        g.setTransform(S,0,0,S,-x0*S,-y0*S);
+        zeichne(g,false);
+        bodenCacheT={R,breite,Z,geladen,W,H,S,x0,y0,bw,bh,lw};
+      }
+      const b=bodenCacheT;
+      ctx.drawImage(b.lw,b.x0,b.y0,b.bw,b.bh);
+      return true;
+    }catch(err){ bodenCacheT=false; return false; }
+  }
   let takeshiPublikumAn=false;
   function bodenTakeshiRoute(){
     if(!takeshiPublikumAn){ tonLoopStart("takeshis-castle"); takeshiPublikumAn=true; }
     const R=routeTabelle(), z=cam.zoom, breite=BA().routeBreite||56, t=rennT;
-    ctx.save(); ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z,z);
+    // GEOMETRIE (rein rechnerisch, zeichnet nichts): Zonen, Huellen von See/Hang/Hof. Steht VOR dem
+    // Boden-Cache, weil Wellen, Baeume und Fallen dieselben Werte brauchen (Welle 4, 22.11.).
     const Z=BA().zonen||[{bis:1,boden:"pfad",um:"wiese"}];
     const zoneBei=(s)=>Z.find(q=>s<=q.bis)||Z[Z.length-1];
     const zoneVon=(q)=>{const i=Z.indexOf(q); return i?Z[i-1].bis:0;};
+    const huelleEll=(um,rand)=>{ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,da=false;
+      for(const q of Z){ if(q.um!==um)continue; const a=zoneVon(q);
+        for(let k=0;k<=24;k++){const p=routeXY(a+(q.bis-a)*k/24); da=true;
+          x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);} }
+      return da?{cx:(x0+x1)/2,cy:(y0+y1)/2,rx:(x1-x0)/2+rand,ry:(y1-y0)/2+rand}:null; };
+    const inEll=(h,x,y,f)=>h&&Math.hypot((x-h.cx)/(h.rx*(f||1)),(y-h.cy)/(h.ry*(f||1)))<1;
+    const hHang=huelleEll("huegel",80);
+    const e=routeXY(1), hHof={cx:e.x,cy:e.y+44,rx:320,ry:125};
+    const hSee=huelleEll("see",56);
+    if(hSee){ hSee.cy+=14; hSee.ry=Math.min(hSee.ry,hSee.cy-(e.y+18)); }   // nie bis unter die Burgmauer
+    const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
+    let wald_=null;
+    // STATISCHER BODEN (Schritte 1-7: Wiese, Zonen, Route, Bauten, Waldplatzierung, Tor, Burg). Nimmt den
+    // Zeichenkontext als PARAMETER (Schatten auf `ctx`), damit derselbe Code einmal in eine Offscreen-Leinwand
+    // (takeshiBodenZeichnen) und im Notfall direkt auf die Hauptleinwand laufen kann. Wellen (Zeit t) laufen
+    // nur mit `mitWellen`, sonst zeichnet zeichneWellen() sie je Bild nach. Reine Anzeige.
+    const zeichneStatisch=(ctx,mitWellen)=>{
     const teilPfad=(s0,s1)=>{ ctx.beginPath(); const n=Math.max(2,Math.ceil((s1-s0)*160));
       for(let k=0;k<=n;k++){const r=routeXY(s0+(s1-s0)*k/n); k?ctx.lineTo(r.x,r.y):ctx.moveTo(r.x,r.y);} };
     const M=(n,f)=>aMust(n)||f;               // Kachelmuster, sonst die Farbfassung
@@ -47149,14 +47201,8 @@
       ctx.closePath(); return true;
     };
     // Fuer See und Burghof bleibt die Ellipse richtig — ein See ist rund, ein Hof auch.
-    const huelleEll=(um,rand)=>{ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,da=false;
-      for(const q of Z){ if(q.um!==um)continue; const a=zoneVon(q);
-        for(let k=0;k<=24;k++){const p=routeXY(a+(q.bis-a)*k/24); da=true;
-          x0=Math.min(x0,p.x);y0=Math.min(y0,p.y);x1=Math.max(x1,p.x);y1=Math.max(y1,p.y);} }
-      return da?{cx:(x0+x1)/2,cy:(y0+y1)/2,rx:(x1-x0)/2+rand,ry:(y1-y0)/2+rand}:null; };
     const ell=(h,fill,dx,dy,f)=>{ if(!h)return; ctx.fillStyle=fill; ctx.beginPath();
       ctx.ellipse(h.cx+(dx||0),h.cy+(dy||0),h.rx*(f||1),h.ry*(f||1),0,0,6.283); ctx.fill(); };
-    const inEll=(h,x,y,f)=>h&&Math.hypot((x-h.cx)/(h.rx*(f||1)),(y-h.cy)/(h.ry*(f||1)))<1;
 
     // 1. GRUNDFLAECHE: Wiese. Midoriyama heisst "Gruener Berg" — offenes, huegeliges
     //    Gelaende, kein Studio-Parcours. Grosszuegig ueber den Weltausschnitt hinaus, weil
@@ -47185,14 +47231,14 @@
     ctx.beginPath(); ctx.ellipse(W*0.28,-H*0.02,W*0.5,H*0.32,0,0,6.283); ctx.fill();
     ctx.beginPath(); ctx.ellipse(W*0.15,H*1.02,W*0.30,H*0.22,0,0,6.283); ctx.fill();
     if(huellePfad("huegel",84)){ ctx.fillStyle=M("boden_hang","#7a5a2a"); ctx.fill(); }
-    const hHang=huelleEll("huegel",80);
-    const e=routeXY(1), hHof={cx:e.x,cy:e.y+44,rx:320,ry:125}; ell(hHof,M("boden_pflaster","#a08050"));
-    const hSee=huelleEll("see",56);
-    if(hSee){ hSee.cy+=14; hSee.ry=Math.min(hSee.ry,hSee.cy-(e.y+18));   // nie bis unter die Burgmauer
+    ell(hHof,M("boden_pflaster","#a08050"));
+    if(hSee){
       ell(hSee,M("boden_schlamm","#5a3b22"),0,0,1.14); ell(hSee,M("boden_see","#2d6d8a"));
-      ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1;
-      for(let k=0;k<8;k++){const ph=(t*0.4+k*0.125)%1; ctx.beginPath();
-        ctx.ellipse(hSee.cx+(bodenSaat(k+900)-0.5)*hSee.rx*1.3,hSee.cy+(bodenSaat(k+950)-0.5)*hSee.ry*1.3,4+ph*12,2+ph*5,0,0,6.283); ctx.stroke();}
+      if(mitWellen){
+        ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1;
+        for(let k=0;k<8;k++){const ph=(t*0.4+k*0.125)%1; ctx.beginPath();
+          ctx.ellipse(hSee.cx+(bodenSaat(k+900)-0.5)*hSee.rx*1.3,hSee.cy+(bodenSaat(k+950)-0.5)*hSee.ry*1.3,4+ph*12,2+ph*5,0,0,6.283); ctx.stroke();}
+      }
       // SCHILF AM UFER (Kulissen-QS 08.11., Audit-Wunsch "See mit Ufer, Schilf und Steg"): kein
       // neuer Download, nur ein paar Grasklingen-Buendel im Schlammring knapp ausserhalb der
       // Wasserflaeche. Saatfest, deshalb an jedem Spieltag dieselben Buendel.
@@ -47262,7 +47308,6 @@
           ctx.ellipse(x,y,rr,rr*0.7,0,0,6.283); ctx.stroke(); } } }
     // 5. BAEUME: nur auf Wiese und Wald, nie auf Route, See, Hof, Burgzone oder Tuempel —
     //    Fuss UND Krone werden geprueft, sonst haengt eine Krone ueber dem Weg.
-    const baeume=["baum_1","baum_2","baum_3","baum_4"].filter(aDa);
     // GECACHT (Task #9, 13.10.): `wald_` haengt nur an `R` (routeTabelle()) und `breite` —
     // beide stehen fuer die Dauer eines Rennens fest (routeCache wird erst in reset() neu
     // gezogen). Vorher lief die 130-Punkte-Kandidatenliste MIT ihren `nahe()`-Abstands-
@@ -47271,7 +47316,6 @@
     // Einzelposten im Takeshi-Draw). Reiner Darstellungs-Cache, keine Simulationslogik
     // beruehrt: `wald_` fliesst nur ins Zeichnen der Baumkronen (Schritt "Baeume zuletzt"
     // unten), nie in rr()/wert()/Boxscore.
-    let wald_;
     if(waldCache&&waldCache.R===R&&waldCache.breite===breite){
       wald_=waldCache.wald_;
     } else {
@@ -47325,6 +47369,19 @@
       ctx.beginPath(); ctx.moveTo(zl.x-zl.nx*breite/2,zl.y-zl.ny*breite/2);
       ctx.lineTo(zl.x+zl.nx*breite/2,zl.y+zl.ny*breite/2); ctx.stroke(); ctx.setLineDash([]);
     }
+    };
+    // WELLEN auf dem See: einzige zeitabhaengige Zeichnung des Bodens, deshalb ausserhalb des Caches.
+    const zeichneWellen=()=>{ if(!hSee)return;
+      ctx.save(); ctx.strokeStyle="rgba(255,255,255,.2)"; ctx.lineWidth=1;
+      for(let k=0;k<8;k++){const ph=(t*0.4+k*0.125)%1; ctx.beginPath();
+        ctx.ellipse(hSee.cx+(bodenSaat(k+900)-0.5)*hSee.rx*1.3,hSee.cy+(bodenSaat(k+950)-0.5)*hSee.ry*1.3,4+ph*12,2+ph*5,0,0,6.283); ctx.stroke();}
+      ctx.restore(); };
+    ctx.save(); ctx.translate(W/2-camR.x*z, H/2-camR.y*z); ctx.scale(z,z);
+    if(takeshiBodenZeichnen(R,breite,Z,zeichneStatisch)){ zeichneWellen();
+      // Zeichenzustand wie nach dem direkten Zeichnen (Schritt 7 endet so), damit Fallen/Baeume unveraendert aussehen.
+      ctx.lineJoin="round"; ctx.lineCap="round"; ctx.lineWidth=3; ctx.strokeStyle="#fff"; ctx.setLineDash([]); ctx.lineDashOffset=0; ctx.globalAlpha=1;
+    } else zeichneStatisch(ctx,true);
+    if(!wald_&&waldCache)wald_=waldCache.wald_;
     // 8. DIE FALLEN an den Wegpunkten: DIESELBEN zehn Bilder wie in der Burgpunkte-Runde,
     //    nur einmal je Station statt einmal je Spur, und in Weltkoordinaten — sie wachsen
     //    also mit der Kamera. Dazu ein Wegpunkt-Pfahl mit so vielen Sternen, wie die Falle
@@ -52579,7 +52636,7 @@
     // Route: Kameramitte auf den Start setzen und die Bogenlaengen-Tabelle verwerfen —
     // letzteres, damit ein spaeterer Ausbau (eine Wegpunkt-Liste JE KURS, Plan 4.3 C)
     // beim Kurswechsel nicht auf der alten Kurve zeichnet.
-    routeCache=null; waldCache=null;
+    routeCache=null; waldCache=null; bodenCacheT=bodenCacheT===false?false:null;
     if(BA().route){ const r0=routeXY(0); camR={x:r0.x,y:r0.y}; }
     const d=bahnDisc, art=BA(), n=art.jeSeite;
     // ERSATZAUFSTELLUNG. Fuer Spurt stellt Chris von Hand auf; fuer die anderen Bahnen
@@ -57177,7 +57234,7 @@
     if(!(sc>0.5&&sc<1.5))return false;
     if(!grauBlatt){
       grauBlatt=document.createElement("canvas"); grauBlatt.width=GRAU_B; grauBlatt.height=GRAU_H;
-      grauCtx=grauBlatt.getContext("2d",{willReadFrequently:true});
+      grauCtx=grauBlatt.getContext("2d");
       if(!grauCtx){ grauBlatt=null; return false; }
     }
     const gx=M.a*x+M.c*y+M.e, gy=M.b*x+M.d*y+M.f;
@@ -57195,15 +57252,14 @@
       zeichneSprite(g,arg,x,y);
     } finally { g.restore(); }
     g.setTransform(1,0,0,1,0,0);
-    const bild=g.getImageData(0,0,GRAU_B,GRAU_H), d=bild.data;
-    for(let i=0;i<d.length;i+=4){
-      if(d[i+3]===0)continue;
-      const v=((0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2])*0.8+0.5)|0;
-      d[i]=v; d[i+1]=v; d[i+2]=v;
-    }
-    g.putImageData(bild,0,0);
+    // WELLE 4 (22.11., Takeshi "ruckelt"): vorher getImageData + Pixelschleife + putImageData je Ausgeschiedenem
+    // und Bild (61k Pixel, GPU-Rueckleseweg; bei 24 Laeufern im Pod wuchs die Last mit jedem Ausscheiden).
+    // Jetzt EIN gefiltertes drawImage des fertigen Blatts: derselbe Filter (grayscale(1) brightness(0.8)),
+    // aber nur auf einem Bild statt auf jeder Zeichenoperation des Sprites und ohne Ruecklesen.
     c.save(); c.setTransform(1,0,0,1,0,0); c.globalAlpha=1; c.imageSmoothingEnabled=false;
+    c.filter="grayscale(1) brightness(0.8)";
     c.drawImage(grauBlatt,wx,wy);
+    c.filter="none";
     c.restore();
     return true;
   }
@@ -57961,7 +58017,21 @@
     zfEtik=[];
     // Vorgemerkte Etikettentexte (s. `ctx.fillText=bahnTextMerkF` in der Laeuferschleife unten).
     const bahnSpaeteTexte=[], bahnTextOrigF=ctx.fillText, bahnTextOrigS=ctx.strokeText;
+    // LESBARKEIT TAKESHI-POD (Welle 4, 22.11., Chris: "unuebersichtlich"): bei 24 Laeufern auf einer Route stapelten
+    // sich 24 dreizeilige Etiketten. Im Vier-Team-Pod tragen nur noch die Hauptdarsteller Name/Plan/Punkte: das eigene
+    // Team (Seite 0, Heim), der Fuehrende JEDES Teams und alle im Ziel. Alle anderen bekommen eine kleine Marke in
+    // Teamfarbe ueber dem Kopf (Teamzugehoerigkeit bleibt lesbar), der Name steht weiter im Ticker und der Wertung.
+    // Liest nur u.pos/u.seite/u.fertig/u.raus, schreibt nichts zurueck; Menge in WeakSet-freier Lokalvariable je Bild.
+    const takeshiHaupt=new Set();
+    const podLesbar=!!BA().takeshi&&bahnPodAnzeigeAktiv()&&LAEUFER.length>12;
+    if(podLesbar){
+      const besterJeSeite={};
+      for(const o of LAEUFER){ if(o.fertig!=null||o.raus)continue; const b=besterJeSeite[o.seite]; if(!b||o.pos>b.pos)besterJeSeite[o.seite]=o; }
+      for(const k in besterJeSeite)takeshiHaupt.add(besterJeSeite[k]);
+    }
+    let bahnTextAus=false;
     const bahnTextMerk=(fuell)=>(t,x,y)=>{
+      if(bahnTextAus)return;
       bahnSpaeteTexte.push({fuell,t,x,y,font:ctx.font,fs:ctx.fillStyle,ss:ctx.strokeStyle,lw:ctx.lineWidth,
         ga:ctx.globalAlpha,ta:ctx.textAlign,tb:ctx.textBaseline,lj:ctx.lineJoin,fi:ctx.filter});
     };
@@ -58441,6 +58511,19 @@
       // nach der Laeuferschleife gezeichnet (`bahnSpaeteTexte`) -- sonst malte jeder spaeter
       // gezeichnete Laeufer (Nachbarbahn, Staffel-Wartereihe, Takeshi-Pulk) seinen Sprite ueber die
       // Etiketten der frueheren. Position, Schrift, Farbe, Kontur und Deckkraft sind unveraendert.
+      bahnTextAus=podLesbar&&u.seite!==0&&u.fertig==null&&!takeshiHaupt.has(u);
+      if(podLesbar){
+        // Marke in Teamfarbe (alle ausser Hauptdarstellern) bzw. Bodenring (eigenes Team): lesbar auch ohne Namen.
+        const farbe=bahnSeitenFarbe(u.seite);
+        if(bahnTextAus||u.raus){
+          ctx.save(); ctx.globalAlpha=u.raus?0.45:1; ctx.fillStyle=farbe; ctx.strokeStyle="rgba(8,10,14,.9)"; ctx.lineWidth=1.5; ctx.lineJoin="round";
+          ctx.beginPath(); ctx.moveTo(x-4.5,y-27); ctx.lineTo(x+4.5,y-27); ctx.lineTo(x,y-20); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
+        }
+        if(u.seite===0&&!u.raus&&u.fertig==null){
+          ctx.save(); ctx.strokeStyle=farbe; ctx.globalAlpha=0.9; ctx.lineWidth=2;
+          ctx.beginPath(); ctx.ellipse(x,y+17,12,4.2,0,0,6.283); ctx.stroke(); ctx.restore();
+        }
+      }
       ctx.fillText=bahnTextMerkF; ctx.strokeText=bahnTextMerkS;
       if(u.vizRampe>0&&!zfLabelAus&&!zfBlase){
         setzeFont(ctx,"700 9px 'RaniraSeason',Georgia,'Times New Roman',serif"); ctx.textAlign="center";
@@ -60173,7 +60256,14 @@
   // Oval+HUD).
   const ZEIT_DEHNUNG={
     tdm:1.88, "mini-dm":2.86, fechten:1.62, battlefield:5.00,
-    spurt:11.14, staffel:14.65, "time-trial":4.38, climbing:4.38, "takeshis-castle":2.17,
+    spurt:11.14, staffel:14.65, "time-trial":4.38, climbing:4.38,
+    // TAKESHI 22.11. (Chris' Livebefund "zu schnell vorbei, unuebersichtlich"): 2,17 -> 4,3. Das Rennen
+    // dauerte im Vier-Team-Pod gut eine Minute (1:02) bei 24 Laeufern; mit 4,3 sind es rund zwei Minuten
+    // (siehe docs/design/takeshi-lesbarkeit-22-11.md). Reine Anzeige: die Bahn tickt seit dem Anzeige-Treue-
+    // Fix A1 mit FESTEM 1/60 (bahnSimAcc), der Faktor streckt nur, wie oft das je Wandsekunde geschieht;
+    // die Kamera und alle Laeufer werden zwischen den Takten interpoliert (viMische). Wertung und
+    // Fingerabdruck lesen den Faktor nie.
+    "takeshis-castle":4.3,
     // Chris' Fund (29.08.): die Bewegung auf dem Court wirkt zu hektisch, um ihr zu
     // folgen. tempoPx selbst anzufassen wuerde die Matrix-Balance neu aufrollen (s.
     // die ausfuehrliche Herleitung beim tempoPx-Koeffizienten, bewegeSpielerLive) — der
