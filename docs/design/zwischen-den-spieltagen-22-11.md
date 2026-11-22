@@ -1535,3 +1535,256 @@ Gegenstände · 5 Meisterschmiede (halbe Teile, Reparatur 20 % günstiger). Kost
      einmal?
   3. Reparaturkosten: Zielgröße „voll ausgerüstet etwa 15 bis 20 % der Gehaltskosten“ richtig, oder härter?
   4. Signatur-Material nur über Wimpel, Goldkiste und Händler Stufe 4, oder auch in der Eisenkiste?
+
+---
+
+# Runde 10 (22.11.): Preise aus dem Gegenwert, Lager statt Budget, Mehrfach-Gegenstände, Truhen, Optik, Sichtbarkeit, KI, Traits
+
+Dieser Teil ersetzt aus Runde 9: die Reparaturpreise (§44), das Effekt-Budget (§43) und den Katalog mit einer Disziplin
+je Legendärem (§37, §42). Die Stufenregel (§40), die Materialien (§41) und der Baum in drei Schritten (§42) bleiben.
+
+## 48. Preise aus dem Gegenwert
+
+**Anker aus dem Gehaltsmarkt (Chris):** ein Spieler kostet etwa 6,5 C je Saison und bringt etwa 45 Punkte.
+
+    Preis je Leistungspunkt  = 6,5 C ÷ 45        = 0,144 C
+    Gegenwert je Einsatz     = Mehrertrag je Einsatz × 0,144 C
+    Gegenwert je Saison      = Gegenwert je Einsatz × wirksame Einsätze je Saison
+    Reparatur je Einsatz     = 30 % × Gegenwert je Einsatz
+    volle Reparatur (0→100)  = Reparatur je Einsatz × 20      (5 % Verschleiß je Einsatz)
+    Händlerpreis             = Gegenwert je Saison × 2        (rechnet sich nach zwei Saisons)
+
+Der **Mehrertrag je Einsatz** ist der Zielwert aus dem Messplan (§49), in Punkten des Trägers. Die **wirksamen Einsätze**
+zählen nur Disziplinen, in denen der Gegenstand wirkt und der Spieler aufgestellt ist (jede Disziplin kommt zweimal je
+Saison; ein allgemeines Teil an einem Stammspieler kommt auf rund 20).
+
+| Stufe | Mehrertrag je Einsatz (Ziel) | Einsätze je Saison (typisch) | Gegenwert je Saison | Reparatur je Einsatz | volle Reparatur | Händlerpreis |
+|---|---:|---:|---:|---:|---:|---:|
+| Standard | 0,08 | 10 | 0,12 C | 0,004 C | 0,07 C | 0,25 C |
+| Selten | 0,15 | 8 | 0,17 C | 0,006 C | 0,13 C | 0,35 C |
+| Episch | 0,30 | 5 | 0,22 C | 0,013 C | 0,26 C | 0,50 C |
+| Legendär (3 Disziplinen) | 0,60 | 6 | 0,52 C | 0,026 C | 0,52 C | 1,00 C |
+
+- Ein kaputtes Teil kostet weiter das 1,5-Fache. Topf, Posten in den Finanzen und Auto-Reparatur bleiben wie in §44/§45.
+- **Legendär voll reparieren: 0,52 C statt 3 C.** Ein Legendäres kostet im Unterhalt etwa 0,16 C je Saison, also rund
+  2,5 % eines Spielergehalts.
+- **Folge, offen gesagt:** ein voll ausgerüsteter Kader (28 Teile) kostet so etwa **1,6 C je Saison**, der Kader im
+  Mockup 0,63 C. Das ist ein Viertel eines Spielergehalts und damit nicht „deutlich mehr Unterhalt“. Beides zugleich geht
+  nicht: entweder der Preis folgt dem Gegenwert, oder Ausrüstung ist ein spürbarer Kostenblock. Der Stellhebel ist der
+  Anteil (30 %): bei 50 % wären es 2,7 C. Der eigentliche Preis der Ausrüstung liegt dann in Ruhm, Schmiede und
+  Signatur-Material, nicht in der Reparatur.
+- Verkauf bleibt 25 / 30 / 35 / 40 % vom Händlerpreis mal Zustand. Alle Zahlen sind Startwerte, bis §49 gemessen ist; danach
+  wird nur die Spalte „Mehrertrag“ ersetzt, der Rest rechnet sich daraus.
+
+## 49. Messplan für die Effektgröße
+
+Gemessen wird vom Bau-Agenten, bevor ein Gegenstand live geht. Ein Effekt ohne Messung bleibt hinter seinem Stempel aus.
+
+- **Sonde:** `scripts/miss-alle-disziplinen.mjs --node`, erweitert um einen Schalter „Träger + Gegenstand“ (Node-Motor,
+  kein Chromium). Je Zelle zwei Läufe mit derselben Saat: ohne und mit Gegenstand. 32 KI-Teams, `OLY_FORM_MODUS=echt`.
+- **Zellen:** je Gegenstand × Disziplin × Träger (schwächster, mittlerer, bester Aufgestellter) × 200 Spiele × zwei
+  Saatstämme. Dazu je Legendärem eine Zelle mit Gegenmittel.
+- **Kennzahlen:**
+  1. Punkte-Delta des Trägers je Einsatz (C2-Skala), das ist der „Mehrertrag“ aus §48.
+  2. Rangverschiebung des Trägers im Feld (Median der Ränge mit minus ohne).
+  3. Duellpunkte-Delta des Teams (E1-Skala).
+  4. Siegquote mit Gegenstand bei gleich starken Teams (Spiegelkader, ohne Gegenstand 50 %).
+  5. Auslösequote: in wie viel Prozent der Spiele zündet der Effekt.
+  6. Kontrolle: der Fingerabdruck ohne Gegenstand bleibt bit-gleich, rho gegen die reine Eignung unverändert.
+- **Zielkorridor je Stufe:**
+
+| Stufe | Punkte-Delta je Einsatz | Rang des Trägers | Siegquote (Spiegelkader) |
+|---|---:|---:|---:|
+| Standard | 0,05 bis 0,10 | unter 0,3 | 50,5 bis 52 % |
+| Selten | 0,10 bis 0,20 | 0,3 bis 0,5 | 52 bis 54 % |
+| Episch | 0,25 bis 0,40 | 0,5 bis 1 | 54 bis 57 % |
+| Legendär | 0,50 bis 0,80 | 1 bis 2 | 57 bis 62 % |
+
+- **Zu schwach:** unter dem Korridor oder Auslösequote unter 60 %. **Zu stark:** Siegquote über 65 %, oder der schwächste
+  Träger landet im Median auf Rang 1, oder zwei gleiche Legendäre bringen mehr als das 1,8-Fache von einem.
+- **Ergebnis:** eine Tabelle je Gegenstand in `data/generated/`, daraus die Spalte „Mehrertrag“ in §48.
+- Die Verlaufszeilen aus §54 liefern später dieselben Kennzahlen aus echten Spielständen (ohne Vergleichslauf, daher nur
+  als Plausibilitätsprüfung).
+
+## 50. Kein Budget je Team, dafür begrenzter Platz
+
+- Das Effekt-Budget aus §43 entfällt. **Wer die Sachen hat und unterhalten kann, darf sie nutzen.**
+- **Lager: 16 Plätze**, fest (kein Ausbau über Gebäude). Getragenes zählt nicht mit. Höchstens im Verein: 28 getragene
+  Ausrüstungen, 14 Verbrauch, 16 im Lager.
+- **Volles Lager:** ein neuer Fund muss sofort getauscht, verkauft oder zerlegt werden. Bei Abwesenden und KI wird das
+  wertloseste Teil zerlegt.
+- **Materialbeutel:** je Material höchstens 8, je Signatur-Material höchstens 2. Überzähliges wird zu Teilen. Damit lässt
+  sich über mehrere Saisons kein Vorrat für zehn Legendäre anlegen.
+- Es bleiben: ein Spieler trägt denselben Gegenstand nicht zweimal, einmal je Spiel, Gegenmittel.
+
+## 51. Legendäre über zwei bis vier Disziplinen
+
+Der Katalog hat jetzt **15 Legendäre statt 26**. Zehn wirken in zwei bis vier Disziplinen je unterschiedlich, fünf
+übergreifend. Alle zwanzig Disziplinen sind abgedeckt.
+
+| Legendär | Disziplin: großer Effekt |
+|---|---|
+| **Enterhaken** | Climbing: schwerste Sektion überspringen · TDM, Mini DM: Gegner heranziehen, nächster Treffer sitzt · Battlefield: Verteidiger vom Punkt ziehen |
+| **Rauchbombe** | TDM: drei Takte nicht anvisierbar · Battlefield: Punkt verdeckt einnehmen · I-Spy: Gegner sehen fünf Sekunden keine Truhen-Marken |
+| **Torwand** | Hockey: Torwart hält einmal je Drittel · Fechten, Mini DM: erster gegnerischer Treffer prallt ab · Football: stoppt einen vierten Versuch |
+| **Sprungfedern** | Spurt: erste Station ohne Zeitverlust · Takeshi: erste Falle wirft nicht zurück · Basketball: ein Rebound je Viertel sicher |
+| **Rückenwind-Segel** | Time Trial: +15 % auf der längsten Geraden · Staffel: ein Wechsel kostet keine Zeit · Eiskunstlauf: schwerster Sprung stürzt nicht |
+| **Fernglas** | I-Spy: Truhe aus der Ferne prüfen · TDM: erster Schuss trifft · Tennis: ein knapper Ausball je Satz zählt |
+| **Daumenschraube** | Breaking: erster Peinigungs-Gang eine Stufe stärker · Fechten: erster Treffer zählt doppelt · Football: ein Tackle erzwingt Ballverlust |
+| **Beißholz** | Breaking: übersteht einen Gang · Wettessen: erster Schwächeanfall entfällt · Gewichtheben: ein zusätzlicher Versuch |
+| **Feuerwerk** | Showcase: letzte Nummer 1,5-fach · Eiskunstlauf: Schlusssprung 1,3-fach · Basketball: nach zwei Treffern sitzt der nächste Wurf |
+| **Joker-Karte** | Speed-Schach: schwerster Fehler zurück · Football: vierter Versuch wiederholt · Tennis: ein Doppelfehler je Satz wiederholt |
+| Schiedsrichterpfeife, Zweite Luft, Glücksmünze, Kapitänsschärpe, Maske | alle Disziplinen (wie §37; die Maske schützt jetzt den Träger vor Pfeife und Regelbuch, weil Gegenstände im Vorraum offen sind) |
+
+- **Pilot-Bäume** (§42) mit den neuen Namen: Enterhaken (Wurfanker + Ankerkette), Sprungfedern (Federsohlen +
+  Federstahl), Fernglas (Feldstecher + Schliffglas), Daumenschraube (Zwinge + Folterknecht-Siegel), Beißholz (Mundschutz +
+  Wurzelholz), Schiedsrichterpfeife (Regelbuch + Ligasiegel). Das Signatur-Material gehört jetzt zum Gegenstand, nicht zur
+  Disziplin. Auch die epische Vorstufe wirkt klein in denselben Disziplinen.
+- **Gegenwert:** drei Disziplinen sind sechs Einsätze je Saison statt zwei; das ist in §48 schon eingerechnet.
+- **Aufwand:** je Gegenstand ein Motor-Haken **je Disziplin** (30 Haken statt 26 für die großen Effekte), dafür nur 15
+  Symbole und Requisiten-Sätze. Der Kampf-Enterhaken nutzt die vorhandene Treffer-Pose des Gegners.
+
+## 52. Drei Truhen
+
+| | Holz | Eisen | Gold |
+|---|---:|---:|---:|
+| Ruhm | 10 | 20 | 45 |
+| Material | 45 % | 30 % | 15 % |
+| Standard | 40 % | 28 % | 10 % |
+| Selten | 13 % | 28 % | 35 % |
+| Episch | 2 % | 12 % | 28 % |
+| Legendär | – | 2 % | 7 % |
+| Signatur-Material | – | – | 5 % |
+
+- Chancen je Fund; drei Funde, einen nimmt man, mindestens einer ist Ausrüstung.
+- **Holz:** erster Disziplinsieg des Spieltags (höchstens eine je Spieltag) oder 10 Ruhm.
+- **Eisen:** 20 Ruhm, erfülltes Wochenziel, Wimpel. Mitleidszähler: jede fünfte zeigt etwas Episches.
+- **Gold:** Derby-Sieg, Saisonziel des Vorstands, Platz 1 bis 3 zur Halbzeit und am Saisonende. Für Ruhm höchstens eine
+  je fünf Spieltage. Signatur-Material gibt es nur hier, über Wimpel und beim Händler ab Stufe 4.
+- Im Mockup `?ansicht=kiste`, in der Demo drei Knöpfe mit eigenen Chancen-Balken. Die Holz- und Goldtruhe sind dort die
+  eingefärbte Eisentruhe; eigene Bilder wären zwei bis vier Generationen (nicht bestellt).
+
+## 53. Optik: was man am Spieler sieht
+
+**Frage von Chris: kann man Modelle bauen, die die Spieler optisch tragen?** Echt am Körper: nein. Jede Figur ist ein
+fertig gemaltes Blatt (vier Animationen, drei Richtungen, 9 bis 17 Bilder). Ein getragenes Teil hieße, jedes Blatt je Figur
+und Gegenstand neu zu erzeugen, rund 25 Generationen je Figur und Gegenstand, bei 368 Figuren. Das fällt unter die Sperre
+für neue Animationen und ist auch für die 14 eigenen Spieler (rund 350 je Gegenstand) nicht bezahlbar.
+
+**Was geht, ohne neue Animation:** alles, was über dem Sprite liegt. Nachgemessen an fünf Figuren (Zyra, Emilia, Conan,
+Maru, Brightpaw): der oberste Punkt der Silhouette wandert beim Laufen 1 bis 2 Pixel, beim Angriff bis 6 (beim Wolf
+Brightpaw 30), im Tod ist er weg. Ein Symbol über dem Kopf sitzt also sauber; ein Teil *am* Kopf braucht eine Ankertabelle
+je Bild und eine Stichprobe (Hörner, Hüte).
+
+**Entschieden (Chris, 22.11.):**
+- **In der Arena im Normalzustand nichts** über dem Kopf.
+- **Beim Einsatz** ploppt das Symbol des Gegenstands in Stufenfarbe für 1 bis 1,5 Sekunden über dem Kopf auf, dazu
+  Requisit und Effekt (Haken, Seil) und eine Zeile im Ereignis-Ticker.
+- **Im Vorraum vor der Arena offen:** je Spieler ein kleines Symbol in Stufenfarbe für jedes getragene Teil, bei eigenen
+  und gegnerischen Spielern. Maus darüber zeigt eine Karte mit Name, Stufe, Zustand, Attributbonus, Effekt in der heutigen
+  Disziplin (was, wann, wie oft), übrigen Disziplinen und Gegenmittel.
+- Nicht gewählt: dauerhafte Aura oder Ring. Später möglich: Teil am Kopf.
+
+**Kosten (Schätzung, nichts bestellt):** Symbol und Ticker 0 zusätzlich (Icons kommen mit dem Lager); Requisiten für 15
+Legendäre je 1 bis 3, zusammen 25 bis 40 Generationen, einmalig und unabhängig von der Zahl der Figuren. Teile am Kopf
+später 18 bis 24. Im Mockup: `?ansicht=optik` mit echter Lauf-Animation aus dem Bestand.
+
+## 54. Sichtbarkeit, Verlauf, Auflösung
+
+| Stelle | eigenes Team | fremdes Team |
+|---|---|---|
+| Einsatzliste | Gegenstände je Spieler, „Automatisch ausrüsten“ | – |
+| Vorraum | offen, Karte bei Maus | offen, Karte bei Maus |
+| Arena | Aufleuchten beim Einsatz, Ticker | gleich |
+| Auflösung nach der Disziplin | eigene Spalte, Effekt-Moment | gleich |
+| Nach dem Spiel, Sendung | „Schlüsselmoment: Enterhaken“ | gleich |
+| Spielerprofil | getragene Gegenstände, Verlauf | getragene Gegenstände, Verlauf |
+| Teamprofil | alles, auch Lager und Materialbeutel | Getragenes offen, Lager und Beutel verdeckt |
+| Liga, Saisonstand | keine Kennzahl | Statistik „Gegenstände der Saison“ |
+
+- **Kein Nebel auf Getragenem.** Der Scouting-Nebel gilt für Attribute, nicht für Ausrüstung. Verdeckt bleibt nur, was im
+  Lager liegt.
+- **„Ausrüstungsstärke“ als Spalte: nein.** Eine Zahl je Team nimmt das Ergebnis vorweg, wie eine zu genaue Kaderstärke.
+  Im Teamprofil steht, was getragen wird (zum Beispiel „2 Legendäre, 5 Epische“), das sind offene Tatsachen.
+- **Verlauf je Gegenstand:** jeder Gegenstand hat eine Kennung. Je Einsatz eine Zeile im Spielstand: Gegenstand, Spieler,
+  Spieltag, Disziplin, Eignungs-Bonus, gezündet ja/nein, Wirkung des Effekts (Motor-Ereignis), Zustand. Daraus: wer trug
+  ihn wann, wie oft gezündet, geschätzter Ertrag (Eignungs-Bonus mal gemessene Steigung aus §49; als „geschätzt“
+  beschriftet, weil es im Spiel keinen Vergleichslauf gibt). Größe: höchstens rund 60 Zeilen je Spieltag in der ganzen
+  Liga.
+- **„Gegenstände der Saison“:** meistgenutzt, wirksamster, meistgezündet, je Liga; geht in Chronik und Rekorde.
+- **Auflösungs-Bildschirm** (`?ansicht=aufloesung`, Zielform für `DisciplineStageSpieltagswertung` und
+  `DisciplineStageResultTable`): je Spieler `Eignung roh + Slot + Formkarte + Mutator + Gegenstand ± Belastung = Wert`,
+  daneben der Effekt-Moment mit Symbol und Takt. Die Zeile lässt sich aufklappen: Mutator (welcher, wie viele Treffer,
+  +3,5 Attribut je Treffer als Form, keine Punkte), Gegenstand (Attributbonus durch die Matrix), Effekt-Moment (was
+  passiert ist). Der Effekt-Moment hat keine Zahl in der Summe, weil er ein Ereignis im Motor ist. Beide Teams.
+
+## 55. KI-Nutzung
+
+Grundsatz: dieselben Funktionen wie der Mensch, je Bereich eine Nachschlagetabelle oder Prioritätsliste, **keine Suche
+über Kombinationen**. Alles ist linear in der Zahl der Teile (höchstens 58 je Team) und läuft einmal je Spieltag. Die
+delegierte KI eines Menschen nutzt dieselben Listen und fasst nichts an, was er von Hand gesetzt oder gesperrt hat.
+
+| Bereich | Regel | Aufwand je Team und Spieltag |
+|---|---|---|
+| **Ausrüsten** | Gierig: für die zwei Disziplinen des Spieltags jedes Teil nach `Bonus × Matrixgewicht` sortieren, der Reihe nach an den aufgestellten Spieler mit dem höchsten Wert, der noch einen Platz frei hat und das Teil nicht schon trägt. Legendäre zuerst, nach der Spalte „KI rüstet“ im Katalog. Verbrauchsteile nur in Derbys und engen Duellen. | eine Sortierung, höchstens 58 × 12 Vergleiche |
+| **Effekte zünden** | Kein Entscheid im Spiel: der Motor zündet nach der festen Bedingung des Gegenstands (erste Gelegenheit bzw. schwerste Sektion), für Mensch und KI gleich. | keiner |
+| **Kombinieren** | Feste Wunschliste je Team: die Legendären, deren Disziplinen zu den zwei stärksten Farben des Teams passen (Tabelle aus der Team-Identität). Nach jeder Truhe: den ersten Schritt bauen, der möglich ist, von oben nach unten (Legendär vor Episch vor Grundgegenstand). Glücksregel nur mit drei Teilen, die keiner trägt und die auf keiner Wunschliste stehen. | Liste mit höchstens 15 Einträgen |
+| **Reparieren** | Auto-Reparatur nach Finanzwert: 8 bis 10 alles; 5 bis 7 ab Selten und Aufgestelltes; 1 bis 4 nur Aufgestelltes unter 50 %. Nie über die Vorstands-Freigabe, nie unter die Rücklage. | eine Schleife |
+| **Verkaufen und Zerlegen** | Nur wenn das Lager über 12 von 16 steht oder die Kasse unter der Rücklage liegt: das Teil mit dem kleinsten `Bonus × Matrixgewicht` über alle 20 Disziplinen. Verkaufen, wenn ein Händler da ist, sonst zerlegen. Nie Teile der Wunschliste. | eine Sortierung |
+| **Truhen öffnen** | Sofort öffnen, sobald der Ruhm für die Eisentruhe reicht; Goldtruhe, wenn erlaubt. Wahl aus drei: Wunschlisten-Material vor höchster Stufe vor höchstem `Bonus × Matrixgewicht`. | drei Vergleiche |
+| **Händler** | Kauft ein Material der Wunschliste, sonst nichts, solange der freie Investitionsbetrag nach Reparatur reicht. | eine Abfrage |
+| **Schmiede und Handelsposten bauen** | Tabelle aus §38 (Finanzwert, Ehrgeiz, Identität). | einmal je Saisonabschnitt |
+
+- **Gleich für alle:** die Vorstands-Freigabe, Lager- und Beutelgrenzen und die Regel „nicht zweimal derselbe Gegenstand“
+  gelten für KI-Teams unverändert.
+- **Rechenlast:** 32 Teams × wenige Sortierungen je Spieltag, kein Vorausrechnen von Spielen, keine Vergleichsläufe. Der
+  Vorraum und die Auflösung lesen nur, was schon gebucht ist.
+- **Prüfung:** ein Messlauf mit 32 KI-Teams über zwei Saisons muss zeigen, dass KI-Teams im Mittel zwei bis vier Legendäre
+  tragen, ihr Lager nicht volläuft und kein Team wegen Reparaturen unter die Rücklage fällt.
+
+## 56. Ereignisse, die Traits treffen
+
+Im Spiel gibt es genau 36 Traits (`CANONICAL_POSITIVE_TRAITS` und `CANONICAL_NEGATIVE_TRAITS` in
+`lib/training/class-progression-config.ts`, je 18). Die Ereignisse nutzen nur diese. Die Traits behalten ihre heutige
+Rolle (Mutator-Treffer, Trainingsfaktor, bei Healthy und FaintHearted die Erschöpfung); die Ereignisse sind ein eigener,
+kleiner Kanal über Form, Moral und Erschöpfung.
+
+**Global, als Liga-Lage** (dieselbe Regel für alle 32 Teams, zwei bis drei Spieltage, einen Spieltag vorher angekündigt):
+
+| Lage | Dauer | profitiert | leidet |
+|---|---|---|---|
+| Hitzewelle | 2 Spieltage | Healthy: Erschöpfung −10 %, Eignung +1 % | FaintHearted: Erschöpfung +10 % · Lazy: Eignung −1 % |
+| Medien-Rummel | 3 Spieltage | FanFavorite, Eloquent, Sexy: +2 % in SOC-Disziplinen | Timid, Paranoid: −2 % in SOC-Disziplinen |
+| Schiedsrichter greifen durch | 2 Spieltage | Fair, Disciplined: Form +1 Stufe | Cheater, Devious: Form −1 Stufe |
+| Derby-Fieber | 1 Derby-Spieltag | Fearless, FiredUp: +2 % | Timid, FaintHearted: −2 % |
+| Transfergerüchte | 3 Spieltage | Loyal: Moral +3 | Mercenary, Renegade: Moral −4, fordern bei Verlängerung 10 % mehr |
+
+**In der Kabine** (nur das eigene Team, Auslöser aus dem Spielstand, für jedes Team gleich viele je Halbserie):
+
+| Ereignis | Auslöser | hilft | schadet |
+|---|---|---|---|
+| Streit | zwei Spieler mit Feisty, Vindictive oder Egomaniac in einer Aufstellung, 25 % je Spieltag | Fair, Caring oder Altruistic unter den Anführern: nach einem Spieltag vorbei | sonst beide Moral −3 je Spieltag bis zur Antwort |
+| Teamabend | zwei Siege in Folge | Relaxed, Caring: Kabinen-Stimmung +2 zusätzlich | Diva: will Sonderbehandlung, sonst Moral −4 |
+| Vorbild im Training | jede Woche, Paare wählbar | Diligent, Disciplined, Motivated: Trainingspartner +5 % Trainingspunkte | Lazy: Trainingspartner −5 % |
+
+- **Größe:** höchstens ±2 % Eignung oder eine Form-Stufe. On top, zählt nicht gegen die Schranke 0,75.
+- **Fair:** globale Lagen treffen alle gleich; ungleich ist nur, wer die Traits hat. Die Lage ist ein befristeter Stempel
+  im Spielstand, nie eine Regel im Code.
+- **KI:** stellt mit derselben Eignungsrechnung auf, in der die Wirkung schon steckt, und antwortet auf Kabinen-Ereignisse
+  nach der Tabelle aus §25 (Harmonie, Ehrgeiz). Paare im Training: Vorbild zum Spieler mit dem größten Potential.
+- **Anzeige:** in der Lage steht, welche eigenen Spieler betroffen sind; in der Auflösung läuft die Wirkung über die
+  Spalten Form bzw. Belastung. Im Mockup: `?ansicht=traits`, Hinweise in `lage` und `kabine`.
+
+## 57. Im Mockup und offen
+
+- Neu: `?ansicht=optik`, `?ansicht=aufloesung`, `?ansicht=traits`. Geändert: `bauplan` (15 Legendäre mit mehreren
+  Disziplinen, kein Budget), `kiste` (drei Truhen), `ausruestung`, `team`, `woche` (neue Preise), `lage`, `kabine`.
+- Demo `public/mockups/kiste-demo-22-11.html` (25 KB): drei Truhen mit eigenen Chancen, Signatur-Material nur in Gold,
+  neue Reparatur- und Händlerpreise, Enterhaken mit vier Disziplinen.
+- **Offen:**
+  1. Reparatur: Preis nach Gegenwert (voll ausgerüstet rund 1,6 C je Saison) oder doch ein spürbarer Kostenblock? Der
+     Anteil (30 %) ist der Hebel.
+  2. Lager fest bei 16, Materialbeutel 8 je Sorte und 2 je Signatur-Material: passt das?
+  3. Zwei gleiche Legendäre in einer Aufstellung zünden beide. Die Messung prüft, ob das zu stark ist (Grenze 1,8-fach).
+  4. Goldtruhe für Ruhm höchstens eine je fünf Spieltage: zu streng?
+  5. Trait-Ereignisse: Größe ±2 % richtig, und soll „Transfergerüchte“ wirklich auf Gehaltsforderungen durchschlagen?
