@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kredite – Reiter der Finanzseite (Mockup 22.11.)</title>
+<!--
+  KREDITE, STAND 22.11. Konzept: docs/design/kredite-modern-22-11.md. Kein App-Code, kein PixelLab, alles CSS/SVG.
+  Vorschlag: Kredite werden ein Reiter der Finanzseite (finanzen-modern-18-11.html), der eigene Navigationspunkt entfaellt.
+  ECHT (Live-Abbild, Spielstand new-game-1795114260527-nzr0z9, Saison 1, vor Spieltag 12): Kasse, Kaderwert, Gehalt,
+        Finanzwert, Vorstands-Vertrauen, Sponsor-Hochrechnung aller 32 Teams; Zins- und Rahmenformel aus
+        lib/finance/loan-service.ts (Bank 10 % + 1,2 % je fehlendem Finanzpunkt − 0,4 % je Zusatzsaison, 7 bis 20 %;
+        Rahmen 15 % der Kasse + 30 % des Kaderwerts − Restschuld; Abloese mit 20 % der entgangenen Zinsen).
+  BEISPIEL (gestrichelte Marke): die laufenden Kredite. Im Spielstand gibt es noch keinen einzigen Kredit
+        (Schalter "Kredite: echt" zeigt genau das). Team-Angebote rechnen mit Beziehung 0.
+  ZIELBILD: Raten je Spieltag (20 je Saison). Der Code bucht heute die Jahresrate am Saisonende.
+  URL: ?stand=bsp|echt  &betrag=<C>  &lz=<Saisonen>  &liga=2|alle  &kredit=0|1  &still=1
+-->
+<link rel="stylesheet" href="kredite-ranks-leaders-22-11/basis.css">
+<style>
+.work{grid-template-columns:minmax(0,1.2fr) minmax(27em,.9fr) minmax(24em,.78fr)}
+.hero .kul{background-image:url("../szenen/basketball/parkett.jpg")}
+/* Kennzahlen */
+.kz{flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-bottom:1px solid var(--linie)}
+.kz>div{padding:.6em .75em .65em;border-right:1px solid var(--linie);min-width:0}
+.kz>div:last-child{border-right:0}
+.kz strong{display:block;font-size:1.75em;line-height:1.05;font-weight:700;color:var(--creme);white-space:nowrap}
+.kz small{display:block;font-size:.8em;color:var(--stumm);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kz .bk{margin-top:.4em}
+/* laufende Kredite */
+.lk .th,.lk .tz{grid-template-columns:minmax(8em,1.5fr) 3.6em 5em 3.8em 6.2em 6em 5em;gap:.5em}
+.lk .tl{flex:none;overflow:visible}
+.lk .tz{flex:none;height:3.1em;max-height:none;cursor:pointer}
+.geber{display:flex;align-items:center;gap:.55em;min-width:0}
+.geber .gi{width:1.9em;height:1.9em;border-radius:.35em;display:grid;place-items:center;background:var(--flaeche-3);border:1px solid var(--linie);color:var(--gold);flex:none;overflow:hidden}
+.geber .gi img{width:100%;height:100%;object-fit:cover}
+.geber b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1}
+.geber small{display:block;font-size:.78em;color:var(--stumm);white-space:nowrap}
+.gz{line-height:1.05}
+.gz b{display:block;font-size:1.12em;font-weight:700}
+.gz small{display:block;font-size:.76em;color:var(--stumm);font-weight:500;white-space:nowrap}
+.leer{flex:none;margin:.75em;padding:1.1em;border:1px dashed var(--linie-2);border-radius:var(--r);text-align:center;color:var(--leise)}
+.leer strong{display:block;font:400 1.4em var(--haus);color:var(--creme);margin-bottom:.2em}
+/* Tilgungsplan */
+.tp{flex:1;min-height:0;display:flex;flex-direction:column;border-top:1px solid var(--linie)}
+.tpk{flex:none;display:flex;align-items:center;gap:.6em;padding:.5em .75em}
+.tpk h3{margin:0;font:400 1.1em var(--haus);color:var(--creme);white-space:nowrap}
+.tpk .sp{flex:1}
+.tpk .leg{font-size:.8em;color:var(--leise);display:flex;gap:.9em;white-space:nowrap}
+.tpk .leg i{display:inline-block;width:.7em;height:.7em;border-radius:2px;margin-right:.3em;vertical-align:-.05em}
+.tpb{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:.75em;padding:0 .75em .6em}
+.chart{min-height:0;display:flex;flex-direction:column;background:var(--flaeche-2);border:1px solid var(--linie);border-radius:var(--r-s);padding:.55em .65em .4em}
+.chart svg{flex:1;min-height:0;width:100%}
+.chart .cl{flex:none;position:relative;height:1.3em}
+.chart .cl span{position:absolute;top:0;padding-left:.3em;white-space:nowrap}
+.chart .ct{flex:none;display:flex;justify-content:space-between;font-size:.78em;color:var(--stumm)}
+.plan{min-height:0;display:flex;flex-direction:column;border:1px solid var(--linie);border-radius:var(--r-s);overflow:hidden}
+.plan .th,.plan .tz{grid-template-columns:minmax(7.2em,1.5fr) 2.6em repeat(4,minmax(2.6em,1fr));gap:.4em;padding:0 .6em}
+.plan .tl{flex:none}
+.plan .tz{flex:none;height:2.2em}
+.sts{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:.35em;padding:.6em;border-top:1px solid var(--linie)}
+.sts .rw{display:grid;grid-template-columns:repeat(20,1fr);gap:3px}
+.sts .rw i{height:1.7em;border-radius:3px;display:grid;place-items:center;font-style:normal;font-size:.72em;font-weight:700;color:var(--stumm);background:rgba(255,255,255,.05)}
+.sts .rw i.bez{background:rgba(98,211,148,.25);color:var(--gut)}
+.sts .rw i.off{background:rgba(240,195,90,.2);color:var(--gold)}
+.sts .rw i.heu{background:var(--gold);color:#17120a}
+.sts p{margin:0;font-size:.84em;color:var(--leise);line-height:1.3}
+.plan .tz{min-height:1.7em}
+.plan .tz.jetzt{background:rgba(240,195,90,.09)}
+.plan .tz.sum{border-top:1px solid var(--linie-2);font-weight:700;color:var(--creme);background:var(--flaeche-2)}
+.abl{flex:none;display:flex;align-items:center;gap:.9em;padding:.5em .75em;border-top:1px solid var(--linie);font-size:.9em;color:var(--leise);white-space:nowrap;overflow:hidden}
+.abl b{color:var(--creme)} .abl .sp{flex:1}
+/* Rechner */
+.re{flex:1;min-height:0;display:flex;flex-direction:column;gap:.6em;padding:.7em .75em;overflow:hidden}
+.hinw{flex:none;display:flex;gap:.55em;align-items:flex-start;padding:.5em .65em;border-radius:var(--r-s);border:1px solid rgba(255,96,88,.5);background:rgba(255,96,88,.09);font-size:.88em;line-height:1.25;color:var(--tinte)}
+.hinw svg{color:var(--warn);font-size:1.2em;margin-top:.05em}
+.hinw b{color:#fff}
+.feld{flex:none}
+.feld .zl{display:flex;align-items:baseline;gap:.5em;margin-bottom:.25em}
+.feld .zl strong{font-size:1.9em;line-height:1;font-weight:700;color:var(--creme)}
+.feld .zl span{font-size:.84em;color:var(--stumm)} .feld .zl .sp{flex:1}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:1.4em;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:.5em;border-radius:99px;background:linear-gradient(90deg,var(--gold) var(--f,0%),rgba(255,255,255,.1) var(--f,0%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:1.3em;height:1.3em;border-radius:50%;background:var(--creme);border:3px solid var(--gold);margin-top:-.4em;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.skala{display:flex;justify-content:space-between;font-size:.76em;color:var(--stumm);margin-top:.1em}
+.lz{display:flex;align-items:center;gap:.6em}
+.lz .seg{flex:1} .lz .seg button{flex:1;padding:0}
+.ang{flex:none;display:grid;gap:.4em}
+.an1{display:grid;grid-template-columns:auto minmax(0,1fr) 4.2em 6.2em 5.4em;gap:.65em;align-items:center;padding:.42em .6em;border:1px solid var(--linie);border-radius:var(--r-s);background:var(--flaeche-2);width:100%}
+.an1:hover{border-color:var(--linie-2)}
+.an1[aria-pressed=true]{border-color:var(--gold);background:linear-gradient(90deg,rgba(240,195,90,.16),var(--flaeche-2) 70%)}
+.an1[disabled]{opacity:.45;cursor:default}
+.an1 .best{color:var(--gut)}
+.wk{flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--linie);border-radius:var(--r-s);overflow:hidden}
+.wk .wz{flex:1 1 0;min-height:1.75em;display:grid;grid-template-columns:minmax(0,1.25fr) 5.2em 1.2em 5.6em 4.6em;gap:.45em;align-items:center;padding:0 .65em;border-bottom:1px solid rgba(244,230,196,.06)}
+.wk .wz:last-child{border-bottom:0}
+.wk .wz.kopf{flex:none;height:1.9em;background:var(--flaeche-2);font-size:.74em;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600}
+.wk .wz span.l{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wk .wz span.l small{color:var(--stumm);font-size:.82em;margin-left:.35em}
+.wk .r{text-align:right} .wk .pf{color:var(--stumm);text-align:center}
+.quote{flex:none}
+.quote .qb{position:relative;height:.8em;border-radius:99px;background:rgba(255,255,255,.08);margin:.3em 0 1.15em}
+.quote .qb i{position:absolute;left:0;top:0;bottom:0;border-radius:99px}
+.quote .qb i.alt{background:var(--leise);z-index:2}
+.quote .qb i.neu{background:var(--gold)}
+.quote .qb i.rot{background:var(--warn)}
+.quote .qb u{position:absolute;top:-.25em;bottom:-.25em;width:2px;background:var(--creme);text-decoration:none}
+.quote .qb u::after{content:attr(data-t);position:absolute;top:calc(100% + .1em);left:50%;transform:translateX(-50%);font-size:.72em;color:var(--stumm);white-space:nowrap}
+.quote .qz{display:flex;justify-content:space-between;font-size:.86em;color:var(--leise)}
+.quote .qz b{color:var(--creme)}
+.fuss{flex:none;display:flex;align-items:center;gap:.75em}
+.fuss .txt{flex:1;font-size:.84em;color:var(--leise);line-height:1.2;min-width:0}
+.fuss .btn{height:2.6em;padding:0 1.1em;font-size:1em}
+/* Liga */
+.lg .th,.lg .tz{grid-template-columns:2.2em minmax(0,1fr) 3.5em 2.9em 3.6em 3.5em;gap:.4em;padding:0 .65em}
+.lg .qz2{display:grid;gap:.15em}
+</style>
+</head>
+<body>
+<div class="demo" id="demo"></div>
+<div class="app">
+  <nav class="rail" id="rail" aria-label="Hauptnavigation"></nav>
+  <main>
+    <header class="hero">
+      <div class="kul"></div>
+      <div class="hk" id="hk"></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Finanzen"></div>
+      <div class="hr" id="hr"></div>
+    </header>
+    <div class="work">
+      <section class="pan lk" id="p1" aria-label="Laufende Kredite"></section>
+      <section class="pan" id="p2" aria-label="Neuer Kredit"></section>
+      <section class="pan lg" id="p3" aria-label="Liga-Vergleich"></section>
+    </div>
+  </main>
+</div>
+<script src="kredite-ranks-leaders-22-11/daten.js"></script>
+<script src="kredite-ranks-leaders-22-11/basis.js"></script>
+<script>
+/* ---------- Regeln (lib/finance/loan-service.ts, docs/design/finanzkonzept-v2-18-11.md Abschnitt 6) ---------- */
+var ST=O.stand.spieltag, RATEN=20, REST=RATEN-(ST-1);         /* Raten je Saison, offene Spieltage dieser Saison */
+function r2(x){return Math.round(x*100)/100}
+function bankZins(fin,lz){return Math.round(Math.min(.20,Math.max(.07,.10+(10-fin)*.012-(lz-1)*.004))*1000)/1000}
+function teamZins(bank,geberFin){return Math.round(Math.max(.05,bank-.01-Math.max(0,(geberFin-5)/5)*.01)*1000)/1000}
+/* Annuitaet je Spieltag: Zins je Saison / 20, Laufzeit x 20 Raten. */
+function rateJeST(P,z,lz){var i=z/RATEN,N=lz*RATEN;return i===0?P/N:P*i/(1-Math.pow(1+i,-N))}
+/* Plan: Raten nach Saison gruppiert. start = Spieltag der ersten Rate (Saison 1), bezahlt = Zahl gebuchter Raten. */
+function plan(P,z,lz,start){
+  var i=z/RATEN,N=lz*RATEN,a=rateJeST(P,z,lz),rest=P,zeilen=[],saison=1,st=start,cur=null;
+  for(var k=0;k<N;k++){
+    if(!cur||st>RATEN){if(st>RATEN){saison++;st=1}cur={saison:saison,n:0,zins:0,tilg:0,von:st,rest:0};zeilen.push(cur)}
+    var zi=rest*i,ti=a-zi;rest=Math.max(0,rest-ti);cur.n++;cur.zins+=zi;cur.tilg+=ti;cur.rest=rest;cur.bis=st;st++;
+  }
+  return {a:a,zeilen:zeilen,zinsen:a*N-P,N:N};
+}
+function restNach(P,z,lz,bezahlt){var i=z/RATEN,a=rateJeST(P,z,lz),rest=P;for(var k=0;k<bezahlt;k++)rest-=a-rest*i;return Math.max(0,rest)}
+function freigabe(v){return O.stand.saison===1?1:v>=7.5?1:v>=5?.9:v>=3?.8:v>=1.5?.7:.5}
+
+/* ---------- Zustand ---------- */
+var Z={stand:Q.get("stand")==="echt"?"echt":"bsp",betrag:+(Q.get("betrag")||8),lz:+(Q.get("lz")||2),ang:0,liga:Q.get("liga")==="alle"?"alle":"2",kredit:+(Q.get("kredit")||0),
+       so1:{k:"rest",d:-1},so3:{k:"schuld",d:1}};
+/* Beispiel-Kredite des eigenen Teams. von = erster Raten-Spieltag in Saison 1. */
+function meineKredite(){
+  if(Z.stand==="echt")return [];
+  var b=bankZins(WIR.fin,2),wl=TB["W-L"];
+  return [{geber:"Bank",gid:null,P:10,z:bankZins(WIR.fin,3),lz:3,von:5},{geber:wl.name,gid:"W-L",P:5,z:teamZins(b,wl.fin),lz:2,von:9}].map(function(k){
+    k.bez=ST-k.von;k.pl=plan(k.P,k.z,k.lz,k.von);k.rest=restNach(k.P,k.z,k.lz,k.bez);k.offen=k.pl.N-k.bez;return k});
+}
+/* Beispiel-Schulden der anderen Teams: fest aus Kuerzel und Finanzwert abgeleitet, damit der Vergleich etwas zeigt. */
+function schuldVon(t){
+  if(Z.stand==="echt")return {schuld:0,rate:0};
+  if(t.id===ICH){var s=0,r=0;meineKredite().forEach(function(k){s+=k.rest;r+=k.pl.a*RATEN});return {schuld:s,rate:r}}
+  var h=(t.id.charCodeAt(0)*7+t.id.charCodeAt(2)*13)%10, s2=t.fin>=8||h<2?0:Math.round(((9-t.fin)*2.4+h*1.9)*10)/10;
+  return {schuld:s2,rate:s2?rateJeST(s2,bankZins(t.fin,2),2)*RATEN:0};
+}
+function lage(){
+  var ks=meineKredite(),schuld=0,rate=0,zinsgew=0;ks.forEach(function(k){schuld+=k.rest;rate+=k.pl.a*RATEN;zinsgew+=k.rest*k.z});
+  var rahmenGes=.15*Math.max(0,WIR.cash)+.30*WIR.mv;
+  return {ks:ks,schuld:schuld,rate:rate,zins:schuld?zinsgew/schuld:0,rahmenGes:rahmenGes,frei:Math.max(0,rahmenGes-schuld),plan:WIR.spons,grenze:.20*WIR.spons};
+}
+function angebote(L){
+  var bz=bankZins(WIR.fin,Z.lz),a=[{geber:"Bank",gid:null,z:bz,max:L.frei,txt:"Finanzwert "+z1(WIR.fin)+" von 10"}];
+  TEAMS.filter(function(t){return t.id!==ICH&&t.cash>20&&t.fin>=6}).sort(function(x,y){return y.cash-x.cash}).slice(0,3).forEach(function(t){
+    a.push({geber:t.name,gid:t.id,z:teamZins(bz,t.fin),max:Math.min(L.frei,Math.round((t.cash-.12*t.geh)*.5*10)/10),txt:"Liga "+t.liga+" · leiht bis "})});
+  return a;
+}
+
+/* ---------- Rahmen ---------- */
+function baueKopf(){
+  document.getElementById("rail").innerHTML=rail("geld");
+  document.getElementById("hk").innerHTML='<div class="crest"><img src="../'+logo(ICH)+'" alt=""></div><div><h1>Finanzen</h1><div class="sub"><b>'+esc(WIR.name)+'</b> · Liga '+WIR.liga+' · Saison '+O.stand.saison+' · vor Spieltag '+ST+'</div></div>';
+  var L=lage();
+  var tabs=[["kreis","Konto","Kasse",geld(WIR.cash),"heute"],["wahl","Töpfe","Budgets",pz(freigabe(WIR.vert),0),"Freigabe"],["hand","Vertrag","Sponsor",geld(WIR.spons),"Hochrechnung"],["bank","Schulden","Kredite",geld(L.schuld),L.ks.length+(L.ks.length===1?" Kredit":" Kredite")]];
+  document.getElementById("tabs").innerHTML=tabs.map(function(t,i){return '<a class="dtab'+(i===3?' an':'')+'" role="tab" aria-selected="'+(i===3)+'" href="'+(i===3?'#':'finanzen-modern-18-11.html')+'"><span class="ic">'+ic(t[0])+'</span><span><em>'+t[1]+'</em><b>'+t[2]+'</b></span><span class="erw"><strong class="t'+(i===0&&WIR.cash<0?' minus':'')+'">'+t[3]+'</strong><span>'+t[4]+'</span></span>'+(i===3?'<span class="neu">NEU</span>':'')+'</a>'}).join("");
+  document.getElementById("hr").innerHTML='<div class="frist"><span class="gk">Vorstand</span><strong class="t">Vertrauen '+z1(WIR.vert)+'</strong><small>Freigabe '+pz(freigabe(WIR.vert),0)+' · Kredit erlaubt</small></div>';
+}
+
+/* ---------- Tafel 1: laufende Kredite + Tilgungsplan ---------- */
+function baueP1(){
+  var L=lage(),ks=L.ks,quote=L.rate/L.plan;
+  var h='<div class="pk"><h2>Laufende Kredite</h2>'+(Z.stand==="bsp"?'<span class="bsp" data-tip="Im Spielstand läuft noch kein Kredit. Die zwei Kredite sind Beispielwerte, gerechnet mit den echten Formeln und den echten Zahlen des Teams.">Beispiel</span>':'')+'<span class="sp"></span><span class="hin">Rate groß je Saison, klein je Spieltag</span></div>';
+  h+='<div class="kz">'+
+    '<div><span class="gk">Schulden</span><strong class="t">'+geld(L.schuld)+'</strong><small>'+ks.length+' laufend</small></div>'+
+    '<div><span class="gk">Rate je Saison</span><strong class="t">'+geld(L.rate)+'</strong><small class="t">'+z2(L.rate/RATEN)+' C je Spieltag</small></div>'+
+    '<div><span class="gk">Ø Zins</span><strong class="t">'+(L.schuld?pz(L.zins):"–")+'</strong><small>je Saison</small></div>'+
+    '<div><span class="gk">Rahmen frei</span><strong class="t">'+geld(L.frei)+'</strong><div class="bk"><i style="width:'+Math.min(100,L.schuld/L.rahmenGes*100)+'%;--bf:var(--acht)"></i></div><small class="t">'+pz(L.schuld/L.rahmenGes,0)+' von '+z1(L.rahmenGes)+' C genutzt</small></div>'+
+    '<div><span class="gk">Schuldendienst</span><strong class="t'+(quote>.2?' minus':'')+'">'+pz(quote)+'</strong><div class="bk"><i style="width:'+Math.min(100,quote/.2*100)+'%;--bf:'+(quote>.2?'var(--warn)':quote>.1?'var(--acht)':'var(--gut)')+'"></i></div><small>Grenze 20 % der Planeinnahmen</small></div>'+
+  '</div>';
+  if(!ks.length){
+    h+='<div class="leer"><strong>Kein Kredit läuft</strong>Das Team ist schuldenfrei. Der Rahmen von <b class="t">'+geld(L.frei)+'</b> steht ab Saison 1 offen (15 % der Kasse + 30 % des Kaderwerts von '+z1(WIR.mv)+' C).</div>'+
+       '<div class="tp"><div class="tpk"><h3>So wird ein Kredit getilgt</h3></div><div class="kb" style="padding-top:0;color:var(--leise);line-height:1.35"><p style="margin:.2em 0">Jeder Kredit läuft in <b style="color:var(--creme)">20 Raten je Saison</b>, eine je Spieltag. Die Rate ist über die Laufzeit gleich; am Anfang steckt mehr Zins darin, am Ende mehr Tilgung.</p><p style="margin:.5em 0">In der GuV zählt nur der <b style="color:var(--creme)">Zins</b>. Die Tilgung senkt die Kasse, ist aber kein Verlust.</p><p style="margin:.5em 0">Vorzeitig ablösen kostet die Restschuld plus 20 % der Zinsen, die dem Geber entgehen.</p></div></div>';
+    document.getElementById("p1").innerHTML=h;return;
+  }
+  var so=Z.so1,W={geber:function(k){return k.geber},P:function(k){return k.P},rest:function(k){return k.rest},z:function(k){return k.z},lzr:function(k){return k.offen},rate:function(k){return k.pl.a}};
+  var liste=sortiere(ks,W[so.k],so.d,function(k){return k.geber});
+  h+='<div class="tl"><div class="th">'+kopf("geber","Geber",so)+kopf("P","Aufgen.",so,"r")+kopf("rest","Restschuld",so,"r")+kopf("z","Zins",so,"r")+kopf("lzr","Restlaufzeit",so,"r")+kopf("rate","Rate",so,"r")+'<span class="r">Aktion</span></div>';
+  liste.forEach(function(k){var idx=ks.indexOf(k);
+    h+='<div class="tz'+(idx===Z.kredit?' sel':'')+'" data-kr="'+idx+'" tabindex="0"><span class="geber"><span class="gi">'+(k.gid?'<img src="../'+logo(k.gid)+'" alt="">':ic("bank"))+'</span><span><b>'+esc(k.geber)+'</b><small>seit Spieltag '+k.von+' · '+k.lz+(k.lz===1?' Saison':' Saisons')+'</small></span></span>'+
+      '<span class="r z t">'+z1(k.P)+'</span><span class="r gz t"><b>'+z1(k.rest)+' C</b><small>'+pz(1-k.rest/k.P,0)+' getilgt</small></span><span class="r z t">'+pz(k.z)+'</span>'+
+      '<span class="r gz t"><b>'+k.offen+' Raten</b><small>'+k.bez+' von '+k.pl.N+' bezahlt</small></span><span class="r gz t"><b>'+z1(k.pl.a*RATEN)+' C</b><small>'+z2(k.pl.a)+' C je Spieltag</small></span>'+
+      '<span class="r"><button class="btn klein" type="button" data-abl="'+idx+'">Ablösen</button></span></div>'});
+  h+='</div>';
+  /* Tilgungsplan des gewaehlten Kredits */
+  var k=ks[Math.min(Z.kredit,ks.length-1)],pl=k.pl;
+  h+='<div class="tp"><div class="tpk"><h3>Tilgungsplan · '+esc(k.geber)+'</h3><span class="t leise">'+z1(k.P)+' C · '+pz(k.z)+' · '+pl.N+' Raten</span><span class="sp"></span><span class="leg"><span><i style="background:var(--warn)"></i>Zins</span><span><i style="background:var(--gold)"></i>Tilgung</span><span><i style="background:var(--creme)"></i>Restschuld</span></span></div><div class="tpb">';
+  /* Chart: je Rate ein Balken (Zins unten rot, Tilgung gold), Linie = Restschuld */
+  var i=k.z/RATEN,rest=k.P,W2=600,H=210,bw=W2/pl.N,bars="",linie="M0,"+(H-H*.98),maxA=pl.a;
+  for(var n=0;n<pl.N;n++){var zi=rest*i,ti=pl.a-zi;rest=Math.max(0,rest-ti);var x=n*bw,hz=zi/maxA*H*.5,ht=ti/maxA*H*.5,bez=n<k.bez;
+    bars+='<rect x="'+(x+bw*.14).toFixed(1)+'" y="'+(H-hz).toFixed(1)+'" width="'+(bw*.72).toFixed(1)+'" height="'+hz.toFixed(1)+'" fill="#ff6058" opacity="'+(bez?.35:.95)+'"/><rect x="'+(x+bw*.14).toFixed(1)+'" y="'+(H-hz-ht).toFixed(1)+'" width="'+(bw*.72).toFixed(1)+'" height="'+ht.toFixed(1)+'" fill="#f0c35a" opacity="'+(bez?.35:.95)+'"/>';
+    linie+=" L"+((n+1)*bw).toFixed(1)+","+(H-rest/k.P*H*.98).toFixed(1)}
+  var marken="",lab="",xs=0;pl.zeilen.forEach(function(zl,j){if(j>0)marken+='<line x1="'+(xs*bw)+'" x2="'+(xs*bw)+'" y1="0" y2="'+H+'" stroke="rgba(244,230,196,.25)" stroke-dasharray="3 4"/>';if(zl.n>=8)lab+='<span style="left:'+(xs/pl.N*100)+'%">Saison '+zl.saison+'</span>';xs+=zl.n});
+  var heute=k.bez*bw;
+  h+='<div class="chart"><div class="cl gk">'+lab+'</div><svg viewBox="0 0 '+W2+' '+H+'" preserveAspectRatio="none" role="img" aria-label="Zins, Tilgung und Restschuld je Rate">'+marken+bars+'<path d="'+linie+'" fill="none" stroke="#f4e6c4" stroke-width="2.5" vector-effect="non-scaling-stroke"/><line x1="'+heute+'" x2="'+heute+'" y1="0" y2="'+H+'" stroke="#62d394" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><div class="ct"><span>Rate 1</span><span class="plus">grün: heute, '+k.bez+' Raten bezahlt</span><span>Rate '+pl.N+'</span></div></div>';
+  /* Tabelle je Saison */
+  var sz=0,st=0,jetzt=1;
+  h+='<div class="plan"><div class="th"><span>Saison</span><span class="r">Raten</span><span class="r">Zins</span><span class="r">Tilgung</span><span class="r">Summe</span><span class="r">Rest</span></div><div class="tl">';
+  pl.zeilen.forEach(function(zl){sz+=zl.zins;st+=zl.tilg;h+='<div class="tz'+(zl.saison===jetzt?' jetzt':'')+'"><span>Saison '+zl.saison+' <small class="stumm">ST '+zl.von+'–'+zl.bis+'</small></span><span class="r t">'+zl.n+'</span><span class="r t minus">'+z1(zl.zins)+'</span><span class="r t">'+z1(zl.tilg)+'</span><span class="r t"><b>'+z1(zl.zins+zl.tilg)+'</b></span><span class="r t">'+z1(zl.rest)+'</span></div>'});
+  h+='<div class="tz sum"><span>Gesamt</span><span class="r t">'+pl.N+'</span><span class="r t minus">'+z1(sz)+'</span><span class="r t">'+z1(st)+'</span><span class="r t">'+z1(sz+st)+'</span><span class="r t">0,0</span></div></div>';
+  var bx="";for(var q=1;q<=RATEN;q++)bx+='<i class="'+(q<k.von?'':q<ST?'bez':q===ST?'heu':'off')+'" data-tip="Spieltag '+q+(q<k.von?': noch kein Kredit':q<ST?': Rate bezahlt':q===ST?': nächste Rate '+z2(pl.a)+' C':': offen')+'">'+q+'</i>';
+  h+='<div class="sts"><span class="gk">Saison '+O.stand.saison+' je Spieltag · Rate '+z2(pl.a)+' C</span><div class="rw">'+bx+'</div><p>Grün bezahlt, Gold offen, kräftig Gold die nächste Rate. Zins zählt in der GuV, Tilgung nur in der Kasse.</p></div></div></div>';
+  /* Abloese: Restschuld + 20 % der entgangenen Zinsen */
+  var entg=Math.max(0,pl.a*k.offen-k.rest),geb=.2*entg;
+  h+='<div class="abl">'+ic("info")+'<span>Heute ablösen: <b class="t">'+geld(k.rest+geb)+'</b> = Restschuld '+z1(k.rest)+' + Gebühr '+z1(geb)+' (20 % der entgangenen Zinsen)</span><span class="sp"></span><span>spart <b class="t plus">'+geld(entg-geb)+'</b> Zins</span></div></div>';
+  document.getElementById("p1").innerHTML=h;
+}
+
+/* ---------- Tafel 2: Rechner ---------- */
+function baueP2(nurUnten){
+  var L=lage(),A=angebote(L),max=Math.floor(L.frei);
+  Z.betrag=Math.max(1,Math.min(max,Z.betrag));if(Z.ang>=A.length)Z.ang=0;
+  /* Angebot, das den Betrag nicht deckt, ist gesperrt; guenstigstes gueltiges ist markiert */
+  var best=-1;A.forEach(function(a,i){a.ok=a.max>=Z.betrag;if(a.ok&&(best<0||a.z<A[best].z))best=i});
+  if(!A[Z.ang].ok)Z.ang=0;
+  var a=A[Z.ang],pl=plan(Z.betrag,a.z,Z.lz,ST),rateS=pl.a*RATEN;
+  var zinsDieseSaison=pl.zeilen[0].zins,ratenDieseSaison=pl.zeilen[0].zins+pl.zeilen[0].tilg;
+  var fg=freigabe(WIR.vert),qAlt=L.rate/L.plan,qNeu=(L.rate+rateS)/L.plan;
+  var kasseNeu=WIR.cash+Z.betrag;
+  var h='<div class="pk"><h2>Neuer Kredit</h2><span class="sp"></span><span class="hin">Rechner · nichts ist gebucht</span></div><div class="re">';
+  if(WIR.cash<0){var pfl=-WIR.cash+.1*WIR.geh;h+='<div class="hinw">'+ic("acht")+'<span><b>Kasse im Minus ('+geld(WIR.cash)+').</b> Bleibt das bis zum Kassensturz, legt der Vorstand einen Pflichtkredit auf: Fehlbetrag + 10 % des Jahresgehalts = <b class="t">'+geld(pfl)+'</b>, 2 Saisons, 12 %. Ein eigener Kredit vorher kommt dem zuvor.</span></div>'}
+  h+='<div class="feld"><div class="zl"><span class="gk">Betrag</span><span class="sp"></span><strong class="t" id="bz">'+z1(Z.betrag)+' C</strong><span class="t">von '+z1(L.frei)+' C Rahmen</span></div><input type="range" id="sb" min="1" max="'+max+'" step="1" value="'+Z.betrag+'" style="--f:'+((Z.betrag-1)/(max-1)*100)+'%" aria-label="Kreditbetrag"><div class="skala t"><span>1</span><span>'+Math.round(max/2)+'</span><span>'+max+' C</span></div></div>';
+  h+='<div class="feld lz"><span class="gk">Laufzeit</span><div class="seg" role="group" aria-label="Laufzeit in Saisons">'+[1,2,3,4,5,6,8,10].map(function(n){return '<button type="button" data-lz="'+n+'" aria-pressed="'+(n===Z.lz)+'">'+n+'</button>'}).join("")+'</div><span class="leise t" style="white-space:nowrap">'+(Z.lz===1?'Saison':'Saisons')+' · '+Z.lz*RATEN+' Raten</span></div>';
+  h+='<div id="p2b" style="display:contents">';
+  h+='<div class="ang"><div class="th" style="position:static;display:grid;grid-template-columns:auto minmax(0,1fr) 4.2em 6.2em 5.4em;gap:.65em;padding:0 .6em;background:none;border:0;height:1.5em"><span style="width:1.9em"></span><span>Geber</span><span class="r">Zins</span><span class="r">Rate</span><span class="r">Zinsen</span></div>';
+  A.forEach(function(x,i){var p=plan(Z.betrag,x.z,Z.lz,ST);
+    h+='<button type="button" class="an1" data-ang="'+i+'" aria-pressed="'+(i===Z.ang)+'"'+(x.ok?'':' disabled')+'><span class="geber"><span class="gi">'+(x.gid?'<img src="../'+logo(x.gid)+'" alt="">':ic("bank"))+'</span></span><span class="geber"><span><b>'+esc(x.geber)+'</b><small>'+(i===best?'<span class="marke gut" style="font-size:.86em;margin-right:.4em">günstigstes</span>':'')+(x.gid?x.txt+z1(x.max)+' C':x.txt)+'</small></span></span>'+
+      '<span class="r z t'+(i===best?' best':'')+'">'+pz(x.z)+'</span><span class="r gz t"><b>'+z1(p.a*RATEN)+' C</b><small>'+z2(p.a)+' je Spieltag</small></span><span class="r z t minus">'+z1(p.zinsen)+' C</span></button>'});
+  h+='</div>';
+  h+='<div class="wk"><div class="wz kopf"><span>Wirkung</span><span class="r">heute</span><span></span><span class="r">mit Kredit</span><span class="r">Änderung</span></div>';
+  function wz(l,k,alt,neu,d,gut){return '<div class="wz"><span class="l">'+l+(k?'<small>'+k+'</small>':'')+'</span><span class="r t leise">'+alt+'</span><span class="pf">→</span><span class="r t"><b>'+neu+'</b></span><span class="r t '+(gut===null?'null':gut?'plus':'minus')+'">'+d+'</span></div>'}
+  h+=wz("Kasse","sofort",geld(WIR.cash),geld(kasseNeu),geld(Z.betrag,1),true)+
+     wz("Transfertopf","Freigabe "+pz(fg,0),geld(Math.max(0,WIR.cash)*fg),geld(Math.max(0,kasseNeu)*fg),geld(Math.max(0,kasseNeu)*fg-Math.max(0,WIR.cash)*fg,1),true)+
+     wz("Raten im Gehaltstopf","Fixkosten je Saison",geld(-L.rate),geld(-(L.rate+rateS)),geld(-rateS,1),false)+
+     wz("GuV Saison "+O.stand.saison,"nur der Zins zählt",geld(WIR.guv,1),geld(WIR.guv-zinsDieseSaison,1),geld(-zinsDieseSaison,1),false)+
+     wz("Raten bis Saisonende",REST+" Spieltage","–",geld(-ratenDieseSaison),geld(-ratenDieseSaison,1),false)+
+     wz("Gesamtkosten","Zinsen über die Laufzeit","–",geld(Z.betrag+pl.zinsen),geld(-pl.zinsen,1),false)+'</div>';
+  h+='<div class="quote"><div class="qz"><span class="gk">Schuldendienst an den Planeinnahmen ('+z1(L.plan)+' C)</span><b class="t'+(qNeu>.2?' minus':'')+'">'+pz(qAlt)+' → '+pz(qNeu)+'</b></div><div class="qb"><i class="'+(qNeu>.2?'rot':'neu')+'" style="width:'+Math.min(100,qNeu/.3*100)+'%"></i><i class="alt" style="width:'+Math.min(100,qAlt/.3*100)+'%"></i><u style="left:33.33%" data-t="10 % KI-Grenze"></u><u style="left:66.67%" data-t="20 % Obergrenze"></u></div></div>';
+  var sperre=qNeu>.2?"Über 20 %: der Vorstand verlangt erst Verkäufe.":fg<.6?"Sparauflage: kein freiwilliger Kredit.":"";
+  h+='<div class="fuss"><span class="txt">'+(sperre?'<b class="minus">'+sperre+'</b>':'Der Betrag landet im Transfertopf und unterliegt der Freigabe. Die Rate senkt den Gehaltstopf. Erste Rate am Spieltag '+ST+'.')+'</span><button type="button" class="btn ja"'+(sperre?' disabled':'')+'>'+ic("ok")+z1(Z.betrag)+' C aufnehmen</button></div></div></div>';
+  if(nurUnten){var t=document.createElement("div");t.innerHTML=h;document.getElementById("p2b").innerHTML=t.querySelector("#p2b").innerHTML;
+    document.getElementById("bz").textContent=z1(Z.betrag)+" C";document.getElementById("sb").style.setProperty("--f",((Z.betrag-1)/(max-1)*100)+"%");return}
+  document.getElementById("p2").innerHTML=h;
+}
+
+/* ---------- Tafel 3: Liga-Vergleich ---------- */
+function baueP3(){
+  var liste=TEAMS.filter(function(t){return Z.liga==="alle"||t.liga===WIR.liga}).map(function(t){var s=schuldVon(t);return {t:t,schuld:s.schuld,rate:s.rate,quote:s.rate/Math.max(1,t.spons),zins:bankZins(t.fin,1)}});
+  var alle=TEAMS.map(function(t){return {t:t,schuld:schuldVon(t).schuld}}),rAlle=raenge(alle,function(x){return x.schuld},false),alleBy={};alle.forEach(function(x){alleBy[x.t.id]=rAlle.get(x)});
+  var so=Z.so3,W={team:function(x){return x.t.name},schuld:function(x){return x.schuld},rate:function(x){return x.rate},quote:function(x){return x.quote},zins:function(x){return x.zins}};
+  /* Rang 1 = bester: bei Kosten und Schulden der NIEDRIGSTE Wert */
+  var rk=so.k==="team"?"schuld":so.k,rg=raenge(liste,W[rk],false);
+  var sort=sortiere(liste,W[so.k],so.d,function(x){return x.t.name});
+  var h='<div class="pk"><h2>Liga-Vergleich</h2>'+(Z.stand==="bsp"?'<span class="bsp" data-tip="Schulden der anderen Teams sind Beispielwerte. Zinssatz und Finanzwert sind echt.">Beispiel</span>':'')+'<span class="sp"></span><div class="seg"><button type="button" data-liga="2" aria-pressed="'+(Z.liga==="2")+'">Liga '+WIR.liga+'</button><button type="button" data-liga="alle" aria-pressed="'+(Z.liga==="alle")+'">Alle 32</button></div></div>';
+  h+='<div class="tl"><div class="th"><span class="m tipll" data-tip="Rang in der sortierten Spalte. Rang 1 ist der beste: geringste Schulden, kleinste Rate, niedrigster Zins.">#</span>'+kopf("team","Team",so)+kopf("schuld","Schulden",so,"r")+kopf("rate","Rate",so,"r")+kopf("quote","Dienst",so,"r","Schuldendienst: Rate je Saison geteilt durch die Planeinnahmen")+kopf("zins","Zins",so,"r tipl","Bankzins für 1 Saison, aus dem Finanzwert des Teams")+'</div>';
+  sort.forEach(function(x){var r=rg.get(x);
+    h+='<div class="tz'+(x.t.id===ICH?' wir':'')+'"><span class="rg m t">'+r+(Z.liga==="2"&&rk==="schuld"?'<small>'+alleBy[x.t.id]+'/32</small>':'')+'</span>'+teamZ(x.t.id)+
+      '<span class="r z t'+(x.schuld?'':' null')+'">'+(x.schuld?z1(x.schuld):'0')+'</span><span class="r t'+(x.rate?'':' null')+'">'+(x.rate?z1(x.rate):'–')+'</span>'+
+      '<span class="r"><span class="qz2"><span class="t'+(x.quote>.2?' minus':'')+'">'+(x.rate?pz(x.quote,0):'–')+'</span><span class="bk"><i style="width:'+Math.min(100,x.quote/.2*100)+'%;--bf:'+(x.quote>.2?'var(--warn)':x.quote>.1?'var(--acht)':'var(--gut)')+'"></i></span></span></span><span class="r t leise">'+pz(x.zins)+'</span></div>'});
+  h+='</div><div class="kf"><span>Rang 1 = geringste Schulden</span><span class="sp"></span><span>'+(Z.liga==="2"?'klein: Rang unter allen 32':'alle 32 Teams')+'</span></div>';
+  document.getElementById("p3").innerHTML=h;
+}
+function baueDemo(){
+  document.getElementById("demo").innerHTML='<b>Mockup Kredite</b>'+demoKnopf("stand","bsp","Kredite: Beispiel",Z.stand==="bsp")+demoKnopf("stand","echt","Kredite: echt (keine)",Z.stand==="echt")+'<span class="sp"></span><a href="ranks-modern-22-11.html">Ranks</a><a href="leaders-modern-22-11.html">Leaders</a>';
+}
+function alles(){baueDemo();baueKopf();baueP1();baueP2();baueP3()}
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-dk]");if(b){Z.stand=b.dataset.dv;Z.kredit=0;setzeUrl("stand",Z.stand);alles();return}
+  b=e.target.closest("[data-so]");if(b){var p=b.closest(".pan").id==="p1"?"so1":"so3",k=b.dataset.so;Z[p]=Z[p].k===k?{k:k,d:-Z[p].d}:{k:k,d:(k==="team"||k==="geber"||p==="so3")?1:-1};p==="so1"?baueP1():baueP3();return}
+  b=e.target.closest("[data-abl]");if(b){Z.kredit=+b.dataset.abl;baueP1();return}
+  b=e.target.closest("[data-kr]");if(b){Z.kredit=+b.dataset.kr;baueP1();return}
+  b=e.target.closest("[data-lz]");if(b){Z.lz=+b.dataset.lz;baueP2();return}
+  b=e.target.closest("[data-ang]");if(b&&!b.disabled){Z.ang=+b.dataset.ang;baueP2();return}
+  b=e.target.closest("[data-liga]");if(b){Z.liga=b.dataset.liga;baueP3();return}
+});
+document.addEventListener("input",function(e){if(e.target.id==="sb"){Z.betrag=+e.target.value;baueP2(true)}});
+alles();
+</script>
+</body>
+</html>
