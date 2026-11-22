@@ -298,7 +298,7 @@ test("local cockpit flow is playable through the UI", async ({ page }) => {
 
   expect(freshSave.gameState.teams).toHaveLength(32);
   expect(
-    freshSave.gameState.teams.every((team) => Number(team.cash.toFixed(2)) === Number(team.budget.toFixed(2))),
+    freshSave.gameState.teams.every((team) => Number(team.cash.toFixed(2)) === Number((team.budget + (freshSave.gameState.seasonState.startbudgetStaffel?.aufschlag?.[team.teamId] ?? 0)).toFixed(2))),
   ).toBe(true);
   expect(
     Object.values(freshSave.gameState.seasonState.standings ?? {}).every((entry) => (entry?.points ?? 0) === 0),

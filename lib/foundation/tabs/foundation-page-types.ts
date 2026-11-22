@@ -2085,6 +2085,7 @@ export type NewGameTeamPreview = {
   shortCode: string;
   name: string;
   budget: number;
+  startkasse?: number;
   startRank: number;
   controlMode: TeamControlMode;
   ownerId: string;

@@ -4227,6 +4227,12 @@ export type SeasonState = {
    * Stempel oder gehoert er zu einer anderen Saison, gilt der alte Weg (alles am Saisonende).
    */
   finanzenJeSpieltag?: { seasonId: string; version: "v1" } | null;
+  /**
+   * STARTBUDGET-STAFFEL (22.11., lib/resolve/startbudget-staffel.ts): Aufschlag auf die Startkasse je Team nach Budget-Platz
+   * (`20 + 2 x (32 - Platz)`), gesetzt NUR beim Anlegen eines Spiels. `team.budget` bleibt die Basis (Rang, Stufen), `team.cash` startet bei
+   * budget + aufschlag. Fehlt der Stempel (bestehender Spielstand), gab es keinen Aufschlag.
+   */
+  startbudgetStaffel?: { regel: "alt" | "neu"; aufschlag: Record<string, number> } | null;
   /** Ledger der Spieltagsbuchungen (je Team und Spieltag eine Zeile), siehe `SpieltagFinanzBuchung`. */
   spieltagFinanzen?: SpieltagFinanzBuchung[];
   /**

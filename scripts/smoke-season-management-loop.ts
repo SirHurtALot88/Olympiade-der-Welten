@@ -13,6 +13,7 @@ import {
   previewLocalTransfermarktSell,
 } from "@/lib/market/transfermarkt-local-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
+import { startbudgetStaffelAufschlag } from "@/lib/resolve/startbudget-staffel";
 
 type SmokeCandidate = {
   teamId: string;
@@ -76,7 +77,7 @@ function validateFreshSeasonStart(saveId: string) {
         ? Number((roster.reduce((sum, entry) => sum + entry.contractLength, 0) / roster.length).toFixed(1))
         : null;
 
-    if (row.budget !== row.cash) {
+    if (Math.abs(row.budget + startbudgetStaffelAufschlag(gameState, row.teamId) - row.cash) > 0.005) {
       throw new Error(`Fresh save budget/cash mismatch for ${row.teamId}: budget=${row.budget}, cash=${row.cash}`);
     }
     if (row.rosterCount !== roster.length) {
