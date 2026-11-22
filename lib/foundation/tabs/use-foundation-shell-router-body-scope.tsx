@@ -811,6 +811,7 @@ import {
   EMPTY_MULTI_SEASON_BALANCE_DASHBOARD,
 } from "@/lib/foundation/tabs/use-cockpit-panel-derivations";
 import type { VorstandAktionEingabe } from "@/lib/finance/vorstand-aktion-typen";
+import type { AusruestungAktion } from "@/lib/ausruestung/ausruestung-aktionen";
 import {
   HISTORY_ALL_SEASONS_FILTER,
   TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE,
@@ -6344,6 +6345,40 @@ export function useFoundationShellRouterBodyScope({
       const payload = (await response.json()) as { ok?: boolean; reason?: string | null; meldung?: string };
       // Auch ein abgelehnter Antrag aendert den Spielstand (Vermerk fuer die Anzeige): immer neu laden.
       if (payload.reason === "vorstand_lehnt_ab" || (response.ok && payload.ok)) await loadSave(activeSaveId);
+      return { ok: Boolean(response.ok && payload.ok), reason: payload.reason ?? null, meldung: payload.meldung ?? "" };
+    } catch {
+      return { ok: false, reason: "network_error", meldung: "Keine Verbindung zum Server." };
+    }
+  }
+
+  /**
+   * Ausruestung (Phase 1a, 22.11.): Truhe oeffnen, Fund waehlen, Kiste verwerfen, Teil zerlegen. Gleiches Muster wie die
+   * Vorstand-Aktion: POST, dann den Spielstand neu laden. Immer das aktive Team des Managers, nie ein fremdes; der Server prueft
+   * den Besitz ueber `authorizeServerRoomWrite` und liest den Stand frisch (die Lager fremder Teams kennt der Browser nicht).
+   */
+  async function ausruestungAktion(input: AusruestungAktion): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available", meldung: "Nur lesbar." };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available", meldung: "Dieses Team gehoert dir nicht." };
+    }
+    try {
+      const response = await fetch("/api/ausruestung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          ...input,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null; meldung?: string };
+      if (response.ok && payload.ok) await loadSave(activeSaveId);
       return { ok: Boolean(response.ok && payload.ok), reason: payload.reason ?? null, meldung: payload.meldung ?? "" };
     } catch {
       return { ok: false, reason: "network_error", meldung: "Keine Verbindung zum Server." };
@@ -13433,6 +13468,7 @@ export function useFoundationShellRouterBodyScope({
     orderedDisciplines,
     originateLoanForActiveTeam,
     vorstandBudgetAktion,
+    ausruestungAktion,
     kannVerwaltenAktivesTeam: Boolean(activeManagerTeamId && canManageTeamId(activeManagerTeamId)),
     repayLoanEarlyForActiveTeam,
     ownerQuickSwitchTeams,

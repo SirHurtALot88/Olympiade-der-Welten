@@ -252,6 +252,10 @@ const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/F
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
 });
+const FoundationAusruestungHost = dynamic(() => import("@/app/foundation/ausruestung/FoundationAusruestungHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Ausrüstung wird geladen…" />,
+});
 const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-arena/FoundationBattleArenaHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Entwurf wird geladen…" />,
@@ -492,6 +496,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   orderedDisciplines,
   originateLoanForActiveTeam,
   vorstandBudgetAktion,
+  ausruestungAktion,
   kannVerwaltenAktivesTeam,
   repayLoanEarlyForActiveTeam,
   persistenceError,
@@ -3291,6 +3296,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
               onVorstandAktion={vorstandBudgetAktion}
               onOpenOffice={() => navigateHomeTab("office")}
+              kannVerwalten={kannVerwaltenAktivesTeam}
+            />
+          ) : null}
+
+          {activeView === "ausruestung" ? (
+            <FoundationAusruestungHost
+              gameState={gameState}
+              teamId={activeManagerTeamId}
+              onAktion={ausruestungAktion}
               kannVerwalten={kannVerwaltenAktivesTeam}
             />
           ) : null}

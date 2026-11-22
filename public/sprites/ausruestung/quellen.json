@@ -1,0 +1,36 @@
+{
+ "_hinweis": "Icon-Probe Ausrüstung (22.11.): drei der acht Familien, je eine Stufe. PixelLab /create-image-pixflux, no_background, je ein POST ohne Wiederholung unter flock, je 1,0 Generation. Bisher nur in public/mockups/gm-galerie-22-11.html genutzt.",
+ "helm-standard.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "64x64",
+  "bezug": "Familie Helm, Standard (Einfacher Helm)",
+  "saat": 31,
+  "generationen": 1.0,
+  "guthaben_vorher": 271.54,
+  "guthaben_nachher": 270.54,
+  "prompt": "simple plain iron sports helmet with leather chin strap, grey steel, single item icon, pixel art game item, 16-bit RPG style, clean dark outline"
+ },
+ "plattenpanzer-selten.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "64x64",
+  "bezug": "Familie Plattenpanzer, Selten (Verstärkter Plattenpanzer)",
+  "saat": 32,
+  "generationen": 1.0,
+  "guthaben_vorher": 270.54,
+  "guthaben_nachher": 269.54,
+  "prompt": "reinforced steel plate chest armor with blue enamel trim and rivets, torso armor only, single item icon, pixel art game item, 16-bit RPG style, clean dark outline"
+ },
+ "amulett-legendaer.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "64x64",
+  "bezug": "Familie Amulett, Legendär (Herz der Qual)",
+  "saat": 33,
+  "generationen": 1.0,
+  "guthaben_vorher": 269.54,
+  "guthaben_nachher": 268.54,
+  "prompt": "legendary golden amulet on a chain with a glowing dark red heart shaped crystal wrapped in thorns, single item icon, pixel art game item, 16-bit RPG style, clean dark outline"
+ }
+}

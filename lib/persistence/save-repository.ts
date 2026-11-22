@@ -32,6 +32,7 @@ import { stempleHockeyTorwart } from "@/lib/resolve/hockey-torwart";
 import { stempleFormkartenRegelNachLaden } from "@/lib/resolve/formkarten-regel";
 import { stempleBasketballPuste } from "@/lib/resolve/basketball-puste";
 import { stempleBreakingFormat } from "@/lib/resolve/breaking-format";
+import { stempleAusruestungRegel } from "@/lib/ausruestung/ausruestung-regel";
 import { stempleBattlefieldFormat } from "@/lib/resolve/battlefield-format";
 import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
 import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
@@ -168,6 +169,9 @@ type GameMetadata = {
   // Load (Reload, neue Sitzung, Serverneustart) baute den Spielstand ohne dieses Feld neu auf —
   // "0 Einträge. Noch nichts gemerkt.", obwohl gerade gemerkt wurde.
   merkliste?: MerklisteEintrag[];
+  // AUSRUESTUNG (22.11., lib/ausruestung/*): Besitz je Team (Lager, Teile, Ruhm, Truhen). Wie `merkliste` auf der obersten Ebene des
+  // Spielstands; ohne diese drei Stellen (Typ, Schreib- und Lesezweig) ueberlebt keine Truhe einen Kalt-Load.
+  ausruestung?: GameState["ausruestung"];
 };
 
 type PlayerSavePayload =
@@ -1401,6 +1405,8 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     // Merkliste (Lesezeichen auf Teams/Spieler) wiederherstellen — siehe Begründung am Typ
     // `GameMetadata` oben.
     ...(gameMetadata?.merkliste ? { merkliste: gameMetadata.merkliste } : {}),
+    // Ausruestung (Besitz je Team) wiederherstellen — siehe `GameMetadata`.
+    ...(gameMetadata?.ausruestung ? { ausruestung: gameMetadata.ausruestung } : {}),
     season,
     seasonState,
     matchdayState,
@@ -1442,7 +1448,8 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): gleiches Muster.
   // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): ohne Stempel rechnet die laufende Saison "alt" zu Ende.
   // BREAKING-FORMAT (22.11., lib/resolve/breaking-format.ts): gleiches Muster.
-  const gameStateWithoutBaseline = stempleFormkartenRegelNachLaden(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+  // AUSRUESTUNGS-REGEL (22.11., lib/ausruestung/ausruestung-regel.ts): gleiches Muster (Wechselliste je Saison).
+  const gameStateWithoutBaseline = stempleAusruestungRegel(stempleFormkartenRegelNachLaden(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
@@ -1466,7 +1473,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  )))))))));
+  ))))))))));
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),
@@ -1869,6 +1876,8 @@ function createPersistedSaveRecord(input: {
       // Merkliste (Lesezeichen auf Teams/Spieler) dauerhaft schreiben — siehe Begründung am Typ
       // `GameMetadata` oben. Ohne diese Zeile ueberlebt kein Stern einen Kalt-Load.
       merkliste: guardedGameState.merkliste,
+      // Ausruestung (Besitz je Team) dauerhaft schreiben — siehe `GameMetadata`.
+      ausruestung: guardedGameState.ausruestung,
     } satisfies GameMetadata);
     replaceSingleton("mapping_reports", input.saveId, guardedGameState.mappingReport);
     replacePlayerBaselinesForSave(input.saveId, guardedGameState.playerBaselines, updatedAt);

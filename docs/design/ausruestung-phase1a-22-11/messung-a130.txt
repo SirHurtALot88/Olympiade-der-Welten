@@ -1,0 +1,26 @@
+SONDE a > 100 · 8 Spiele je Paarung, 3 Paarung(en), je Bedingung 48 gepaarte Spiele
+Aufschlag: +30 auf jedes Attribut mit Matrixgewicht, a bis 130 (A) bzw. bei 100 gekappt (B), d um die gewichtete Summe
+
+Disziplin        Chassis     Quote A  Quote B  zA     zB      rho Basis  rho A   eig max (Basis/A)  nicht endlich  negativ (Basis/A)  Befund
+tdm              arena       100.0%  100.0%    4.90   4.87    0.91    0.94     86 / 116           0             0 / 0      sauber, Teil ueber 100 wirkt nicht zusaetzlich
+mini-dm          arena       100.0%  100.0%    1.94   1.94    0.33    0.71     75 / 106           0             0 / 0      sauber, Teil ueber 100 wirkt nicht zusaetzlich
+battlefield      arena       100.0%   97.9%    1.80   1.80    0.50    0.79     73 / 103           0             0 / 0      sauber, Teil ueber 100 wirkt nicht zusaetzlich
+gewichtheben     buehne      100.0%  100.0%    5.26   4.93    0.88    0.95     81 / 111           0             0 / 0      sauber, Teil ueber 100 wirkt zusaetzlich
+climbing         bahn        100.0%  100.0%    4.25   4.29    0.82    0.92     79 / 109           0           288 / 576    sauber, Teil ueber 100 wirkt nicht zusaetzlich
+staffel          bahn        100.0%  100.0%   10.57  10.62    0.92    0.96     85 / 115           0           288 / 576    sauber, Teil ueber 100 wirkt nicht zusaetzlich
+time-trial       bahn        100.0%   97.9%    6.83   6.53    0.94    0.97     82 / 112           0             0 / 0      sauber, Teil ueber 100 wirkt zusaetzlich
+spurt            bahn        100.0%  100.0%    5.11   5.00    0.92    0.98     70 / 100           0           288 / 576    sauber, Teil ueber 100 wirkt nicht zusaetzlich
+tennis           buehne      100.0%  100.0%    5.42   5.19    0.89    0.95     93 / 123           0             0 / 0      sauber, Teil ueber 100 wirkt nicht zusaetzlich
+hockey           feldspiel   100.0%  100.0%    5.25   5.16    0.70    0.81     83 / 113           0             1 / 45     sauber, Teil ueber 100 wirkt nicht zusaetzlich
+showcase         buehne      100.0%  100.0%    5.51   5.24    0.83    0.91     85 / 115           0             0 / 0      sauber, Teil ueber 100 wirkt zusaetzlich
+speed-schach     buehne      100.0%  100.0%    4.17   4.05    0.95    0.97     78 / 108           0             0 / 0      sauber, Teil ueber 100 wirkt nicht zusaetzlich
+takeshis-castle  bahn        100.0%  100.0%    3.97   3.78    0.91    0.97     73 / 103           0            66 / 70     sauber, Teil ueber 100 wirkt nicht zusaetzlich
+breaking         buehne      100.0%  100.0%    5.69   5.45    0.85    0.90     75 / 105           0             0 / 0      sauber, Teil ueber 100 wirkt nicht zusaetzlich
+wettessen        buehne      100.0%  100.0%    9.30   8.54    0.92    0.92     87 / 117           0             0 / 0      sauber, Teil ueber 100 wirkt zusaetzlich
+basketball       feldspiel   100.0%  100.0%    6.72   6.33    0.89    0.90     94 / 124           0             1 / 9      sauber, Teil ueber 100 wirkt zusaetzlich
+football         feldspiel   100.0%  100.0%    6.18   5.95    0.87    0.93     84 / 114           0            64 / 277    sauber, Teil ueber 100 wirkt nicht zusaetzlich
+eiskunstlauf     buehne      100.0%  100.0%    6.40   6.18    0.92    0.96     97 / 127           0             0 / 0      sauber, Teil ueber 100 wirkt nicht zusaetzlich
+fechten          buehne      100.0%  100.0%    8.53   8.02    0.88    0.96     82 / 112           0             0 / 0      sauber, Teil ueber 100 wirkt zusaetzlich
+i-spy            buehne      100.0%  100.0%    4.42   4.32    0.87    0.94     73 / 103           0             0 / 0      sauber, Teil ueber 100 wirkt nicht zusaetzlich
+
+Laufzeit 336 s. SE = Standardfehler der Siegquote bei 48 Spielen (konservativ, p = 50 %).
