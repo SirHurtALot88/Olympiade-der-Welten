@@ -122,7 +122,7 @@ describe("Hockey-Torwart: Stempel beim Laden", () => {
     expect(arenaFormatByDisciplineId(spielstand([]), "md-1", "tennis")).toBeUndefined();
     expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-1", "hockey")).toEqual({ hockey: "alt" });
     expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-2", "hockey")).toEqual({ hockey: "neu" });
-    expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-2", "alle")).toEqual({ climbing: "canyon", hockey: "neu" });
+    expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-2", "alle")).toEqual({ climbing: "canyon", hockey: "neu", basketball: "neu" });
   });
 });
 

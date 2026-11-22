@@ -9897,6 +9897,10 @@
       label:"Basketball", jeSeite:6, zuegeJeSeite:12, zugDauer:60/(12*2*2),
       punkteNah:2, punkteFern:3, fernAnteil:0.32,
       wortAbwehr:"Steal", wortBlock:"Block", wortRebound:"Rebound",
+      // PUSTE (22.11., docs/design/basketball-puste-22-11.md): Rezept und Begruendung stehen an BB_PUSTE_KONSTANTE
+      // (Block "BASKETBALL-PUSTE" unten). Als Getter, damit die alte Regel (Rueckweg `OLY_BASKETBALL_PUSTE=alt`) exakt
+      // so aussieht wie vor dem 22.11.: ohne `art.puste` ist jede Puste-Zeile im Motor wirkungslos (pusteMax 0).
+      get puste(){ return bbPusteAn()?BB_PUSTE:undefined; },
       // LIVE-BLOCK: die Kennzeichnung "diese Disziplin faehrt den Live-Motor" und alles,
       // was der Motor an disziplinabhaengigen Zahlen braucht. Bis hierher stand das in
       // Konstanten mit BASKETBALL im Namen (VIERTEL_ANZAHL_BASKETBALL und so fort) und
@@ -12967,8 +12971,16 @@
     u.weg=(u.weg||0)+weg;
     const P=FB().puste;
     const regen=P.regen*(aufDemEis(u)?1:(P.strafbankRegen??1));
-    u.puste=Math.max(0,Math.min(u.pusteMax,u.puste+regen*dt-weg*P.jePx));
+    // Ballfuehrung kostet (nur Basketball-Rezept: `ballJeSek` fehlt bei Hockey, dort ist die Zeile rechnerisch nicht da).
+    const ball=(P.ballJeSek&&u.hatBall)?P.ballJeSek*dt:0;
+    u.puste=Math.max(0,Math.min(u.pusteMax,u.puste+regen*dt-weg*P.jePx-ball));
     if(u.puste<u.pusteMin)u.pusteMin=u.puste;
+    // Ticker-Hinweis (nur Anzeige): einmal, wenn die Puste unter 25 % faellt; erst nach der Erholung ueber 55 % wieder.
+    if(P.ballJeSek!=null){
+      const anteil=u.puste/u.pusteMax;
+      if(anteil<0.25&&!BB_PUSTE_MUEDE.has(u)){ BB_PUSTE_MUEDE.add(u); feed(u.side,u.n+" ist außer Puste."); }
+      else if(anteil>0.55)BB_PUSTE_MUEDE.delete(u);
+    }
   }
   // SCHUSSWEITEN. Basketballs Staffel (dunk 42 / nah 94 / mit 112,8 / fern 170) kommt aus
   // der Geometrie eines Courts und passt auf dem Eis nirgends hin: die Hockey-Slots liegen
@@ -13268,6 +13280,33 @@
   // gegengeprueft. Bericht: docs/design/hockey-torwart-konstanten-nachgezogen.md.
   const HK_TW_REF=0.871, HK_TW_BASIS=9.13, HK_TW_GSAA_K=2.0;
 
+  // ============================== BASKETBALL-PUSTE (22.11.) ==============================
+  // Arbeitsliste 21.11., Welle 4: „Basketball: Puste; Maru-Fall ST7 (fast null Beteiligung) pruefen.“ Das Feldspiel-Chassis
+  // fuehrt die Puste seit dem Hockey-Bau (FELDSPIEL_ART.hockey.puste: Vorrat aus AUSDAUER, Netto-Modell, Leiste unter den
+  // Fuessen); Basketball hatte kein Rezept, sein AUSDAUER-Sub-Skill (stamina 48, spirit 22, torment 18, speed 12) war
+  // „mechanisch tot“ (battle-mode.rezepte.js). Hier bekommt er seinen Kanal:
+  //   * Vorrat = basis + AUSDAUER x jeAusdauer; Verbrauch je gelaufenem Pixel (`jePx`) UND je Sekunde mit dem Ball (`ballJeSek`:
+  //     wer viel den Ball fuehrt, wird muede -- der Stern zuerst); Regeneration `regen` je Sekunde, `pause` = Anteil des
+  //     Vorrats, der zwischen den Vierteln zurueckkommt.
+  //   * Wirkung: Tempo (`tempoMin`), Rebound-Gerangel (`zweikampfMin`), die Pass-Lotterie (`passMin`: ein erschoepfter
+  //     Spieler wird seltener angespielt -- die Ballverteilung flacht ab, der Stern klebt nicht am Ball) und die
+  //     Wurfquote (`wurfMin`, nur Faktor auf die Trefferchance, kein Wurf mehr oder weniger).
+  //   * Alles ist `pusteMax>0`-gegatet: ohne Rezept (alte Regel) bleibt jede Zeile rechnerisch nicht vorhanden.
+  // Rueckweg: OLY_BASKETBALL_PUSTE=alt (Stempel, lib/resolve/basketball-puste.ts), Messhebel `basketballPuste("alt"|obj|null)`.
+  // Zahlen KALIBRIERT (docs/design/basketball-puste-22-11.md Abschnitt 3): in Basketball laeuft jeder Spieler fast dauernd (rund 78000 px
+  // je Spiel, Stern wie Rollenspieler), `jePx` allein unterscheidet also kaum -- die Streuung kommt aus dem Vorrat (AUSDAUER) und aus der
+  // Ballfuehrung. Ziel: tiefster Stand im Mittel um die Haelfte, Stern 45-55 %, ein Fuenftel der Spieler unter 30 %.
+  const BB_PUSTE_KONSTANTE={an:true, basis:20, jeAusdauer:1.42, regen:0.34, jePx:0.0028, ballJeSek:1.0, pause:0.28,
+    strafbankRegen:1, tempoMin:0.90, wuchtMin:1, zweikampfMin:0.82, passMin:0.70, passBoden:0.5, wurfMin:0.94,
+    checkGeben:0, checkNehmen:0, kontrastSkala:40, kontrastGewicht:0.5};
+  let BB_PUSTE={...BB_PUSTE_KONSTANTE};
+  let BB_PUSTE_EXPLIZIT=false;
+  const BB_PUSTE_MUEDE=new WeakSet();
+  function bbPusteAn(){
+    if(BB_PUSTE_EXPLIZIT)return BB_PUSTE.an;
+    const f=echterKader&&echterKader.formatByDisciplineId&&echterKader.formatByDisciplineId.basketball;
+    return f==="alt"?false:BB_PUSTE.an;
+  }
   // TORWART-REGEL (22.11., docs/design/hockey-torwart-22-11.md): zwei Aenderungen an dem, was ein Torwart halten
   // kann, beide nur ueber Attribute, die die Matrix schon gewichtet.
   //   gueteEig   Nebenweg ueber die Eignung. PARADE (awareness/will/determination/health/dexterity) hat auf der
@@ -15551,10 +15590,20 @@
     // Ereignis (cutBis) erweitert statt den bestehenden rollBis-Zweig umzuwidmen — beide
     // Fenster koennen sich zeitlich ueberlappen (ein Schneider, der danach noch zum
     // Screen gerufen wird), ohne dass sich der Bonus verdoppelt.
-    return gewichtetesLosNach(mitspieler,m=>
+    const passGewicht=m=>
       losGewicht(m.ABSCHLUSS,USAGE_KAPPA)*Math.pow(qualitaet(m),2)
       *offenheitFuerPass(von,m)*abwehrTeiler(m)*((m.rollBis>fsT||m.cutBis>fsT)?GIVE_AND_GO_PASS_MUL:1)
-      *(m===ausbrecher&&fsT<(m.ausbruchBis||0)?AUSBRUCH_PASS_MUL:1));
+      *(m.pusteMax>0&&FB().puste.passMin!=null?pusteFaktor(m,FB().puste.passMin):1)
+      *(m===ausbrecher&&fsT<(m.ausbruchBis||0)?AUSBRUCH_PASS_MUL:1);
+    // BASKETBALL-PUSTE (22.11.): Beteiligungsboden `passBoden` -- jeder Mitspieler bekommt zusaetzlich ein Gewicht in Hoehe dieses
+    // Anteils vom Mittel der Gewichte aller Anspielstationen (nur mit Puste-Rezept; sonst exakt der alte Aufruf).
+    const boden=mitspieler.length>1&&FB().puste&&FB().puste.passBoden>0?FB().puste.passBoden:0;
+    if(boden>0){
+      let sw=0; for(const m of mitspieler)sw+=Math.max(0.01,passGewicht(m));
+      const zusatz=boden*sw/mitspieler.length;
+      return gewichtetesLosNach(mitspieler,m=>Math.max(0.01,passGewicht(m))+zusatz);
+    }
+    return gewichtetesLosNach(mitspieler,passGewicht);
   }
 
   // Der Ballfuehrer entscheidet — gedrosselt ueber reevBall, dieselbe Grundidee wie
@@ -15990,7 +16039,10 @@
     // s. verbucheFreiwurf) — der Treffer-Teil wird gleich unten in loeseFlugAuf gezaehlt,
     // sobald flug.treffer bekannt ist.
     schuetze.feldwuerfe++;
-    const treffer=rr()<technik; // gewuerfelt beim Abwurf, enthuellt bei Ankunft — deterministisch
+    // BASKETBALL-PUSTE (22.11.): ein erschoepfter Schuetze trifft etwas schlechter (`wurfMin`, nur Faktor auf die Chance, kein Wurf mehr
+    // oder weniger; ohne Puste-Rezept ist die Zeile rechnerisch nicht vorhanden: x*1 === x).
+    const technikP=technik*(schuetze.pusteMax>0&&FB().puste.wurfMin!=null?pusteFaktor(schuetze,FB().puste.wurfMin):1);
+    const treffer=rr()<technikP; // gewuerfelt beim Abwurf, enthuellt bei Ankunft — deterministisch
     const fern=tier==="fern";
     // NUR BASKETBALL, K3-Analog zu Hockeys xg (s. dortiger Kommentar bei loeseHockeySchuss):
     // `technik` ist hier bereits die volle Trefferwahrscheinlichkeit des Feldkorbversuchs,
@@ -16001,7 +16053,7 @@
     // Ausserhalb von Basketball bleibt u.xp bei 0 und ungelesen (feldspielWert liest u.xp
     // nur im Basketball-Zweig).
     if(feldspielDisc==="basketball")
-      schuetze.xp=(schuetze.xp||0)+technik*(fern?art.punkteFern:art.punkteNah);
+      schuetze.xp=(schuetze.xp||0)+technikP*(fern?art.punkteFern:art.punkteNah);
     // Nur fuer die Wurfmechanik-Abnahme (s. fsZuege()-Debughook): die tatsaechliche
     // Distanz zum Korb IM Abwurfmoment, damit sich die Tier-Klassifizierung nachtraeglich
     // gegen die echte Geometrie pruefen laesst, ohne die Spiellogik selbst zu beeinflussen.
@@ -73288,6 +73340,16 @@
       else HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE};
       return vorher;
     },
+    // BASKETBALL-PUSTE (22.11.) -- MESSHEBEL, dasselbe Muster wie `hockeyTorwart`: `basketballPuste(obj|"alt"|null)` stellt das Rezept fuer
+    // Messung/Rueckweg um und liefert das vorherige zurueck; "alt" = an:false, null = Spielkonstante.
+    basketballPuste:(r)=>{
+      const vorher={...BB_PUSTE};
+      BB_PUSTE_EXPLIZIT=r!=null;
+      if(r==="alt")BB_PUSTE={...BB_PUSTE_KONSTANTE,an:false};
+      else if(r&&typeof r==="object")BB_PUSTE={...BB_PUSTE_KONSTANTE,...r};
+      else BB_PUSTE={...BB_PUSTE_KONSTANTE};
+      return vorher;
+    },
     hockeyTwGsaxK:(k)=>{
       const vorher=HK_TW_GSAX_K;
       HK_TW_GSAX_K=Number.isFinite(k)?k:HK_TW_GSAX_K_KONSTANTE;
@@ -73448,6 +73510,10 @@
             :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:eigVon(u),torwart:!!u.torwart,slotId:u.slotId||null,
               // HOCKEY-TORWART-DIAGNOSE (22.11., nur mit `o.hockeyDiag`): Parade-Wert, Ausdauer und die
               // Schusszaehler des Torwarts je Spiel -- reine Messhilfe, ohne die Option fehlt das Feld.
+              // BETEILIGUNGS-DIAGNOSE (22.11., nur mit `o.beteiligungDiag`): Ballaktionen und Puste je Spieler
+              // (scripts/miss-basketball-beteiligung.mjs) -- reine Messhilfe, ohne die Option fehlt das Feld.
+              ...(o.beteiligungDiag?{bet:{fga:u.feldwuerfe||0,assists:u.assists||0,rebounds:u.rebounds||0,steals:u.steals||0,
+                bloecke:u.bloecke||0,verluste:u.verluste||0,punkte:u.punkte||0,pusteMin:+((u.pusteMin||0).toFixed(1)),pusteMax:u.pusteMax||0,weg:Math.round(u.weg||0),puste:+((u.puste||0).toFixed(1))}}:{}),
               ...(o.hockeyDiag&&u.torwart?{diag:{parade:u.PARADE,ausd:u.AUSDAUER,saves:u.saves,gegentore:u.gegentore,
                 xgGegen:+((u.xgGegen||0).toFixed(3)),xgAkt:+((HK_XG_AKT.get(u)||0).toFixed(3)),pusteMin:+((u.pusteMin||0).toFixed(1)),
                 pusteMax:u.pusteMax||0,punkte:u.punkte}}:{})}))
@@ -73486,6 +73552,7 @@
               // `feld` die tatsaechlich zurueckgegebenen `teilnehmer` entstehen.
               ...(u.slotId!=null?{slotId:u.slotId}:{}),
               ...(u.diag?{diag:u.diag}:{}),
+              ...(u.bet?{bet:u.bet}:{}),
               ...(u.kulisseOW!=null?{eigKulisse:Math.round(u.eigKulisse*100)/100,kulisse:u.kulisse,
                 kulisseOW:Math.round(u.kulisseOW*100)/100}:{}),
               // ZUGANGS-DIAGNOSE durchreichen (s. `feld` oben) — `zugang` ist immer eine

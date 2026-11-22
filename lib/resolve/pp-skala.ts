@@ -90,19 +90,20 @@ export function ppSkalaAktiv(gameState?: Parameters<typeof ppSkalaVersionFuer>[0
  * Einsaetze je Zelle, die Disziplin-weiten Anker mitteln ueber alle Feldgroessen.
  */
 /** Anker-Variante eines Spieltags (Format bzw. Regel, nach der er gebucht wurde). */
-export type PpSkalaAnkerVariante = "orte3" | "torwartAlt";
+export type PpSkalaAnkerVariante = "orte3" | "torwartAlt" | "pusteAlt";
 
 export function ppSkalaAnker(
   disciplineId: string | null | undefined,
   playerCount?: number | null,
   /**
    * "orte3": Battlefield-Pod im alten Format (Anker unter `battlefieldOrte3`, 22.11.);
-   * "torwartAlt": Hockey-Spieltag mit der alten Torwart-Regel (Anker unter `hockeyAlt`, 22.11.); sonst weglassen.
+   * "torwartAlt": Hockey-Spieltag mit der alten Torwart-Regel (Anker unter `hockeyAlt`, 22.11.);
+   * "pusteAlt": Basketball-Spieltag mit der alten Puste-Regel (Anker unter `basketballPusteAlt`, 22.11.); sonst weglassen.
    */
   variante?: PpSkalaAnkerVariante,
 ): PpSkalaAnker | null {
   if (!disciplineId) return null;
-  const suffix = variante === "orte3" ? "Orte3" : variante === "torwartAlt" ? "Alt" : null;
+  const suffix = variante === "orte3" ? "Orte3" : variante === "torwartAlt" ? "Alt" : variante === "pusteAlt" ? "PusteAlt" : null;
   const eintrag = (suffix ? ANKER_JE_DISZIPLIN.get(`${disciplineId}${suffix}`) : undefined) ?? ANKER_JE_DISZIPLIN.get(disciplineId);
   if (!eintrag) return null;
   if (typeof playerCount === "number" && Number.isFinite(playerCount)) {

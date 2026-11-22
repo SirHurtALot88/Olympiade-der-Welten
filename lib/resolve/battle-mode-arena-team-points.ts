@@ -190,6 +190,7 @@ import iSpyPpsReferenzJson from "@/data/generated/i-spy-pps-referenz.json";
 // (g.kaempfer[].wert aus tdmGefecht()), nicht mehr ein Mass der alten PPS-Duell-Bruecke.
 import tdmPpsReferenzJson from "@/data/generated/tdm-pps-referenz.json";
 import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
+import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
 
 /**
@@ -1293,7 +1294,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   disciplineId: string = "basketball",
   /** PP-Skala dieser Saison (`ppSkalaModus(gameState)`, lib/resolve/pp-skala.ts); "aus" = Kurve bis 5,5. */
   ppSkala: PpSkalaModus = "aus",
-  /** Hockey-Torwart-Regel dieses Spieltags; "alt" -> alte Torwart-Referenz (gezeigt = gebucht). */
+  /** Regel dieses Spieltags (Hockey-Torwart bzw. Basketball-Puste); "alt" -> alte Torwart-Referenz bzw. alte Anker (gezeigt = gebucht). */
   torwartRegel: "alt" | "neu" = "neu",
 ): Map<string, number> {
   const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld");
@@ -1325,7 +1326,12 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
             modus: ppSkala,
             playerCount,
             // Hockey-Spieltag mit der alten Torwart-Regel: die alten Anker (`hockeyAlt`), gezeigt = gebucht.
-            variante: disciplineId === "hockey" && torwartRegel === "alt" ? "torwartAlt" : undefined,
+            variante:
+              disciplineId === "hockey" && torwartRegel === "alt"
+                ? "torwartAlt"
+                : disciplineId === "basketball" && torwartRegel === "alt"
+                  ? "pusteAlt"
+                  : undefined,
           }),
         );
         continue;
@@ -1671,7 +1677,11 @@ export async function runBattleModeArenaMatchday(
     fieldSizeGewuerfelt,
     disciplineId,
     ppSkalaModus(gameState, matchdayId),
-    disciplineId === "hockey" ? hockeyTorwartFuer(gameState, matchdayId) : "neu",
+    disciplineId === "hockey"
+      ? hockeyTorwartFuer(gameState, matchdayId)
+      : disciplineId === "basketball"
+        ? basketballPusteFuer(gameState, matchdayId)
+        : "neu",
   );
 
   // Ein Team ohne Fixture an diesem Spieltag (z. B. unvollstaendige `leagueTeamIds`) bekommt

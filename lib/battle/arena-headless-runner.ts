@@ -494,7 +494,7 @@ export type VorbereitetesFixture = {
    * "standard" }`, nur fuer Climbing gesetzt -- derselbe Umschlag-Teil, den der Host fuer die Anzeige setzt
    * (gezeigt = gebucht). Fehlt fuer jede andere Disziplin, deren Umschlag damit Zeichen fuer Zeichen der alte bleibt.
    */
-  formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu" };
+  formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu"; basketball?: "alt" | "neu" };
 };
 
 /**
@@ -691,7 +691,7 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
     kulisseByDisciplineId: Record<string, string>;
     strategieByDisciplineId?: ArenaStrategieByDisciplineId;
-    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu" };
+    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu"; basketball?: "alt" | "neu" };
   }[];
   disziplin: string;
   /** Der Spieltagswurf, s. `RunArenaFixturesOptions.mutatoren` — fuer jedes Fixture derselbe. */
@@ -732,7 +732,7 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
     kulisseByDisciplineId: Record<string, string>;
     strategieByDisciplineId?: ArenaStrategieByDisciplineId;
-    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu" };
+    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu"; basketball?: "alt" | "neu" };
   }) => {
     fenster.__olyArenaKader = {
       heim: kader.heim,

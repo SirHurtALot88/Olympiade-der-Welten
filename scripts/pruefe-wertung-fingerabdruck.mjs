@@ -188,7 +188,16 @@ try {
       catch (e) { torwartAlt.push([`spiele hockey/torwart-alt ${s}`, "FEHLER " + String(e)]); }
       finally { A.hockeyTorwart(null); }
     }
-    return { aus, kontakt, standard, orte3, tdmGefecht, torwartAlt };
+    // BASKETBALL MIT DER ALTEN PUSTE-REGEL (Rueckweg seit Basketball-Puste, 22.11., docs/design/basketball-puste-22-11.md):
+    // eigene Eintraege AUSSERHALB von GESAMT; GESAMT rechnet Basketball mit der neuen Regel (Motor-Vorgabe). Die alte Regel
+    // (keine Puste, kein Beteiligungsboden) muss die frueheren `spiele basketball`-Zeilen treffen.
+    const pusteAlt = [];
+    if (A.basketballPuste) for (const s of SAATEN) {
+      try { A.basketballPuste("alt"); pusteAlt.push([`spiele basketball/puste-alt ${s}`, A.spiele("basketball", s)]); }
+      catch (e) { pusteAlt.push([`spiele basketball/puste-alt ${s}`, "FEHLER " + String(e)]); }
+      finally { A.basketballPuste(null); }
+    }
+    return { aus, kontakt, standard, orte3, tdmGefecht, torwartAlt, pusteAlt };
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
@@ -198,6 +207,8 @@ try {
   if (ergebnis.orte3?.length) console.log(`BATTLEFIELD-ORTE3 ${h(ergebnis.orte3)} (${ergebnis.orte3.length} Eintraege, nicht in GESAMT)`);
   for (const [name, wert] of ergebnis.torwartAlt || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.torwartAlt?.length) console.log(`HOCKEY-TORWART-ALT ${h(ergebnis.torwartAlt)} (${ergebnis.torwartAlt.length} Eintraege, nicht in GESAMT)`);
+  for (const [name, wert] of ergebnis.pusteAlt || []) console.log(`${h(wert)}  ${name}`);
+  if (ergebnis.pusteAlt?.length) console.log(`BASKETBALL-PUSTE-ALT ${h(ergebnis.pusteAlt)} (${ergebnis.pusteAlt.length} Eintraege, nicht in GESAMT)`);
   for (const [name, wert] of ergebnis.tdmGefecht || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.tdmGefecht?.length) console.log(`TDM-GEFECHT ${h(ergebnis.tdmGefecht)} (${ergebnis.tdmGefecht.length} Eintraege, nicht in GESAMT)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.
