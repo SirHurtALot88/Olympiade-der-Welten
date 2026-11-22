@@ -1,3 +1,4 @@
+import { BREAKING_DISCIPLINE_ID, normalisiereBreakingWaffen } from "@/lib/lineups/breaking-waffen";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { hasSlotCountSpecificRoles, resolveSlotRoleShortId } from "@/lib/lineups/matchday-slot-roles";
 import { getSeasonDisciplineScheduleEntry } from "@/lib/season/season-discipline-schedule";
@@ -82,6 +83,11 @@ export type ArenaAufstellungEintrag = {
    */
   form?: number;
   intensitaet?: "schonen" | "normal" | "push";
+  /**
+   * BREAKING-WAFFENFOLGE (22.11., lib/lineups/breaking-waffen.ts): Waffe je eigenem Gang ("wucht" | "hieb" | "zermuerbung" |
+   * null = die KI waehlt). Nur fuer Breaking und nur, wenn der Manager mindestens eine Waffe gesetzt hat.
+   */
+  waffen?: Array<string | null>;
 };
 
 /** Spielername -> Platzierung. Der Motor schluesselt `place` ueber den NAMEN, nicht die ID. */
@@ -228,6 +234,14 @@ export function buildArenaAufstellung(
     if (!slot) continue;
 
     aufstellung[name] = { d: eintrag.disciplineId, slot };
+    // BREAKING-WAFFENFOLGE (22.11., docs/design/breaking-tagteam-22-11.md): die vom Manager gesetzte Waffe je eigenem Gang.
+    // Nur fuer Breaking und nur, wenn mindestens ein gueltiger Eintrag gesetzt ist; sonst ist der Eintrag exakt der alte.
+    if (eintrag.disciplineId === BREAKING_DISCIPLINE_ID && (eintrag.disciplineSide === "d1" || eintrag.disciplineSide === "d2")) {
+      const plan = entwurf.modifiers?.[eintrag.disciplineSide]?.breakingWaffen;
+      // Rueckfall auf die Spieler-Id auch dann, wenn die Folge unter der Kader-Zeilen-Id nur aus "KI" besteht.
+      const folge = normalisiereBreakingWaffen(plan?.[eintrag.activePlayerId ?? spielerId]) ?? normalisiereBreakingWaffen(plan?.[spielerId]);
+      if (folge) aufstellung[name] = { ...aufstellung[name], waffen: folge };
+    }
     // Ohne gueltige Seite (alte/teilweise Staende, Messsonden) laesst sich keine Kartenwahl zuordnen:
     // der Eintrag bleibt dann exakt das alte {d, slot} statt zu werfen.
     if (nutztEchteFormkarten(eintrag.disciplineId) && (eintrag.disciplineSide === "d1" || eintrag.disciplineSide === "d2")) {

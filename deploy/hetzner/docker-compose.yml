@@ -29,6 +29,9 @@ services:
         # Basketball-Puste (22.11., lib/resolve/basketball-puste.ts): derselbe Weg, ohne eigenen Wert gilt der
         # Server-Schalter OLY_BASKETBALL_PUSTE. Leer = neue Regel.
         NEXT_PUBLIC_OLY_BASKETBALL_PUSTE: ${NEXT_PUBLIC_OLY_BASKETBALL_PUSTE:-${OLY_BASKETBALL_PUSTE:-}}
+        # Breaking-Format (22.11., lib/resolve/breaking-format.ts): derselbe Weg, ohne eigenen Wert gilt der
+        # Server-Schalter OLY_BREAKING_FORMAT. Leer = Tag-Team.
+        NEXT_PUBLIC_OLY_BREAKING_FORMAT: ${NEXT_PUBLIC_OLY_BREAKING_FORMAT:-${OLY_BREAKING_FORMAT:-}}
     restart: unless-stopped
     # E1 (docs/design/battle-arena-auto-run-anbindung-plan-16-10.md Abschnitt 4.1, Fund F11):
     # Chromium braucht beides, nicht nur eins von beiden.
@@ -112,6 +115,10 @@ services:
       # Beteiligungsboden in der Pass-Lotterie), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten Spieltag wieder die
       # alte Regel; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.
       OLY_BASKETBALL_PUSTE: ${OLY_BASKETBALL_PUSTE:-}
+      # Breaking-Format (22.11., docs/design/breaking-tagteam-22-11.md): leer = Tag-Team (6 gegen 6, je Team einer im Ring,
+      # Gang mit zwei Phasen, verdeckter Wechsel, Waffe frei waehlbar), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten
+      # Spieltag wieder der Gauntlet; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.
+      OLY_BREAKING_FORMAT: ${OLY_BREAKING_FORMAT:-}
       # Liga-Draft (Draft-Seite, #1619/#1623, docs/design/draft-neubau-kern-18-11.md): DIESELBE Falle wie oben -- ohne diese
       # Durchreichung erreicht ein Wert aus deploy/hetzner/.env den Container NIE (gefunden in der Abnahme 19.11.,
       # docs/design/abnahme-saison-19-11.md). Leer = Code-Standard (seit 19.11.: neuer Draft mit Draft-Seite); "block" = Rueckweg

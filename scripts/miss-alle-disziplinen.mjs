@@ -107,7 +107,11 @@ const STRATEGIE_SCHALTER = strategieSchalterAusArgs(roheArgs);   // --strategie=
 // `basketballPuste` des Motors; "alt" = Rueckweg, JSON = Rezept-Ueberschreibung). Ohne den Schalter gilt der Motor-Standard.
 const bbPusteArg = roheArgs.find((a) => a.startsWith("--basketball-puste="));
 const BB_PUSTE_SCHALTER = bbPusteArg ? bbPusteArg.slice("--basketball-puste=".length) : null;
-const rest = roheArgs.filter((a) => !a.startsWith("--basketball-puste=") && a !== "--einzelkader" && a !== "--node" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !a.startsWith("--kulisse=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a) && !IST_KONTAKT_SCHALTER(a) && !IST_STRATEGIE_SCHALTER(a));
+// --breaking-format=gauntlet|<json> (22.11., additiv): stellt das Breaking-Format fuer die Messung um (Messhebel
+// `breakingFormat` des Motors; "gauntlet" = altes Format, JSON = Regel-Ueberschreibung der TT-Konstanten). Ohne den Schalter gilt der Motor-Standard.
+const brFormatArg = roheArgs.find((a) => a.startsWith("--breaking-format="));
+const BR_FORMAT_SCHALTER = brFormatArg ? brFormatArg.slice("--breaking-format=".length) : null;
+const rest = roheArgs.filter((a) => !a.startsWith("--basketball-puste=") && !a.startsWith("--breaking-format=") && a !== "--einzelkader" && a !== "--node" && a !== "--bootstrap-unsicherheit" && !a.startsWith("--je-seite=") && !a.startsWith("--mutatoren=") && !a.startsWith("--kulisse=") && !IST_BUEHNE_SCHALTER(a) && !IST_STAFFEL_PAAR_SCHALTER(a) && !IST_KONTAKT_SCHALTER(a) && !IST_STRATEGIE_SCHALTER(a));
 const SPIELE = Number(rest[0] || 24);
 const NUR = rest.slice(1);
 
@@ -139,6 +143,7 @@ try {
   // Einsatzlisten-Szenario je Seite statt der Ersatzkarte. Ohne die Variable unveraendert.
   if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
   if (BB_PUSTE_SCHALTER) await seite.evaluate((w) => window.__arena.basketballPuste(w), BB_PUSTE_SCHALTER.startsWith("{") ? JSON.parse(BB_PUSTE_SCHALTER) : BB_PUSTE_SCHALTER);
+  if (BR_FORMAT_SCHALTER) await seite.evaluate((w) => window.__arena.breakingFormat(w), BR_FORMAT_SCHALTER.startsWith("{") ? JSON.parse(BR_FORMAT_SCHALTER) : BR_FORMAT_SCHALTER);
   schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
   staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
   kontaktGesetzt = await setzeKontaktSchalter(seite, KONTAKT_SCHALTER);

@@ -123,7 +123,7 @@ describe("Basketball-Puste: Stempel beim Laden", () => {
     expect(arenaFormatByDisciplineId(spielstand([]), "md-1", "tennis")).toBeUndefined();
     expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-1", "basketball")).toEqual({ basketball: "alt" });
     expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-2", "basketball")).toEqual({ basketball: "neu" });
-    expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-2", "alle")).toEqual({ climbing: "canyon", hockey: "neu", basketball: "neu" });
+    expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-2", "alle")).toEqual({ climbing: "canyon", hockey: "neu", basketball: "neu", breaking: "tagteam" });
   });
 });
 

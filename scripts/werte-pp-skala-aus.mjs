@@ -396,6 +396,20 @@ if (args.includes("--nur-hockey")) {
   process.exit(0);
 }
 
+// 22.11.: `--nur-breaking` mischt NUR den Breaking-Anker (Laeufe mit dem neuen Tag-Team-Format) in die bestehende Datei; der
+// bisherige Eintrag wandert beim ersten Mal nach `breakingGauntletAlt` (Spieltage im alten Gauntlet-Format, gezeigt = gebucht).
+if (args.includes("--nur-breaking")) {
+  const ziel = new URL("../data/generated/pp-skala-kalibrierung.json", import.meta.url);
+  const bestand = JSON.parse(readFileSync(ziel, "utf8"));
+  if (!kalibrierung.breaking) throw new Error("Keine Breaking-Zellen in den Abzuegen.");
+  if (!bestand.disziplinen.breakingGauntletAlt) bestand.disziplinen.breakingGauntletAlt = bestand.disziplinen.breaking;
+  bestand.disziplinen.breaking = kalibrierung.breaking;
+  bestand.breakingQuellen = { neu: { gemessenAm: new Date().toISOString().slice(0, 10), saves: quellen.map((x) => x.saveId) } };
+  writeFileSync(ziel, JSON.stringify(bestand, null, 2) + "\n");
+  console.log("\nBreaking-Anker (Tag-Team) geschrieben: " + ziel.pathname);
+  process.exit(0);
+}
+
 // 22.11.: `--nur-basketball` mischt NUR den Basketball-Anker (Laeufe mit der NEUEN Puste-Regel) in die bestehende Datei; der
 // bisherige Eintrag wandert beim ersten Mal nach `basketballPusteAlt` (Spieltage mit der alten Regel, gezeigt = gebucht).
 if (args.includes("--nur-basketball")) {
@@ -415,7 +429,7 @@ if (schreibe) {
   // Regel-/Format-Varianten (`*Alt`, `*Orte3`, `*PusteAlt`) und die zugehoerigen `*Quellen` stammen aus Sonderlaeufen
   // (--nur-hockey/--nur-battlefield/--nur-basketball) und duerfen vom vollen Lauf nicht verschwinden.
   const vorhanden = existsSync(ziel) ? JSON.parse(readFileSync(ziel, "utf8")) : {};
-  const varianten = Object.fromEntries(Object.entries(vorhanden.disziplinen ?? {}).filter(([k]) => /(Alt|Orte3|PusteAlt)$/.test(k) && !(k in kalibrierung)));
+  const varianten = Object.fromEntries(Object.entries(vorhanden.disziplinen ?? {}).filter(([k]) => /(Alt|Orte3|PusteAlt|GauntletAlt)$/.test(k) && !(k in kalibrierung)));
   const quellenErhalten = Object.fromEntries(Object.entries(vorhanden).filter(([k]) => /Quellen$/.test(k) && k !== "quellen"));
   writeFileSync(
     ziel,

@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Breaking – Tag-Team (Mockup 22.11.)</title>
+<!--
+  MOCKUP, kein Spielcode. Entwurf fuer Breaking als Tag-Team-1v1 (docs/design/breaking-tagteam-22-11.md).
+  Breaking ist ein Folter-/Aushalte-Zweikampf (einer fuegt Schmerz zu, der andere haelt aus, dann Wechsel),
+  KEIN Breakdance. Die Simulation unten ist eine Schau-Simulation fuer die Regie des Mockups, NICHT der
+  Arena-Motor: Startwerte aus dem Konzept, keine Messung. Spielerwerte: data/generated/oly-player-attributes.json
+  (Beispielkader, frei zusammengestellt). Figuren: vorhandene PixelLab-Posen (east/south, walk, angriff,
+  treffer, tod) - keine neue Animation. Kulisse: public/sprites/kulissen/breaking/brutal.jpg.
+  Geraete-Zeichen: Platzhalter-SVG, im Bau PixelLab-Requisiten (nur Vorschlag, nichts bestellt).
+  URL-Schalter: ?sprites=<Basis-URL zu public/sprites> (Standard ../sprites), ?schritt=<n> (n Schritte sofort
+  rechnen), ?pause=1, ?tempo=1|3|8, ?saat=<n>, ?ende=1 (bis zum Endstand rechnen)
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:800;src:url("../fonts/barlow-condensed-latin-800-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --hud-flaeche:rgba(9,12,18,.90); --hud-flaeche-2:#121824; --hud-flaeche-3:#1a2231;
+  --hud-linie:rgba(244,230,196,.16); --hud-linie-2:rgba(244,230,196,.34);
+  --hud-creme:#f4e6c4; --hud-gold:#f0c35a; --hud-tinte:#eef2f8; --hud-leise:#9aa7ba; --hud-stumm:#66738a;
+  --hud-heim:#F2A03D; --hud-gast:#45B0C9; --hud-gut:#62d394; --hud-warn:#ff6058;
+  --kl-rot:#e8604f; --kl-gruen:#62d394; --kl-blau:#5fa8ff; --kl-gelb:#f0c35a;
+  --hud-haus:"RaniraSeason","Barlow Condensed",sans-serif; --hud-zahl:"Barlow Condensed","Arial Narrow",sans-serif;
+  --hud-r:8px; --hud-schraeg:-14deg;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#020305;overflow:hidden;color:var(--hud-tinte);font-family:var(--hud-zahl)}
+#rahmen{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;background:#06080c}
+canvas#buehne{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+#schleier{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 72%,rgba(0,0,0,0) 30%,rgba(2,3,5,.62) 100%),linear-gradient(180deg,rgba(2,3,5,.55),rgba(2,3,5,0) 26%,rgba(2,3,5,0) 74%,rgba(2,3,5,.7));pointer-events:none}
+button{font:inherit;color:inherit;cursor:pointer}
+.glas{background:var(--hud-flaeche);border:1px solid var(--hud-linie);border-radius:var(--hud-r);backdrop-filter:blur(6px)}
+h3{margin:0 0 6px;font-size:14px;font-weight:700;letter-spacing:1.8px;color:var(--hud-gold);text-transform:uppercase;display:flex;justify-content:space-between}
+h3 em{font-style:normal;color:var(--hud-stumm);letter-spacing:.6px}
+
+/* Kopf: Lebensbalken links/rechts, Stand in der Mitte (Prügler-Aufbau) */
+#kopf{position:absolute;left:22px;right:22px;top:16px;display:grid;grid-template-columns:1fr 316px 1fr;gap:14px;align-items:stretch}
+.leben{padding:8px 12px 10px;display:grid;grid-template-columns:76px 1fr;gap:12px;border-color:var(--hud-linie-2);position:relative}
+.leben.gast{grid-template-columns:1fr 76px}
+.leben.gast .portrait{order:2}.leben.gast .leben-text{text-align:right}
+.leben::before{content:"";position:absolute;top:0;bottom:0;width:6px;background:var(--tf);border-radius:8px 0 0 8px}
+.leben.heim::before{left:0}.leben.gast::before{right:0;border-radius:0 8px 8px 0}
+.portrait{width:76px;height:76px;border-radius:6px;background:#0b0f16 no-repeat;image-rendering:pixelated;background-size:190% 190%;background-position:50% 22%;border:1px solid var(--hud-linie)}
+.leben-zeile{display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+.leben.gast .leben-zeile{flex-direction:row-reverse}
+.leben-name{font-family:var(--hud-haus);font-size:30px;color:var(--hud-creme);line-height:1}
+.chip{font-size:14px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:1px 7px;border-radius:4px;background:var(--hud-flaeche-3);color:var(--kf,var(--hud-leise));border:1px solid var(--hud-linie)}
+.chip.waffe{color:var(--hud-tinte);border-left:4px solid var(--wf)}
+.rolle{font-size:14px;font-weight:800;letter-spacing:1.6px;padding:1px 8px;border-radius:4px;text-transform:uppercase}
+.rolle.peinigt{background:var(--hud-gold);color:#141005}.rolle.haelt{background:transparent;color:var(--hud-creme);border:1px solid var(--hud-linie-2)}
+.balken{height:26px;margin-top:6px;border-radius:5px;background:#0b0f16;border:1px solid var(--hud-linie);position:relative;overflow:hidden}
+.balken i{position:absolute;top:0;bottom:0;left:0;display:block;transition:width .25s}
+.leben.gast .balken i{left:auto;right:0}
+.balken .rot{background:repeating-linear-gradient(135deg,#8a2a25 0 6px,#5c1a17 6px 12px)}
+.balken .hp{background:linear-gradient(180deg,#8fe6a8,#3fae69)}
+.balken .hp.mittel{background:linear-gradient(180deg,#f6d37a,#d19a2a)}
+.balken .hp.wenig{background:linear-gradient(180deg,#ff8a7c,#d3392f)}
+.balken b{position:absolute;top:0;bottom:0;display:flex;align-items:center;padding:0 9px;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;color:#06080c;mix-blend-mode:normal;text-shadow:0 0 3px rgba(255,255,255,.5)}
+.leben.heim .balken b{left:0}.leben.gast .balken b{right:0}
+.leben-fuss{display:flex;gap:10px;margin-top:5px;font-size:15px;font-weight:600;color:var(--hud-leise);white-space:nowrap}
+.leben.gast .leben-fuss{flex-direction:row-reverse}
+.leben-fuss b{color:var(--hud-tinte);font-variant-numeric:tabular-nums}
+.pips{display:inline-flex;gap:3px;vertical-align:middle}
+.pips i{width:10px;height:10px;border-radius:2px;background:var(--hud-flaeche-3);border:1px solid var(--hud-linie-2)}
+.pips i.an{background:var(--hud-gold);border-color:var(--hud-gold)}
+
+#mitte{display:flex;flex-direction:column;align-items:center;justify-content:center;border-color:var(--hud-linie-2);background:#0b0f16;padding:6px 10px}
+.mitte-titel{font-size:14px;font-weight:700;letter-spacing:2px;color:var(--hud-gold);text-transform:uppercase}
+.mitte-stand{display:flex;align-items:center;gap:14px;font-size:58px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.mitte-stand span:first-child{color:var(--hud-heim)}.mitte-stand span:last-child{color:var(--hud-gast)}
+.mitte-stand i{font-style:normal;font-size:30px;color:var(--hud-stumm)}
+.mitte-sub{font-size:14px;font-weight:700;letter-spacing:1.4px;color:var(--hud-leise);text-transform:uppercase}
+.mitte-team{display:flex;justify-content:space-between;width:100%;font-family:var(--hud-haus);font-size:17px;color:var(--hud-creme)}
+
+/* Bank */
+.bank{position:absolute;top:150px;width:calc(50% - 180px);display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+#bank0{left:22px}#bank1{right:22px;direction:rtl}
+.bankkarte{direction:ltr;padding:5px 7px 6px;display:grid;grid-template-columns:44px 1fr;gap:7px;min-width:0;border-left:4px solid var(--wf);position:relative}
+.bankkarte .portrait{width:44px;height:44px}
+.bank-name{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.05;color:var(--hud-creme)}
+.bank-stat{font-size:13px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--hud-leise);white-space:nowrap}
+.bank-balken{grid-column:1/3;height:8px;border-radius:3px;background:#0b0f16;position:relative;overflow:hidden;border:1px solid var(--hud-linie)}
+.bank-balken i{position:absolute;left:0;top:0;bottom:0}
+.bank-balken .rot{background:#7c2722}.bank-balken .hp{background:#58c783}
+.bankkarte.raus{opacity:.42;filter:grayscale(.8)}
+.bankkarte.naechster{border-color:var(--hud-gold);box-shadow:0 0 0 1px var(--hud-gold) inset}
+.bankkarte.naechster .bank-stat{color:var(--hud-gold)}
+.bankkarte.gesperrt .bank-stat{color:var(--hud-stumm)}
+.bankkarte.erholt .bank-stat{color:var(--hud-gut)}
+
+/* Ring */
+.fig{position:absolute;background-repeat:no-repeat;image-rendering:pixelated;background-size:auto 100%;pointer-events:none;transition:left .45s ease,opacity .3s}
+.fig.gast{transform:scaleX(-1)}
+.fig.aktiv{width:420px;height:420px;bottom:196px}
+#fig0{left:470px}#fig1{left:1030px}
+.fig.rein0{left:120px!important;opacity:0}.fig.rein1{left:1380px!important;opacity:0}
+.fig.zuckt{animation:zuck .28s}
+@keyframes zuck{0%,100%{translate:0 0}25%{translate:-10px 0}60%{translate:8px 0}}
+.schatten{position:absolute;width:230px;height:34px;border-radius:50%;background:rgba(0,0,0,.45);filter:blur(5px);bottom:236px}
+#sch0{left:565px}#sch1{left:1125px}
+.bankfig{position:absolute;width:150px;height:150px;background-repeat:no-repeat;image-rendering:pixelated;background-size:auto 100%;filter:brightness(.72)}
+.bankfig.raus{filter:brightness(.4) grayscale(.9)}
+.rollenmarke{position:absolute;bottom:604px;width:260px;text-align:center;font-family:var(--hud-haus);font-size:30px;letter-spacing:1px;text-shadow:0 2px 0 #000,0 0 14px rgba(0,0,0,.9)}
+#marke0{left:550px}#marke1{left:1110px}
+.rollenmarke.peinigt{color:var(--hud-gold)}.rollenmarke.haelt{color:var(--hud-creme)}
+#geraet{position:absolute;left:50%;bottom:668px;transform:translateX(-50%);padding:8px 16px 8px 10px;display:flex;align-items:center;gap:12px;border-left:6px solid var(--wf);white-space:nowrap}
+#geraet svg{width:54px;height:54px;flex:none}
+#geraetName{font-family:var(--hud-haus);font-size:28px;color:var(--hud-creme);line-height:1}
+#geraetZeile{font-size:16px;font-weight:700;color:var(--hud-leise);letter-spacing:.6px}
+.float{position:absolute;font-size:44px;font-weight:800;text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.9);pointer-events:none;animation:hoch .95s forwards;white-space:nowrap;text-align:center;width:300px}
+.float small{display:block;font-size:19px;letter-spacing:1.4px}
+.float.haelt{color:var(--hud-creme)}.float.bricht{color:var(--hud-warn)}
+@keyframes hoch{0%{opacity:0;translate:0 14px}15%{opacity:1}100%{opacity:0;translate:0 -70px}}
+
+/* Einblender */
+#einb{position:absolute;left:50%;top:232px;transform:translateX(-50%) skewX(var(--hud-schraeg));display:flex;align-items:center;gap:16px;padding:8px 28px 8px 12px;
+  background:linear-gradient(90deg,var(--tf,#f0c35a),rgba(9,12,18,.95) 36%);border-radius:6px;opacity:0;transition:opacity .25s,translate .25s;translate:-40px 0;pointer-events:none;z-index:5}
+#einb.an{opacity:1;translate:0 0}
+#einb>*{transform:skewX(14deg)}
+#einbPortrait{width:60px;height:60px;border-radius:6px;background:#0b0f16 no-repeat;image-rendering:pixelated;background-size:190% 190%;background-position:50% 22%}
+#einbWort{font-family:var(--hud-haus);font-size:38px;color:var(--hud-creme);line-height:1;white-space:nowrap}
+#einbZeile{font-size:18px;font-weight:700;color:var(--hud-leise);white-space:nowrap}
+
+/* Wechselfenster */
+#fenster{position:absolute;left:50%;top:312px;transform:translateX(-50%);width:980px;padding:12px 16px 14px;display:none;z-index:4;border-color:var(--hud-gold)}
+#fenster.an{display:block}
+#fenster h2{margin:0 0 8px;font-family:var(--hud-haus);font-size:32px;color:var(--hud-gold);text-align:center;line-height:1}
+#fenster h2 small{font-family:var(--hud-zahl);font-size:16px;color:var(--hud-leise);font-weight:700;letter-spacing:1.4px;margin-left:12px}
+.fenster-zeilen{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fz{padding:8px 12px;border-radius:6px;background:var(--hud-flaeche-2);border-left:5px solid var(--tf);font-size:19px;font-weight:700;line-height:1.25}
+.fz b{color:var(--hud-creme)}.fz em{font-style:normal;color:var(--hud-gold)}
+.fz small{display:block;font-size:15px;font-weight:600;color:var(--hud-leise)}
+
+/* Dock */
+#dock{position:absolute;left:22px;right:22px;bottom:16px;display:grid;grid-template-columns:470px 1fr 470px;gap:14px;align-items:end}
+#matchup,#verlaufK{padding:10px 12px}
+.kanal{display:grid;grid-template-columns:132px 1fr 40px;gap:8px;align-items:center;font-size:16px;font-weight:700;margin-top:4px;color:var(--hud-leise)}
+.kanal .spur{height:12px;border-radius:3px;background:#0b0f16;overflow:hidden;border:1px solid var(--hud-linie)}
+.kanal .spur i{display:block;height:100%;background:var(--hud-stumm)}
+.kanal b{text-align:right;font-variant-numeric:tabular-nums;color:var(--hud-tinte)}
+.kanal.trifft{color:var(--hud-creme)}.kanal.trifft .spur i{background:var(--wf)}
+#matchFuss{margin-top:8px;font-size:16px;font-weight:600;color:var(--hud-leise);line-height:1.25}
+#matchFuss b{color:var(--hud-gold);font-size:20px;font-variant-numeric:tabular-nums}
+#phase{padding:10px 14px 10px}
+.phase-zeile{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:nowrap}
+.pblock{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:6px;background:var(--hud-flaeche-2);border-bottom:3px solid var(--tf);font-size:16px;font-weight:700;white-space:nowrap}
+.pblock.jetzt{background:var(--hud-flaeche-3);box-shadow:0 0 0 1px var(--hud-linie-2) inset}
+.pblock .p{width:16px;height:16px;border-radius:3px;background:#0b0f16;border:1px solid var(--hud-linie-2)}
+.pblock .p.haelt{background:var(--hud-creme);border-color:var(--hud-creme)}
+.pblock .p.bricht{background:var(--hud-warn);border-color:var(--hud-warn)}
+.pblock .p.dran{outline:2px solid var(--hud-gold);outline-offset:1px}
+.raute{width:22px;height:22px;transform:rotate(45deg);border:2px solid var(--hud-stumm);border-radius:3px;margin:0 8px}
+.raute.an{background:var(--hud-gold);border-color:var(--hud-gold)}
+.phase-fuss{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:10px}
+.phase-fuss span{font-size:15px;font-weight:600;color:var(--hud-leise)}
+.regie{display:flex;gap:5px;align-items:center}
+.regie small{font-size:12px;color:var(--hud-stumm);letter-spacing:.8px;text-transform:uppercase;margin-right:4px}
+.regie button{background:var(--hud-flaeche-3);border:1px solid var(--hud-linie-2);border-radius:5px;padding:3px 10px;font-size:16px;font-weight:700}
+.regie button.an{background:var(--hud-gold);color:#141005;border-color:var(--hud-gold)}
+#verlauf{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;height:152px;overflow:hidden}
+#verlauf li{display:grid;grid-template-columns:50px 1fr;gap:6px;font-size:15px;font-weight:600;line-height:1.15;padding:3px 6px;border-radius:4px;background:var(--hud-flaeche-2);border-left:3px solid var(--tf,var(--hud-stumm));white-space:nowrap;overflow:hidden}
+#verlauf li b{color:var(--hud-leise);font-variant-numeric:tabular-nums;font-weight:700}
+#verlauf li.gross{color:var(--hud-gold)}
+
+/* Endstand */
+#ende{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:1240px;padding:16px 20px 18px;display:none;z-index:8;border-color:var(--hud-gold);background:rgba(9,12,18,.96)}
+#ende.an{display:block}
+#ende h2{margin:0;font-family:var(--hud-haus);font-size:40px;color:var(--hud-creme);line-height:1}
+#ende .unter{font-size:18px;font-weight:700;color:var(--hud-leise);margin:4px 0 10px}
+#ende .unter b{color:var(--hud-gold)}
+#ende table{width:100%;border-collapse:collapse;font-size:17px;font-weight:600}
+#ende th{font-size:13px;letter-spacing:1.2px;text-transform:uppercase;color:var(--hud-stumm);text-align:right;padding:3px 8px;border-bottom:1px solid var(--hud-linie-2);cursor:pointer}
+#ende th:nth-child(-n+3){text-align:left}
+#ende td{padding:3px 8px;text-align:right;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--hud-linie)}
+#ende td:nth-child(-n+3){text-align:left}
+#ende td.nm{color:var(--hud-creme);font-weight:700;border-left:4px solid var(--tf)}
+#ende .hinweis{font-size:14px;color:var(--hud-stumm);margin-top:8px}
+</style>
+</head>
+<body>
+<div id="rahmen">
+  <canvas id="buehne" width="1920" height="1080"></canvas>
+  <div id="schleier"></div>
+  <div id="bankfiguren"></div>
+  <div class="schatten" id="sch0"></div><div class="schatten" id="sch1"></div>
+  <div class="fig aktiv heim" id="fig0"></div>
+  <div class="fig aktiv gast" id="fig1"></div>
+  <div class="rollenmarke" id="marke0"></div><div class="rollenmarke" id="marke1"></div>
+  <div class="glas" id="geraet"><span id="geraetBild"></span><div><div id="geraetName"></div><div id="geraetZeile"></div></div></div>
+  <div id="floats"></div>
+
+  <div id="kopf">
+    <div class="glas leben heim" id="leben0" style="--tf:var(--hud-heim)"></div>
+    <div class="glas" id="mitte">
+      <div class="mitte-titel">Breaking · Tag-Team</div>
+      <div class="mitte-stand"><span id="stand0">0</span><i>:</i><span id="stand1">0</span></div>
+      <div class="mitte-sub" id="mitteSub">Gang 1 · Umlauf 1</div>
+      <div class="mitte-team"><span>Death Peaches</span><span>Cold Steel</span></div>
+    </div>
+    <div class="glas leben gast" id="leben1" style="--tf:var(--hud-gast)"></div>
+  </div>
+  <div class="bank" id="bank0"></div>
+  <div class="bank" id="bank1"></div>
+
+  <div id="einb"><div id="einbPortrait"></div><div><div id="einbWort"></div><div id="einbZeile"></div></div></div>
+  <div class="glas" id="fenster"><h2>Wechselfenster<small id="fensterSub"></small></h2><div class="fenster-zeilen" id="fensterZeilen"></div></div>
+
+  <div id="dock">
+    <div class="glas" id="matchup">
+      <h3>Gerät trifft Kanal <em id="matchWer"></em></h3>
+      <div id="kanaele"></div>
+      <div id="matchFuss"></div>
+    </div>
+    <div class="glas" id="phase">
+      <div class="phase-zeile" id="phaseZeile"></div>
+      <div class="phase-fuss">
+        <span id="phaseText"></span>
+        <div class="regie"><small>Mockup-Regie</small>
+          <button id="bPlay">⏸</button><button id="bSchritt">Schritt</button>
+          <button data-tempo="1">×1</button><button data-tempo="3">×3</button><button data-tempo="8">×8</button>
+          <button id="bNeu">Neu</button><button id="bEnde">Endstand</button></div>
+      </div>
+    </div>
+    <div class="glas" id="verlaufK"><h3>Verlauf <em id="verlaufSub"></em></h3><ul id="verlauf"></ul></div>
+  </div>
+
+  <div class="glas" id="ende"></div>
+</div>
+
+<script>
+"use strict";
+const Q=new URLSearchParams(location.search);
+const SPR=Q.get("sprites")||"../sprites";
+const $=id=>document.getElementById(id);
+
+/* ---------- Rahmen: 1920 breit, Hoehe folgt dem Fenster (16:9 = 1080, 16:10 = 1200) ---------- */
+let RH=1080;
+function passeAn(){
+  const w=innerWidth,h=innerHeight;
+  RH=Math.max(1000,Math.min(1280,Math.round(1920*h/w)));
+  const s=Math.min(w/1920,h/RH), r=$("rahmen");
+  r.style.height=RH+"px"; r.style.transform=`scale(${s})`;
+  r.style.left=Math.round((w-1920*s)/2)+"px"; r.style.top=Math.round((h-RH*s)/2)+"px";
+  maleKulisse();
+}
+const kulisse=new Image(); kulisse.src=SPR+"/kulissen/breaking/brutal.jpg"; kulisse.onload=()=>maleKulisse();
+function maleKulisse(){
+  const c=$("buehne"); c.height=RH; const x=c.getContext("2d"); x.imageSmoothingEnabled=false;
+  x.fillStyle="#06080c"; x.fillRect(0,0,1920,RH);
+  if(!kulisse.complete||!kulisse.naturalWidth)return;
+  const s=Math.max(1920/kulisse.naturalWidth,RH/kulisse.naturalHeight);
+  const bw=kulisse.naturalWidth*s,bh=kulisse.naturalHeight*s;
+  x.drawImage(kulisse,(1920-bw)/2,RH-bh,bw,bh);
+}
+addEventListener("resize",passeAn);
+
+/* ---------- Daten ---------- */
+const KLASSE_FARBE={Berserker:"rot",Warlord:"rot",Tank:"rot",Sprinter:"gruen",Rogue:"gruen",Charger:"gruen",Mage:"blau",Overseer:"blau",Templar:"blau",Bard:"gelb",Hero:"gelb",Badass:"gelb",Tactician:"gelb"};
+/* Leibgeraet je Klassenfarbe. Budget je Phase ist gleich (rund 68-72 bei 50 % Halten): die Waffe aendert das PROFIL, nicht die Staerke. */
+const WAFFE={
+  rot:  {id:"wucht", name:"Vorschlaghammer", fam:"Wucht",      n:3, haelt:14, bricht:34, erholbar:.5, kanal:"SPITZE",  kanalName:"Spitzenmoment", f:"var(--kl-rot)"},
+  gruen:{id:"hieb",  name:"Peitsche",        fam:"Hieb",       n:4, haelt:10, bricht:24, erholbar:.5, kanal:"TECHNIK", kanalName:"Technik",       f:"var(--kl-gruen)"},
+  blau: {id:"zerm",  name:"Daumenschraube",  fam:"Zermürbung", n:5, haelt:8,  bricht:19, erholbar:0,  kanal:"NERVEN",  kanalName:"Nerven",        f:"var(--kl-blau)"},
+};
+const GERAET_SVG={
+  wucht:'<svg viewBox="0 0 54 54"><rect x="24" y="16" width="6" height="34" rx="2" fill="#8d6b41"/><rect x="9" y="6" width="36" height="16" rx="3" fill="#aab3c2" stroke="#e8604f" stroke-width="2"/></svg>',
+  hieb:'<svg viewBox="0 0 54 54"><rect x="6" y="38" width="16" height="7" rx="3" fill="#8d6b41" transform="rotate(-30 14 41)"/><path d="M20 36 C30 20 38 44 48 10" fill="none" stroke="#62d394" stroke-width="4" stroke-linecap="round"/></svg>',
+  zerm:'<svg viewBox="0 0 54 54"><rect x="8" y="30" width="38" height="8" rx="2" fill="#aab3c2"/><rect x="8" y="44" width="38" height="6" rx="2" fill="#aab3c2"/><rect x="24" y="8" width="6" height="24" fill="#8d6b41"/><rect x="14" y="5" width="26" height="6" rx="3" fill="#5fa8ff"/></svg>',
+};
+const P=(n,slug,kl,pow,hea,det,sta,wil,tor,int)=>({n,slug,kl,a:{pow,hea,det,sta,wil,tor,int}});
+const KADER=[
+ [P("Malagor","malagor","Templar",85,79,82,77,78,97,84),P("Vorrak","vorrak","Tank",79,97,86,69,73,70,35),P("Hulk","hulk","Charger",98,94,28,92,66,74,16),
+  P("Knochenrichter","knochenrichter","Templar",59,64,81,53,88,77,44),P("Chain","chain","Rogue",76,76,53,34,53,96,39),P("Blorgh","blorgh","Tank",85,93,86,78,39,76,7)],
+ [P("Kelektros","kelektros","Charger",88,72,81,70,69,73,59),P("Umbrafond","umbrafond","Berserker",88,79,74,58,63,76,35),P("Abysskraken","abysskraken","Warlord",90,87,70,70,56,69,17),
+  P("Lady Mournvale","lady-mournvale","Mage",48,29,45,51,98,83,77),P("Starbound","starbound","Templar",55,74,64,35,91,62,69),P("Steel Sentinel","steel-sentinel","Hero",74,86,81,66,76,47,24)]
+];
+const TEAM=["Death Peaches","Cold Steel"], TF=["var(--hud-heim)","var(--hud-gast)"];
+const FRAMES={walk:17,angriff:17,treffer:9,tod:17};
+const MAX_STAND=2, MAX_UMLAUF=3, MAX_GANG=60;
+/* Eskalation: je Umlauf liegt die naechste Stufe des Geraets auf dem Tisch (I, II, III) - der Kampf darf nicht versanden. */
+const STUFE_F=[1,1.4,1.9], STUFE_NAME=["I","II","III"], SCHUTZ_AB=.25;
+const stufe=()=>Math.min(MAX_UMLAUF,Math.max(Z.umlauf[0],Z.umlauf[1]))-1;
+
+let rngZ=1; const rr=()=>{rngZ=(Math.imul(rngZ,1664525)+1013904223)>>>0; return (rngZ>>>8)/16777216;};
+const kl=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+let Z=null;
+function neu(saat){
+  rngZ=(saat||7)>>>0;
+  const teams=KADER.map((k,s)=>k.map((p,i)=>{
+    const a=p.a;
+    const NERVEN=.42*a.wil+.52*a.hea+.06*a.int, TECHNIK=.63*a.tor+.37*a.det, SPITZE=.54*a.pow+.46*a.wil, AUSDAUER=.5*a.sta+.3*a.hea+.2*a.wil;
+    const hpMax=Math.round(150+1.5*NERVEN);
+    const peiniger=.6*TECHNIK+.4*SPITZE;
+    const farbe=KLASSE_FARBE[p.kl];
+    return {...p,s,i,farbe,NERVEN,TECHNIK,SPITZE,AUSDAUER,hpMax,hp:hpMax,rot:0,raus:false,dran:false,stand:0,einsaetze:0,
+      dmgF:kl(1+.30*(peiniger-50)/100,.85,1.15),zugefuegt:0,ausgehalten:0,gehalten:0,anschlaege:0,gaenge:0,grund:""};
+  }));
+  Z={teams,akt:[teams[0][0],teams[1][0]],stand:[0,0],gang:1,umlauf:[1,1],erst:0,phase:0,anschlag:0,modus:"anschlag",
+     pips:[[],[]],log:[],ende:null,schritte:0,fenster:null};
+  for(const s of [0,1]){Z.akt[s].dran=true;Z.akt[s].einsaetze=1;}
+  logge(null,"Anpfiff – "+TEAM[0]+" peinigt zuerst",true);
+}
+function waffeFuer(p,gegner){
+  if(p.farbe!=="gelb")return {...WAFFE[p.farbe],wahl:false};
+  // Gelb = Wahlgeraet: nimmt die Familie, deren Kanal beim Gegner am schwaechsten ist, zahlt dafuer 10 % Schaden.
+  const best=Object.values(WAFFE).slice().sort((x,y)=>gegner[x.kanal]-gegner[y.kanal])[0];
+  return {...best,haelt:Math.round(best.haelt*.9),bricht:Math.round(best.bricht*.9),wahl:true,f:"var(--kl-gelb)"};
+}
+function halteChance(e,w){
+  const mix=e.TECHNIK*.0055+e.NERVEN*.0035;
+  return kl(.15+.65*mix+.35*e[w.kanal]*.009,.05,.94);
+}
+function logge(s,text,gross){ Z.log.unshift({s,text,gross,g:Z.gang}); if(Z.log.length>40)Z.log.pop(); }
+const lebende=s=>Z.teams[s].filter(p=>!p.raus);
+const bank=s=>Z.teams[s].filter(p=>!p.raus&&p!==Z.akt[s]);
+
+/* Wer darf rein? Umlauf-Regel: niemand kommt ein zweites Mal, bevor alle lebenden Kollegen dran waren. */
+function kandidaten(s){
+  let k=bank(s).filter(p=>!p.dran);
+  if(!k.length&&bank(s).length){ Z.umlauf[s]++; for(const p of Z.teams[s])p.dran=false; Z.akt[s].dran=true; k=bank(s); }
+  return k;
+}
+function wahlRein(s,k){
+  const gegner=Z.akt[1-s], w=waffeFuer(gegner,k[0]);
+  const anker=Z.teams[s][Z.teams[s].length-1];
+  return k.slice().sort((x,y)=>{
+    const wx=x[w.kanal]*.5+(x.hp/x.hpMax)*40-(x===anker&&k.length>1?25:0);
+    const wy=y[w.kanal]*.5+(y.hp/y.hpMax)*40-(y===anker&&k.length>1?25:0);
+    return wy-wx||x.i-y.i;
+  })[0];
+}
+function kiWechsel(s){
+  const a=Z.akt[s], g=Z.akt[1-s];
+  if(!bank(s).length)return null;
+  const w=waffeFuer(g,a);
+  let grund=null;
+  if(a.stand+1>=MAX_STAND)grund="Pflicht: "+MAX_STAND+" Gänge am Stück";
+  else if(a.hp/a.hpMax<SCHUTZ_AB)grund="Schutz: nur noch "+Math.round(100*a.hp/a.hpMax)+" % HP";
+  else{
+    const k0=bank(s).filter(p=>!p.dran);
+    if(a[w.kanal]<62&&k0.some(p=>p[w.kanal]>=a[w.kanal]+10))grund="Konter: "+w.fam+" trifft "+w.kanalName+" "+Math.round(a[w.kanal]);
+  }
+  if(!grund)return null;
+  const k=kandidaten(s); if(!k.length)return null;
+  return {raus:a,rein:wahlRein(s,k),grund};
+}
+function einwechseln(s,p){ Z.akt[s]=p; p.dran=true; p.stand=0; p.einsaetze++; }
+
+function schritt(){
+  if(Z.ende)return {art:"ende"};
+  Z.schritte++; Z.fenster=null;
+  if(Z.modus==="fenster"){
+    const wechsel=[kiWechsel(0),kiWechsel(1)];
+    for(const s of [0,1]){
+      // Bank erholt sich (nur die erholbaren, "roten" HP), der Steher zaehlt einen Gang Standzeit.
+      for(const p of bank(s)){ const r=Math.min(p.rot,Math.round(p.hpMax*.06*(.5+p.AUSDAUER/200))); p.hp+=r; p.rot-=r; }
+      Z.akt[s].stand++; Z.akt[s].gaenge++;
+      if(wechsel[s]){ einwechseln(s,wechsel[s].rein); logge(s,wechsel[s].raus.n+" raus, "+wechsel[s].rein.n+" rein ("+wechsel[s].grund.split(":")[0]+")"); }
+    }
+    Z.fenster=wechsel; Z.gang++; Z.erst=1-Z.erst; Z.phase=0; Z.anschlag=0; Z.pips=[[],[]]; Z.modus="anschlag";
+    if(Z.gang>MAX_GANG||Math.max(Z.umlauf[0],Z.umlauf[1])>MAX_UMLAUF)return beende("Notbremse");
+    return {art:"fenster",wechsel};
+  }
+  const ps=Z.phase===0?Z.erst:1-Z.erst, es=1-ps, pe=Z.akt[ps], e=Z.akt[es];
+  const w=waffeFuer(pe,e), chance=halteChance(e,w), haelt=rr()<chance;
+  const schaden=Math.min(e.hp,Math.round((haelt?w.haelt:w.bricht)*pe.dmgF*STUFE_F[stufe()]));
+  e.hp-=schaden; e.rot+=Math.round(schaden*w.erholbar); if(e.rot>e.hpMax-e.hp)e.rot=e.hpMax-e.hp;
+  pe.zugefuegt+=schaden; e.ausgehalten+=schaden; e.anschlaege++; if(haelt)e.gehalten++;
+  Z.pips[Z.phase].push(haelt?"haelt":"bricht"); Z.anschlag++;
+  const erg={art:"anschlag",ps,es,pe,e,w,haelt,schaden,chance};
+  if(e.hp<=0){
+    e.raus=true; e.rot=0; Z.stand[ps]++; erg.ko=true; erg.wort=e.NERVEN>=70?"GEBROCHEN":"GIBT AUF";
+    logge(es,e.n+" "+(erg.wort==="GEBROCHEN"?"ist gebrochen":"gibt auf")+" – "+pe.n+" ("+w.name+")",true);
+    if(!lebende(es).length)return Object.assign(erg,beende("Aufgabe"));
+    const k=kandidaten(es); const rein=wahlRein(es,k); einwechseln(es,rein); erg.rein=rein;
+    // Der Sieger verschnauft kurz und behaelt die Peiniger-Rolle: der Frische ertraegt zuerst.
+    const v=Math.min(pe.rot,Math.round(pe.hpMax*.04*(.5+pe.AUSDAUER/200))); pe.hp+=v; pe.rot-=v;
+    pe.stand++; pe.gaenge++; Z.gang++; Z.erst=ps; Z.phase=0; Z.anschlag=0; Z.pips=[[],[]];
+    logge(es,rein.n+" kommt rein");
+    return erg;
+  }
+  if(Z.anschlag>=w.n){
+    if(Z.phase===0){ Z.phase=1; Z.anschlag=0; erg.rollentausch=true; }
+    else Z.modus="fenster";
+  }
+  return erg;
+}
+function beende(art){
+  const rest=s=>Z.teams[s].reduce((x,p)=>x+p.hp,0)/Z.teams[s].reduce((x,p)=>x+p.hpMax,0);
+  const r=[rest(0),rest(1)];
+  let sieger=Z.stand[0]!==Z.stand[1]?(Z.stand[0]>Z.stand[1]?0:1):(r[0]>=r[1]?0:1);
+  if(art==="Aufgabe")sieger=lebende(0).length?0:1;
+  Z.ende={art,sieger,rest:r}; logge(sieger,TEAM[sieger]+" gewinnt ("+art+")",true);
+  return {art:"ende"};
+}
+
+/* ---------- Anzeige ---------- */
+const figZ=[{},{}];
+function setzeAnim(s,art,opts){
+  const p=Z.akt[s], f=figZ[s], el=$("fig"+s);
+  f.art=art; f.frame=0; f.frames=art==="steh"?1:FRAMES[art]; f.halt=opts&&opts.halt; f.slug=p.slug;
+  el.style.backgroundImage=`url(${SPR}/figuren/${p.slug}/${art==="steh"?"east":art+"-east"}.png)`;
+  el.style.backgroundPosition="0 0";
+}
+setInterval(()=>{
+  for(const s of [0,1]){ const f=figZ[s]; if(!f.frames||f.frames<2)continue;
+    if(f.frame<f.frames-1)f.frame++; else if(!f.halt){ setzeAnim(s,"steh"); continue; }
+    $("fig"+s).style.backgroundPosition=(f.frame/(f.frames-1)*100)+"% 0";
+  }
+},42);
+const portrait=p=>`background-image:url(${SPR}/figuren/${p.slug}/south.png)`;
+const hpKlasse=q=>q>.5?"":q>.25?"mittel":"wenig";
+function maleLeben(s){
+  const p=Z.akt[s], g=Z.akt[1-s], w=waffeFuer(p,g), q=p.hp/p.hpMax;
+  const peinigt=!Z.ende&&Z.modus==="anschlag"&&(Z.phase===0?Z.erst:1-Z.erst)===s;
+  $("leben"+s).innerHTML=`<div class="portrait" style="${portrait(p)}"></div><div class="leben-text">
+    <div class="leben-zeile"><span class="leben-name">${p.n}</span><span class="chip" style="--kf:var(--kl-${p.farbe})">${p.kl}</span>
+      <span class="chip waffe" style="--wf:${w.f}">${w.name}${w.wahl?" (Wahl)":""} · ${w.n} × ${Math.round(w.bricht*p.dmgF*STUFE_F[stufe()])}</span>
+      <span class="rolle ${peinigt?"peinigt":"haelt"}">${Z.ende?"Ende":peinigt?"peinigt":"hält aus"}</span></div>
+    <div class="balken"><i class="rot" style="width:${100*(p.hp+p.rot)/p.hpMax}%"></i><i class="hp ${hpKlasse(q)}" style="width:${100*q}%"></i><b>${p.hp} / ${p.hpMax}</b></div>
+    <div class="leben-fuss"><span>Standzeit <span class="pips">${[0,1].map(i=>`<i class="${i<p.stand?"an":""}"></i>`).join("")}</span></span>
+      <span>erholbar <b>${p.rot}</b></span><span>Schaden <b>${p.zugefuegt}</b></span><span>Einsatz <b>${p.einsaetze}</b></span></div></div>`;
+}
+function maleBank(s){
+  const k=bank(s).filter(p=>!p.dran), naechster=k.length?wahlRein(s,k):null;
+  $("bank"+s).innerHTML=Z.teams[s].filter(p=>p!==Z.akt[s]).map(p=>{
+    const w=p.farbe==="gelb"?{f:"var(--kl-gelb)"}:WAFFE[p.farbe];
+    const stat=p.raus?"gebrochen":p===naechster?"nächster":p.dran?(p.rot>0?"erholt sich":"war dran"):"wartet";
+    const kls=p.raus?"raus":p===naechster?"naechster":p.dran?(p.rot>0?"erholt":"gesperrt"):"";
+    return `<div class="glas bankkarte ${kls}" style="--wf:${w.f}"><div class="portrait" style="${portrait(p)}"></div>
+      <div style="min-width:0"><div class="bank-name">${p.n}</div><div class="bank-stat">${stat}</div></div>
+      <div class="bank-balken"><i class="rot" style="width:${100*(p.hp+p.rot)/p.hpMax}%"></i><i class="hp" style="width:${100*p.hp/p.hpMax}%"></i></div></div>`;
+  }).join("");
+}
+function maleBankfiguren(){
+  let h="";
+  for(const s of [0,1]) Z.teams[s].filter(p=>p!==Z.akt[s]).forEach((p,i)=>{
+    const x=s===0?40+i*74:1920-190-i*74, b=300+(i%2)*46;
+    const bild=p.raus?`tod-south.png`:`south.png`;
+    h+=`<div class="bankfig ${p.raus?"raus":""}" style="left:${x}px;bottom:${b}px;background-image:url(${SPR}/figuren/${p.slug}/${bild});background-position:${p.raus?"100%":"0"} 0;z-index:${2-(i%2)}"></div>`;
+  });
+  $("bankfiguren").innerHTML=h;
+}
+function maleMatchup(){
+  const ps=Z.phase===0?Z.erst:1-Z.erst, pe=Z.akt[ps], e=Z.akt[1-ps], w=waffeFuer(pe,e), ch=halteChance(e,w);
+  $("matchWer").textContent=e.n+" hält aus";
+  $("kanaele").innerHTML=[["NERVEN","Nerven · Zermürbung"],["TECHNIK","Technik · Hieb"],["SPITZE","Spitze · Wucht"]].map(([k,t])=>
+    `<div class="kanal ${w.kanal===k?"trifft":""}" style="--wf:${w.f}"><span>${t}</span><div class="spur"><i style="width:${e[k]}%"></i></div><b>${Math.round(e[k])}</b></div>`).join("");
+  $("matchFuss").innerHTML=`Halte-Chance je Anschlag <b>${Math.round(ch*100)} %</b> · hält −${Math.round(w.haelt*pe.dmgF*STUFE_F[stufe()])} · bricht ein −${Math.round(w.bricht*pe.dmgF*STUFE_F[stufe()])}<br>${w.erholbar?"Die Hälfte des Schadens ist auf der Bank erholbar.":"Zermürbung bleibt: nichts davon ist erholbar."}`;
+  $("geraet").style.setProperty("--wf",w.f); $("geraetBild").innerHTML=GERAET_SVG[w.id];
+  $("geraetName").textContent=w.name+(w.wahl?" (Wahlgerät)":"");
+  $("geraetZeile").textContent=w.fam+" · Stufe "+STUFE_NAME[stufe()]+" · "+w.n+" Anschläge · trifft "+w.kanalName;
+  $("geraet").style.display=Z.ende?"none":"flex";
+  for(const s of [0,1]){ const m=$("marke"+s); m.className="rollenmarke "+(s===ps?"peinigt":"haelt"); m.textContent=Z.ende?"":s===ps?"PEINIGT":"HÄLT AUS"; }
+}
+function malePhase(){
+  const bl=[0,1].map(ph=>{
+    const ps=ph===0?Z.erst:1-Z.erst, pe=Z.akt[ps], w=waffeFuer(pe,Z.akt[1-ps]);
+    const jetzt=Z.modus==="anschlag"&&Z.phase===ph;
+    let pp=""; for(let i=0;i<w.n;i++)pp+=`<i class="p ${Z.pips[ph][i]||""} ${jetzt&&i===Z.pips[ph].length?"dran":""}"></i>`;
+    return `<div class="pblock ${jetzt?"jetzt":""}" style="--tf:${TF[ps]}">${pe.n} peinigt ${pp}</div>`;
+  });
+  $("phaseZeile").innerHTML=bl[0]+`<span style="color:var(--hud-stumm);font-weight:800">▸</span>`+bl[1]+`<i class="raute ${Z.modus==="fenster"?"an":""}"></i><span style="font-size:15px;font-weight:700;color:${Z.modus==="fenster"?"var(--hud-gold)":"var(--hud-stumm)"};letter-spacing:1px;text-transform:uppercase">Wechselfenster</span>`;
+  $("phaseText").textContent=Z.ende?"Kampf beendet":Z.modus==="fenster"?"Beide Teams entscheiden gleichzeitig und verdeckt.":"Ein Gang: erst peinigt der eine, dann der andere – danach darf gewechselt werden.";
+}
+function maleVerlauf(){
+  $("verlauf").innerHTML=Z.log.slice(0,6).map(l=>`<li class="${l.gross?"gross":""}" style="--tf:${l.s==null?"var(--hud-stumm)":TF[l.s]}"><b>G ${l.g}</b><span>${l.text}</span></li>`).join("");
+  $("verlaufSub").textContent="Schritt "+Z.schritte;
+}
+function maleAlles(){
+  for(const s of [0,1]){ maleLeben(s); maleBank(s); $("stand"+s).textContent=Z.stand[s]; }
+  $("mitteSub").textContent="Gang "+Z.gang+" · Umlauf "+Math.min(MAX_UMLAUF,Math.max(Z.umlauf[0],Z.umlauf[1]))+" / "+MAX_UMLAUF;
+  maleBankfiguren(); maleMatchup(); malePhase(); maleVerlauf();
+}
+function einblender(s,p,wort,zeile,ms){
+  const e=$("einb"); e.style.setProperty("--tf",TF[s]); $("einbPortrait").style.cssText=portrait(p);
+  $("einbWort").textContent=wort; $("einbZeile").textContent=zeile; e.classList.add("an");
+  clearTimeout(einblender.t); if(ms)einblender.t=setTimeout(()=>e.classList.remove("an"),ms);
+}
+function zeigeFenster(wechsel){
+  const f=$("fenster");
+  $("fensterSub").textContent="nach Gang "+(Z.gang-1)+" · gleichzeitig, verdeckt";
+  $("fensterZeilen").innerHTML=[0,1].map(s=>{ const w=wechsel[s];
+    return `<div class="fz" style="--tf:${TF[s]}">${w?`<b>${w.raus.n}</b> raus <em>▸</em> <b>${w.rein.n}</b> rein<small>${w.grund}</small>`:`<b>${Z.akt[s].n}</b> bleibt stehen<small>${bank(s).length?"kein Grund zu wechseln (Standzeit "+Z.akt[s].stand+" von "+MAX_STAND+" Gängen)":"letzter Mann – niemand mehr auf der Bank"}</small>`}</div>`;}).join("");
+  f.classList.add("an"); $("geraet").style.display="none";
+}
+function float(s,text,klein,kls){
+  const d=document.createElement("div"); d.className="float "+kls; d.style.left=(s===0?530:1090)+"px"; d.style.bottom="520px";
+  d.innerHTML=text+`<small>${klein}</small>`; $("floats").appendChild(d); setTimeout(()=>d.remove(),1000);
+}
+function zeigeEnde(){
+  const e=Z.ende, alle=Z.teams.flat().map(p=>({p,leistung:Math.round(p.zugefuegt*.5+p.gehalten*6+p.ausgehalten*.2)}));
+  const max=Math.max(...alle.map(x=>x.leistung));
+  alle.sort((x,y)=>y.leistung-x.leistung);
+  const e1=Z.stand[e.sieger]-Z.stand[1-e.sieger]>=4?[10,2]:Z.stand[e.sieger]-Z.stand[1-e.sieger]>=2?[8,4]:[7,5];
+  const erg=e.sieger===0?e1:[e1[1],e1[0]];
+  $("ende").innerHTML=`<h2>${TEAM[e.sieger]} gewinnt</h2>
+   <div class="unter">Gebrochen <b>${Z.stand[0]} : ${Z.stand[1]}</b> → Ergebnis <b>${erg[0]} : ${erg[1]}</b> · Rest-HP ${Math.round(e.rest[0]*100)} % : ${Math.round(e.rest[1]*100)} % · ${Z.gang} Gänge · Ende durch ${e.art}</div>
+   <table><thead><tr><th>#</th><th>Spieler</th><th>Gerät</th><th>Einsätze</th><th>Gänge</th><th>Zugefügt</th><th>Ausgehalten</th><th>Gehalten</th><th>Leistung</th><th>PP</th></tr></thead><tbody>${
+   alle.map((x,i)=>{const p=x.p,w=p.farbe==="gelb"?"Wahlgerät":WAFFE[p.farbe].name;
+     return `<tr><td>${i+1}</td><td class="nm" style="--tf:${TF[p.s]}">${p.n}${p.raus?" ✕":""}</td><td style="color:var(--kl-${p.farbe})">${w}</td><td>${p.einsaetze}</td><td>${p.gaenge}</td><td>${p.zugefuegt}</td><td>${p.ausgehalten}</td><td>${p.gehalten} / ${p.anschlaege}</td><td>${x.leistung}</td><td>${(5*x.leistung/max).toFixed(1).replace(".",",")}</td></tr>`;}).join("")}</tbody></table>
+   <div class="hinweis">Beispielwerte der Schau-Simulation. Leistung = zugefügter Schaden + gehaltene Anschläge + ausgehaltener Schaden (Gewichte im Konzept); PP im Mockup linear auf 5 normiert, im Spiel über die C2-Referenz.</div>`;
+  $("ende").classList.add("an");
+}
+
+/* ---------- Regie ---------- */
+let tempo=+(Q.get("tempo")||1), laeuft=Q.get("pause")!=="1", timer=null;
+function spiele(){
+  clearTimeout(timer); $("fenster").classList.remove("an");
+  const r=schritt(); let warte=820;
+  if(r.art==="anschlag"){
+    maleAlles();
+    // Anzeige: Peiniger schlaegt (angriff), Ertragender zuckt (treffer) oder faellt (tod).
+    setzeAnim(r.ps,"angriff");
+    if(r.rein){ // Akteur wurde ersetzt: Figur des Neuen einlaufen lassen
+      const el=$("fig"+r.es); el.classList.add("rein"+r.es); setzeAnim(r.es,"walk",{halt:false});
+      setTimeout(()=>el.classList.remove("rein"+r.es),60);
+      einblender(r.es,r.e,r.wort,r.e.n+" · "+r.pe.n+" mit "+r.w.name,2200/Math.sqrt(tempo)); warte=2300;
+    }else if(r.ko){ setzeAnim(r.es,"tod",{halt:true}); }
+    else setzeAnim(r.es,"treffer");
+    const el=$("fig"+r.es); el.classList.remove("zuckt"); void el.offsetWidth; if(!r.haelt)el.classList.add("zuckt");
+    float(r.es,"−"+r.schaden,r.haelt?"HÄLT":"BRICHT EIN",r.haelt?"haelt":"bricht");
+    if(r.rollentausch)warte=1300;
+  }else if(r.art==="fenster"){
+    maleAlles(); zeigeFenster(r.wechsel); for(const s of [0,1])setzeAnim(s,r.wechsel[s]?"walk":"steh"); warte=2600;
+  }
+  if(Z.ende){ maleAlles(); zeigeEnde(); return; }
+  if(laeuft)timer=setTimeout(spiele,warte/tempo);
+}
+function start(saat){
+  $("ende").classList.remove("an"); $("fenster").classList.remove("an"); $("einb").classList.remove("an");
+  neu(saat); const n=+(Q.get("schritt")||0); let letzter=null;
+  for(let i=0;i<n&&!Z.ende;i++)letzter=schritt();
+  if(Q.get("ende")==="1")while(!Z.ende)schritt();
+  maleAlles(); for(const s of [0,1])setzeAnim(s,"steh");
+  if(letzter&&letzter.art==="fenster")zeigeFenster(letzter.wechsel);
+  if(letzter&&letzter.ko&&!Z.ende){ einblender(letzter.es,letzter.e,letzter.wort,letzter.e.n+" · "+letzter.pe.n+" mit "+letzter.w.name,0); }
+  if(letzter&&letzter.art==="anschlag"&&!letzter.ko){ setzeAnim(letzter.ps,"angriff",{halt:true}); figZ[letzter.ps].frame=6; setzeAnim(letzter.es,"treffer",{halt:true}); }
+  if(Z.ende){ zeigeEnde(); return; }
+  if(laeuft)timer=setTimeout(spiele,900);
+}
+function maleRegie(){ $("bPlay").textContent=laeuft?"⏸":"▶"; document.querySelectorAll("[data-tempo]").forEach(b=>b.classList.toggle("an",+b.dataset.tempo===tempo)); }
+$("bPlay").onclick=()=>{ laeuft=!laeuft; maleRegie(); clearTimeout(timer); if(laeuft)spiele(); };
+$("bSchritt").onclick=()=>{ laeuft=false; maleRegie(); spiele(); };
+$("bNeu").onclick=()=>{ clearTimeout(timer); laeuft=true; maleRegie(); Q.delete("schritt"); Q.delete("ende"); start(1+Math.floor(Math.random()*9999)); };
+$("bEnde").onclick=()=>{ clearTimeout(timer); while(!Z.ende)schritt(); maleAlles(); zeigeEnde(); };
+document.querySelectorAll("[data-tempo]").forEach(b=>b.onclick=()=>{ tempo=+b.dataset.tempo; maleRegie(); });
+$("ende").onclick=()=>$("ende").classList.remove("an");
+passeAn(); maleRegie(); start(+(Q.get("saat")||7));
+</script>
+</body>
+</html>

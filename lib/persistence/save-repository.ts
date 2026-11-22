@@ -30,6 +30,7 @@ import { stelleLaufendeSaisonAufC2Um } from "@/lib/resolve/wertungs-skalen";
 import { stempleClimbingFormat } from "@/lib/resolve/climbing-format";
 import { stempleHockeyTorwart } from "@/lib/resolve/hockey-torwart";
 import { stempleBasketballPuste } from "@/lib/resolve/basketball-puste";
+import { stempleBreakingFormat } from "@/lib/resolve/breaking-format";
 import { stempleBattlefieldFormat } from "@/lib/resolve/battlefield-format";
 import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
 import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
@@ -1438,7 +1439,8 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // BATTLEFIELD-FORMAT (Fuenf Punkte live, 22.11., lib/resolve/battlefield-format.ts): gleiches Muster.
   // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): gleiches Muster.
   // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): gleiches Muster.
-  const gameStateWithoutBaseline = stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+  // BREAKING-FORMAT (22.11., lib/resolve/breaking-format.ts): gleiches Muster.
+  const gameStateWithoutBaseline = stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
@@ -1462,7 +1464,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  )))))));
+  ))))))));
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),

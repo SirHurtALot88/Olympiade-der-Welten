@@ -721,6 +721,14 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus.
+**Stand 22.11. (Breaking Tag-Team-1v1, `docs/design/breaking-tagteam-22-11.md`): GESAMT fe1dc086d68d (75 Eintraege)**; gegenueber `ea36f666cc71`
+(Basketball-Puste) bewegen sich NUR `spiele breaking 1|7|42` (ed316124be88/0a689ade305e/c4bf3bd3603f -> 618a78380a90/9fcfb85a5f9a/ae3a91006f01); das alte Format (Gauntlet) steht
+als `BREAKING-GAUNTLET 031655024229` (3 Zeilen `spiele breaking/gauntlet`, bit-identisch zu den frueheren Breaking-Zeilen) AUSSERHALB von GESAMT, Rueckweg
+`OLY_BREAKING_FORMAT=alt` (Stempel `seasonState.breakingFormat`, `lib/resolve/breaking-format.ts`, Messhebel `window.__arena.breakingFormat("gauntlet")`).
+Inhalt: 6 gegen 6, je Team einer im Ring, Gang = A peinigt / B haelt aus und umgekehrt, danach verdeckter Wechsel; jeder kommt dran, Standzeit 2,
+Geraete-Eskalation je Umlauf; **Waffe frei waehlbar (Chris 22.11.): genau eine je Gang und Spieler, Plan des Managers in der Einsatzliste, sonst KI-Konterwahl;
+der Plan reist als `waffen` im Aufstellungseintrag**. rho je Spiel 0,856 -> 0,915 (n=48), Pp 10,0/13,9 (gepoolt 10,4); Feldgroesse 2 unter 0,75 (0,68, Gauntlet 0,70), Notbremse 0,3 %. C2-/E1-Anker und PP-Referenz je Format
+(`breakingGauntletAlt`, `duellGauntletAlt`, `breaking-pps-referenz-gauntlet.json`). Die anderen fuenf Schutzsummen sind unveraendert.
 **Stand 22.11. (Basketball-Puste, `docs/design/basketball-puste-22-11.md`): GESAMT ea36f666cc71 (75 Eintraege)**; gegenueber `0310ec4a4e3d`
 (Hockey-Torwart-Regel) bewegen sich NUR `spiele basketball 1|7|42` (91a13edbaa37/9cae043e306d/8a75782eceaa -> 1dcbd995722b/4aa24b3936d0/0478707f7e77);
 die alte Regel steht als `BASKETBALL-PUSTE-ALT 77aa7158ff0d` (3 Zeilen `spiele basketball/puste-alt`, bit-identisch zu den frueheren

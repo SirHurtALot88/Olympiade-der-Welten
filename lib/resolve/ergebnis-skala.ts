@@ -76,11 +76,12 @@ export type ErgebnisSkalaFormat = "duell" | "pod";
  * Spannen dort (Median Platz 1-4 bei k=4: 104) passen nicht zur Fuenf-Punkte-Domination (158); `pod` gilt fuer das
  * Standardformat. Gezeigt = gebucht: ein im alten Format gebuchter Spieltag rechnet mit den alten Knoten weiter.
  */
-type AnkerSchluessel = ErgebnisSkalaFormat | "podOrte3" | "duellTorwartAlt" | "duellPusteAlt";
+type AnkerSchluessel = ErgebnisSkalaFormat | "podOrte3" | "duellTorwartAlt" | "duellPusteAlt" | "duellGauntletAlt";
 /** Das Battlefield-Format eines Spieltags, soweit es die Pod-Anker betrifft. Andere Disziplinen kennen nur eine Variante. */
-export type PodAnkerVariante = "standard" | "orte3" | "torwartAlt" | "pusteAlt";
+export type PodAnkerVariante = "standard" | "orte3" | "torwartAlt" | "pusteAlt" | "gauntletAlt";
 /* `torwartAlt` (Hockey, 22.11.): Duell-Anker eines Spieltags, der mit der alten Torwart-Regel gebucht wurde (`duellTorwartAlt`).
-   `pusteAlt` (Basketball, 22.11.): dasselbe fuer die alte Puste-Regel (`duellPusteAlt`). */
+   `pusteAlt` (Basketball, 22.11.): dasselbe fuer die alte Puste-Regel (`duellPusteAlt`).
+   `gauntletAlt` (Breaking, 22.11.): dasselbe fuer das alte Gauntlet-Format (`duellGauntletAlt`). */
 export type MargeQuelle = "marge" | "relativ" | "leistung";
 
 type AnkerRoh = { knoten?: number[]; margeQuelle?: MargeQuelle; lP5?: number; lP50?: number; lP95?: number; n?: number };
@@ -123,7 +124,7 @@ export function ergebnisSkalaAnker(
 ): ErgebnisSkalaAnker | null {
   const eintraege = KALIBRIERUNG.disziplinen?.[disciplineId];
   const alt =
-    format === "pod" && podVariante === "orte3" ? eintraege?.podOrte3 : format === "duell" && podVariante === "torwartAlt" ? eintraege?.duellTorwartAlt : format === "duell" && podVariante === "pusteAlt" ? eintraege?.duellPusteAlt : undefined;
+    format === "pod" && podVariante === "orte3" ? eintraege?.podOrte3 : format === "duell" && podVariante === "torwartAlt" ? eintraege?.duellTorwartAlt : format === "duell" && podVariante === "pusteAlt" ? eintraege?.duellPusteAlt : format === "duell" && podVariante === "gauntletAlt" ? eintraege?.duellGauntletAlt : undefined;
   const eintrag = alt ?? eintraege?.[format];
   if (!eintrag) return null;
   if (typeof playerCount === "number" && Number.isFinite(playerCount)) {
@@ -257,7 +258,7 @@ export function berechneDuellErgebnisE1(input: {
   seiten?: readonly [number, number] | null;
   leistungEigen: number | null | undefined;
   leistungGegner: number | null | undefined;
-  /** Hockey mit der alten Torwart-Regel: `"torwartAlt"`, Basketball mit der alten Puste-Regel: `"pusteAlt"` (alte Duell-Anker). Sonst weglassen. */
+  /** Hockey mit der alten Torwart-Regel: `"torwartAlt"`, Basketball mit der alten Puste-Regel: `"pusteAlt"`, Breaking im alten Gauntlet-Format: `"gauntletAlt"` (alte Duell-Anker). Sonst weglassen. */
   variante?: PodAnkerVariante;
 }): DuellErgebnisE1 {
   const anker = ergebnisSkalaAnker(input.disciplineId, "duell", input.playerCount, input.variante ?? "standard");

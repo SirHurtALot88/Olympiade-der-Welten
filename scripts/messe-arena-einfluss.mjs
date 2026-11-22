@@ -44,6 +44,9 @@ const schalter = process.argv.slice(2).filter((a) => a.startsWith("--"));
 const positionen = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const schalterWert = (name) => schalter.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
 const MUTATOR_MODUS = schalterWert("mutatoren") ?? null;
+// --breaking-format=gauntlet|<json> (22.11., additiv): Breaking-Format fuer die Messung (Messhebel `breakingFormat`); ohne den
+// Schalter gilt der Motor-Standard (Tag-Team). Der Wert darf ein "=" im JSON enthalten, daher nicht ueber schalterWert().
+const BR_FORMAT = (schalter.find((a) => a.startsWith("--breaking-format=")) ?? "").slice("--breaking-format=".length) || null;
 const SAAT_VERSATZ = Number(schalterWert("saat-versatz") ?? 0);
 // --je-seite=N (27.10., additiv): Kadergroesse einer ARENA-Disziplin fuer diese Messung (z.B.
 // Battlefield 2/4/6 je Seite). Ohne den Schalter misst das Skript bei ARENA_ART[d].jeSeite wie bisher.
@@ -130,6 +133,7 @@ await seite.waitForFunction(() => window.__arena, null, { timeout: 30000 });
 // P4 (docs/design/formkarten-motor-p4-11-11.md): OLY_FORM_MODUS=echt misst mit einem
 // Einsatzlisten-Szenario je Seite statt der Ersatzkarte. Ohne die Variable unveraendert.
 if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
+if (BR_FORMAT) await seite.evaluate((w) => window.__arena.breakingFormat(w), BR_FORMAT.startsWith("{") ? JSON.parse(BR_FORMAT) : BR_FORMAT);
 const schalterGesetzt = await setzeBuehneSchalter(seite, BUEHNE_SCHALTER);
 const staffelPaarGesetzt = await setzeStaffelPaarSonde(seite, STAFFEL_PAAR_SCHALTER);
 const kontaktGesetzt = await setzeKontaktSchalter(seite, KONTAKT_SCHALTER);

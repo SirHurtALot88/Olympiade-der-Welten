@@ -90,7 +90,7 @@ export function ppSkalaAktiv(gameState?: Parameters<typeof ppSkalaVersionFuer>[0
  * Einsaetze je Zelle, die Disziplin-weiten Anker mitteln ueber alle Feldgroessen.
  */
 /** Anker-Variante eines Spieltags (Format bzw. Regel, nach der er gebucht wurde). */
-export type PpSkalaAnkerVariante = "orte3" | "torwartAlt" | "pusteAlt";
+export type PpSkalaAnkerVariante = "orte3" | "torwartAlt" | "pusteAlt" | "gauntletAlt";
 
 export function ppSkalaAnker(
   disciplineId: string | null | undefined,
@@ -98,12 +98,13 @@ export function ppSkalaAnker(
   /**
    * "orte3": Battlefield-Pod im alten Format (Anker unter `battlefieldOrte3`, 22.11.);
    * "torwartAlt": Hockey-Spieltag mit der alten Torwart-Regel (Anker unter `hockeyAlt`, 22.11.);
-   * "pusteAlt": Basketball-Spieltag mit der alten Puste-Regel (Anker unter `basketballPusteAlt`, 22.11.); sonst weglassen.
+   * "pusteAlt": Basketball-Spieltag mit der alten Puste-Regel (Anker unter `basketballPusteAlt`, 22.11.);
+   * "gauntletAlt": Breaking-Spieltag im alten Gauntlet-Format (Anker unter `breakingGauntletAlt`, 22.11.); sonst weglassen.
    */
   variante?: PpSkalaAnkerVariante,
 ): PpSkalaAnker | null {
   if (!disciplineId) return null;
-  const suffix = variante === "orte3" ? "Orte3" : variante === "torwartAlt" ? "Alt" : variante === "pusteAlt" ? "PusteAlt" : null;
+  const suffix = variante === "orte3" ? "Orte3" : variante === "torwartAlt" ? "Alt" : variante === "pusteAlt" ? "PusteAlt" : variante === "gauntletAlt" ? "GauntletAlt" : null;
   const eintrag = (suffix ? ANKER_JE_DISZIPLIN.get(`${disciplineId}${suffix}`) : undefined) ?? ANKER_JE_DISZIPLIN.get(disciplineId);
   if (!eintrag) return null;
   if (typeof playerCount === "number" && Number.isFinite(playerCount)) {
@@ -153,7 +154,7 @@ export function ppAusKurveSkaliert(input: {
   modus?: PpSkalaModus;
   /** Feldgroesse dieser Disziplin an diesem Spieltag (Anker je Feldgroesse). */
   playerCount?: number | null;
-  /** Alte Variante ("orte3" Battlefield, "torwartAlt" Hockey, "pusteAlt" Basketball): die Anker dieses Formats/dieser Regel (gezeigt = gebucht). */
+  /** Alte Variante ("orte3" Battlefield, "torwartAlt" Hockey, "pusteAlt" Basketball, "gauntletAlt" Breaking): die Anker dieses Formats/dieser Regel (gezeigt = gebucht). */
   variante?: PpSkalaAnkerVariante;
 }): number {
   const { referenz } = input;

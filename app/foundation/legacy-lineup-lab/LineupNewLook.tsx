@@ -192,6 +192,18 @@ export type LineupNewLookProps = Pick<
   getDisciplineStrategie?: (disciplineSide: "d1" | "d2") => string | null;
   onUpdateDisciplineStrategie?: (disciplineSide: "d1" | "d2", strategie: string | null) => void;
   /**
+   * BREAKING-WAFFENFOLGE (22.11., lib/lineups/breaking-waffen.ts): je Spieler eine Waffe je eigenem Gang. `spieler` liefert die
+   * gesetzten Spieler der Seite in Slot-Reihenfolge (= Wechselreihenfolge), `folge` die gesetzte Waffenfolge, `setze` schreibt
+   * einen Eintrag (`null` = die KI waehlt). Fehlt die Prop, gibt es keinen Waffenblock.
+   */
+  breakingWaffen?: {
+    /** Nur im Tag-Team-Format gesetzt (`breakingFormatFuer(...) === "tagteam"`); im alten Gauntlet gibt es keine Waffenwahl. */
+    aktiv: boolean;
+    spieler: (disciplineSide: "d1" | "d2") => Array<{ activePlayerId: string; name: string; slotNr: number }>;
+    folge: (disciplineSide: "d1" | "d2", activePlayerId: string) => Array<string | null>;
+    setze: (disciplineSide: "d1" | "d2", activePlayerId: string, gang: number, waffe: string | null) => void;
+  };
+  /**
    * Letztes Preview-Ergebnis des Clients (derselbe Feed, den die klassische
    * Einsatzliste für ihren Scoreboard-Reveal nutzt). Treibt die Resolve-Show —
    * null/nicht-ok => Show wird gar nicht angeboten (progressive Enhancement).

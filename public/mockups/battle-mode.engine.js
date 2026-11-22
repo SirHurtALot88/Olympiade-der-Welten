@@ -22444,7 +22444,7 @@
     wettessenMenuWahl=(buehneDisc==="wettessen")
       ?WETTESSEN_MENU[cypherHash(seed,733)%WETTESSEN_MENU.length]
       :WETTESSEN_MENU[0];
-    floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
+    floats.length=0; letzterHebenZug=null; letzterHebenLampenZug=null; hebenTeamBannerGezeigt.clear(); letzterGauntletZug=null; letzterGauntletBruch=null; gauntletBoutStartT=null; gauntletReihen=null; ttGezeigt=null; ttBauteAktiv=false; gauntletHerzPhase=0; schachFokus=0; schachPin=null; schachMiniRects=[]; schachFokusRect=null;
     // PAKET B (06.10.): B2/B3/B4-Zustand mit zurueckgesetzt, sonst ueberlebte er ein
     // naechstes Spiel (gleiches Muster wie hebenTeamBannerGezeigt.clear() direkt davor).
     hebenLetzteAktivNr=null; hebenBauchbindeSeitMs=0; hebenBauchbindeBisMs=0;
@@ -22724,7 +22724,7 @@
     // baueGauntlet() haelt die Kettenreihenfolge fuer Chris' Slot-6-Anker-Dramaturgie
     // (s. Kommentar dort) fuer bereits slot-echt -- dieselbe falsche Annahme wie beim
     // `art.duell`-Block oben. `mineGeordnet`/`gegnerGeordnet` lösen das ein.
-    if(art.gauntlet){ baueGauntlet(art,mineGeordnet,gegnerGeordnet); return; }
+    if(art.gauntlet){ if(ttAn())baueTagTeam(art,mineGeordnet,gegnerGeordnet); else{ ttBauteAktiv=false; baueGauntlet(art,mineGeordnet,gegnerGeordnet); } return; }
     // SCHATZSUCHE (I-Spy) — KEIN `return`: anders als Heben braucht I-Spy weder `.vorteil`
     // noch eine Brett-Paarung, nur befuellte `runden[]` je Teilnehmer. baueSchatzsuche()
     // (Definition vor stepBuehne()) schreibt sie direkt auf die schon in TEILNEHMER
@@ -29111,6 +29111,430 @@
     }
   }
 
+  // ================== BREAKING ALS TAG-TEAM-1v1 (22.11., docs/design/breaking-tagteam-22-11.md) ==================
+  // Arbeitsliste 21.11., Welle 4, Chris woertlich: „Breaking: Tag-Team-1v1 (Tekken/Street-Fighter-Art, Ein- und
+  // Auswechseln, jeder kommt dran), HP/DMG je Spieler und Waffe unterschiedlich.“ Breaking bleibt ein Folter-/Aushalte-
+  // Zweikampf (NICHT Breakdance): einer fuegt Schmerz zu, der andere haelt aus, dann Wechsel, bis einer aufgibt.
+  //
+  // REGELN. 6 gegen 6, je Team EINER im Ring. Ein GANG = zwei Phasen: A peinigt (B haelt aus), danach B peinigt (A haelt aus).
+  // Nach jedem Gang wechseln beide Teams gleichzeitig und verdeckt (deterministische KI, kein rr()). Umlauf-Regel: niemand
+  // kommt ein zweites Mal rein, bevor alle lebenden Teamkameraden dran waren; Standzeit hoechstens 2 Gaenge am Stueck;
+  // Geraete-Eskalation je Umlauf (I/II/III, Schaden x1/x1,5/x2,2, ab Umlauf 4 x3/x4), damit der Kampf durch Aufgabe endet (Notbremse nach Umlauf 5 oder 700 Anschlaegen, nur an Gang-Grenzen; gemessen 0,3 %; nach
+  // Notbremse: Zahl der Gebrochenen, dann Rest-HP-Anteil).
+  // HP = 200 + 1,5 x NERVEN je Spieler; Schaden des Peinigers aus TECHNIK (0,6) und SPITZENMOMENT (0,4), gedeckelt auf
+  // +-15 % (HP-Bilanz); dem Peiniger wird je Anschlag eine GUTSCHRIFT gebucht (Qual-Punkte): erwarteter Schaden dieses Anschlags
+  // (Mittel aus halten/brechen der Waffe x Eskalation) x TT.k x Wertungsfaktor aus TECHNIK/SPITZENMOMENT (`ttGutFaktor`, Steigung
+  // TT.gutSteil, ohne Deckel). Sie haengt an SEINEM Schlag, nicht am Haltewurf des Gegners (sonst traegt jeder Treffer fremdes
+  // Wuerfelrauschen in den eigenen Wert). Matrix nur gelesen.
+  // GEMESSEN (22.11., docs/design/breaking-tagteam-22-11.md Abschnitt 11): Gutschrift aus dem tatsaechlichen Schaden und kleinem k
+  // (0,5-1) brachte rho je Spiel nur 0,77-0,81 und Pp 22,5-58 (Qual und Entschlossenheit zu schwach, Wille und Gesundheit zu stark);
+  // die erwartungsbasierte Gutschrift mit k 4 / Steigung 3 trifft die Matrix (Pp 8,9) bei rho 0,897. Konter-Wechsel (Konzept 4,
+  // Regel 3) kostete rho 0,04 und steht deshalb auf `konterSchwelle:0` (aus); Standzeit 2 bleibt.
+  //
+  // WAFFE FREI WAEHLBAR (Chris, 22.11., ersetzt das Leibgeraet nach Klassenfarbe des Konzepts): keine feste Waffe. Jeder Spieler
+  // nutzt in JEDEM Gang genau EINE Waffe und darf sie von Gang zu Gang wechseln. Gleiches Schadensbudget je Phase fuer alle
+  // drei Waffen (Wucht 3 x 14/33, Hieb 4 x 10/25, Zermuerbung 5 x 8/20, je rund 70 bei 50 % Halten), nur das PROFIL
+  // unterscheidet sich (wenige schwere Schlaege / viele kleine / nicht erholbar) und welcher Teilwert des Aushaltenden
+  // dagegenhaelt (SPITZENMOMENT / TECHNIK / NERVEN). Wer waehlt: der Manager kann je Spieler eine Waffenfolge in der
+  // Einsatzliste vorgeben (`place[n].waffen`, Index = eigener Gang); was er nicht setzt, fuellt die KI deterministisch:
+  // die Waffe, deren Kanal beim aktuellen Gegner am schwaechsten ist (Konterwahl; Gleichstand Wucht, Hieb, Zermuerbung).
+  // Gleiche Logik fuer KI-Teams und delegierte Bereiche („Mensch ueberschreibt, KI respektiert“).
+  //
+  // GEZEIGT = GEBUCHT: baueTagTeam() rechnet den ganzen Kampf VOR dem ersten Frame (wie baueGauntlet()); die Anzeige
+  // enthuellt Anschlag fuer Anschlag. Jeder Anschlag traegt einen Schnappschuss (`r.snap`) beider Teams, den die Anzeige liest.
+  // Format-Schalter: `ttAn()` (Umschlag `formatByDisciplineId.breaking` = "gauntlet" | "tagteam", Messhebel
+  // `window.__arena.breakingFormat()`); "gauntlet" ist das alte Format Zeichen fuer Zeichen (baueGauntlet()).
+  const TT_WAFFEN_KONSTANTE={
+    wucht:       {id:"wucht",       name:"Wucht",      n:6, halt:7, bricht:16.5,erh:0.5,kanal:"SPITZENMOMENT",geraete:[6,8,9]},
+    hieb:        {id:"hieb",        name:"Hieb",       n:8, halt:5, bricht:12.5,erh:0.5,kanal:"TECHNIK",      geraete:[1,2,5]},
+    zermuerbung: {id:"zermuerbung", name:"Zermürbung", n:10,halt:4, bricht:10,  erh:0,  kanal:"NERVEN",       geraete:[0,3,4]}
+  };
+  const TT_WAFFEN_IDS=["wucht","hieb","zermuerbung"];
+  const TT_KONSTANTE={hpBasis:200, hpNerven:1.5, eskal:[1,1.5,2.2,3,4], stufeJeUmlauf:3, peinigerDeckel:0.15, peinigerSteil:0.30,
+    k:3.0, standzeit:2, schutzAnteil:0.25, konterSchwelle:0, konterVorsprung:10, erholRate:0.06, umlaufMax:5,
+    anschlagMax:700, gangMax:120, verschnaufen:0.04, gutErwartet:true, gutSteil:3.0, bruchBonus:0};
+  let TT={...TT_KONSTANTE, waffen:{...TT_WAFFEN_KONSTANTE}};
+  let TT_EXPLIZIT=false, TT_AN_HEBEL=true;
+  function ttAn(){
+    if(TT_EXPLIZIT)return TT_AN_HEBEL;
+    const f=echterKader&&echterKader.formatByDisciplineId&&echterKader.formatByDisciplineId.breaking;
+    return f!=="gauntlet";
+  }
+  // Zustand je Teilnehmer in einer WeakMap (kein neues Feld am Spielerobjekt): einsaetze, gaenge (eigene Gaenge, Index der
+  // Waffenfolge), stand (Gaenge am Stueck), erh (erholbarer Schaden).
+  const ttSt=new WeakMap();
+  let ttSeitenZusatz=[0,0], ttEnde=null, ttGezeigt=null, ttBauteAktiv=false, ttProtokoll=[];
+  function ttSchadenFaktor(p){
+    const pw=0.6*p.TECHNIK+0.4*p.SPITZENMOMENT;
+    return Math.max(1-TT.peinigerDeckel,Math.min(1+TT.peinigerDeckel,1+TT.peinigerSteil*(pw-50)/100));
+  }
+  // Wertungsfaktor des Peinigers fuer die Gutschrift: dieselbe Groesse wie der Schadensfaktor (0,6 TECHNIK + 0,4 SPITZENMOMENT),
+  // nur mit eigener, steilerer Steigung und ohne den +-15-%-Deckel des Schadens (der Deckel schuetzt die HP-Bilanz, nicht die Punkte).
+  function ttGutFaktor(p){
+    const pw=0.6*p.TECHNIK+0.4*p.SPITZENMOMENT;
+    return Math.max(0.3,1+TT.gutSteil*(pw-50)/100);
+  }
+  function ttWaffeGueltig(id){return typeof id==="string"&&Object.prototype.hasOwnProperty.call(TT.waffen,id);}
+  // KI-Konterwahl: die Waffe, deren Kanal beim Aushaltenden am schwaechsten ist. Rein, kein rr().
+  function ttWaffeKI(zu){
+    let best=null,bestW=1e9;
+    for(const id of TT_WAFFEN_IDS){ const w=TT.waffen[id], v=zu[w.kanal]; if(v<bestW-1e-9){bestW=v;best=id;} }
+    return best;
+  }
+  function ttWaffeWaehlen(u,zu){
+    const pl=place[u.n]&&place[u.n].waffen, st=ttSt.get(u);
+    if(Array.isArray(pl)&&pl.length){
+      const v=pl[st.gaenge%pl.length];
+      if(ttWaffeGueltig(v))return {id:v,quelle:"plan"};
+    }
+    return {id:ttWaffeKI(zu),quelle:"ki"};
+  }
+  function baueTagTeam(art,mine,gegner){
+    ttBauteAktiv=true; ttVerlauf=[]; ttFenster=null;
+    mine.concat(gegner).forEach(p=>{ const tu=TEILNEHMER.find(x=>x.n===p.n); if(tu)ttKlasse.set(tu,TT_KLASSEN_FARBE[p.c]||"#9aa7ba"); });
+    const A=mine.map(p=>TEILNEHMER.find(x=>x.side===0&&x.n===p.n)).filter(Boolean);
+    const B=gegner.map(p=>TEILNEHMER.find(x=>x.side===1&&x.n===p.n)).filter(Boolean);
+    const alle=A.concat(B);
+    for(const u of alle){
+      u.runden=[]; u.summe=0; u.aktuell=-1;
+      u.hpMax=Math.round(TT.hpBasis+TT.hpNerven*u.NERVEN); u.hp=u.hpMax; u.raus=false;
+      u.bout=0; u.gegnerN=null;
+      ttSt.set(u,{einsaetze:0,gaenge:0,stand:0,erh:0});
+    }
+    A.forEach((u,i)=>{u.gauntletIdx=i;}); B.forEach((u,i)=>{u.gauntletIdx=i;});
+    gauntletReihen={0:A,1:B};
+    buehneQueue=[]; ttSeitenZusatz=[0,0]; ttEnde=null; ttGezeigt=null; ttProtokoll=[];
+    if(!A.length||!B.length)return;
+    const T=[A,B], akt=[0,0];
+    ttSt.get(A[0]).einsaetze=1; ttSt.get(B[0]).einsaetze=1;
+    const lebt=(u)=>u.hp>0;
+    const snapDe=(extra)=>Object.assign({hp:alle.map(u=>u.hp),erh:alle.map(u=>Math.round(ttSt.get(u).erh)),akt:[akt[0],akt[1]],
+      stand:[ttSt.get(T[0][akt[0]]).stand,ttSt.get(T[1][akt[1]]).stand],ein:[ttSt.get(T[0][akt[0]]).einsaetze,ttSt.get(T[1][akt[1]]).einsaetze]},extra);
+    const umlaufRoh=(t)=>{ let m=1e9; for(const u of T[t])if(lebt(u))m=Math.min(m,ttSt.get(u).einsaetze); return m===1e9?1e9:1+m; };
+    const eligible=(t)=>{
+      const bank=T[t].filter((u,i)=>i!==akt[t]&&lebt(u));
+      if(!bank.length)return [];
+      const mn=Math.min(...bank.map(u=>ttSt.get(u).einsaetze));
+      return bank.filter(u=>ttSt.get(u).einsaetze===mn);
+    };
+    let anschlaege=0, gang=0, ersteSeite=0, wechselNotiz=[], ende="aufgabe";
+    const erholung=(u)=>{
+      const st=ttSt.get(u); if(st.erh<=0||u.hp>=u.hpMax)return;
+      const h=Math.min(Math.round(u.hpMax*TT.erholRate*(0.5+u.AUSDAUER/200)),Math.round(st.erh),u.hpMax-u.hp);
+      u.hp+=h; st.erh-=h;
+    };
+    // EINE PHASE: `p` peinigt `z` mit Waffe `w`, bis die Anschlaege durch sind oder z bricht.
+    const phase=(p,z,wahl,umlauf,phaseNr)=>{
+      const w=TT.waffen[wahl.id], pT=p.side, zT=z.side;
+      const stufeUm=Math.min(TT.eskal.length-1,umlauf-1);
+      for(let i=0;i<w.n;i++){
+        z.gegnerN=p.n; p.gegnerN=z.n;
+        const ri=z.runden.length;
+        const provoziert=z.WAGNIS>=GAUNTLET_PROVOKATION_SCHWELLE;
+        const stufe=Math.min(FOLTER_GERAETE.length-1,Math.min(2,stufeUm)*TT.stufeJeUmlauf+(provoziert?1:0));
+        const r=gauntletRunde(z,ri,art,{stufe,familie:w.id,provoziert});
+        const hpVor=z.hp;
+        const schaden=Math.max(1,Math.round((r.haelt?w.halt:w.bricht)*TT.eskal[stufeUm]*ttSchadenFaktor(p)));
+        z.hp=Math.max(0,z.hp-schaden);
+        const echt=hpVor-z.hp, stz=ttSt.get(z);
+        stz.erh=Math.min(stz.erh+echt*w.erh,z.hpMax-z.hp);
+        // GUTSCHRIFT des Peinigers: aus SEINEM Schlag (erwarteter Schaden dieses Anschlags x Peinigerfaktor x Eskalation), nicht aus dem
+        // Ausgang des Haltewurfs des Gegners -- sonst traegt jeder Treffer das Rauschen eines fremden Wurfs in den eigenen Wert.
+        const gut=TT.gutErwartet?Math.round(TT.k*0.5*(w.halt+w.bricht)*TT.eskal[stufeUm]*ttGutFaktor(p)):Math.round(TT.k*echt);
+        anschlaege++;
+        const rec={punkte:r.punkte,ereignis:r.ereignis,gegnerN:p.n,bout:gang,hpVor,hpNach:z.hp,hpMax:z.hpMax,
+          stufe:w.geraete[Math.min(2,stufeUm)],familie:w.id,provoziert,schaden:echt,
+          tt:true,gut,peinigerN:p.n,peinigerSide:pT,waffe:w.id,waffeQuelle:wahl.quelle,umlauf,gang,phase:phaseNr,
+          anschlagNr:i+1,phasenN:w.n,wechsel:null,snap:null};
+        z.runden.push(rec);
+        if(z.hp<=0){ z.raus=true; }
+        rec.snap=snapDe({umlauf,gang,phase:phaseNr,peiniger:pT,ertrager:zT,haelt:r.haelt});
+        if(wechselNotiz.length){ rec.wechsel=wechselNotiz; wechselNotiz=[]; }
+        buehneQueue.push(z);
+        ttProtokoll.push({art:"anschlag",gang,phase:phaseNr,umlauf,peiniger:p.n,peinigerSide:pT,ertragender:z.n,waffe:w.id,quelle:wahl.quelle,schaden:echt,haelt:r.haelt,hpNach:z.hp,gut,punkte:r.punkte});
+        if(z.hp<=0){
+          // Bruch-Bonus: wer den Gegner mitten in der Phase bricht, bekommt die Gutschrift der restlichen Anschlaege der Phase dazu
+          // (sonst wuerde fruehes Brechen bestraft). Wird mit diesem Anschlag enthuellt.
+          if(TT.gutErwartet&&TT.bruchBonus&&i<w.n-1)rec.gut+=Math.round(TT.bruchBonus*(w.n-1-i)*TT.k*0.5*(w.halt+w.bricht)*TT.eskal[stufeUm]*ttGutFaktor(p));
+          return true;
+        }
+      }
+      return false;
+    };
+    // WECHSELFENSTER: beide Teams gleichzeitig und verdeckt. Entscheidung aus dem Stand VOR dem Wechsel.
+    const entscheide=(t)=>{
+      const u=T[t][akt[t]], el=eligible(t);
+      if(!el.length)return null;
+      const gebrochen=!lebt(u), st=ttSt.get(u);
+      // Proxy fuer die Waffe des Gegners: Konterwahl gegen den aktuellen Ring-Spieler.
+      const kanal=TT.waffen[ttWaffeKI(u)].kanal;
+      let grund=null;
+      if(gebrochen)grund="gebrochen";
+      else if(st.stand>=TT.standzeit)grund="standzeit";
+      else if(u.hp/u.hpMax<TT.schutzAnteil)grund="schutz";
+      else if(u[kanal]<TT.konterSchwelle&&el.some(c=>c[kanal]>=u[kanal]+TT.konterVorsprung))grund="konter";
+      if(!grund)return null;
+      const letzter=T[t].length-1;
+      let pool=el.filter(c=>c.gauntletIdx!==letzter);
+      if(!pool.length)pool=el;
+      let best=null,bs=-1e9;
+      for(const c of pool){
+        const s=c[kanal]+40*(c.hp/c.hpMax);
+        if(s>bs+1e-9){bs=s;best=c;}
+      }
+      return {rein:best.gauntletIdx,grund};
+    };
+    for(;;){
+      if(gang>=TT.gangMax||anschlaege>=TT.anschlagMax){ ende="notbremse"; break; }
+      const um=Math.max(umlaufRoh(0),umlaufRoh(1));
+      if(um>TT.umlaufMax){ ende="notbremse"; break; }
+      gang++;
+      const umlauf=Math.min(um,TT.umlaufMax);
+      const p0=T[ersteSeite][akt[ersteSeite]], p1=T[1-ersteSeite][akt[1-ersteSeite]];
+      for(const u of [p0,p1]){ const s=ttSt.get(u); u.bout=gang; s.stand++; }
+      const bankZuvor=[];
+      for(let t=0;t<2;t++)T[t].forEach((u,i)=>{if(i!==akt[t]&&lebt(u))bankZuvor.push(u);});
+      let bruch=null;
+      // Die Waffe wird erst zu Beginn der eigenen Phase gewaehlt; der Plan zaehlt die Gaenge, in denen der Spieler wirklich peinigt.
+      const wahl0=ttWaffeWaehlen(p0,p1); ttSt.get(p0).gaenge++;
+      if(phase(p0,p1,wahl0,umlauf,1))bruch=p1;
+      else{
+        const wahl1=ttWaffeWaehlen(p1,p0); ttSt.get(p1).gaenge++;
+        if(phase(p1,p0,wahl1,umlauf,2))bruch=p0;
+      }
+      for(const u of bankZuvor)erholung(u);
+      const tot=[T[0].every(u=>!lebt(u)),T[1].every(u=>!lebt(u))];
+      if(tot[0]||tot[1]){ ende="aufgabe"; break; }
+      if(anschlaege>=TT.anschlagMax){ ende="notbremse"; break; }
+      // Verschnaufen des Ueberlebenden nach einem Bruch (nur erholbarer Teil)
+      if(bruch){
+        const sieger=bruch===p1?p0:p1, ss=ttSt.get(sieger);
+        const h=Math.min(Math.round(sieger.hpMax*TT.verschnaufen*(0.5+sieger.AUSDAUER/200)),Math.round(ss.erh),sieger.hpMax-sieger.hp);
+        if(h>0){sieger.hp+=h; ss.erh-=h;}
+      }
+      const w0=entscheide(0), w1=entscheide(1);
+      wechselNotiz=[];
+      [w0,w1].forEach((w,t)=>{
+        if(!w)return;
+        const raus=T[t][akt[t]], rein=T[t][w.rein];
+        wechselNotiz.push({team:t,raus:raus.n,rein:rein.n,grund:w.grund});
+        ttProtokoll.push({art:"wechsel",gang,team:t,raus:raus.n,rein:rein.n,grund:w.grund});
+        ttSt.get(raus).stand=0;
+        akt[t]=w.rein; const s=ttSt.get(rein); s.einsaetze++; s.stand=0;
+      });
+      // Wer eroeffnet den naechsten Gang? Nach einem Bruch peinigt der Ueberlebende zuerst (Sieger behaelt die Rolle).
+      if(bruch)ersteSeite=bruch.side===0?1:0; else ersteSeite=1-ersteSeite;
+    }
+    // Ergebnis: Lebende je Seite; bei Notbremse und gleicher Zahl entscheidet der Rest-HP-Anteil.
+    const lebende=[T[0].filter(lebt).length,T[1].filter(lebt).length];
+    const anteil=(t)=>{ const s=T[t].reduce((a,u)=>a+Math.max(0,u.hp),0), m=T[t].reduce((a,u)=>a+u.hpMax,0); return m>0?s/m:0; };
+    if(ende==="notbremse"&&lebende[0]===lebende[1]){
+      const a0=anteil(0), a1=anteil(1);
+      if(Math.abs(a0-a1)>1e-9)ttSeitenZusatz=a0>a1?[0.5,0]:[0,0.5];
+    }
+    ttEnde={art:ende,lebende,anteil:[anteil(0),anteil(1)],gaenge:gang,anschlaege};
+  }
+  // GEZEIGT: Schnappschuss des zuletzt enthuellten Anschlags (reveal-gegatet, kein Spoiler).
+  function ttHpJetzt(u){
+    if(!ttGezeigt)return u.hpMax;
+    const arr=ttGezeigt.snap.hp, idx=(u.side===0?0:(gauntletReihen[0]||[]).length)+u.gauntletIdx;
+    return arr[idx]!=null?arr[idx]:u.hpMax;
+  }
+
+  // ================== BREAKING TAG-TEAM: ANZEIGE (22.11., Mockup public/mockups/breaking-tagteam-22-11.html) ==================
+  // Rein praesentational: liest den Schnappschuss des zuletzt ENTHUELLTEN Anschlags (`ttGezeigt.snap`, reveal-gegatet), schreibt
+  // nur Anzeige-Zustand (u.hp/u.down/u.lunge fuer die Figuren-Animation, ttFenster/ttVerlauf), kein rr(), keine Wertung.
+  // Figuren: nur der Bestand (angriff/treffer/tod/walk, Sued/Ost/Nord); Geraete-Zeichen vorerst die Platzhalter FOLTER_GERAETE.
+  const TT_KLASSEN_FARBE={Berserker:"#e8604f",Warlord:"#e8604f",Tank:"#e8604f",Sprinter:"#62d394",Rogue:"#62d394",Charger:"#62d394",
+    Mage:"#5fa8ff",Overseer:"#5fa8ff",Templar:"#5fa8ff",Bard:"#f0c35a",Hero:"#f0c35a",Badass:"#f0c35a",Tactician:"#f0c35a"};
+  const TT_WAFFEN_FARBE={wucht:"#ff5a5a",hieb:"#ff9a4a",zermuerbung:"#8db3ff"};
+  const ttKlasse=new WeakMap();
+  let ttFenster=null, ttVerlauf=[];
+  function ttIdx(u){ return (u.side===0?0:(gauntletReihen[0]||[]).length)+u.gauntletIdx; }
+  function ttErhJetzt(u){ return ttGezeigt?(ttGezeigt.snap.erh[ttIdx(u)]||0):0; }
+  function ttAktive(){
+    const sn=ttGezeigt?ttGezeigt.snap.akt:[0,0];
+    return [(gauntletReihen[0]||[])[sn[0]]||null,(gauntletReihen[1]||[])[sn[1]]||null];
+  }
+  function ttNotiere(r,u){
+    const p=TEILNEHMER.find(x=>x.side===r.peinigerSide&&x.n===r.peinigerN);
+    ttVerlauf.push({txt:(p?p.n:"?")+" › "+u.n+"  "+TT.waffen[r.waffe].name+"  −"+r.schaden,haelt:r.ereignis===BB().erfolgWort,gang:r.gang});
+    if(ttVerlauf.length>7)ttVerlauf.shift();
+    if(r.wechsel&&r.wechsel.length)ttFenster={bis:buehneT+2.6,eintraege:r.wechsel,gang:r.gang,umlauf:r.umlauf};
+  }
+  // Anzeige-Schritt: Figuren-Zustand je Frame aus dem enthuellten Schnappschuss ableiten (kein Eingriff in die Simulation).
+  function stepTagTeam(dt){
+    for(const u of TEILNEHMER){
+      const hp=ttHpJetzt(u);
+      u.hp=hp; u.down=!!(ttGezeigt&&hp<=0); u.vx=0; u.vy=0;
+    }
+  }
+  function ttText(txt,x,y,gr,farbe,ausrichtung,haus){
+    ctx.font=(haus?"400 ":"700 ")+gr+"px "+(haus?"'RaniraSeason',Georgia,'Times New Roman',serif":"'Barlow Condensed','Roboto Condensed','Arial Narrow',sans-serif");
+    ctx.textAlign=ausrichtung||"left"; ctx.textBaseline="alphabetic";
+    ctx.lineWidth=Math.max(2,gr/6); ctx.strokeStyle="rgba(6,8,12,.9)"; ctx.strokeText(txt,x,y);
+    ctx.fillStyle=farbe; ctx.fillText(txt,x,y);
+  }
+  function ttFlaeche(x,y,w,h,rand){
+    ctx.fillStyle="rgba(9,12,18,.88)"; ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle=rand||"rgba(244,230,196,.22)"; ctx.lineWidth=1.2; ctx.strokeRect(x+.5,y+.5,w-1,h-1);
+  }
+  function ttHpBalken(x,y,w,h,u,rechts){
+    const hp=Math.max(0,ttHpJetzt(u)), erh=ttErhJetzt(u), m=u.hpMax||1;
+    ctx.fillStyle="#0b0f16"; ctx.fillRect(x,y,w,h);
+    const bw=w*Math.min(1,hp/m), ew=w*Math.min(1,Math.min(erh,m-hp)/m);
+    const frac=hp/m;
+    ctx.fillStyle=frac<0.25?"#d3392f":frac<0.5?"#d19a2a":"#3fae69";
+    if(rechts)ctx.fillRect(x+w-bw,y,bw,h); else ctx.fillRect(x,y,bw,h);
+    if(ew>0){
+      ctx.fillStyle="#8a2a25";
+      if(rechts)ctx.fillRect(x+w-bw-ew,y,ew,h); else ctx.fillRect(x+bw,y,ew,h);
+    }
+    ctx.strokeStyle="rgba(244,230,196,.2)"; ctx.strokeRect(x+.5,y+.5,w-1,h-1);
+  }
+  function zeichneBreakingTagTeam(art){
+    if(!TEILNEHMER.length||!gauntletReihen)return;
+    const u0=ttAktive(), sn=ttGezeigt?ttGezeigt.snap:null, r=ttGezeigt;
+    const farbe=[css("--home")||"#F2A03D",css("--away")||"#45B0C9"];
+    // Entwurfsmasse: Leinwand 1240 x 470 (Standard der Motor-Seite); alles wird mit E auf die echte Leinwand skaliert.
+    const E=Math.min(W/1240,H/470), px=(v)=>v*E, ox=(W-1240*E)/2, oy=(H-470*E)/2;
+    ctx.save(); ctx.translate(ox,oy);
+    // Grund: die Kulisse (bodenBuehne, Folterkeller-Platzhalter, die PixelLab-Arena kommt separat) bleibt sichtbar; ein leichter Schleier
+    // unten und oben haelt Tafeln und Zahlen lesbar.
+    const schleier=ctx.createLinearGradient(0,-oy,0,H-oy);
+    schleier.addColorStop(0,"rgba(4,5,9,.55)"); schleier.addColorStop(0.3,"rgba(4,5,9,.22)"); schleier.addColorStop(0.62,"rgba(4,5,9,.12)"); schleier.addColorStop(1,"rgba(4,5,9,.7)");
+    ctx.fillStyle=schleier; ctx.fillRect(-ox,-oy,W,H);
+    ctx.fillStyle="rgba(0,0,0,.30)"; ctx.beginPath(); ctx.ellipse(px(620),px(328),px(330),px(22),0,0,6.2832); ctx.fill();
+    // ---- Kopf: Lebensbalken links/rechts, Stand in der Mitte ----
+    const kopfY=px(70), kopfH=px(52), rand=px(8), mitteW=px(150), luecke=px(8), seitenW=(px(1240)-2*rand-mitteW-2*luecke)/2;
+    for(let t=0;t<2;t++){
+      const u=u0[t]; if(!u)continue;
+      const x=t===0?rand:px(1240)-rand-seitenW, rolle=(sn&&sn.peiniger===t)?"PEINIGT":(sn&&sn.ertrager===t)?"HÄLT AUS":"BEREIT";
+      ttFlaeche(x,kopfY,seitenW,kopfH,"rgba(244,230,196,.34)");
+      ctx.fillStyle=farbe[t]; ctx.fillRect(t===0?x:x+seitenW-px(5),kopfY,px(5),kopfH);
+      const kl=ttKlasse.get(u)||"#9aa7ba", wf=(r&&sn&&sn.peiniger===t)?TT_WAFFEN_FARBE[r.waffe]:"#9aa7ba";
+      ctx.fillStyle=kl; ctx.fillRect(t===0?x+px(5):x+seitenW-px(8),kopfY,px(3),kopfH);
+      const innen=px(14), tx=t===0?x+px(5)+innen:x+seitenW-px(8)-innen, al=t===0?"left":"right";
+      ttText(u.n.length>22?u.n.slice(0,21)+"…":u.n,tx,kopfY+px(17),px(17),"#f4e6c4",al,true);
+      ttText(rolle,tx,kopfY+px(29),px(11),rolle==="PEINIGT"?"#f0c35a":"#eef2f8",al);
+      if(r&&sn&&sn.peiniger===t)ttText(TT.waffen[r.waffe].name+" · "+r.anschlagNr+"/"+r.phasenN,t===0?tx+px(66):tx-px(66),kopfY+px(29),px(11),wf,al);
+      const bx=t===0?tx:x+px(5)+innen, bw=seitenW-px(5)-px(8)-2*innen;
+      ttHpBalken(bx,kopfY+px(33),bw,px(13),u,t===1);
+      ttText(Math.max(0,ttHpJetzt(u))+" / "+(u.hpMax||0),t===0?bx+px(5):bx+bw-px(5),kopfY+px(43),px(11),"#fff",al);
+      ttText((u.summe||0)+" Pkt",t===0?bx+bw-px(5):bx+px(5),kopfY+px(43),px(10),"#c9d3e4",t===0?"right":"left");
+      if(sn){
+        // Standzeit: zwei Punkte, ein gefuellter je Gang am Stueck; Einsaetze des Spielers in diesem Kampf
+        const stand=sn.stand[t], px0=t===0?x+seitenW-px(96):x+px(18);
+        for(let i=0;i<TT.standzeit;i++){ ctx.fillStyle=i<stand?"#f0c35a":"#1a2231"; ctx.fillRect(px0+i*px(14),kopfY+px(8),px(10),px(7)); }
+        ttText("Standzeit",t===0?px0+TT.standzeit*px(14)+px(4):px0+TT.standzeit*px(14)+px(4),kopfY+px(15),px(9),"#9aa7ba","left");
+        ttText("Einsatz "+sn.ein[t],t===0?x+seitenW-px(30):x+px(30)+px(60),kopfY+px(28),px(10),"#9aa7ba",t===0?"right":"left");
+      }
+    }
+    const mx=px(1240)/2-mitteW/2;
+    ttFlaeche(mx,kopfY,mitteW,kopfH,"rgba(244,230,196,.34)");
+    const gebrochen=[0,1].map(s=>(gauntletReihen[1-s]||[]).filter(u=>gauntletRausJetzt(u)).length);
+    ttText("GANG "+(r?r.gang:1)+" · UMLAUF "+(r?Math.min(3,r.umlauf):1),px(1240)/2,kopfY+px(13),px(11),"#f0c35a","center");
+    ttText(String(gebrochen[0]),px(1240)/2-px(32),kopfY+px(41),px(30),farbe[0],"center");
+    ttText(":",px(1240)/2,kopfY+px(38),px(20),"#66738a","center");
+    ttText(String(gebrochen[1]),px(1240)/2+px(32),kopfY+px(41),px(30),farbe[1],"center");
+    ttText("GEBROCHEN",px(1240)/2,kopfY+px(50),px(10),"#9aa7ba","center");
+    // ---- Bank: fuenf Karten je Team ----
+    const bankY=kopfY+kopfH+px(5), kW=(seitenW-px(4*5))/5, kH=px(32);
+    for(let t=0;t<2;t++){
+      const reihe=gauntletReihen[t]||[], aktiv=u0[t];
+      reihe.filter(u=>u!==aktiv).forEach((u,i)=>{
+        const x=t===0?rand+i*(kW+px(5)):px(1240)-rand-(i+1)*kW-i*px(5), tot=ttGezeigt&&ttHpJetzt(u)<=0;
+        ctx.globalAlpha=tot?0.45:1;
+        ttFlaeche(x,bankY,kW,kH);
+        ctx.fillStyle=ttKlasse.get(u)||"#9aa7ba"; ctx.fillRect(x,bankY,px(3),kH);
+        ttText(u.n.length>13?u.n.slice(0,12)+"…":u.n,x+px(8),bankY+px(12),px(12),"#f4e6c4","left");
+        const war=u.aktuell>=0&&u.runden.length>0, erholt=ttErhJetzt(u)>0&&ttHpJetzt(u)<u.hpMax;
+        const txt=tot?"GEBROCHEN":erholt?"erholt sich":war?"war dran":"wartet";
+        ttText(txt,x+px(8),bankY+px(22),px(10),tot?"#66738a":erholt?"#62d394":"#9aa7ba","left");
+        ttHpBalken(x+px(6),bankY+kH-px(7),kW-px(12),px(4),u,t===1);
+        ctx.globalAlpha=1;
+      });
+    }
+    // ---- Ring: die zwei Aktiven gross ----
+    const fussY=px(334), ringX=[px(620)-px(200),px(620)+px(200)], S=1.55*E;
+    for(let t=0;t<2;t++){
+      const u=u0[t]; if(!u)continue;
+      ctx.save(); ctx.translate(ringX[t],fussY-px(26)*1.55); ctx.scale(S,S);
+      zeichneSprite(ctx,u,0,0);
+      ctx.restore();
+    }
+    // Geraete-Plakette ueber dem Ring
+    if(r){
+      const w=TT.waffen[r.waffe], dev=FOLTER_GERAETE[r.stufe], pw=px(330), ph=px(34), gx=px(620)-pw/2, gy=bankY+kH+px(14);
+      ttFlaeche(gx,gy,pw,ph,TT_WAFFEN_FARBE[r.waffe]);
+      ctx.fillStyle=TT_WAFFEN_FARBE[r.waffe]; ctx.fillRect(gx,gy,px(4),ph);
+      ctx.save(); ctx.translate(gx+px(24),gy+ph/2); ctx.scale(E*0.9,E*0.9); try{dev.zeichne(ctx);}catch(e){} ctx.restore();
+      ttText(dev.name+" "+(["I","II","III"][Math.min(2,r.umlauf-1)]),gx+px(52),gy+px(16),px(17),"#f4e6c4","left",true);
+      ttText(w.name+" · "+r.anschlagNr+" von "+r.phasenN+" · trifft "+(w.kanal==="NERVEN"?"Nerven":w.kanal==="TECHNIK"?"Technik":"Spitzenmoment")+(r.waffeQuelle==="plan"?" · Plan":" · KI-Wahl"),gx+px(52),gy+px(29),px(10),"#9aa7ba","left");
+      const jetzt=buehneT-(r.zeigeT!=null?r.zeigeT:buehneT), ertr=u0[sn.ertrager];
+      if(ertr){
+        const t0=Math.max(0,Math.min(1,jetzt/0.9));
+        ctx.globalAlpha=1-t0;
+        ttText("−"+r.schaden,ringX[sn.ertrager],fussY-px(120)-t0*px(28),px(30),r.ereignis===BB().erfolgWort?"#f4e6c4":"#ff6058","center");
+        ctx.globalAlpha=1;
+      }
+    }
+    // ---- Fuss: Geraet trifft Kanal / Phasenleiste / Verlauf ----
+    const fy=px(346), fh=px(118), gap=px(8), spalte=(px(1240)-2*rand-2*gap)/3;
+    ttFlaeche(rand,fy,spalte,fh);
+    ttText("GERÄT TRIFFT KANAL",rand+px(10),fy+px(17),px(11),"#f0c35a","left");
+    const zu=r&&sn&&u0[sn.ertrager]?u0[sn.ertrager]:null;
+    [["Spitzenmoment","SPITZENMOMENT","wucht"],["Technik","TECHNIK","hieb"],["Nerven","NERVEN","zermuerbung"]].forEach((k,i)=>{
+      const yy=fy+px(40)+i*px(24), wert=zu?Math.round(zu[k[1]]):0, treff=r&&r.waffe===k[2];
+      ttText(k[0],rand+px(10),yy,px(13),treff?"#f4e6c4":"#9aa7ba","left");
+      const bx2=rand+px(104), bw2=spalte-px(104)-px(44);
+      ctx.fillStyle="#0b0f16"; ctx.fillRect(bx2,yy-px(10),bw2,px(10));
+      ctx.fillStyle=treff?TT_WAFFEN_FARBE[k[2]]:"#4a5568"; ctx.fillRect(bx2,yy-px(10),bw2*Math.min(1,wert/100),px(10));
+      ttText(String(wert),bx2+bw2+px(7),yy,px(13),treff?"#f4e6c4":"#9aa7ba","left");
+    });
+    const mx2=rand+spalte+gap;
+    ttFlaeche(mx2,fy,spalte,fh);
+    ttText("PHASE",mx2+px(10),fy+px(17),px(11),"#f0c35a","left");
+    if(r){
+      const n=r.phasenN, bw3=Math.min(px(30),(spalte-px(20)-n*px(3))/n);
+      for(let i=0;i<n;i++){
+        const x=mx2+px(10)+i*(bw3+px(3)), erledigt=i<r.anschlagNr;
+        ctx.fillStyle=!erledigt?"#1a2231":(i===r.anschlagNr-1?(r.ereignis===BB().erfolgWort?"#f4e6c4":"#ff6058"):"#6b7a92");
+        ctx.fillRect(x,fy+px(28),bw3,px(18));
+      }
+      ttText("Phase "+r.phase+" von 2 · "+(sn.peiniger===0?"links":"rechts")+" peinigt",mx2+px(10),fy+px(70),px(13),"#eef2f8","left");
+      ttText("Danach verdeckter Wechsel beider Teams",mx2+px(10),fy+px(90),px(11),"#9aa7ba","left");
+    }
+    const vx=mx2+spalte+gap;
+    ttFlaeche(vx,fy,spalte,fh);
+    ttText("VERLAUF",vx+px(10),fy+px(17),px(11),"#f0c35a","left");
+    ttVerlauf.slice().reverse().slice(0,5).forEach((e,i)=>ttText(e.txt,vx+px(10),fy+px(38)+i*px(17),px(12),e.haelt?"#eef2f8":"#ff8a7c","left"));
+    // ---- Wechselfenster: zwischen den beiden Ring-Spielern, damit die Figuren frei bleiben ----
+    if(ttFenster&&buehneT<ttFenster.bis){
+      const fw=px(300), fh2=px(86), x=px(620)-fw/2, y=px(214);
+      ttFlaeche(x,y,fw,fh2,"#f0c35a");
+      ttText("WECHSEL · GANG "+(ttFenster.gang-1)+" → "+ttFenster.gang,px(620),y+px(21),px(17),"#f0c35a","center",true);
+      const GRUND={gebrochen:"gebrochen",standzeit:"Standzeit erreicht",schutz:"unter 25 % HP",konter:"Konter"};
+      ttFenster.eintraege.forEach((e,i)=>ttText(e.raus+" → "+e.rein+" ("+(GRUND[e.grund]||e.grund)+")",px(620),y+px(42)+i*px(18),px(12),farbe[e.team],"center"));
+      if(!ttFenster.eintraege.length)ttText("beide bleiben im Ring",px(620),y+px(48),px(13),"#9aa7ba","center");
+    }
+    // ---- Notbremse: Entscheidung nach Rest-HP (nur wenn der Kampf so endet und alles gezeigt ist) ----
+    if(done&&ttEnde&&ttEnde.art==="notbremse"){
+      ttText("NOTBREMSE · Entscheidung: Zahl der Lebenden, dann Rest-HP",px(620),px(262),px(16),"#f0c35a","center");
+    }
+    // ---- Aufgabe ----
+    if(letzterGauntletBruch){
+      const seit=buehneT-letzterGauntletBruch.bruchT;
+      if(seit>=0&&seit<2.2){
+        ctx.globalAlpha=Math.min(1,(2.2-seit)*1.5);
+        ttText(gauntletAusscheidenWort(letzterGauntletBruch.u),px(620),px(270),px(44),"#ff6058","center",true);
+        ttText(letzterGauntletBruch.u.n+" scheidet aus",px(620),px(292),px(15),"#f4e6c4","center");
+        ctx.globalAlpha=1;
+      }
+    }
+    ctx.restore();
+  }
+
   // GAUNTLET-STUFENWECHSEL war hier (Audit-Punkt 7, Abschnitt 3.4): eine Funktion
   // `gauntletStufenwechsel(hpVor,hpNach,hpMax)` markierte per HP-Schwelle (die Haelfte, dann
   // ein Fuenftel), wann sich das Kraeftemessen eines Ertragenden sichtbar dreht, und loeste
@@ -29138,6 +29562,7 @@
   // Vor der ersten eigenen Enthuellung (u.aktuell===-1, noch kein einziger Zug gezeigt) ist der
   // Kaempfer unverletzt: voller HP-Stand.
   function gauntletHpJetzt(u){
+    if(ttBauteAktiv)return ttHpJetzt(u);
     const r=u.aktuell>=0?u.runden[u.aktuell]:null;
     if(r&&r.hpNach!=null)return r.hpNach;
     return u.hpMax!=null?u.hpMax:GAUNTLET_HP_MAX;
@@ -29285,7 +29710,14 @@
       // (die Kampf-Nummer haengt an der ganzen Kette, nicht an einem einzelnen Teilnehmer) --
       // reine Buchfuehrung, kein rr(), keine neue Zahl (r.bout steht schon seit baueGauntlet()
       // auf dem Rundeneintrag, hier nur reveal-gegatet gemerkt).
-      if(BB().gauntlet){
+      if(BB().gauntlet&&ttBauteAktiv&&r.tt){
+        // TAG-TEAM: Schnappschuss merken (Anzeige liest ihn), Gutschrift des Peinigers erst bei der Enthuellung.
+        ttGezeigt=r;
+        if(r.gut){ const pu=TEILNEHMER.find(x=>x.side===r.peinigerSide&&x.n===r.peinigerN); if(pu)pu.summe+=r.gut; }
+        letzterGauntletZug={u,r}; r.zeigeT=buehneT; ttNotiere(r,u);
+        { const pu=TEILNEHMER.find(x=>x.side===r.peinigerSide&&x.n===r.peinigerN); if(pu)pu.lunge=0.2; }
+        if(r.hpNach<=0){ letzterGauntletBruch={u,r,bruchT:buehneT}; teamFeierAusloesen(1-u.side,"gross",null,{funken:true}); sfx("breaking",gauntletAusscheidenWort(u)==="GEBROCHEN"?"gebrochen":"gibtauf"); }
+      } else if(BB().gauntlet){
         // B6: NEUER BOUT ENTHUELLT (r.bout weicht vom zuletzt gezeigten ab, oder es ist der
         // allererste Zug ueberhaupt) -- der Standzeit-Zaehler faengt neu an.
         if(!letzterGauntletZug||letzterGauntletZug.r.bout!==r.bout)gauntletBoutStartT=buehneT;
@@ -29315,7 +29747,7 @@
       // neue Zahl -- dieselbe `u.summe`, die gleich darunter unveraendert weiterlaeuft.
       const vorherSumme=u.summe||0;
       if(!BB().heben)u.summe+=r.punkte;
-      u.lunge=0.5;
+      u.lunge=(ttBauteAktiv&&r.tt&&BB().gauntlet)?0:0.5;
       // BIG-FLAG (Nachtrag, s. docs/design/broadcast-praesentation-uebergreifend-recherche-
       // 06-09.md Abschnitt 4.1/4.4): dieselbe Bedingung, die hier schon lange den
       // Schwebetext hervorhebt (schwebe()s `crit`), markiert jetzt AUCH die Ticker-Zeile
@@ -29899,7 +30331,8 @@
         // dafuer unter routine/budget, genau wie ein gewoehnlicher "haelt stand"-Zug).
         const angeschlagenBig=false;
         feed(u.side,u.n+" — "+r.ereignis+geraetHinweis+" gegen "+r.gegnerN+" · HP "+hpJetzt+"/"+r.hpMax
-          +" (Kampf "+r.bout+").",angeschlagenBig,undefined,
+          +(r.tt?" (Gang "+r.gang+", "+TT.waffen[r.waffe].name+" "+r.anschlagNr+"/"+r.phasenN+")."
+            :" (Kampf "+r.bout+")."),angeschlagenBig,undefined,
           angeschlagenBig?"angeschlagen":undefined,undefined,undefined,
           r.ereignis===BB().erfolgWort?"routine":undefined);
         if(r.hpNach<=0){
@@ -29908,7 +30341,7 @@
           // (C3) bleibt einheitlich "gebrochen" -- HIGHLIGHT_TITEL kennt keinen eigenen
           // "aufgegeben"-Eintrag, der Ticker-Satz selbst traegt die Unterscheidung.
           const wort=gauntletAusscheidenWort(u);
-          feed(u.side,u.n+" — "+wort+" — scheidet aus — Kampf "+r.bout+" geht an "+r.gegnerN+".",
+          feed(u.side,u.n+" — "+wort+" — scheidet aus — "+(r.tt?"Gang "+r.gang+" geht an ":"Kampf "+r.bout+" geht an ")+r.gegnerN+".",
             buehneBahnGrossDrosseln(true,true),undefined,"gebrochen");
         }
       } else if(BB().duett){
@@ -30024,6 +30457,7 @@
     // B2/B3 (Broadcast-Optik-Recherche 27.09.): stepGauntletHp() laeuft NUR fuer den
     // Gauntlet (art.gauntlet) direkt nach stepCypher() mit -- dieselbe reine Anzeige-
     // Buchfuehrung wie stepSchach()s Uhr, kein zweiter Dispatcher-Zweig noetig.
+    if(art.cypher && ttBauteAktiv){ stepTagTeam(dt); return; }
     if(art.cypher && typeof stepCypher==="function"){ stepCypher(dt,art); if(art.gauntlet&&typeof stepGauntletHp==="function")stepGauntletHp(dt); return; } // Ziel 4
     // VORAB ANGELEGT IN PR 0.3 (Opus-Plan Zehn-Disziplinen 09-10, Abschnitt 7.1, Kollision
     // 1): drei spaetere Ziel-PRs (Gewichtheben, Speed-Schach, Fechten) haetten sonst alle
@@ -32287,7 +32721,7 @@
       // GAUNTLET (Breaking, 22.09.): eigene Unterzeile statt des generischen
       // "N Durchgaenge"-Texts, der hier (variable Zuganzahl je Ueberlebendem) nicht passt.
       : BB().gauntlet
-      ? "Slot für Slot — der Sieger bleibt im Ring, mit seinem aktuellen HP-Stand"
+      ? (ttBauteAktiv?"Tag-Team — ein Gang, zwei Phasen, dann verdeckter Wechsel":"Slot für Slot — der Sieger bleibt im Ring, mit seinem aktuellen HP-Stand")
       : BB().rundenN+" Durchgänge — Punkte laufend enthüllt";
     // Nicht kumulativ ersetzen, s. Feldspiel-Pendant (updateHudFeldspiel): dataset.origHtml
     // haelt die Vorlage fest, damit ein Discipline-Wechsel hin und zurueck nicht ins Leere
@@ -34216,7 +34650,7 @@
     // Disziplinen (Auftritte, Speed-Schach/I-Spy-Duelle) behalten das Reihenbild.
     if(art.heben){ zeichneHeben(art); return; }
     if(art.schach){ zeichneSchach(art); return; }
-    if(art.cypher){ zeichneBreaking(art); return; }
+    if(art.cypher){ if(ttBauteAktiv&&gauntletReihen)zeichneBreakingTagTeam(art); else zeichneBreaking(art); return; }
     // TENNIS (Feinschliff 14.09.): eigener Zweig, exklusiv auf `art.tennis` gegated (s.
     // BUEHNE_ART.tennis) — dasselbe Muster wie die drei Zweige direkt oberhalb. Schlaeger an
     // der Hand (DISZIPLIN_PROP.tennis) + Ballwechsel-Visualisierung, s. zeichneTennis()
@@ -37815,17 +38249,17 @@
         // wie WERTUNG_HEBEN() mit `bestBisher()`/`paarFertig()` direkt unten.
         ...(art.gauntlet?[
           {id:"hp",   kopf:"HP",   titel:"aktueller HP-Stand (0 = ausgeschieden)",
-            wert:z=>Math.max(0,gauntletHpJetzt(z.u)), fmt:v=>v+"/"+GAUNTLET_HP_MAX,
+            wert:z=>Math.max(0,gauntletHpJetzt(z.u)), fmt:v=>ttBauteAktiv?String(v):v+"/"+GAUNTLET_HP_MAX,
             farbe:v=>v<=0?"var(--crit)":null},
-          {id:"kampf",kopf:"Kampf", titel:"laufende Kampf-Nummer in der Kette",
+          {id:"kampf",kopf:ttBauteAktiv?"Gang":"Kampf", titel:ttBauteAktiv?"laufende Gang-Nummer":"laufende Kampf-Nummer in der Kette",
             wert:z=>z.r.length?z.r[z.r.length-1].bout:null},
           {id:"gauntlet-gegner",kopf:"Gegner", titel:"aktueller/letzter Gegner in der Kette",
             wert:z=>z.r.length?z.r[z.r.length-1].gegnerN:null},
           {id:"status",kopf:"Status", titel:"noch im Ring oder schon ausgeschieden?",
-            wert:z=>z.r.length&&z.r[z.r.length-1].hpNach<=0?"raus":"im Ring",
+            wert:z=>z.r.length&&z.r[z.r.length-1].hpNach<=0?"raus":(ttBauteAktiv&&ttGezeigt&&!ttAktive().includes(z.u)?"Bank":"im Ring"),
             farbe:v=>v==="raus"?"var(--crit)":"var(--ok)"}
         ]:[]),
-        {id:"schnitt",kopf:"Ø", top:true, titel:"Punkte je Durchgang", wert:z=>z.r.length?Math.round(z.u.summe/z.r.length):null},
+        {id:"schnitt",kopf:"Ø", top:true, titel:"Punkte je Durchgang", wert:z=>z.r.length?Math.round(z.r.reduce((a,r)=>a+r.punkte,0)/z.r.length):null},
         {id:"best", kopf:"Best", top:true, titel:"bester Durchgang", wert:z=>z.r.length?Math.max(...z.r.map(r=>r.punkte)):null},
         {id:"letzt",kopf:"Letzt", titel:"letzter Durchgang", wert:z=>z.r.length?z.r[z.r.length-1].punkte:null},
         {id:"fail", kopf:w.failKopf||"Fehl", titel:art.failWort, wert:z=>z.r.filter(r=>r.ereignis===art.failWort).length||null},
@@ -39958,6 +40392,9 @@
           place[n].form=e.form;
           if(e.intensitaet==="schonen"||e.intensitaet==="normal"||e.intensitaet==="push")place[n].intensitaet=e.intensitaet;
         }
+        // BREAKING-WAFFENFOLGE (22.11., lib/lineups/breaking-waffen.ts): optionale Waffe je eigenem Gang; nur uebernommen, wenn es
+        // ein Feld ist, und nur fuer Breaking. Gelesen ausschliesslich von ttWaffeWaehlen() (ungueltige Eintraege faellt dort die KI).
+        if(e.d==="breaking"&&Array.isArray(e.waffen))place[n].waffen=e.waffen.slice(0,6);
         order[n]=slotOrd(e.slot);
       }
     }
@@ -41051,7 +41488,18 @@
       // Einzelauftritte. Der Rest der Funktion (Gegner-Aufstellungsliste unten) gilt
       // unveraendert fuer jede Buehnen-Disziplin, deshalb hier KEIN `return`, nur ein
       // anderer Text fuer denselben Plan-Kasten.
-      if(BB().gauntlet){
+      if(BB().gauntlet&&ttAn()){
+        k.appendChild(el("b",null,"Tag-Team"));
+        k.appendChild(el("p",null,"Je Team steht einer im Ring. Ein Gang: A peinigt, B hält aus — dann B peinigt, A hält aus. "+
+          "Danach wechseln beide Teams gleichzeitig und verdeckt; niemand kommt ein zweites Mal rein, bevor alle lebenden "+
+          "Teamkameraden dran waren. Jeder Spieler nutzt in jedem Gang genau eine Waffe (Wucht, Hieb oder Zermürbung). "+
+          "Mit jedem Umlauf liegt die nächste Stufe der Geräte auf dem Tisch, bis ein Team aufgibt."));
+        box.appendChild(k);
+        const apb0=document.getElementById("arenaplan");
+        if(apb0){apb0.textContent="Tag-Team, "+jeSeiteVon(disc)+" gegen "+jeSeiteVon(disc)+"."; apb0.title=apb0.textContent;}
+        const pl0=document.querySelector(".planzeile b");
+        if(pl0)pl0.textContent="Tag-Team";
+      } else if(BB().gauntlet){
         k.appendChild(el("b",null,"Gauntlet"));
         k.appendChild(el("p",null,"Slot 1 gegen Slot 1, dann bleibt der Sieger MIT seinem "+
           "aktuellen HP-Stand im Ring und trifft auf den nächsten Kämpfer des Verliererteams — "+
@@ -69513,7 +69961,9 @@
                     SANDSACK_PAR_FILM=a.SANDSACK_PAR_FILM??null; SANDSACK_PAR_SZENE=a.SANDSACK_PAR_SZENE??null;},
       vorher:()=>{disc=bd; buehneDisc=bd;},
       bau:(saat)=>{buehneDisc=bd; bauBuehne(saat);},
-      lauf:()=>{let g=0; while(!done&&g<120){ stepBuehne(1/60); g+=1/60; }},
+      // Tag-Team (22.11.): das Fenster richtet sich nach der Warteschlange (ein Anschlag je rundenDauer), sonst wuerde ein langer Kampf nach
+      // 120 s abgeschnitten und der Rest fehlte in u.summe. Alle anderen Buehnen bleiben bei 120 s (bitgleich).
+      lauf:()=>{let g=0; const grenze=(ttBauteAktiv&&bd==="breaking")?Math.max(120,buehneQueue.length*BUEHNE_ART[bd].rundenDauer*1.1+5):120; while(!done&&g<grenze){ stepBuehne(1/60); g+=1/60; }},
       namen:()=>TEILNEHMER.map(u=>u.n),
       // Duell (Speed-Schach, I-Spy): "besser" ist der eigene Vorteil am Brett, nicht die
       // absolute Punktesumme — ein Brett kann man mit wenigen, aber besseren Zuegen
@@ -72337,6 +72787,8 @@
     // laeuft immer bis GENAU ein Team komplett aufgebraucht ist (oder beide Teams leer sind,
     // ein praktisch ausgeschlossener Randfall) -- `seiten` ist deshalb entweder [>=1,0] oder
     // [0,>=1], nie [0,0] bei echten Aufstellungen. Kein `gesamtKg`-Tiebreak noetig.
+    // TAG-TEAM (22.11.): endet fast immer ebenfalls durch Aufgabe (Notbremse gemessen 0,3 %); bei der Notbremse mit gleicher Zahl Lebender
+    // entscheidet der Rest-HP-Anteil ueber +0,5 (`ttSeitenZusatz`), sonst bleibt es ein Remis.
     spieleBuehneGauntlet:(bd,saat)=>{
       if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||!BUEHNE_ART[bd].gauntlet)return null;
       const M=MOTOREN[bd]; if(!M)return null;
@@ -72347,7 +72799,7 @@
       const namen=M.namen();
       const boxscore=namen.map(n=>({name:n,wert:wert[n]??0}));
       const alive=(s)=>TEILNEHMER.filter(u=>u.side===s&&!u.raus).length;
-      const seiten=[alive(0),alive(1)];
+      const seiten=ttBauteAktiv?[alive(0)+ttSeitenZusatz[0],alive(1)+ttSeitenZusatz[1]]:[alive(0),alive(1)];
       // ANZEIGE-ZAHL (21.11., Spieltagswertung): besiegte Gegner je Seite (Chris: Breaking zaehlt besiegte Gegner, nicht
       // 1 : 0). Seite A besiegt die ausgeschiedenen Spieler von B und umgekehrt. Nur Nachlese.
       const gesamt=(s)=>TEILNEHMER.filter(u=>u.side===s).length;
@@ -73441,6 +73893,18 @@
       else BB_PUSTE={...BB_PUSTE_KONSTANTE};
       return vorher;
     },
+    // BREAKING-FORMAT (22.11.) -- MESSHEBEL: `breakingFormat("gauntlet"|"tagteam"|obj|null)` stellt das Format fuer
+    // Messung/Rueckweg um und liefert den vorherigen Stand ({an, regel}) zurueck; null = Spielkonstante / Umschlag.
+    breakingFormat:(r)=>{
+      const vorher={an:TT_EXPLIZIT?TT_AN_HEBEL:null,regel:TT};
+      TT_EXPLIZIT=r!=null; TT_AN_HEBEL=true;
+      if(r==="gauntlet"){ TT_AN_HEBEL=false; }
+      else if(r&&typeof r==="object"){ TT={...TT_KONSTANTE,waffen:{...TT_WAFFEN_KONSTANTE},...r}; }
+      else if(r==null){ TT={...TT_KONSTANTE,waffen:{...TT_WAFFEN_KONSTANTE}}; }
+      return vorher;
+    },
+    breakingEnde:()=>ttEnde&&{...ttEnde},
+    breakingProtokoll:()=>ttProtokoll.map(e=>({...e})),
     hockeyTwGsaxK:(k)=>{
       const vorher=HK_TW_GSAX_K;
       HK_TW_GSAX_K=Number.isFinite(k)?k:HK_TW_GSAX_K_KONSTANTE;
