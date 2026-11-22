@@ -125,3 +125,41 @@ describe("Hockey-Torwart: Stempel beim Laden", () => {
     expect(arenaFormatByDisciplineId(spielstand(["md-1"]), "md-2", "alle")).toEqual({ climbing: "canyon", hockey: "neu" });
   });
 });
+
+describe("Hockey-Torwart: mehrere Spieltage ohne Neuladen (Review 22.11.)", () => {
+  // legacy-matchday-result-apply-service.ts schreibt den Stempel VOR dem Ergebnis fest; derselbe Ablauf in einem Prozess.
+  function buche(g: any, id: string) {
+    const gestempelt: any = stempleHockeyTorwart(g);
+    return {
+      ...gestempelt,
+      seasonState: {
+        ...gestempelt.seasonState,
+        matchdayResults: [...gestempelt.seasonState.matchdayResults, { seasonId: "s1", matchdayId: id }],
+      },
+    };
+  }
+
+  it("Saisonwechsel + Spieltag 1 + 2 ohne Neuladen: die gebuchten Spieltage behalten die neue Regel", () => {
+    delete process.env.OLY_HOCKEY_TORWART;
+    delete process.env.NEXT_PUBLIC_OLY_HOCKEY_TORWART;
+    let g: any = spielstand([]);
+    const neu = hockeyTorwartFuer(g, "md-1");
+    g = buche(g, "md-1");
+    g = buche(g, "md-2");
+    const geladen: any = stempleHockeyTorwart(g);
+    for (const id of IDS) expect(hockeyTorwartFuer(geladen, id)).toBe(neu);
+  });
+
+  it("ohne Festschreiben fiele ein gebuchter Spieltag auf die alte Regel zurück (Beleg)", () => {
+    delete process.env.OLY_HOCKEY_TORWART;
+    delete process.env.NEXT_PUBLIC_OLY_HOCKEY_TORWART;
+    const neu = hockeyTorwartFuer(spielstand([]) as any, "md-1");
+    expect(hockeyTorwartFuer(spielstand(["md-1", "md-2"]) as any, "md-1")).not.toBe(neu);
+  });
+
+  it("der Buchungsdienst schreibt den Hockey-Stempel fest", async () => {
+    const { readFileSync } = await import("node:fs");
+    const quelle = readFileSync("lib/resolve/legacy-matchday-result-apply-service.ts", "utf8");
+    expect(quelle).toMatch(/stempleHockeyTorwart\(stempleClimbingFormat\(stempleBattlefieldFormat\(/);
+  });
+});
