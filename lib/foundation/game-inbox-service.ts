@@ -1,3 +1,4 @@
+import { berechneZielKurs, kursZuStatus } from "@/lib/board/ziel-kurs";
 import { vertragLaeuftAus } from "@/lib/contracts/vertragslaufzeit";
 import { istJeSpieltagSaison, ungebuchterAnteil } from "@/lib/finance/finanzen-je-spieltag";
 import type { GameFlowState, GameFlowStep } from "@/lib/foundation/game-flow-controller";
@@ -1114,21 +1115,25 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
   const objectiveOverview = buildTeamObjectiveOverview(input.gameState);
   for (const objective of objectiveOverview.objectives) {
     if (!visibleTeamIds.has(objective.teamId)) continue;
-    if (objective.status !== "at_risk" && objective.status !== "failed") continue;
+    // Anzeige-Kurs (Review 22.11.): mitten in der Saison "verfehlt" erst, wenn das Ziel rechnerisch
+    // nicht mehr erreichbar ist; sonst "gefährdet". Der gespeicherte Status bleibt unberührt.
+    const kurs = berechneZielKurs(input.gameState, objective);
+    const zielStatus = kursZuStatus(kurs.kurs);
+    if (zielStatus !== "at_risk" && zielStatus !== "failed") continue;
     // „Ruecklage angezapft" ist ein Kostenvermerk (Vertrauensabzug bei der naechsten Festlegung), kein verfehltes Ziel: keine Meldung.
     if (objective.objectiveId === "vorstand-ruecklage-angezapft") continue;
     items.push(
       createItem({
-        itemId: `board_objective_${objective.status}:${input.saveId}:${objective.seasonId}:${objective.teamId}:${objective.objectiveId}`,
+        itemId: `board_objective_${zielStatus}:${input.saveId}:${objective.seasonId}:${objective.teamId}:${objective.objectiveId}`,
         saveId: input.saveId,
         seasonId: objective.seasonId,
         teamId: objective.teamId,
         category: "task",
-        severity: objective.status === "failed" ? "critical" : "warning",
+        severity: zielStatus === "failed" ? "critical" : "warning",
         // Das Ziel gehoert in den Titel: bei mehreren Board-Zielen entstanden sonst mehrere Karten
         // mit WORTGLEICHEM Titel, und was gemeint war, stand nur in der Kleinzeile.
         title:
-          objective.status === "failed"
+          zielStatus === "failed"
             ? `Board-Ziel verfehlt: ${objective.label}`
             : `Board-Ziel gefährdet: ${objective.label}`,
         /*
@@ -1140,8 +1145,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
          * `ctaLabel` sagt stattdessen, was der Druck TUT. Zwei Formulierungen, weil ein
          * verfehltes Ziel nichts mehr zu retten hat und ein gefaehrdetes schon.
          */
-        ctaLabel: objective.status === "failed" ? "Board-Ziele ansehen" : "Board-Ziel retten",
-        description: `Aktuell ${objective.currentValue ?? "—"} · Ziel ${objective.targetValue ?? "—"}`,
+        ctaLabel: zielStatus === "failed" ? "Board-Ziele ansehen" : "Board-Ziel retten",
+        description: `Aktuell ${objective.currentValue ?? "—"} · Ziel ${objective.targetValue ?? "—"} · ${kurs.begruendung}`,
         targetView: "teams",
         targetParams: { team: objective.teamId, panel: "board-objectives" },
         source: "team_season_objectives",

@@ -3245,7 +3245,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         next[disciplineSide].push({
           tone: "warning",
           label: "Formkarten fehlen",
-          detail: "Reveal und finale Lesbarkeit werden besser, sobald Formkarten erzeugt sind.",
+          detail: "Die Auflösung und die finale Lesbarkeit werden besser, sobald Formkarten erzeugt sind.",
         });
       }
     });

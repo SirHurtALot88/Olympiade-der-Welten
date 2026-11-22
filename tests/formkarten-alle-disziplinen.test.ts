@@ -187,7 +187,7 @@ describe("B) Farbbonus je Spieler: Klasse = Kartenfarbe", () => {
   });
 
   it("Dropdown-Text nennt die Farbe des Bonus statt nur 'Farbe'", () => {
-    expect(kartenEffektText({ value: 8, color: "blue" }, "yellow")).toBe(" · fremd: +4 alle, +4 extra für MEN-Spieler");
+    expect(kartenEffektText({ value: 8, color: "blue" }, "yellow")).toBe(" · andere Farbe: +4 alle, +4 extra für MEN-Spieler");
     expect(kartenEffektText({ value: 8, color: "yellow" }, "yellow")).toBe(" · passt: +8 alle, +4 extra für SOC-Spieler");
   });
 });

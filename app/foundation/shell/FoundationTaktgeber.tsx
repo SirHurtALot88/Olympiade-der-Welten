@@ -184,6 +184,7 @@ export default function FoundationTaktgeber({ label, title, statusClass, onClick
                   <span className="foundation-takt-schritt-text">
                     <b>{schritt.label}</b>
                     {schritt.detail ? <small>{schritt.detail}</small> : null}
+                    {schritt.warum ? <small className="foundation-takt-warum">{schritt.warum}</small> : null}
                   </span>
                   {schritt.sprung ? (
                     <button
