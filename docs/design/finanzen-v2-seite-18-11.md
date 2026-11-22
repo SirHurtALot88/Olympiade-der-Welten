@@ -151,3 +151,7 @@ Korrekturschleife: Seitenhöhe (Schale wächst mit der Breite) und Budgets-Höhe
 2. Die KI-Planer müssen die Töpfe kennen (siehe Diagnose), sonst kostet die harte Sperre Kaderstärke.
 3. Verlängerungen im Saisonende-Fenster von Saison 1 sind frei (Saison-ID 1). Soll die Sperre dort schon für die kommende Saison gelten?
 4. Spieltags-Buchungen (Stufe 4) fehlen, der Verlauf je Spieltag ist bis dahin eine Transfer-/Saisonende-Kurve.
+
+## 6. Posten „Verpflegung (Essens-Abo)“ im Gehaltstopf (Konzept 22.11., noch nicht gebaut)
+
+Chris, 22.11.: das Essens-Abo kostet je Spieler und Saison und gehört in die Finanzsicht. Der Posten läuft im **Gehaltstopf** wie ein Gehalt: je Spieler im Kader (auch Verletzte), abgerechnet je Spieltag (Saison ÷ 20), Preise je Spieler und Saison 0,10 / 0,18 / 0,25 / 0,40 / 0,60 C (Stufe 1 bis 5, Standard 3, also 3,5 C für 14 Spieler und 0,175 C je Spieltag). Er steht als eigene Zeile in der Gehaltsvorschau (Karte „Gehaltsbudget“) und in der GuV je Spieltag, **groß je Saison, klein je Spieltag**. Er unterliegt der Vorstands-Kürzung des Gehaltstopfs; reicht der Topf nicht, fällt das Abo automatisch eine Stufe (nie unter 1, Nachricht im Postfach). Die Kaufvorschau zeigt „Gehalt + Verpflegung“. Herleitung, Tabelle und Messung: `docs/design/zwischen-den-spieltagen-22-11.md` §77; Mockup-Stand: `public/mockups/finanzen-modern-18-11.html` (Ansichten `budget` und `auszug`), Aufnahmen `docs/design/zwischen-den-spieltagen-22-11/finanzen-budget-1920.png` und `finanzen-guv-1920.png`.

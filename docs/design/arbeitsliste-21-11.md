@@ -154,3 +154,4 @@ Transfergerüchte wirken auf Gehaltsforderungen und kommen ins Postfach.
 - [ ] PP-Tagesanker scharf ab nächster Saison (läuft)
 - [ ] Entwicklung Liga-Mittel −1…+1 (läuft)
 - [ ] Vorstand/KI-Kauf Runde 2 inkl. Quote-Vorausschau und Kernschutz bei gutem Angebot (läuft)
+- [ ] Essens-Abo + Getränke-Partner bauen (Posten Verpflegung im Gehaltstopf: Preis je Spieler und Saison, je Spieltag gebucht, Stufe fällt bei knappem Topf, Kaufvorschau „Gehalt + Verpflegung“; Konzept `docs/design/zwischen-den-spieltagen-22-11.md` §76/§77)
