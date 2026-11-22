@@ -39,8 +39,8 @@ So verteilen sich die 32 Teams mit ihrem Identitäts-Vertrauen (`data/generated/
 * **Kredite ab Saison 1 frei.** Wörtlich: „geben wir Kredite auch ab S1 frei“. Das Kreditfenster gilt damit schon vor dem
   ersten Draft; das Gespräch hängt ohnehin an derselben Phasenprüfung (`imFenster`, `lib/finance/vorstand-gespraech.ts:122`,
   Aktion `credit_borrow`). Für den Bau: Phasenregel für Saison 1 öffnen, Kredit in beiden Töpfen wie ab Saison 2 behandeln.
-* **Mehr Puffer als Messvariante** (Chris' Vorschlag, noch keine Entscheidung): alle Startbudgets +25, je Budget-Rang über
-  die 32 Teams zusätzlich +2. Wird neben der Untergrenze 80 % gemessen, siehe Abschnitt 6.
+* **Mehr Puffer als Messvariante** (Chris' Vorschlag, noch keine Entscheidung): Sockel +20 für Budget-Platz 32, je Platz besser
+  +2 (Platz 31 +22, Platz 30 +24 … Platz 1 +82; Chris' Lesart, 22.11. bestätigt). Wird neben der Untergrenze 80 % gemessen, siehe Abschnitt 6.
 * **Porträts für den Vorstand.** Wörtlich: „ich find das nice, dass du n Bild im Mockup drin hast für die Trainer, könnten
   wir da auch welche generieren? Also so Portraits? Passend zum Trainertyp? Können auch andere Rassen sein, die wir in der
   Oly haben!“ Stilprobe bestellt, siehe Abschnitt 9.
@@ -251,21 +251,20 @@ keine Teams über dem Topf. Reißt das Kriterium, ist der erste Hebel Frage 1.
 |---|---|---|
 | A · Entscheidung pur | nach Vertrauen, 70 % möglich | unverändert |
 | B · Untergrenze 80 % | mindestens 80 % in Saison 1 (Frage 1) | unverändert |
-| C · Mehr Startgeld (Chris, 22.11.) | nach Vertrauen | alle +25 C, je Budget-Rang zusätzlich +2 C |
+| C · Mehr Startgeld (Chris, 22.11.) | nach Vertrauen | +20 C für Budget-Platz 32, je Platz besser +2 C (Platz 1 +82 C) |
 | D · beides | mindestens 80 % | wie C |
 
-Zu Lauf C: gelesen als Staffel über die 32 Budget-Ränge, das Team mit dem größten Startbudget bekommt +25 C, jeder Rang
-darunter 2 C mehr, das ärmste also +87 C (Formel `+25 + 2 × (Rang − 1)`). In der Summe sind das 1 792 C mehr in der Liga
-(800 C aus dem Sockel, 992 C aus der Staffel), und der Abstand zwischen reichstem und ärmstem Team schrumpft um 62 C.
-**Diese Lesart vor dem Messlauf mit Chris bestätigen** (die andere Richtung, mehr für die Reichen, würde den Abstand
-vergrößern und den knappen Teams am wenigsten helfen). Mitzumessen bei C und D: Σ Kasse zum Start von Saison 2 und 3
+Zu Lauf C (Chris, 22.11., bestätigt): Sockel +20 C für das Team auf Budget-Platz 32 (kleinstes Startbudget), je Platz
+besser 2 C mehr, Platz 1 (größtes Startbudget) also +82 C (Formel `+20 + 2 × (32 − Platz)`). In der Summe 1 632 C mehr in der Liga
+(640 C Sockel, 992 C Staffel); der Abstand zwischen reichstem und ärmstem Team **wächst** um 62 C — gewollt, die Messung zeigt,
+ob die knappen Teams mit +20 C genug Luft haben. Mitzumessen bei C und D: Σ Kasse zum Start von Saison 2 und 3
 (mehr Startgeld darf nicht einfach liegen bleiben), Ablösepreise im Draft und die Bottom-4-Stärke. Kredite sind in allen
 vier Läufen ab Saison 1 offen.
 
 ## 7. Offene Fragen an Chris
 
-1. **Untergrenze der Quote nur in Saison 1, oder mehr Startgeld?** (Chris, 22.11.: zusätzlich die Variante „alle +25, je
-   Budget-Rang +2“ messen, Abschnitt 6, Läufe B bis D.) Die Hochrechnung sperrt in Saison 1 rund 21 % aller Budgets, vier Teams starten
+1. **Untergrenze der Quote nur in Saison 1, oder mehr Startgeld?** (Chris, 22.11.: zusätzlich die Variante „Sockel +20, je
+   Budget-Platz besser +2“ messen, Abschnitt 6, Läufe B bis D.) Die Hochrechnung sperrt in Saison 1 rund 21 % aller Budgets, vier Teams starten
    mit 70 %. *Empfehlung:* erst messen; nur wenn das Abbruchkriterium reißt, in Saison 1 mindestens 80 % (die Stufe 70 % gäbe
    es dann erst ab Saison 2). Die Halbierung der Rücklage bleibt in jedem Fall.
 2. **Wartet der Draft auf alle Menschen?** *Empfehlung:* in Saison 1 ja (einmaliger Termin, der Draft braucht ohnehin alle);
