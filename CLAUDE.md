@@ -721,6 +721,14 @@ gelaufen.
 
 `node scripts/pruefe-wertung-fingerabdruck.mjs` laesst die Wertung (alle Disziplinen, Spurt-Formate
 Hatz/HYROX mit Saaten 1/7/42) ueber den Node-Motor laufen und gibt eine Pruefsumme aus.
+**Stand 22.11. (Basketball-Puste, `docs/design/basketball-puste-22-11.md`): GESAMT ea36f666cc71 (75 Eintraege)**; gegenueber `0310ec4a4e3d`
+(Hockey-Torwart-Regel) bewegen sich NUR `spiele basketball 1|7|42` (91a13edbaa37/9cae043e306d/8a75782eceaa -> 1dcbd995722b/4aa24b3936d0/0478707f7e77);
+die alte Regel steht als `BASKETBALL-PUSTE-ALT 77aa7158ff0d` (3 Zeilen `spiele basketball/puste-alt`, bit-identisch zu den frueheren
+Basketball-Zeilen) AUSSERHALB von GESAMT, Rueckweg `OLY_BASKETBALL_PUSTE=alt` (Stempel `seasonState.basketballPuste`,
+`lib/resolve/basketball-puste.ts`, Messhebel `window.__arena.basketballPuste("alt")`). Inhalt: Puste-Vorrat aus AUSDAUER, Verbrauch beim Laufen und
+Ballfuehren, Wirkung auf Tempo/Rebound/Wurf/Anspielgewicht, dazu ein Beteiligungsboden in der Pass-Lotterie (Maru-Fall: Geister 3,9 -> 1,3 % bei vier je Seite).
+rho je Spiel 0,864 -> 0,862. C2-/E1-Anker je Regel (`basketballPusteAlt`, `duellPusteAlt`), aus dem Motor abgeleitet. Die vier anderen
+Schutzsummen (CLIMBING-STANDARD, BATTLEFIELD-ORTE3, HOCKEY-TORWART-ALT, TDM-GEFECHT) sind unveraendert.
 **Stand 22.11. (Battlefield Fünf Punkte live): GESAMT 5b9acba4fe42 (75 Eintraege)** — absichtlich bewegt: Battlefield
 bucht und zeigt im Vier-Team-Pod seit Arbeitsliste 21.11. (Welle 4) die Fünf-Punkte-Domination mit Respawn bei sinkenden HP
 (100 → 75 → 50 %, Untergrenze 50 %; `bfd5Gefecht()`, Motor-Vorgabe `BF_POD_FORMAT="domination5"`,

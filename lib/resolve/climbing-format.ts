@@ -33,6 +33,7 @@
  */
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
 import { hockeyTorwartFuer, type HockeyTorwart } from "@/lib/resolve/hockey-torwart";
+import { basketballPusteFuer, type BasketballPuste } from "@/lib/resolve/basketball-puste";
 
 export type ClimbingFormat = "standard" | "canyon";
 
@@ -151,18 +152,25 @@ export function climbingFormatFuer(gameState: FormatQuelle, matchdayId?: string 
 
 /**
  * Der Teil des Kader-Umschlags fuer den Motor (`formatByDisciplineId`): fuer Climbing das Format, fuer Hockey die
- * Torwart-Regel (22.11., lib/resolve/hockey-torwart.ts); "alle" (Host, der die Disziplin je Spieltag wechselt)
- * traegt beide. Jede andere Disziplin: kein Umschlag.
+ * Torwart-Regel (22.11., lib/resolve/hockey-torwart.ts), fuer Basketball die Puste-Regel (22.11., lib/resolve/basketball-puste.ts); "alle" (Host, der die Disziplin je Spieltag wechselt)
+ * traegt alle drei. Jede andere Disziplin: kein Umschlag.
  */
-export type ArenaFormatByDisciplineId = { climbing?: ClimbingFormat; hockey?: HockeyTorwart };
+export type ArenaFormatByDisciplineId = { climbing?: ClimbingFormat; hockey?: HockeyTorwart; basketball?: BasketballPuste };
 
 export function arenaFormatByDisciplineId(
-  gameState: FormatQuelle & Parameters<typeof hockeyTorwartFuer>[0],
+  gameState: FormatQuelle & Parameters<typeof hockeyTorwartFuer>[0] & Parameters<typeof basketballPusteFuer>[0],
   matchdayId: string | null | undefined,
   disziplin: string | null | undefined,
 ): ArenaFormatByDisciplineId | undefined {
   if (disziplin === "climbing") return { climbing: climbingFormatFuer(gameState, matchdayId) };
   if (disziplin === "hockey") return { hockey: hockeyTorwartFuer(gameState, matchdayId) };
-  if (disziplin === "alle") return { climbing: climbingFormatFuer(gameState, matchdayId), hockey: hockeyTorwartFuer(gameState, matchdayId) };
+  if (disziplin === "basketball") return { basketball: basketballPusteFuer(gameState, matchdayId) };
+  if (disziplin === "alle") {
+    return {
+      climbing: climbingFormatFuer(gameState, matchdayId),
+      hockey: hockeyTorwartFuer(gameState, matchdayId),
+      basketball: basketballPusteFuer(gameState, matchdayId),
+    };
+  }
   return undefined;
 }

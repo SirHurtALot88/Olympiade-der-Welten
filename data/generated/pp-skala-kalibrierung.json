@@ -33,38 +33,39 @@
     "basketball": {
       "feldgroessen": {
         "2": {
-          "rTop": 5.12,
-          "rMed": 1.295,
+          "rTop": 4.7,
+          "rMed": 1.225,
           "zellen": 2
         },
         "3": {
-          "rTop": 5.1,
-          "rMed": 1.615,
+          "rTop": 4.83,
+          "rMed": 1.45,
           "zellen": 6
         },
         "4": {
-          "rTop": 8.05,
-          "rMed": 1.34,
+          "rTop": 7.16,
+          "rMed": 1.221,
           "zellen": 2
         },
         "5": {
-          "rTop": 7.47,
-          "rMed": 1.23,
+          "rTop": 6.67,
+          "rMed": 1.125,
           "zellen": 2
         },
         "6": {
-          "rTop": 7.23,
-          "rMed": 1.37,
+          "rTop": 6.54,
+          "rMed": 1.28,
           "zellen": 4
         }
       },
-      "rTop": 6.67,
-      "rMed": 1.43,
-      "faktor": 0.7496,
-      "medianTagesbester": 6.67,
+      "rTop": 6.08,
+      "rMed": 1.317,
+      "faktor": 0.8224,
+      "medianTagesbester": 6.08,
       "zellen": 20,
       "zellenRoh": 16,
-      "zensiert": 1
+      "zensiert": 1,
+      "hinweis": "aus basketballPusteAlt mit den Verhaeltnissen der Motor-Nachrechnung skaliert (scripts/miss-basketball-anker-proxy.mjs), nicht aus frischen Saves; docs/design/basketball-puste-22-11.md Abschnitt 6"
     },
     "battlefield": {
       "feldgroessen": {
@@ -751,6 +752,42 @@
       "zellen": 20,
       "zellenRoh": 16,
       "zensiert": 3
+    },
+    "basketballPusteAlt": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 5.12,
+          "rMed": 1.295,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 5.1,
+          "rMed": 1.615,
+          "zellen": 6
+        },
+        "4": {
+          "rTop": 8.05,
+          "rMed": 1.34,
+          "zellen": 2
+        },
+        "5": {
+          "rTop": 7.47,
+          "rMed": 1.23,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 7.23,
+          "rMed": 1.37,
+          "zellen": 4
+        }
+      },
+      "rTop": 6.67,
+      "rMed": 1.43,
+      "faktor": 0.7496,
+      "medianTagesbester": 6.67,
+      "zellen": 20,
+      "zellenRoh": 16,
+      "zensiert": 1
     }
   },
   "battlefieldQuellen": {
