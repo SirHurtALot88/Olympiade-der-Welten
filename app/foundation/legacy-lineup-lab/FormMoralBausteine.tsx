@@ -253,7 +253,7 @@ export function KartenMarke({ alle, traeger, form, farbe, grund, gegen = 0 }: { 
       <b className="fm-kmarke__sum t">{vz(summe)}</b>
       {traeger !== 0 ? <i className="fm-kmarke__tr t" style={{ color: farbe ? FORM_HEX[farbe] : undefined }}>{vz(traeger)}</i> : null}
       {form !== 0 ? <i className="fm-kmarke__fo t">{vz(form)}</i> : null}
-      {gegen !== 0 ? <i className="fm-kmarke__ge t" data-testid="fm-kmarke-gegen">{vz(gegen)}</i> : null}
+      {gegen !== 0 ? <i className="fm-kmarke__ge t" data-testid="fm-kmarke-gegen" title="Gegenfarbe: Abzug (Pluskarte) bzw. Entlastung (Minuskarte) fuer Spieler der Gegenfarbe">Gegenf. {vz(gegen)}</i> : null}
     </span>
   );
 }

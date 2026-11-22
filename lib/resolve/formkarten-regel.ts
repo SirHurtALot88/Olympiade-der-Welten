@@ -15,11 +15,12 @@
  * (`stempleFormkartenRegelNachLaden`, save-repository.ts) schreibt fuer die laufende Saison "alt" fest, ab dem
  * naechsten Saisonwechsel gilt "plusminus". Kein Prozesszustand: jeder Aufruf liest den Stempel des Spielstands, den er rechnet.
  *
- * SCHALTER `OLY_FORMKARTEN_PLUSMINUS` (Server; im Browser `NEXT_PUBLIC_OLY_FORMKARTEN_PLUSMINUS`):
+ * SCHALTER `OLY_FORMKARTEN_PLUSMINUS` (nur Server, deploy/hetzner/docker-compose.yml; der Browser loest die Regel nie selbst auf):
  *   nicht gesetzt | "an"   neue Saisons bekommen "plusminus" (Standard)
  *   "aus"                  Rueckweg: neue Saisons bekommen "alt"; gestempelte Saisons rechnen weiter wie gestempelt
- *   "aus-sofort"           Notbremse: ignoriert jeden Stempel, alles "alt" (auch mitten in der Saison; ungespielte
- *                          Karten werden dabei auf die alten Werte zurueckgezogen)
+ *   "aus-sofort"           Notbremse: schaltet die WIRKUNG ab (Gegenfarbe, Duellgewicht), auch mitten in der Saison. Die
+ *                          Kartenwerte bleiben (`formkartenKartenwerteNeu` liest nur den Stempel): sonst wuerden ungespielte
+ *                          Karten eines Menschen still umgeschrieben; die alte Regel rechnet mit 2/4/6/8 genauso (nur Werte).
  * Nur Battle-Spielstaende bekommen einen Stempel; der Manager-Modus bleibt "alt".
  */
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
@@ -41,9 +42,12 @@ function leseSchalter(wert: string | undefined): Schalter | null {
   return "an";
 }
 
-/** Browser-Variante zuerst (Next.js ersetzt nur den woertlichen Zugriff), dann Server. */
+/**
+ * Nur Server-Variable: der Stempel wird auf dem Server gesetzt, der Browser liest ihn aus dem Spielstand. Die Notbremse `aus-sofort`
+ * wirkt im Browser deshalb nur ueber den Stempel, den der Server mitliefert (`formkartenRegelFuer` im Browser sieht die Variable nicht).
+ */
 export function formkartenRegelSchalter(): Schalter {
-  return leseSchalter(process.env.NEXT_PUBLIC_OLY_FORMKARTEN_PLUSMINUS) ?? leseSchalter(process.env.OLY_FORMKARTEN_PLUSMINUS) ?? "an";
+  return leseSchalter(process.env.OLY_FORMKARTEN_PLUSMINUS) ?? "an";
 }
 
 export type FormkartenRegelQuelle =
@@ -89,7 +93,14 @@ export function stempleFormkartenRegelNachLaden<T extends NonNullable<Formkarten
   return { ...gameState, seasonState: { ...gameState.seasonState, formkartenRegel: { seasonId, regel: "alt" as const } } };
 }
 
-/** Die Regel DIESER Saison. Notbremse und fehlender/fremder Stempel: "alt". */
+/** Nur der Stempel der laufenden Saison, ohne Notbremse: bestimmt die KARTENWERTE (2/4/6/8 statt 0/2/4/8). */
+export function formkartenKartenwerteNeu(gameState: FormkartenRegelQuelle): boolean {
+  const stempel = gameState?.seasonState?.formkartenRegel;
+  const seasonId = gameState?.seasonState?.seasonId ?? gameState?.season?.id;
+  return Boolean(stempel && seasonId && stempel.seasonId === seasonId && stempel.regel === "plusminus");
+}
+
+/** Die WIRKUNGS-Regel DIESER Saison. Notbremse und fehlender/fremder Stempel: "alt". */
 export function formkartenRegelFuer(gameState: FormkartenRegelQuelle): FormkartenRegelVersion {
   if (formkartenRegelSchalter() === "aus-sofort") return "alt";
   const stempel = gameState?.seasonState?.formkartenRegel;

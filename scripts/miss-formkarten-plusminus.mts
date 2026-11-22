@@ -92,10 +92,10 @@ try {
         klassenFarbe: KLASSENFARBE,
       };
       await seite.evaluate(
-        ({ src, cfg }) => { (window as any).__formHook = (new Function("return " + src))()(cfg); },
+        ({ src, cfg }: { src: string; cfg: unknown }) => { (window as any).__formHook = (new Function("return " + src))()(cfg); },
         { src: erzeugeFormHook.toString(), cfg },
       );
-      const x = await seite.evaluate(([d, n, f]) => (window as any).__arena.disziplinProbe(d, { n, kaderFamilie: f }), [d, SPIELE, familie] as [string, number, unknown]);
+      const x = await seite.evaluate(([d, n, f]: [string, number, unknown]) => (window as any).__arena.disziplinProbe(d, { n, kaderFamilie: f }), [d, SPIELE, familie] as [string, number, unknown]);
       if (x.fehler || !x.varianten) { zeile[name] = { fehler: x.fehler ?? "keine Varianten" }; continue; }
       const jeVariante = (x.varianten as Array<{ spiele: Array<{ teilnehmer: Teiln[] }> }>).map((v) => {
         const werte = v.spiele.map((s) => rho(s.teilnehmer)).filter((q: number) => !Number.isNaN(q));
@@ -110,7 +110,7 @@ try {
       if (process.env.OLY_PP === "1" && (name === "pm" || name === "pm±")) {
         const pp = [] as number[];
         for (const versatz of (process.env.OLY_PP_VERSATZ ? [0] : [0, 10000000])) {
-          const e = await seite.evaluate(([d, n, v]) => {
+          const e = await seite.evaluate(([d, n, v]: [string, number, number]) => {
             const st = window.setTimeout;
             (window as any).setTimeout = () => 0;
             try { return (window as any).__arena.einflussVon(d, n, undefined, v); } finally { window.setTimeout = st; }

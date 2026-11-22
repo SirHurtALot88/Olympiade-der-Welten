@@ -25,6 +25,7 @@ import { vergleichAuswahl } from "@/app/foundation/legacy-lineup-lab/FormMoralBa
 import {
   buildGeneratedFormCardRecordsForTeam,
   computePositiveFormCardValueForTests,
+  ensureLocalFormCardsForSeason,
   getTeamFormCardOptions,
 } from "@/lib/lineups/legacy-lineup-modifiers";
 import { farbregelAusRegeln, resolveFormMoralRegeln } from "@/lib/morale/form-moral-regeln";
@@ -151,6 +152,21 @@ describe("Plus/Minus: Stempel im Spielstand", () => {
     process.env.OLY_FORMKARTEN_PLUSMINUS = "aus";
     const pm = buildGeneratedFormCardRecordsForTeam({ ...basis, ...PM } as unknown as GameState, "s", "season-1", "t");
     expect(pm.every((k) => [2, 4, 6, 8].includes(Math.abs(k.cardValue)))).toBe(true);
+  });
+});
+
+describe("Plus/Minus: Notbremse aendert keine Karten", () => {
+  it("aus-sofort schaltet nur die Wirkung ab; Kartenwerte und geplante Karten eines Menschen bleiben", () => {
+    const basis = { players: [{ id: "a", name: "A", className: "Mage" }, { id: "b", name: "B", className: "Tank" }], rosters: [{ id: "r1", teamId: "t", playerId: "a" }, { id: "r2", teamId: "t", playerId: "b" }], teams: [{ teamId: "t" }] };
+    const gs = { ...basis, ...PM } as unknown as GameState;
+    const karten = buildGeneratedFormCardRecordsForTeam(gs, "s", "season-1", "t");
+    const mitKarten = { ...gs, seasonState: { ...gs.seasonState, formCards: karten } } as unknown as GameState;
+    process.env.OLY_FORMKARTEN_PLUSMINUS = "aus-sofort";
+    expect(formkartenRegelFuer(mitKarten)).toBe("alt");
+    const neuGezogen = buildGeneratedFormCardRecordsForTeam(mitKarten, "s", "season-1", "t");
+    expect(neuGezogen.map((k) => k.cardValue)).toEqual(karten.map((k) => k.cardValue));
+    expect(ensureLocalFormCardsForSeason(mitKarten, "s", "season-1")).toBe(mitKarten);
+    expect(resolveFormMoralRegeln({}, mitKarten)).not.toHaveProperty("plusMinus");
   });
 });
 

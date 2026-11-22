@@ -642,6 +642,9 @@ function buildNextSeasonGameState(
   if (nextSeasonFixtureSchedule) {
     scheduleWarnings.push(...nextSeasonFixtureSchedule.warnings);
   }
+  // FORMKARTEN-REGEL (22.11.): EINMAL berechnet. Die Karten der neuen Saison werden mit DERSELBEN Regel gezogen, die in den
+  // Stempel der neuen Saison kommt (der Generator liest den Stempel aus dem Spielstand, den er bekommt).
+  const nextFormkartenRegel = formkartenRegelFuerSpielmodus(save.gameState, nextSeasonId);
   const nextFormCards = transferPipelineFast
     ? []
     : buildGeneratedFormCardRecordsForSeason(
@@ -655,6 +658,7 @@ function buildNextSeasonGameState(
             currentMatchday: 1,
             matchdayIds,
           },
+          seasonState: { ...save.gameState.seasonState, seasonId: nextSeasonId, formkartenRegel: nextFormkartenRegel },
         },
         save.saveId,
         nextSeasonId,
@@ -669,7 +673,7 @@ function buildNextSeasonGameState(
     wertungsSkalen: wertungsSkalenFuerSpielmodus(save.gameState, nextSeasonId),
     // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
     // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
-    formkartenRegel: formkartenRegelFuerSpielmodus(save.gameState, nextSeasonId),
+    formkartenRegel: nextFormkartenRegel,
     // BELASTUNGSREGEL (21.11., lib/fatigue/belastung-regel-stempel.ts): Chris: ab der FOLGENDEN Saison
     // gilt Belastung/Resistenz mit Pause nach Spieltag 10 — der Saisonwechsel ist der Ort, an dem ein
     // bestehender Spielstand umschaltet. Nur Battle-Doppelsaisons; die Pause der alten Saison verfaellt.

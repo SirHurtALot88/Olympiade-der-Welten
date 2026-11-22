@@ -18,7 +18,7 @@ import {
   type FormkartenZerlegung,
 } from "@/lib/lineups/formkarten-farbregel";
 
-import { FORMKARTEN_WERTE_PLUSMINUS, formkartenPlusMinusFuer } from "@/lib/resolve/formkarten-regel";
+import { FORMKARTEN_WERTE_PLUSMINUS, formkartenKartenwerteNeu } from "@/lib/resolve/formkarten-regel";
 import { formToStufe, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 
 const FORM_CARD_VALUES = [0, 2, 4, 8] as const;
@@ -551,7 +551,7 @@ export function buildGeneratedFormCardRecordsForTeam(
     .sort((left, right) => left.playerId.localeCompare(right.playerId));
   const generated: FormCardRecord[] = [];
   // Kartenwerte nach der Regel DIESER Saison (Spielstand-Stempel), nie nach der Umgebung.
-  const plusMinus = formkartenPlusMinusFuer(gameState);
+  const plusMinus = formkartenKartenwerteNeu(gameState);
 
   for (const rosterEntry of seasonRosterEntries) {
     const player = playerById.get(rosterEntry.playerId);

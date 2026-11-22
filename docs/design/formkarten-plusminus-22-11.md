@@ -124,8 +124,9 @@ Nicht direkt messbar mit der Sonde (kein Team-Ergebnis, keine KI-Aufstellung im 
    Neues Spiel (nur Battle): plusminus ab Saison 1 (`stempleFormkartenRegelBeimAnlegen` in `new-game-setup-service.ts`). Bestehender Spielstand: die Lade-Migration
    (`stempleFormkartenRegelNachLaden`, `save-repository.ts`) schreibt fuer die laufende Saison „alt" fest, damit schon gezogene Karten und gebuchte Aufstellungen unveraendert bleiben;
    der Saisonwechsel (`preseason-workflow-service.ts`) stempelt die Folgesaison nach dem Schalter. Manager-Spielstaende bleiben alt (kein Stempel).
-   Rueckweg `OLY_FORMKARTEN_PLUSMINUS=aus` (neue Saisons alt, gestempelte rechnen weiter), Notbremse `=aus-sofort` (ignoriert jeden Stempel; im Browser zusaetzlich `NEXT_PUBLIC_OLY_FORMKARTEN_PLUSMINUS`;
-   ungespielte Karten werden dabei von `ensureLocalFormCardsForSeason` auf die alten Werte zurueckgezogen).
+   Rueckweg `OLY_FORMKARTEN_PLUSMINUS=aus` (neue Saisons alt, gestempelte rechnen weiter), Notbremse `=aus-sofort` (schaltet nur die WIRKUNG ab: Gegenfarbe und Duellgewicht, auch mitten in der Saison;
+   die Kartenwerte 2/4/6/8 haengen allein am Stempel und bleiben, damit die Karten eines Menschen nicht still umgeschrieben werden). Die Variable ist reine Server-Variable
+   (`deploy/hetzner/docker-compose.yml` environment, `.env.example`), kein `NEXT_PUBLIC`/Build-Arg: der Browser loest die Regel nie selbst auf.
 4. **Vergleichsliste mit sichtbaren Minuskarten** (`vergleichAuswahl`) ist reine Anzeige und gilt seit dem Fix unabhaengig vom Stempel.
 
 ### Wer liest die Regel (eine Quelle, gezeigt = gebucht)
@@ -138,3 +139,18 @@ Zum Arena-Host/Node-Motor reist die Regel nicht als eigenes Feld: der Umschlag t
 `tests/formkarten-plusminus.test.ts` prueft Einsatzliste = Adapter fuer plusminus und fuer alt (auch bei gesetztem Schalter).
 
 **Wertungs-Fingerabdruck:** `node scripts/pruefe-wertung-fingerabdruck.mjs --node` zeigt `GESAMT 0310ec4a4e3d` (75 Eintraege), identisch zum aktuellen main; der Motor wurde nicht angefasst, eine eigene Schutzsumme ist nicht noetig.
+
+## 6. Nachbesserungen nach dem Review (22.11.)
+
+- **KI-Duellgewicht (muss 1):** das Gewicht der Seite (`duellGewicht`, einmal je Seite in `sidePlans`) geht jetzt auch in den Jetzt-Wert der Kartenwahl (`selectPositiveFormCardForSlot`, `gewicht`), nicht nur in den Plan-Anspruch; sonst haette die Reserve-Schwelle die fuer das knappe Duell geplante Karte auf ihrem eigenen Platz zurueckgehalten. Das Neutral-Veto (knappes Duell) faellt bei Regel plusminus weg, wenn der Plan fuer die Seite eine Pluskarte auf den Primaerplatz gelegt hat; ohne Plan und bei Regel alt bleibt es. Test end-to-end ueber `buildAiLegacyLineupModifiers` (`tests/ai-form-card-season-plan.test.ts`, Gegenprobe Regel alt).
+- **Schalter im Container (muss 2):** `OLY_FORMKARTEN_PLUSMINUS` steht in `docker-compose.yml` und `.env.example`; der `NEXT_PUBLIC`-Vorrang ist entfernt.
+- **Saisonwechsel (sollte 3):** die Karten der Folgesaison werden mit einem Spielstand gezogen, der den Stempel der NEUEN Saison traegt (`nextFormkartenRegel`); Test ueber den echten Pfad `applyPreSeasonNextSeasonSetup` (alt -> plusminus: nur 2/4/6/8).
+- **Notbremse (sollte 4):** Kartenwerte nur nach Stempel (`formkartenKartenwerteNeu`), `aus-sofort` aendert keine Karte eines Menschen (Test).
+- **Anzeige:** die Karten-Zusammenfassung bricht um statt abgeschnitten zu werden (CSS), die Platzmarke beschriftet den Abzug als „Gegenf. −2,0".
+- **Nits:** KI-Schaden der Minuskarte nutzt `plan.farbAnteile` statt fester 0,25; `formMoralRegeln` liest den Stempel der angefragten Saison (`params.seasonId`); implizite `any` im Messskript behoben. „Ist plusminus" hat zwei bewusst getrennte Quellen: Kartenwerte = Stempel allein, Wirkung = Stempel, ausser Notbremse und `OLY_FORMKARTEN_FARBREGEL=alt` (dann kein `plusMinus` im Regelstand).
+
+### Folgen fuer das Spiel (fuer Chris und die Abnahme)
+
+- **+33 % spielbare Karten je Spieler:** bisher blendete `getTeamFormCardOptions` jede vierte Karte (Wert 0) aus, jetzt hat jeder Spieler wirklich ein Plus- und ein Minuskartenpaar.
+- **Jeder Spieler hat jetzt eine Minuskarte.** Die moegliche Saisonende-Strafe fuer ungespielte Minuskarten steigt um etwa 43 % (Betrag im Mittel 5,0 statt 3,5 bei den bisher vorhandenen Karten); sichtbar in Inbox und Startseite.
+- **Keine Nachkalibrierung von C2/E1 noetig:** Netto-Wirkung je Pluskarte 2,81 statt 2,92. Nach der ersten plusminus-Saison mit `werte-pp-skala-aus.mjs` nachpruefen.
