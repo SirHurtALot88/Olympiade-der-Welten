@@ -164,6 +164,7 @@ function createGameState(input?: {
 
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { ermittleKiKandidatenInSaison, fuehreKiVerlaengerungenInSaisonAus } from "@/lib/contracts/ki-verlaengerung-in-saison";
+import { stempleDraftPicksS1 } from "@/lib/contracts/draft-pick-markierung";
 import { gespielteSpieltage, kiPruefSpieltag } from "@/lib/contracts/verlaengerung-in-saison";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
 
@@ -345,6 +346,17 @@ describe("Verlaengerung waehrend der Saison", () => {
     expect(gesperrt.blockingReasons).toContain("in_season_renewal_draft_s1");
     const ohneDraft = previewContractRenewalAction({ save, teamId: "A-A", playerId: "p1", action: "renew", contractLength: 2, offeredSalary: 8 });
     expect(ohneDraft.blockingReasons).not.toContain("in_season_renewal_draft_s1");
+  });
+
+  it("Review 22.11. Befund 9: die Kennung am Roster sperrt auch OHNE Draft-Verlauf (Blocklauf-Draft)", () => {
+    const save = inSaison({ gespielt: 4, seasonId: "season-1", players: spieler(), rosters: letzteSaison() });
+    const gestempelt = stempleDraftPicksS1({ ...save.gameState, rosters: save.gameState.rosters.map((r) => ({ ...r, joinedSeasonId: save.gameState.season.id })) });
+    expect(gestempelt.rosters.every((r) => r.draftPickS1 === true)).toBe(true);
+    expect(stempleDraftPicksS1(gestempelt)).toBe(gestempelt);
+    const gesperrt = previewContractRenewalAction({ save: createSave(gestempelt), teamId: "A-A", playerId: "p1", action: "renew", contractLength: 2, offeredSalary: 8 });
+    expect(gesperrt.blockingReasons).toContain("in_season_renewal_draft_s1");
+    const ohne = previewContractRenewalAction({ save, teamId: "A-A", playerId: "p1", action: "renew", contractLength: 2, offeredSalary: 8 });
+    expect(ohne.blockingReasons).not.toContain("in_season_renewal_draft_s1");
   });
 
   it("Vorstands-Gehaltstopf bleibt hart (Gehaltserhoehung ueber dem freien Gehaltsbudget)", () => {

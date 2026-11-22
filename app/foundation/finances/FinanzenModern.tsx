@@ -284,7 +284,7 @@ function Uebersicht({ m, gew, setGew }: { m: FinanzSeiteModell; gew: number; set
 const ART_TEXT: Record<string, string> = {
   transfer_kauf: "Kauf",
   transfer_verkauf: "Verkauf",
-  vertragsende_abloese: "Vertragsende",
+  vertragsende_abloese: "Verkauf (Vertragsende)",
   sponsor: "Sponsor",
   gehalt_und_sponsor_saisonende: "Saisonabrechnung",
   gehalt_spieltag: "Gehalt",

@@ -2630,6 +2630,12 @@ export type RosterEntry = {
   promisedRole?: RosterPromisedRole | null;
   joinedSeasonId: string;
   /**
+   * Saison-1-Draft-Pick (Review 22.11. Befund 9): gesetzt, sobald der Spieler im Liga-Setup-Draft (Blocklauf ODER Einzelschritt) zum
+   * Team kam. Die Sperre „feste Konditionen, verhandelt wird erst am Ende von Saison 1“ liest diese Kennung (und weiter den
+   * Draft-Verlauf), damit sie nicht vom Draft-Weg abhaengt. Siehe `lib/contracts/draft-pick-markierung.ts`.
+   */
+  draftPickS1?: true;
+  /**
    * Verlaengerung WAEHREND der Saison (21.11., docs/design/verlaengerung-in-saison-21-11.md).
    *
    * Das neue Gehalt gilt ab dem naechsten Spieltag, gebucht wird die Saison aber in EINER Summe am Saisonende:
@@ -4202,6 +4208,18 @@ export type SeasonState = {
    * Stempel (bestehender Spielstand) oder gehoert er zu einer anderen Saison, gilt "alt".
    */
   wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string; ppTagesanker?: boolean };
+  /**
+   * WIRTSCHAFTS-REGELN DIESER SAISON (22.11., lib/resolve/wirtschafts-regeln.ts): Kaderpflicht-Quote, Erwartungsanker, Kernschutz und
+   * Rueckkauf-Sperre. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der Stempel oder gehoert er zu einer
+   * anderen Saison, gilt "alt". `vorjahr`: Platzierung der Vorsaison je Team als Anteil 0..1 in der heutigen Liga.
+   */
+  wirtschaftsRegeln?: {
+    seasonId: string;
+    quote: "alt" | "neu";
+    anker: "alt" | "neu";
+    kernschutz: "alt" | "neu";
+    vorjahr?: Record<string, number>;
+  } | null;
   /**
    * FINANZEN JE SPIELTAG (22.11., lib/finance/finanzen-je-spieltag.ts): "v1" = Gehalt, Sponsor-Basis, Gebaeude-Einnahme
    * und -Unterhalt werden je Spieltag zu 1/N gebucht (`spieltagFinanzen`), nur Rang-/Sonderziel-Sponsor, Apron, Ziele

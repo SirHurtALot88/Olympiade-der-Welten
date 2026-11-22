@@ -55,8 +55,9 @@ export function istSaisonDurchgespielt(gameState: GameState): boolean {
 }
 
 /** Saison-1-Draft-Pick dieses Teams? Feste Konditionen, verhandelt wird erst am Ende von Saison 1. */
-export function istDraftPickFestkonditionen(gameState: GameState, entry: Pick<RosterEntry, "teamId" | "playerId">): boolean {
+export function istDraftPickFestkonditionen(gameState: GameState, entry: Pick<RosterEntry, "teamId" | "playerId"> & Partial<Pick<RosterEntry, "draftPickS1">>): boolean {
   if (getCurrentSeasonNumber(gameState) !== 1) return false;
+  if ((entry as Partial<RosterEntry>).draftPickS1 === true) return true;
   const draft = ligaDraftDieserSaison(gameState);
   if (!draft) return false;
   return draft.verlauf.some((eintrag) => eintrag.art === "pick" && eintrag.teamId === entry.teamId && eintrag.playerId === entry.playerId);

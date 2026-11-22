@@ -40,6 +40,10 @@ import {
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
 import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
+import { DEFAULT_ROSTER_MAX } from "@/lib/foundation/roster-limits";
+import { kiMindestKaderFuerRotation, resolveSpitzenbedarf } from "@/lib/ai/ki-schonung-reha-regeln";
+import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
+import { computePlayerQuality } from "@/lib/ai/organic-squad/quality";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
 import { draftUnit } from "@/lib/ai/market-pick-engine/slot-sequence";
 import { buildLeagueMarketBrackets, quantilePrice, type MarketBracketLane } from "@/lib/ai/market-pick-engine/market-brackets";
@@ -54,7 +58,7 @@ import {
   type KiRuecklageErgebnis,
 } from "@/lib/finance/ki-ruecklage";
 import { erwarteterSponsorFuerPlanung, istSponsorForecastAktiv } from "@/lib/finance/sponsor-erwartung";
-import { berechneVorstandBudgetStand, kaufRahmen, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
+import { berechneVorstandBudgetStand, kaufRahmen, schaetzeFreigabeNaechsteSaison, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 import {
   applyGmBiasToLaneAppetite,
   computeIdentityLaneAppetite,
@@ -494,6 +498,9 @@ function buildOrganicPlanContext(input: {
     resolveGmBias(input.gameState, input.team.teamId),
     variationSeed,
   );
+  // Chris 22.11.: Kaderziel mindestens Spitzenbedarf (hoechstens 12) + Ersatz, gedeckelt auf 14 — in Saison 1 wie spaeter.
+  const rotationsZiel = Math.min(DEFAULT_ROSTER_MAX, kiMindestKaderFuerRotation(resolveSpitzenbedarf(input.gameState)));
+  if (weights.optTarget < rotationsZiel) weights.optTarget = rotationsZiel;
   return {
     weights,
     identityAxisWeights: buildIdentityAxisWeights(input.identity),
@@ -633,7 +640,19 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   const feeCap = vorstand.gedeckelt ? vorstand.investition.frei : undefined;
   const salaryCap = vorstand.gedeckelt ? vorstand.gehalt.frei : undefined;
   const planCash = ctx.cash;
-  const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage);
+  // Runde 2 / Chris 22.11. (Punkt 11, Saison 1): wer ab Saison 2 eine strenge Quote erwartet (niedriges Vertrauen laut Vorausschau),
+  // laesst im Draft Spielraum liegen — (1 - erwartete Quote) x halbe Kasse. Nur mit der neuen Quote-Regel (Stempel).
+  const spielraumS1 =
+    istSaisonEins(input.gameState) && wirtschaftsRegel(input.gameState, "quote") === "neu"
+      ? (1 -
+          schaetzeFreigabeNaechsteSaison(input.gameState, input.team.teamId, {
+            vertrauen: input.identity?.boardConfidence ?? null,
+            kasse: planCash,
+          }).anteil) *
+        0.5 *
+        Math.max(0, planCash)
+      : 0;
+  const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage) + spielraumS1;
   const sponsorForecast =
     istSponsorForecastAktiv() && input.forecast?.sponsorIncome === undefined
       ? erwarteterSponsorFuerPlanung(input.gameState, input.team.teamId)
@@ -676,7 +695,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     salaryCeiling,
     // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
     // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
-    solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage),
+    solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage) + spielraumS1,
     // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
     // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
     minFillFloor: ruecklage > 0 ? ruecklage : undefined,
@@ -940,6 +959,26 @@ const UPGRADE_SWAP_UPLIFT = Number(process.env.OLY_UPGRADE_SWAP_UPLIFT ?? 1.5) |
 /** Absolute headroom (MW) the replacement budget must also clear, so tiny-MW swaps still need real cash. */
 const UPGRADE_SWAP_MIN_HEADROOM = Number(process.env.OLY_UPGRADE_SWAP_MIN_HEADROOM ?? 10) || 10;
 
+/**
+ * Review 22.11. Befund 3: KERNSCHUTZ. Die besten drei Spieler eines Kaders (nach Staerke-Qualitaet) verkauft ein Team nur noch in
+ * Finanznot (Kasse unter dem Puffer). Gemessen verkaufte ein sparsames Team (D-L) in zwei Fenstern seine Top-5-Eignung 45 bis 50
+ * zum Marktwert und kaufte 11 bis 21 zurueck, obwohl der freie Pool im Median 57,8 hielt: der Verkaufserloes (`wThrift x saleValue`)
+ * schlug den Staerkeverlust, solange der Vorstand den Abstieg nicht bestrafte. 0 oder `OLY_KI_KERNSCHUTZ=0` schaltet ab.
+ */
+const KERNSCHUTZ_ANZAHL = 3;
+/**
+ * Chris 22.11. (Runde 2, Punkt 10): „das ist ja auch eine valide Moeglichkeit, dann Cash zu generieren“. Ein Kernspieler geht auch ohne
+ * Finanznot weg, wenn das Angebot (realisierter Verkaufspreis, nach allen Abschlaegen) ueber einem Vielfachen seines Marktwerts liegt;
+ * je besser der Spieler im eigenen Kader, desto hoeher die Schwelle: Rang 1 = 1,5, Rang 2 = 1,4, Rang 3 = 1,3.
+ */
+export const KERN_ANGEBOT_FAKTOR = [1.5, 1.4, 1.3] as const;
+/** Reicht das Angebot (realisierter Preis / Marktwert) fuer einen Kernspieler dieses Rangs (0 = bester)? */
+export function kernAngebotGenuegt(rang: number, faktor: number | null): boolean {
+  return faktor != null && faktor >= KERN_ANGEBOT_FAKTOR[Math.min(Math.max(0, rang), KERN_ANGEBOT_FAKTOR.length - 1)]!;
+}
+/** Messspur (Prozess-global, nur mit `OLY_KERN_VERKAUF_LOG=1`, fuer Messskripte): jeder geplante Verkauf eines Kernspielers samt Faktor und Grund. */
+export const KERN_VERKAUF_LOG: Array<{ teamId: string; playerId: string; rang: number; faktor: number | null; grund: "gutes_angebot" | "finanznot" }> = [];
+
 export type OrganicSellDecision = {
   /** Domain player id (matches OrganicPlayerView.playerId / Player.id). */
   playerId: string;
@@ -1109,12 +1148,46 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
 
   // Floor is ROSTER_MIN in-season, 0 at season end (allowBelowMin). Only players clearing
   // SELL_THRESHOLD are shed, highest-sellUtility first — keepers (negative sellUtility) never sell.
+  let kernRang: Map<string, number> | null = null;
+  const kernFaktor = new Map<string, number | null>();
   while (held.length > rosterMin) {
     const state = buildState();
+    // Kernschutz (Befund 3): einmal je Plan aus dem Kader zu Beginn bestimmt; faellt weg, sobald das Team in Finanznot ist.
+    if (kernRang == null) {
+      kernRang = new Map(
+        wirtschaftsRegel(input.gameState, "kernschutz") === "neu"
+          ? [...held]
+              .sort((a, b) => computePlayerQuality(b, state.needAxisWeights) - computePlayerQuality(a, state.needAxisWeights))
+              .slice(0, KERNSCHUTZ_ANZAHL)
+              .map((view, index) => [view.playerId, index] as const)
+          : [],
+      );
+    }
+    const finanznot = teamDistressed || state.cash < ctx.cashBuffer;
+    const angebotFaktor = (view: OrganicPlayerView): number | null => {
+      if (!kernFaktor.has(view.playerId)) {
+        const realized = estimateRealizedSellPrice(
+          input.gameState,
+          input.team.teamId,
+          playerById.get(view.playerId) ?? null,
+          rosterEntryByPlayerId.get(view.playerId) ?? null,
+          Math.max(0, held.length - 1),
+        );
+        kernFaktor.set(view.playerId, realized != null && view.marketValue > 0 ? realized / view.marketValue : null);
+      }
+      return kernFaktor.get(view.playerId) ?? null;
+    };
+    const kernGesperrt = (view: OrganicPlayerView): boolean => {
+      const rang = kernRang!.get(view.playerId);
+      if (rang == null || finanznot) return false;
+      const faktor = angebotFaktor(view);
+      return !kernAngebotGenuegt(rang, faktor);
+    };
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
     for (const view of held) {
       if (blockedFloorPlayerIds.has(view.playerId)) continue; // kept by the think-twice floor gate
+      if (kernRang.has(view.playerId) && kernGesperrt(view)) continue; // Kernschutz (gutes Angebot oder Finanznot heben ihn auf)
       const jitter =
         input.draftSeed && ORGANIC_SELL_JITTER > 0
           ? ORGANIC_SELL_JITTER * (draftUnit(`${input.draftSeed}:${view.playerId}`) - 0.5)
@@ -1152,6 +1225,10 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       }
     }
 
+    const verkaufterKernRang = kernRang.get(best.playerId);
+    if (verkaufterKernRang != null && process.env.OLY_KERN_VERKAUF_LOG === "1") {
+      KERN_VERKAUF_LOG.push({ teamId: input.team.teamId, playerId: best.playerId, rang: verkaufterKernRang + 1, faktor: kernFaktor.get(best.playerId) ?? null, grund: finanznot ? "finanznot" : "gutes_angebot" });
+    }
     held.splice(held.indexOf(best), 1);
     cash += Math.max(0, best.marketValue);
     salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
@@ -1181,6 +1258,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       let weakest: OrganicPlayerView | null = null;
       let weakestUtility = -Infinity;
       for (const view of held) {
+        if (kernRang?.has(view.playerId) && !(teamDistressed || state.cash < ctx.cashBuffer)) continue; // Kernschutz (Befund 3): Upgrade-Tausch nie ueber Kernspieler
         const utility = sellUtility(view, state);
         if (utility > weakestUtility) {
           weakestUtility = utility;

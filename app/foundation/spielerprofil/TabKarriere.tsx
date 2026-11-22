@@ -5,7 +5,7 @@ import { gehaltJeSpieltag } from "@/lib/foundation/spielerprofil-modell";
 import { formatLeagueTierShortLabel } from "@/lib/season/league-history";
 import { Tafel, geld, zahl } from "./bausteine";
 
-const WECHSEL: Record<string, string> = { buy: "Kauf", sell: "Verkauf", contract_exit: "Vertragsende" };
+const WECHSEL: Record<string, string> = { buy: "Kauf", sell: "Verkauf", contract_exit: "Verkauf (Vertragsende)" };
 
 export function TabKarriere({ data }: { data: PlayerDetailDrawerData }) {
   const zeilen = [...data.historyRows].reverse();
@@ -62,7 +62,7 @@ export function TabKarriere({ data }: { data: PlayerDetailDrawerData }) {
             <div className="spr-leer">Noch keine Auszeichnung.</div>
           )}
         </Tafel>
-        <Tafel titel="Wechsel" klein="Kauf, Verkauf, Vertragsende" testId="spielerprofil-wechsel">
+        <Tafel titel="Wechsel" klein="Kauf, Verkauf (auch Vertragsende)" testId="spielerprofil-wechsel">
           <div className="spr-th">
             {data.transferHistory.slice(0, 8).map((wechsel) => (
               <div key={wechsel.id} className="spr-zeile">

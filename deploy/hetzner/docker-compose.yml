@@ -120,6 +120,9 @@ services:
       # Beteiligungsboden in der Pass-Lotterie), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten Spieltag wieder die
       # alte Regel; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.
       OLY_BASKETBALL_PUSTE: ${OLY_BASKETBALL_PUSTE:-}
+      OLY_QUOTE_UEBER_PFLICHTKADER: ${OLY_QUOTE_UEBER_PFLICHTKADER:-}
+      OLY_BOARD_ERWARTUNG_ANKER: ${OLY_BOARD_ERWARTUNG_ANKER:-}
+      OLY_KI_KERNSCHUTZ: ${OLY_KI_KERNSCHUTZ:-}
       # Formkarten Plus/Minus (22.11., docs/design/formkarten-plusminus-22-11.md): leer = Standard (neue Saisons bekommen die Regel
       # plusminus), "aus" = Rueckweg (neue Saisons alt), "aus-sofort" = Notbremse (Gegenfarbe und Duellgewicht aus, auch mitten in
       # der Saison). Nur Server: der Browser loest die Regel nie selbst auf, sie steht im Spielstand. Siehe deploy/hetzner/.env.example.

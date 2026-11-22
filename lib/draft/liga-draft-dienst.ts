@@ -14,6 +14,7 @@
  *
  * Seit der Abnahme 19.11. ist dieser Draft der Standard fuer neue Ligen; `OLY_LIGA_DRAFT_MODUS=block` ist der Rueckweg.
  */
+import { stempleDraftPicksS1 } from "@/lib/contracts/draft-pick-markierung";
 import { meldeHintergrundArbeit } from "@/lib/hintergrund/hintergrund-arbeit";
 import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-adapter";
 import { getNextWishlistPriorityRank } from "@/lib/scouting/scouting-wishlist-slots";
@@ -131,7 +132,7 @@ export function ligaDraftWarnungen(gameState: GameState, draft: LigaDraftZustand
 
 /** Schreibt den Draft-Zustand in den Spielstand des Laufkontexts (ohne zu speichern). */
 function setzeDraftImKontext(ctx: RunContext, draft: LigaDraftZustand): void {
-  const gameState = ctx.save.gameState;
+  const gameState = stempleDraftPicksS1(ctx.save.gameState);
   const geordneterTeilVorbei = draft.status !== "laeuft";
   ctx.save = {
     ...ctx.save,

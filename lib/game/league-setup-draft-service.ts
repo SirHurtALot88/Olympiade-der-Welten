@@ -1,3 +1,4 @@
+import { stempleDraftPicksS1 } from "@/lib/contracts/draft-pick-markierung";
 import type { GameState, LeagueSetupTeamWarning } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { runAiPicksExecutePreview, type AiPicksRunResult } from "@/lib/ai/ai-picks-run-service";
@@ -361,7 +362,7 @@ function schreibeLigaSetupStatus(
     }
     try {
       persistence.saveSingleplayerState(saveId, {
-        ...save.gameState,
+        ...(status === "ready" ? stempleDraftPicksS1(save.gameState) : save.gameState),
         seasonState: {
           ...save.gameState.seasonState,
           leagueSetupStatus: status,

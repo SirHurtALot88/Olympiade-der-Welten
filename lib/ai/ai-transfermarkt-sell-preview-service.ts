@@ -22,7 +22,8 @@ import {
   modellFuerSpieler,
   type LeagueSalaryBenchmarks,
 } from "@/lib/contracts/salary-benchmark-league";
-import { getTeamControlSettings, withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { getTransferControlSettings as getTeamControlSettings } from "@/lib/ai/ki-delegierte-transfers";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { normalizeTransfermarktToken } from "@/lib/market/transfermarkt-fit";
 import type { LocalTransfermarktRunContext } from "@/lib/market/transfermarkt-local-service";

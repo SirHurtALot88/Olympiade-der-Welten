@@ -51,6 +51,8 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
+process.env.OLY_KERN_VERKAUF_LOG ??= "1";
+import { KERN_VERKAUF_LOG } from "@/lib/ai/organic-squad/draft-adapter";
 import { fuehreKiPreseasonLaufAus } from "@/lib/ai/ai-preseason-background-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamFacilityUpkeepTotal, getTeamActualSalaryTotal, getTeamNegotiatedSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
@@ -98,8 +100,8 @@ const STOP_AFTER = arg("stop-after", "");
 const NUR_ANLAGE = process.argv.includes("--nur-anlage");
 /** Vorhandene (kopierte) Anlage-SQLite weiterverwenden: saveId, ab dem Draft laufen. */
 const VON_ANLAGE = arg("von-anlage", "");
-/** "block" (Standard, alter Hintergrund-Draft) oder "einzelschritt" (neuer Liga-Draft Pick fuer Pick). */
-const DRAFT_ART = arg("draft", "block") as "block" | "einzelschritt";
+/** "einzelschritt" (Standard seit 22.11., wie die App: Liga-Draft Pick fuer Pick) oder "block" (alter Hintergrund-Draft; setzt seit Befund 9 dieselbe Roster-Kennung `draftPickS1`). */
+const DRAFT_ART = arg("draft", "einzelschritt") as "block" | "einzelschritt";
 
 /**
  * S1-KADERBAU-VARIANTEN (18.11., Messung "S1 ohne Draft"):
@@ -380,6 +382,7 @@ async function main() {
   }
   const phasen = run.phasen as Record<string, unknown>;
   const schreibe = () => {
+    run.kernVerkaeufe = [...KERN_VERKAUF_LOG];
     if (OUT) fs.writeFileSync(OUT, JSON.stringify(run));
   };
   const finish = () => {
@@ -507,6 +510,8 @@ async function main() {
     // Spieltage
     const md = get().gameState.season.matchdayIds.length;
     const kasseJeSpieltag: Record<string, number[]> = {};
+    // Chris 22.11.: gleichzeitig verletzte Spieler je Team und Spieltag (Verletzt/Genesend laut Verfuegbarkeitsstand) - Entscheidung, ob 14 als Kadergrenze reicht.
+    const verletztJeSpieltag: Record<string, number[]> = {};
     const ts = Date.now();
     for (let i = ersterIdx; i < md; i += 1) {
       const cur = get();
@@ -520,11 +525,20 @@ async function main() {
       const adv = await executeMatchdayAdvance({ saveId, seasonId: sid, source: "sqlite", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN }, persistence);
       if (!adv.ok || !adv.applied) { log(`Wechsel blockiert: ${adv.blockingReasons.join(" | ")}`); break; }
       for (const t of get().gameState.teams) (kasseJeSpieltag[t.teamId] ??= []).push(r2(t.cash));
+      {
+        const g = get().gameState;
+        const roster = new Set(g.rosters.map((r) => `${r.teamId}|${r.playerId}`));
+        const je: Record<string, number> = {};
+        for (const a of g.seasonState.playerAvailabilityState ?? []) {
+          if ((a.injuryStatus === "injured" || a.injuryStatus === "recovering") && roster.has(`${a.teamId}|${a.playerId}`)) je[a.teamId] = (je[a.teamId] ?? 0) + 1;
+        }
+        for (const t of g.teams) (verletztJeSpieltag[t.teamId] ??= []).push(je[t.teamId] ?? 0);
+      }
       if ((i + 1) % 5 === 0) log(`${praefix} Spieltag ${i + 1}/${md} (${((Date.now() - ts) / 1000).toFixed(0)}s)`);
     }
     const vorAbschluss = get().gameState;
     phasen[`${praefix}_03_nach_spieltagen`] = {
-      snap: snap(vorAbschluss), kasseJeSpieltag,
+      snap: snap(vorAbschluss), kasseJeSpieltag, verletztJeSpieltag,
       sponsorEvents: (vorAbschluss.seasonState.sponsorEvents ?? []).filter((e) => (e as { seasonId?: string }).seasonId === sid || true).length,
     };
     schreibe();

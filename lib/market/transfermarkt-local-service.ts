@@ -43,9 +43,9 @@ import { applySellBoardReactionToGameState } from "@/lib/market/transfermarkt-se
 import { applySellPricingPolicyToBreakdown } from "@/lib/market/transfermarkt-sell-pricing-policy";
 import { resolveTransfermarktSellProceeds } from "@/lib/market/transfermarkt-sell-proceeds";
 import {
-  isPlayerTransferBuyBlocked,
+  baueSoldCooldownBlocker,
   buildSoldPlayerSeasonBans,
-  SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER,
+  getSoldPlayerSeasonBan,
   SOLD_PLAYER_SEASON_COOLDOWN_OVERRIDE_WARNING,
 } from "@/lib/market/transfer-sold-cooldown";
 import {
@@ -1460,14 +1460,14 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
   if (isHumanInitiatedTransferSource(params.transferSource) && !isTransferBuyPhaseOpen(gameState)) {
     blockingReasons.push(new TransferWindowClosedError("buy_players", gameState).reason);
   }
-  const soldThisSeasonCooldownHit = isPlayerTransferBuyBlocked({
-    gameState,
-    playerId: params.playerId,
-  });
-  if (soldThisSeasonCooldownHit && !params.bypassSoldThisSeasonCooldown) {
-    blockingReasons.push(SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER);
+  // GLOBALE VERKAUFS-SPERRE (Chris 22.11.): fuer alle Teams, Mensch wie KI; Notfall-Nachbesetzung unter dem Kader-Minimum darf sie
+  // umgehen, aber NIE fuer den eigenen Abgang (Rueckkauf gibt es nicht).
+  const soldBan = getSoldPlayerSeasonBan({ gameState, playerId: params.playerId });
+  const bypassErlaubt = Boolean(params.bypassSoldThisSeasonCooldown) && soldBan?.fromTeamId !== params.teamId;
+  if (soldBan && !bypassErlaubt) {
+    blockingReasons.push(baueSoldCooldownBlocker(soldBan));
   }
-  if (soldThisSeasonCooldownHit && params.bypassSoldThisSeasonCooldown) {
+  if (soldBan && bypassErlaubt) {
     warnings.push(SOLD_PLAYER_SEASON_COOLDOWN_OVERRIDE_WARNING);
   }
   if (purchasePrice == null || purchasePrice <= 0) blockingReasons.push("market_value_missing");
@@ -2784,14 +2784,14 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
   if (isHumanInitiatedTransferSource(params.transferSource) && !isTransferBuyPhaseOpen(gameState)) {
     blockingReasons.push(new TransferWindowClosedError("buy_players", gameState).reason);
   }
-  const soldThisSeasonCooldownHit = isPlayerTransferBuyBlocked({
-    gameState,
-    playerId: params.playerId,
-  });
-  if (soldThisSeasonCooldownHit && !params.bypassSoldThisSeasonCooldown) {
-    blockingReasons.push(SOLD_PLAYER_SEASON_COOLDOWN_BLOCKER);
+  // GLOBALE VERKAUFS-SPERRE (Chris 22.11.): fuer alle Teams, Mensch wie KI; Notfall-Nachbesetzung unter dem Kader-Minimum darf sie
+  // umgehen, aber NIE fuer den eigenen Abgang (Rueckkauf gibt es nicht).
+  const soldBan = getSoldPlayerSeasonBan({ gameState, playerId: params.playerId });
+  const bypassErlaubt = Boolean(params.bypassSoldThisSeasonCooldown) && soldBan?.fromTeamId !== params.teamId;
+  if (soldBan && !bypassErlaubt) {
+    blockingReasons.push(baueSoldCooldownBlocker(soldBan));
   }
-  if (soldThisSeasonCooldownHit && params.bypassSoldThisSeasonCooldown) {
+  if (soldBan && bypassErlaubt) {
     warnings.push(SOLD_PLAYER_SEASON_COOLDOWN_OVERRIDE_WARNING);
   }
   if (purchasePrice == null || purchasePrice <= 0) blockingReasons.push("market_value_missing");

@@ -165,6 +165,12 @@ export type CashFlowForecast = {
 /** Team economic state snapshot the utility model reads. */
 export type OrganicTeamState = {
   cash: number;
+  /**
+   * Runde 2 / Chris 22.11. (Punkt 11b): was der Vorstand fuer Ablosen noch freigibt (`kaufRahmen().grenzeFuer`). Der Kauf-Nutzen misst den
+   * Preis eines Spielers am Budget JE PLATZ bis Opt; ohne dieses Feld stand dort die Kasse, die Quote liess die teuren Einzelkaeufe aber
+   * nicht zu: das Team gab den Topf fuer wenige Stars aus und blieb bei 10 bis 11 Spielern. Fehlt es, gilt `cash` (Saison 1, ohne Quote).
+   */
+  budget?: number;
   cashBuffer: number;
   salaryTotal: number;
   rosterSize: number;

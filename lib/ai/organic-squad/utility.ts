@@ -478,7 +478,7 @@ export function buyUtility(player: OrganicPlayerView, state: OrganicTeamState): 
   // budget instead of the even per-slot share, so a concentrated squad affords one standout. No-op (factor
   // 1) for every other pick and whenever OLY_DRAFT_PEAK is off. The min-fill affordability guard in
   // draft-builder still independently caps the spend, so this only decides WHICH affordable pick wins.
-  const budgetPerOptSlot = Math.max(1, (state.cash * peakFrontLoadFactor(player, state)) / optSlotsRemaining);
+  const budgetPerOptSlot = Math.max(1, ((state.budget ?? state.cash) * peakFrontLoadFactor(player, state)) / optSlotsRemaining);
   const effectiveCost = Math.max(0, player.marketValue) + SALARY_CAPITALIZATION * Math.max(0, player.salary);
   const priceInSlots = effectiveCost / budgetPerOptSlot;
   // ANPASSUNG B2 (flag-gated): once a single pick eats more than the GM's own "star appetite" worth of

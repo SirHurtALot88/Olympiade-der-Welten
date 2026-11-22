@@ -477,8 +477,11 @@ export function buildStepTeamState(input: OrganicSquadPlanInput, step: OrganicPl
     netTransfer: input.economy.netTransfer,
     cashBuffer,
   });
+  const grenze = input.economy.kaufGrenze ? input.economy.kaufGrenze(step.squad.length, step.spentFee, step.spentSalary) : null;
+  const quotenBudget = grenze && Number.isFinite(grenze.fee) ? Math.max(0, Math.min(step.cash, grenze.fee)) : undefined;
   return {
     cash: step.cash,
+    ...(quotenBudget != null ? { budget: quotenBudget } : {}),
     cashBuffer,
     salaryTotal: step.salaryTotal,
     rosterSize: step.squad.length,
