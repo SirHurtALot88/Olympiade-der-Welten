@@ -9,7 +9,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 export function stempleDraftPicksS1(gameState: GameState): GameState {
   const saisonId = gameState.season?.id;
   if (!saisonId) return gameState;
-  if (getCurrentSeasonNumber(gameState) !== 1) return gameState;
+  if (!Array.isArray(gameState.rosters) || getCurrentSeasonNumber(gameState) !== 1) return gameState;
   let geaendert = false;
   const rosters = gameState.rosters.map((eintrag) => {
     if (eintrag.draftPickS1 || eintrag.joinedSeasonId !== saisonId) return eintrag;

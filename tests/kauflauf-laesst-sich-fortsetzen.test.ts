@@ -38,7 +38,7 @@ function spielstand(): GameState {
   ];
   const rosters = [
     ...Array.from({ length: 8 }, (_, i) => ({ teamId: "AAA", playerId: `a${i}` })),
-    ...Array.from({ length: 12 }, (_, i) => ({ teamId: "BBB", playerId: `b${i}` })),
+    ...Array.from({ length: 13 }, (_, i) => ({ teamId: "BBB", playerId: `b${i}` })),
     ...Array.from({ length: 8 }, (_, i) => ({ teamId: "CCC", playerId: `c${i}` })),
   ];
   return {
