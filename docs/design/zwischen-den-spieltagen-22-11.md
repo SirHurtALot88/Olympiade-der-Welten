@@ -1914,3 +1914,27 @@ Ab Schmiede Stufe 3. Bezahlt wird mit dem Material der Familie und mit Teilen. D
      Familie“?
   3. Legendäre II und III über Zündungen: gewünscht, oder lieber nur über Material?
   4. Icons: volle 91 Generationen oder der Sparweg mit 61?
+
+## 66. Entscheidungen nach Runde 11 (Chris, 22.11.)
+
+1. **Höchstens ein Teil je Familie und Spieler.** Kein Spieler trägt zwei Plattenpanzer, und nie denselben Gegenstand
+   doppelt. Das ersetzt den Satz „zwei Teile derselben Familie sind erlaubt“ in §59. Auto-Ausrüsten und KI überspringen in
+   der gierigen Zuteilung (§55, §64) jeden Spieler, der schon ein Teil dieser Familie trägt; von Hand lässt sich ein
+   zweites nicht anlegen (der Platz zeigt den Grund).
+2. **Legendäre steigen nur über Material auf,** nicht über Zündungen. Das ersetzt die Bedingungen in §62:
+
+   | Aufstieg | Kosten | Schmiede |
+   |---|---|---|
+   | I → II | 1 Signatur-Material des Gegenstands + 8 Teile | Stufe 4 |
+   | II → III | 2 Signatur-Materialien des Gegenstands + 12 Teile | Stufe 5 |
+
+   Wirkung und passive Effekte je Stufe bleiben wie in §62. Bis zu Stufe III braucht ein Gegenstand also vier
+   Signatur-Materialien (eines zum Bauen, drei zum Aufsteigen); bei 5 % je Fund in der Goldtruhe ist III ein Ziel über
+   mehrere Saisons. Der Verlauf zählt Zündungen weiter, aber nur für Statistik und Messung.
+3. **Icons: Sparweg, 61 Generationen** (32 Familien-Icons, 15 Legendäre, 14 Materialien; Stufe II und III als
+   Code-Verzierung desselben Icons). **Nicht bestellt;** bestellt wird erst zum Bau.
+4. **Affix-Quoten 60 / 20 / 15** (bevorzugt, zweischneidig, eingeschränkt) gelten als Startwerte; gemessen wird beim Bau
+   nach §49.
+
+Im Mockup `?ansicht=familien` sind die Aufstiegskosten und die Familien-Regel eingetragen. Die Demo ist nicht betroffen
+(sie rüstet keine Spieler aus).
