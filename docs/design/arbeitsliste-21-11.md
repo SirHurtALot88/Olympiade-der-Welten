@@ -79,6 +79,60 @@ PixelLab-Remakes Spurt und Gewichtheben + Altlasten-Audit mit Guard-Test.
   `public/mockups/neue-teams-40-21-11.html`, `docs/design/neue-teams-40-21-11.md`,
   `docs/design/neue-teams-40-21-11/vorschlag.json` (10 Teams, alle für Liga 2; Aufsteiger-Vorschlag M-S, D-P, V-V, T-G).
   Chris: erst umsetzen, wenn mit 16 Teams je Liga alles sauber läuft — 20er-Ligen hießen, alle Layouts anzupassen.
-- **Alternative offen:** bei 16 Teams je Liga bleiben und eine **3. Liga mit 16 Teams** dazunehmen (48 Teams).
-  Die Team-Vorschläge wären dann Kandidaten für Liga 3 (sie sind auf Liga-2-Niveau kalibriert, müssten für Liga 3
-  nach unten nachgezogen werden, und es bräuchte weitere 6–8 Teams).
+- **Entschieden (Chris 22.11. abends): vorerst 2×16, später potentiell 2×20** (Empfehlung Rahmenkonzept: 2×20 mit vier
+  Auf-/Absteigern als Ziel einer späteren Welle; 3×16 verworfen — 16 neue Teams, +50 % Rechenzeit auf dem 4-GB-Server).
+
+## Welle 4 — Stand 22.11. abends
+
+Gemergt: Basketball Puste (#1677), Finanzen je Spieltag + Rang-Abschlag (#1678), Takeshi (#1679), Arena-Vorstellung (#1680),
+Breaking Tag-Team (#1681), Formkarten Plus/Minus 2/4/6/8 + Gegenfarbe (#1682). Offen aus Welle 4: Spannungsbögen,
+Wettessen-Rework (Konzept `docs/design/wettessen-ereignisse-22-11.md`, Strafe „Würgen“ ja), PixelLab-Arena + Geräte für
+Breaking, Hockey rho (Feldspieler-Validität).
+
+## Welle 6 — aus der Gameplay-Review 22.11. (`docs/design/gameplay-review-22-11.md`, `gameplay-designreview-22-11.md`)
+
+**Fehler / Balance (läuft: Branch `claude/review-fixes-wirtschaft-ki-22-11`)**
+- Vorstandsquote greift im Fenster nicht (26–27 von 32 Teams über Freigabe): nur Pflichtkader 8 quotenfrei.
+- Vorstand belohnt Kaderabbau (Sportziel an eigener, sinkender Kaderstärke gemessen).
+- KI verkauft gute und kauft sehr schwache Spieler; KI baut zu dünne Kader (Tiefe schlägt beste 6 in S1–S2).
+- Jedes KI-gesteuerte Team (auch Voll-KI/Halbautomatik-Delegation) kauft ab Saison 2 wie in Saison 1.
+- Vertragsende = Verkauf (Chris 22.11.): Begriffe und Regeln vereinheitlichen; Rückkäufe ausgelaufener Spieler.
+- Messwerkzeug und App draften verschieden (S1-Draft-Markierung).
+
+**Wertung**
+- PP-Skala C2: mehrere Spieler glatt auf 5,0 an 18–21 von 40 Tagen; Tagesanker-Prototyp (`origin/claude/pp-analyse-21-11`)
+  — Freigabe Chris offen. Anker für TDM-Gefecht, Breaking (neu), Bahn nachziehen.
+- Ergebnisskala E1: Median-Abstand je Disziplin 2–9 statt ~3 (Climbing 40 % 10:0) — Anker nachziehen.
+- Hockey rho 0,68 (Ausnahme) — Feldspieler-Validität.
+
+**Mechanik (Entscheidungen Chris offen/teils gefallen)**
+- Moral wirkt kaum (±0,67 %) — Frage offen (Vorschlag ±2–3 %).
+- Kadertiefe in der Kaderstärke-Anzeige ausweisen? — Frage offen.
+- Training/Entwicklung (Chris 22.11.): wenige stark besser, wenige stark schlechter, die Masse kaum; Potential je
+  Attribut driftet je Saison leicht; Ligamittel neutral; gesundes Verhältnis Trainingspunkte (SP) ↔ Leistung (PP).
+- Mehrspieler: dritter Sitz im Online-Raum (Ramona).
+
+**UI aus der Design-Review**
+- Erledigt in #1684: Lexikon/Sprache, Ziele „auf Kurs / gefährdet“, Titelrennen nach Duellpunkten je Liga.
+- Mockups `spieltag-entscheidungen-rennen-22-11`: „Deine Entscheidungen“ (+ Gegnerspalte), Rennen (neu denken, nicht
+  generisch), Halbzeitbericht zur Winterpause, Manager-Leiste + Derby. Entschieden: drittes Rennen Liga 2 = Vorstandsziel;
+  Gegenprobe = Differenz der Vorhersagen; Mitspieler sehen Status + Ergebnisse und nach dem Spieltag die gespielten
+  Entscheidungen, keinen Kartenhaushalt/Lager vorab.
+
+## Welle 7 — Rahmenkonzept „Zwischen den Spieltagen“ (`docs/design/zwischen-den-spieltagen-22-11.md`, Runde 2 läuft)
+
+Vier Schleifen (Spieltag, Woche, Saison, Ära), fünf Säulen (Kader, Spieltag, Verein, Welt, Rivalen). Chris 22.11.:
+- **Welt** ist der größte Punkt: Saisons sollen nicht gleich ablaufen, die Welt entwickelt sich weiter.
+- **Ligaweite Ereignisse** (treffen alle gleich, z. B. Sponsor-Auszahlungen, Zuschauer) mit **drei Antworten** je Team —
+  „richtig gut“, viele Ereignisse und Antworten, gebalanced.
+- **Befristete Ligaregeln per Abstimmung** (Punkteverteilung, Blockaden …) — nur befristet (wenige Spieltage bis max.
+  eine Saison), als Regel-Stempel, nie dauerhaft im Code.
+- **Ausrüstung:** erhöht Attribute um X, on top (nicht matrix-gedeckelt, Ausreißer gewollt); disziplin-, farb- oder
+  allgemein; Forecast je kommender Disziplin; Figur in der Mitte, Slots drumherum; Haltbarkeit vielfältig (Einweg,
+  N Spieltage, Verschleiß, gebraucht, Reparatur); Kisten mit Öffnen-Animation; KI muss alles nutzen; Server 4 GB.
+- **Winterpause** als Status (Halbzeitbericht), ggf. Transferfenster/Item-Shop/fahrende Händler.
+- **Entscheidungen im Spieltag** (Zurufe/Haltungen disziplinübergreifend, Mehrspieler ohne Anhalten).
+- **Verein** ausführlicher (Identität, Fans/Stadion, Gebäude mit Zweck, Personal, Nachwuchs, Vorstand mit Persönlichkeit).
+- **Ära** später, aber sehr wichtig. Kein Pokal/keine WM vorerst.
+- **Rangtreue (Chris 22.11.): Schranke 0,75 gilt nur gegen die reine Eignung**; alles on top (Form, Moral, Karten,
+  Ausrüstung, Zurufe) zählt nicht dagegen — Schwächere dürfen dadurch besser sein.
