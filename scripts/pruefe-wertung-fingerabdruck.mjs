@@ -17,6 +17,10 @@
 //     OLY_CLIMBING_FORMAT=standard) geschuetzt: drei Zeilen `spiele climbing/standard 1|7|42` mit eigener Summe
 //     `CLIMBING-STANDARD ...` AUSSERHALB von GESAMT, mit window.__arena.bahnFlags({climbingFormat:"standard"})
 //     ausdruecklich gesetzt und danach auf die Vorgabe zurueck. `--node` rechnet alles ueber den Node-Motor.
+// GESAMT-STAND (22.11., Hockey-Torwart-Regel, docs/design/hockey-torwart-22-11.md): `GESAMT 0310ec4a4e3d (75 Eintraege)`;
+// gegenueber `5b9acba4fe42` aendern sich NUR die drei Zeilen `spiele hockey 1|7|42` (c3d67a7dbb14/0af1d2c8ec69/d06c32d9bf5e ->
+// 1e83d67c8161/86de5c3617bf/d7bf5303d471). Die alte Regel steht als `HOCKEY-TORWART-ALT cdc62aeea8e4` (drei Zeilen
+// `spiele hockey/torwart-alt <saat>`, die alten Werte) AUSSERHALB von GESAMT.
 // GESAMT-STAND (22.11., Battlefield Fuenf Punkte live, docs/design/battlefield-5punkte-22-11.md):
 // `GESAMT 5b9acba4fe42 (75 Eintraege)`; gegenueber `eaafed96150e` aendert sich NUR die Zeile `spieleBattlefieldPod`
 // (4424ef90cb0c -> 2271b1fad9a4): der Pod laeuft in der Motor-Vorgabe "domination5". Das alte Gefecht je Ort steht als
@@ -175,7 +179,16 @@ try {
       try { tdmGefecht.push([`spieleTdmGefecht ${s}`, A.spieleTdmGefecht("tdm", s)]); }
       catch (e) { tdmGefecht.push([`spieleTdmGefecht ${s}`, "FEHLER " + String(e)]); }
     }
-    return { aus, kontakt, standard, orte3, tdmGefecht };
+    // HOCKEY MIT DER ALTEN TORWART-REGEL (Rueckweg seit Torwart-Balance, 22.11., docs/design/hockey-torwart-22-11.md):
+    // eigene Eintraege AUSSERHALB von GESAMT; GESAMT rechnet Hockey mit der neuen Regel (Motor-Vorgabe). Die alte Regel
+    // (PARADE pur, keine Puste unter Dauerfeuer, Gegentore voll) muss die frueheren `spiele hockey`-Zeilen treffen.
+    const torwartAlt = [];
+    if (A.hockeyTorwart) for (const s of SAATEN) {
+      try { A.hockeyTorwart("alt"); torwartAlt.push([`spiele hockey/torwart-alt ${s}`, A.spiele("hockey", s)]); }
+      catch (e) { torwartAlt.push([`spiele hockey/torwart-alt ${s}`, "FEHLER " + String(e)]); }
+      finally { A.hockeyTorwart(null); }
+    }
+    return { aus, kontakt, standard, orte3, tdmGefecht, torwartAlt };
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
@@ -183,6 +196,8 @@ try {
   if (ergebnis.standard?.length) console.log(`CLIMBING-STANDARD ${h(ergebnis.standard)} (${ergebnis.standard.length} Eintraege, nicht in GESAMT)`);
   for (const [name, wert] of ergebnis.orte3 || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.orte3?.length) console.log(`BATTLEFIELD-ORTE3 ${h(ergebnis.orte3)} (${ergebnis.orte3.length} Eintraege, nicht in GESAMT)`);
+  for (const [name, wert] of ergebnis.torwartAlt || []) console.log(`${h(wert)}  ${name}`);
+  if (ergebnis.torwartAlt?.length) console.log(`HOCKEY-TORWART-ALT ${h(ergebnis.torwartAlt)} (${ergebnis.torwartAlt.length} Eintraege, nicht in GESAMT)`);
   for (const [name, wert] of ergebnis.tdmGefecht || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.tdmGefecht?.length) console.log(`TDM-GEFECHT ${h(ergebnis.tdmGefecht)} (${ergebnis.tdmGefecht.length} Eintraege, nicht in GESAMT)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.

@@ -13,6 +13,7 @@ import { getMiniDmPodsForMatchday, getPodsForMatchday } from "@/lib/season/mini-
 import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
+import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 
 /**
  * PP-SKALA IM EINGABE-HASH (18.11.): der Vorlauf rechnet die Spieler-PP mit (Boxscore -> PP). Wechselt
@@ -113,7 +114,9 @@ export function berechneArenaEingabeHash(input: {
     .update(JSON.stringify({ disciplineId: input.disciplineId, teile, mutatoren, motorHash: leseMotorDateiHash(), ...ppSkalaTeil(input.gameState, input.matchdayId),
       // CLIMBING-FORMAT (Canyon live, 18.11., lib/resolve/climbing-format.ts): nur fuer Climbing, damit ein
       // Formatwechsel nach dem Vorlauf die Vorberechnung verwirft; jede andere Disziplin behaelt ihren Hash.
-      ...(input.disciplineId === "climbing" ? { climbingFormat: climbingFormatFuer(input.gameState, input.matchdayId) } : {}) }))
+      ...(input.disciplineId === "climbing" ? { climbingFormat: climbingFormatFuer(input.gameState, input.matchdayId) } : {}),
+      // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): nur fuer Hockey, aus demselben Grund.
+      ...(input.disciplineId === "hockey" ? { hockeyTorwart: hockeyTorwartFuer(input.gameState, input.matchdayId) } : {}) }))
     .digest("hex");
 }
 

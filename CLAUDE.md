@@ -730,7 +730,10 @@ byte-gleich. Das alte Gefecht je Ort bleibt als Rueckweg geschuetzt: drei eigene
 Summe **`BATTLEFIELD-ORTE3 6413fbdc4641`** AUSSERHALB von GESAMT (erste Zeile = der alte Wert `4424ef90cb0c`). Das Format steht je Spieltag im
 Spielstand (`seasonState.battlefieldFormat`, `lib/resolve/battlefield-format.ts`, gebuchte Spieltage behalten ihr Format;
 Umstellung ab dem naechsten gewerteten Spieltag), Rueckweg-Schalter `OLY_BATTLEFIELD_FORMAT=alt` (deploy/hetzner/.env).
-**Stand 21.11. (Arena-Livefehler): GESAMT eaafed96150e bleibt unveraendert** — Staffel-Uebergabe (Stab-Timer in Zuschauer-
+**Stand 22.11. (Hockey-Torwart-Regel, `docs/design/hockey-torwart-22-11.md`): GESAMT 0310ec4a4e3d (75 Eintraege)**; gegenueber `5b9acba4fe42`
+(Battlefield Fuenf Punkte) bewegen sich NUR `spiele hockey 1|7|42`; die alte Regel steht als `HOCKEY-TORWART-ALT cdc62aeea8e4` (3 Zeilen
+`spiele hockey/torwart-alt`) AUSSERHALB von GESAMT, Rueckweg `OLY_HOCKEY_TORWART=alt` (Stempel `seasonState.hockeyTorwart`,
+`lib/resolve/hockey-torwart.ts`). Davor `5b9acba4fe42` (Battlefield, im Review). **Stand 21.11. (Arena-Livefehler): GESAMT eaafed96150e bleibt unveraendert** — Staffel-Uebergabe (Stab-Timer in Zuschauer-
 statt Simulationssekunden, Naechster wartet an der Linie, HUD wird beim Wechsel durchsichtig) und Spieler-ohne-Figur-Marke sind
 reine Anzeige. **TDM-Gefecht „Kampf bis zum Ende“ (Chris 21.11.: keine Respawns, EIN Kampf bis ein Team ausgeschaltet ist) bewegt
 GESAMT NICHT**, weil `spiele tdm`/`disziplinProbe tdm` das alte Echtzeit-Duell rechnen und die Buchung ueber `spieleTdmGefecht()`

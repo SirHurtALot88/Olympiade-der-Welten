@@ -13268,6 +13268,66 @@
   // gegengeprueft. Bericht: docs/design/hockey-torwart-konstanten-nachgezogen.md.
   const HK_TW_REF=0.871, HK_TW_BASIS=9.13, HK_TW_GSAA_K=2.0;
 
+  // TORWART-REGEL (22.11., docs/design/hockey-torwart-22-11.md): zwei Aenderungen an dem, was ein Torwart halten
+  // kann, beide nur ueber Attribute, die die Matrix schon gewichtet.
+  //   gueteEig   Nebenweg ueber die Eignung. PARADE (awareness/will/determination/health/dexterity) hat auf der
+  //              Kader-Familie praktisch keinen Bezug zur Hockey-Eignung (Korrelation -0,05): ein Torwart mit
+  //              Power 80 und Gesundheit 80 war laut Matrix ein Top-Mann und hielt trotzdem Durchschnitt. Seine
+  //              Parade-Guete ist jetzt ein Mix aus PARADE (Primaerweg) und der auf die PARADE-Skala gelegten
+  //              Eignung `eig` (gueteMitte/eigMitte/eigSteil rechnen die Eignungsskala auf die PARADE-Skala um).
+  //   dauer*     Puste unter Dauerfeuer: jeder Schuss, der den Torwart erreicht, kostet `dauerKosten` Puste
+  //              (der vorhandene Puste-Vorrat aus AUSDAUER, HUD-Leiste unter den Fuessen), die Erholung laeuft
+  //              ueber die bestehende Regeneration; die Guete sinkt um `dauerMax` bei leerer Puste.
+  // `an:false` ist das alte Verhalten Zeichen fuer Zeichen (PARADE pur, kein Puste-Abzug).
+  // Rueckweg im Spiel: OLY_HOCKEY_TORWART=alt (Stempel, s. lib/resolve/hockey-torwart.ts).
+  const HK_TW_REGEL_KONSTANTE={an:true, gueteEig:0.6, gueteMitte:65, eigMitte:56, eigSteil:0.6, dauerKosten:4, dauerMax:12, xgAnteil:0.5, skalaMul:0.92, steil:0.022, f0:0.73, fMin:0.40, fMax:1.15, ref:0.866, basis:9.23};
+  let HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE};
+  // Ist die neue Regel fuer DIESES Spiel an? Ausdruecklich gesetzt (Messhebel `hockeyTorwart()`) gilt das; sonst das gebuchte
+  // Format des Spieltags aus dem Kader-Umschlag (`formatByDisciplineId.hockey`, lib/resolve/hockey-torwart.ts) -- ein mit der
+  // alten Regel gebuchter Spieltag bleibt in der Wiedergabe "alt" (gezeigt = gebucht).
+  // Summe der tatsaechlichen Torwahrscheinlichkeiten je Torwart (WeakMap statt Feld am Spieler: ein neues Feld am Spielerobjekt
+  // landet im Protokoll und verschoebe den Wertungs-Fingerabdruck auch bei unveraendertem Spielverlauf).
+  const HK_XG_AKT=new WeakMap();
+  const HK_TW_MUEDE=new WeakSet();
+  let HK_TW_EXPLIZIT=false;
+  function hkTwAn(){
+    if(HK_TW_EXPLIZIT)return HK_TW_REGEL.an;
+    const f=echterKader&&echterKader.formatByDisciplineId&&echterKader.formatByDisciplineId.hockey;
+    return f==="alt"?false:HK_TW_REGEL.an;
+  }
+  function torwartGuete(tw){
+    const R=HK_TW_REGEL;
+    if(!hkTwAn())return tw.PARADE;
+    let g=tw.PARADE;
+    if(R.gueteEig>0){
+      const e=Math.max(20,Math.min(95,R.gueteMitte+((tw.eig||0)-R.eigMitte)*R.eigSteil));
+      g=(1-R.gueteEig)*g+R.gueteEig*e;
+    }
+    if(R.dauerMax>0&&tw.pusteMax>0)g-=R.dauerMax*(1-pusteAnteil(tw));
+    return g;
+  }
+  // Der Faktor auf die Torwahrscheinlichkeit eines Schusses, der den Torwart erreicht. Alt: PARADE 20 -> 1,00, PARADE 95 -> 0,55
+  // (Steigung 0,006 je Punkt). Neu: dieselbe Mitte (Guete 65 -> f0 0,73), aber steilere Steigung, sodass der Unterschied zwischen
+  // einem guten und einem schwachen Torwart gegen das Schussrauschen eines Spiels sichtbar wird.
+  function torwartFaktor(tw){
+    const R=HK_TW_REGEL;
+    if(!hkTwAn())return 1-Math.max(0,Math.min(0.45,(tw.PARADE-20)*0.0060));
+    return Math.max(R.fMin,Math.min(R.fMax,R.f0-(torwartGuete(tw)-R.gueteMitte)*R.steil));
+  }
+  // Nachziehung der Torzahl: HK_TOR_SKALA haelt die Torzahl, und die neue Torwart-Regel (Dauerfeuer, steilere Guete) verschiebt die
+  // mittlere Fangquote leicht; `skalaMul` zieht sie auf dieselbe Torzahl zurueck. Alt: 1.
+  function torSkalaMul(){ return hkTwAn()?HK_TW_REGEL.skalaMul:1; }
+  function torwartSchussBelastung(tw){
+    const R=HK_TW_REGEL;
+    if(!hkTwAn()||!(R.dauerKosten>0)||!(tw.pusteMax>0))return;
+    tw.puste=Math.max(0,tw.puste-R.dauerKosten);
+    if(tw.puste<tw.pusteMin)tw.pusteMin=tw.puste;
+    // Ticker-Hinweis (nur Anzeige, kein rr()): einmal, wenn die Puste unter 30 % faellt; erst nach der Erholung ueber 60 % wieder.
+    const anteil=pusteAnteil(tw);
+    if(anteil<0.3&&!HK_TW_MUEDE.has(tw)){ HK_TW_MUEDE.add(tw); feed(tw.side,tw.n+" steht unter Dauerfeuer — die Puste geht aus."); }
+    else if(anteil>0.6)HK_TW_MUEDE.delete(tw);
+  }
+
   // H5 (Hockey-Opus-Review Abschnitt 3.3/6, 02.10.): das Verhaeltnis in
   // `punkte*1.5+xg*1.5` wurde beim Einbau (K3) nie gegen Alternativen gesweept — nur
   // "ganz statt halb" wurde verglichen (0,649, schlechter). "Ein Sweep ueber das
@@ -13422,13 +13482,19 @@
         // hat (hockeySchussAusgang, ohne paradeFaktor) — exakt der Nenner, den die echte
         // Analytik fuer GSAx nimmt. Faellt auf GSAA zurueck, solange HK_TORWART_FORMEL
         // (Messhebel, Spielkonstante "gsaa") nicht auf "gsax" steht.
-        const gsaa=()=>{ const schuesse=u.saves+u.gegentore; return schuesse*(1-HK_TW_REF)-u.gegentore; };
+        // TORWART-REGEL (22.11.): Gegentore halb als erwartete Gegentore gebucht (`xgAnteil`) -- dasselbe Prinzip wie K3 bei den
+        // Feldspielern: im Erwartungswert gleich, aber ohne den Muenzwurf, den ein einzelnes Tor bei rund 5 Gegentoren je Spiel
+        // darstellt. Ein Gegentor bleibt der teuerste Posten; nur sein Zufallsanteil wird gedaempft.
+        const gsaa=()=>{ const schuesse=u.saves+u.gegentore;
+          const gegen=hkTwAn()&&HK_TW_REGEL.xgAnteil>0
+            ?(1-HK_TW_REGEL.xgAnteil)*u.gegentore+HK_TW_REGEL.xgAnteil*(HK_XG_AKT.get(u)||0):u.gegentore;
+          return schuesse*(1-(hkTwAn()?HK_TW_REGEL.ref:HK_TW_REF))-gegen; };
         const impact=HK_TORWART_FORMEL==="gsax"
           ?((u.xgGegen||0)-u.gegentore)*HK_TW_GSAX_K
           :gsaa()*HK_TW_GSAA_K;
         // A1/A2 getrennt gewichtet wie beim Feldspieler unten (s. dort) — ein Torwart
         // bekommt in der Praxis fast nie eine Vorlage, die Formel bleibt trotzdem konsistent.
-        return HK_TW_BASIS+impact+u.punkte*3+u.assists1*2+u.assists2*1.5;
+        return (hkTwAn()?HK_TW_REGEL.basis:HK_TW_BASIS)+impact+u.punkte*3+u.assists1*2+u.assists2*1.5;
       }
       // DIE WERTFORMEL, NACHGEZOGEN — drei Befunde des Overseers, alle gemessen:
       //
@@ -16859,9 +16925,10 @@
     // PARADE 20 -> Faktor 1,00 (kein Halt), PARADE 95 -> 0,55. Bewusst gemaessigt: der
     // Torwart soll ein spuerbarer Unterschied sein, aber nicht die einzige Zahl, die
     // ueber ein Spiel entscheidet.
-    const paradeFaktor=tw?1-Math.max(0,Math.min(0.45,(tw.PARADE-20)*0.0060)):1;
+    const paradeFaktor=tw?torwartFaktor(tw):1;
+    if(tw)torwartSchussBelastung(tw);
     const pTor=Math.max(0.01,Math.min(0.60,
-      technik*(tw?HK_TOR_SKALA:HK_TOR_SKALA_LEER)*paradeFaktor));
+      technik*(tw?HK_TOR_SKALA*torSkalaMul():HK_TOR_SKALA_LEER)*paradeFaktor));
     // H2 (Hockey-Opus-Review Abschnitt 2.3/6, 02.10.): GSAx statt GSAA fuer die
     // Torwart-Wertung (feldspielWert, s. dort). GSAx braucht erwartete Gegentore OHNE
     // die Guete DIESES Torwarts — nimmt man `pTor` wie es ist, steckt `paradeFaktor`
@@ -16873,8 +16940,11 @@
     // ueberhaupt erreicht (also nicht geblockt und nicht "vorbei" davor, s. Kommentar
     // oben zu `schuesse=saves+gegentore` an HK_TW_REF) — exakt derselbe Nenner wie GSAA.
     if(tw){
-      const pTorNeutral=Math.max(0.01,Math.min(0.60,technik*HK_TOR_SKALA));
+      const pTorNeutral=Math.max(0.01,Math.min(0.60,technik*HK_TOR_SKALA*torSkalaMul()));
       tw.xgGegen=(tw.xgGegen||0)+pTorNeutral;
+      // Torwart-Regel (22.11.): die TATSAECHLICHE Torwahrscheinlichkeit (mit der Guete DIESES Torwarts) summiert --
+      // das Pendant zum xg der Feldspieler (K3). Kein neuer rr()-Aufruf. Gelesen nur von feldspielWert (xgAnteil).
+      HK_XG_AKT.set(tw,(HK_XG_AKT.get(tw)||0)+pTor);
     }
     if(rr()<pTor)return {ausgang:"tor",torwart:tw,pTor};
     if(!tw)return {ausgang:"vorbei",torwart:null,pTor};
@@ -16973,7 +17043,7 @@
       // per Dekret. Nur der SLOT-Zweig ist der bisherige, frontale Abpraller; die Mehrheit
       // geht jetzt seitlich Richtung Bande/hinter das Tor (s. HK_ABPRALLER_SLOT_*).
       const slotChance=Math.max(HK_ABPRALLER_SLOT_MIN,
-        HK_ABPRALLER_SLOT_BASIS-(tw.PARADE-50)*HK_ABPRALLER_SLOT_K);
+        HK_ABPRALLER_SLOT_BASIS-(torwartGuete(tw)-50)*HK_ABPRALLER_SLOT_K);
       if(rr()<slotChance){
         const streu=18+rr()*34, winkel=(rr()-0.5)*2.0;
         fsLive.ball.frei=haltePuckImFeld({x:torX+rein*Math.cos(winkel)*streu,
@@ -73208,6 +73278,16 @@
     },
     // GSAx-Spreizungskonstante, dasselbe Muster — nur fuer die Kalibrierung dieser einen
     // Zahl gebraucht (die Streuung von `xgGegen-gegentore` gegen die Feldspieler-Streuung).
+    // TORWART-REGEL (22.11.) -- MESSHEBEL, dasselbe Muster: `hockeyTorwart(obj|"alt"|null)` stellt die Torwart-Regel
+    // fuer Messung/Rueckweg um und liefert die vorherige zurueck; "alt" = an:false, null = Spielkonstante.
+    hockeyTorwart:(r)=>{
+      const vorher={...HK_TW_REGEL};
+      HK_TW_EXPLIZIT=r!=null;
+      if(r==="alt")HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE,an:false};
+      else if(r&&typeof r==="object")HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE,...r};
+      else HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE};
+      return vorher;
+    },
     hockeyTwGsaxK:(k)=>{
       const vorher=HK_TW_GSAX_K;
       HK_TW_GSAX_K=Number.isFinite(k)?k:HK_TW_GSAX_K_KONSTANTE;
@@ -73365,7 +73445,12 @@
             // `torwart` darueber: liest ein an jeder Einheit ohnehin vorhandenes Feld
             // (s. `bauSpieler`, slotId:sl) nur aus, veraendert keine Mechanik und keinen
             // rr()-Aufruf. Fuer jede andere Disziplin einfach der dort gesetzte Slot.
-            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:eigVon(u),torwart:!!u.torwart,slotId:u.slotId||null}))
+            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:eigVon(u),torwart:!!u.torwart,slotId:u.slotId||null,
+              // HOCKEY-TORWART-DIAGNOSE (22.11., nur mit `o.hockeyDiag`): Parade-Wert, Ausdauer und die
+              // Schusszaehler des Torwarts je Spiel -- reine Messhilfe, ohne die Option fehlt das Feld.
+              ...(o.hockeyDiag&&u.torwart?{diag:{parade:u.PARADE,ausd:u.AUSDAUER,saves:u.saves,gegentore:u.gegentore,
+                xgGegen:+((u.xgGegen||0).toFixed(3)),xgAkt:+((HK_XG_AKT.get(u)||0).toFixed(3)),pusteMin:+((u.pusteMin||0).toFixed(1)),
+                pusteMax:u.pusteMax||0,punkte:u.punkte}}:{})}))
             // Bei der Arena kommt die REIHE mit. Sie entscheidet, wen die Zielwahl
             // ueberhaupt findet ("naechster" sieht die hintere Reihe kaum), und ist damit
             // die Groesse, an der sich pruefen laesst, ob die Aufstellung die Starken
@@ -73400,6 +73485,7 @@
               // Zeile haette das Feld oben die Einheit NIE erreicht, weil GENAU hier aus
               // `feld` die tatsaechlich zurueckgegebenen `teilnehmer` entstehen.
               ...(u.slotId!=null?{slotId:u.slotId}:{}),
+              ...(u.diag?{diag:u.diag}:{}),
               ...(u.kulisseOW!=null?{eigKulisse:Math.round(u.eigKulisse*100)/100,kulisse:u.kulisse,
                 kulisseOW:Math.round(u.kulisseOW*100)/100}:{}),
               // ZUGANGS-DIAGNOSE durchreichen (s. `feld` oben) — `zugang` ist immer eine

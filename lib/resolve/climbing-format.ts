@@ -32,6 +32,7 @@
  * Battle-Spielstaende (der Manager-Modus kennt die Arena nicht).
  */
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
+import { hockeyTorwartFuer, type HockeyTorwart } from "@/lib/resolve/hockey-torwart";
 
 export type ClimbingFormat = "standard" | "canyon";
 
@@ -148,12 +149,20 @@ export function climbingFormatFuer(gameState: FormatQuelle, matchdayId?: string 
   return format;
 }
 
-/** Der Teil des Kader-Umschlags fuer den Motor (`formatByDisciplineId`), nur fuer Climbing gesetzt. */
+/**
+ * Der Teil des Kader-Umschlags fuer den Motor (`formatByDisciplineId`): fuer Climbing das Format, fuer Hockey die
+ * Torwart-Regel (22.11., lib/resolve/hockey-torwart.ts); "alle" (Host, der die Disziplin je Spieltag wechselt)
+ * traegt beide. Jede andere Disziplin: kein Umschlag.
+ */
+export type ArenaFormatByDisciplineId = { climbing?: ClimbingFormat; hockey?: HockeyTorwart };
+
 export function arenaFormatByDisciplineId(
-  gameState: FormatQuelle,
+  gameState: FormatQuelle & Parameters<typeof hockeyTorwartFuer>[0],
   matchdayId: string | null | undefined,
   disziplin: string | null | undefined,
-): { climbing: ClimbingFormat } | undefined {
-  if (disziplin !== "climbing") return undefined;
-  return { climbing: climbingFormatFuer(gameState, matchdayId) };
+): ArenaFormatByDisciplineId | undefined {
+  if (disziplin === "climbing") return { climbing: climbingFormatFuer(gameState, matchdayId) };
+  if (disziplin === "hockey") return { hockey: hockeyTorwartFuer(gameState, matchdayId) };
+  if (disziplin === "alle") return { climbing: climbingFormatFuer(gameState, matchdayId), hockey: hockeyTorwartFuer(gameState, matchdayId) };
+  return undefined;
 }
