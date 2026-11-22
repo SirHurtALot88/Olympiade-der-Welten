@@ -73,6 +73,7 @@ import {
   evaluatePromisedRoleAttendanceOutcome,
   type PlayerMoraleAssessment,
 } from "@/lib/morale/player-morale-service";
+import { kasseVorSpieltagsbuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -1064,7 +1065,12 @@ function buildPreviewRow(input: {
   team: Team | null;
   rating: PlayerRatingContractRow | null;
 }): ContractRenewalPreviewRow {
-  const { save, entry, player, team, rating } = input;
+  const { save, entry, player, rating } = input;
+  // FINANZEN JE SPIELTAG (22.11.): die Kassenwache urteilt nach der Kasse VOR den Spieltagsbuchungen (wie der Vorstand), damit
+  // die niedrigere Zwischenkasse das Verlaengerungsverhalten nicht verzerrt. Gebucht wird weiter von der echten Kasse.
+  const team: Team | null = input.team
+    ? { ...input.team, cash: kasseVorSpieltagsbuchungen(save.gameState, input.team.teamId, input.team.cash) }
+    : input.team;
   const teamSettings = getTeamControlSettings(save.gameState, entry.teamId);
   const grundModus = teamSettings?.controlMode ?? (team?.humanControlled ? "manual" : "ai");
   // VERLÄNGERN ODER FREIGEBEN (Chris 19.11., lib/contracts/vertragsentscheidung.ts): hat ein Mensch „Käufe, Verkäufe und Verträge“

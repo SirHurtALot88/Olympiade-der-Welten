@@ -18,6 +18,7 @@ import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebth
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
+import { istJeSpieltagSaison, ungebuchterAnteil } from "@/lib/finance/finanzen-je-spieltag";
 
 export type FacilitySeasonEndFinanceFacilityRow = {
   facilityId: FacilityId;
@@ -163,6 +164,35 @@ function buildRows(
   });
 }
 
+/**
+ * SAISONBETRAEGE der Gebaeude eines Teams (Einnahme, bezahlter Unterhalt) nach demselben Rechenweg wie die
+ * Saisonende-Vorschau — fuer die Buchung je Spieltag (`lib/finance/finanzen-je-spieltag-buchung.ts`, Anteil 1/N).
+ * Ein Gebaeude, dessen Unterhalt diese Saison schon abgebucht ist (`lastPaidSeasonId`), zaehlt nicht noch einmal.
+ */
+export function berechneGebaeudeSaisonbetraege(gameState: GameState, teamId: string): { income: number; upkeep: number } {
+  const teamFacilities = getTeamFacilityState(gameState, teamId);
+  const rows = buildRows(
+    teamFacilities,
+    null,
+    gameState.season.id,
+    computeTeamBeliebtheitFromGameState(gameState, teamId).value,
+    resolveFacilityIncomeFaktor(gameState, teamId),
+  );
+  return {
+    income: roundValue(rows.reduce((sum, row) => sum + row.income, 0)),
+    upkeep: roundValue(rows.filter((row) => row.status === "paid").reduce((sum, row) => sum + row.upkeep, 0)),
+  };
+}
+
+/**
+ * Anteil der Saisonbetraege, den der Saisonabschluss noch bucht. Alter Modus: 1 (alles). Modus "je Spieltag": der Teil
+ * der Spieltage, der nicht je Spieltag gebucht wurde (im Normalfall 0 — dann bucht der Abschluss kein Geld mehr, nur noch
+ * Verschleiss und Zahlmarke).
+ */
+export function gebaeudeRestAnteil(gameState: GameState, teamId: string): number {
+  return istJeSpieltagSaison(gameState) ? ungebuchterAnteil(gameState, teamId) : 1;
+}
+
 export function previewFacilitySeasonEndFinance(
   save: PersistedSaveGame,
   teamId: string,
@@ -282,6 +312,9 @@ export function applyFacilitySeasonEndFinance(
     };
   }
   const teamFacilities = getTeamFacilityState(save.gameState, teamId);
+  // Modus "je Spieltag": Einnahme und Unterhalt sind schon je Spieltag gebucht — hier nur der ungebuchte Rest (im
+  // Normalfall 0). Verschleiss, Zahlmarke und die Ereigniszeilen bleiben, damit die Saisonende-Kette unveraendert greift.
+  const restAnteil = gebaeudeRestAnteil(save.gameState, teamId);
   const eventIds: string[] = [];
   const events: FacilityEventRecord[] = [];
   const nextFacilities: TeamFacilityCollection = {
@@ -318,7 +351,7 @@ export function applyFacilitySeasonEndFinance(
       facilityId: row.facilityId,
       previousLevel: row.level,
       nextLevel: row.level,
-      cost: row.status === "paid" ? row.upkeep : 0,
+      cost: row.status === "paid" ? roundValue(row.upkeep * restAnteil) : 0,
       timestamp: new Date().toISOString(),
       source: row.status === "paid" ? "facility_upkeep_paid" : "facility_upkeep_unpaid",
       previousConditionPct,
@@ -335,7 +368,7 @@ export function applyFacilitySeasonEndFinance(
       facilityId: "fan_shop",
       previousLevel: getRawFacilityLevel(teamFacilities, "fan_shop"),
       nextLevel: getRawFacilityLevel(teamFacilities, "fan_shop"),
-      cost: -preview.facilityIncomeTotal,
+      cost: -roundValue(preview.facilityIncomeTotal * restAnteil),
       timestamp: new Date().toISOString(),
       source: "facility_income_collected",
     });
@@ -346,7 +379,10 @@ export function applyFacilitySeasonEndFinance(
       team.teamId === teamId
         ? {
             ...team,
-            cash: preview.cashAfterFacilities ?? team.cash,
+            cash:
+              restAnteil >= 1
+                ? (preview.cashAfterFacilities ?? team.cash)
+                : roundValue(team.cash + preview.netFacilityResult * restAnteil),
           }
         : team,
     ),

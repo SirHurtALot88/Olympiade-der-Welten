@@ -58,7 +58,8 @@ function summeKanaele(row: TransferFinanceTeamSeasonRow) {
     row.netLoanCash +
     row.netFacilityCash +
     row.netObjectiveRewardCash +
-    row.netPraemienCash
+    row.netPraemienCash +
+    row.netSpieltagCash
   );
 }
 

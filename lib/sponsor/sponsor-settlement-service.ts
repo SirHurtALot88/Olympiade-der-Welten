@@ -3,6 +3,7 @@ import { randomUUID } from "@/lib/utils/random-id";
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { istJeSpieltagSaison, summeSpieltagBuchungen, ungebuchtesGehalt } from "@/lib/finance/finanzen-je-spieltag";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-service";
 import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
 import { buildMigratedSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-migration";
@@ -106,6 +107,45 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
   return buildSponsorV3SeasonEndRows(gameState, contract, terms, currentRank);
 }
 
+/**
+ * Die garantierte Saisonbasis des Sponsorvertrags eines Teams (0 ohne Vertrag) — der Betrag, den der Modus "je Spieltag"
+ * zu 1/N je Spieltag auszahlt (`lib/finance/finanzen-je-spieltag-buchung.ts`). Dieselbe Zeile "Saisonbasis (garantiert)"
+ * wie in der Saisonende-Abrechnung (`sponsorV3SettlementParts`, Schluessel `base`), unabhaengig vom Endrang.
+ */
+export function sponsorBasisJahr(gameState: GameState, teamId: string): number {
+  const contract = getTeamSponsorContract(gameState, teamId);
+  if (!contract) return 0;
+  const terms = getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract);
+  const base = sponsorV3SettlementParts({ terms, finalRank: null, goalFraction: 0 }).find((part) => part.key === "base");
+  return base?.cashDelta ?? 0;
+}
+
+/** Anteil der Rangpraemie, der je Spieltag als Abschlag gezahlt wird (Chris, 22.11.: 80 %, damit der Schlussausgleich selten zurueckfordert). */
+export const RANG_ABSCHLAG_QUOTE = 0.8;
+
+/** Der Platz, nach dem ein Team seinen Rang-Abschlag bekommt: Tabellenplatz, sonst Startrang des Vertrags, sonst Ligamitte. */
+export function sponsorRangFuerAbschlag(gameState: GameState, teamId: string): number {
+  const contract = getTeamSponsorContract(gameState, teamId);
+  const terms = contract ? getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract) : null;
+  const ranks = terms?.rankLadder.length || gameState.teams.length || 32;
+  const row = buildTeamSeasonOverviewRows({ gameState }).find((entry) => entry.teamId === teamId) ?? null;
+  const roh = row?.rank ?? terms?.startRank ?? Math.ceil(ranks / 2);
+  return Math.max(1, Math.min(ranks, Math.round(roh)));
+}
+
+/**
+ * Die Rangpraemie (Leiter(Platz) - Sockel, dieselbe Zeile "Tabellenplatz" wie am Saisonende) eines Teams bei `rang`, und der
+ * Abschlag je Spieltag darauf: 0,8 x Praemie / N. Ohne Sponsorvertrag 0.
+ */
+export function sponsorRangAbschlag(gameState: GameState, teamId: string, rang: number, spieltage: number): { praemie: number; abschlag: number } {
+  const contract = getTeamSponsorContract(gameState, teamId);
+  if (!contract || !(spieltage > 0)) return { praemie: 0, abschlag: 0 };
+  const terms = getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract);
+  const teil = sponsorV3SettlementParts({ terms, finalRank: rang, goalFraction: 0 }).find((part) => part.key === "rank");
+  const praemie = teil?.cashDelta ?? 0;
+  return { praemie, abschlag: roundCash((RANG_ABSCHLAG_QUOTE * praemie) / spieltage) };
+}
+
 export function previewSponsorSettlement(
   gameState: GameState,
   phase: SponsorSettlementPhase = "season_end",
@@ -169,14 +209,54 @@ export function applySponsorSettlement(input: {
       continue;
     }
     const contract = getTeamSponsorContract(input.gameState, team.teamId);
-    const teamRows = contract ? preview.rows.filter((row) => row.teamId === team.teamId && row.cashDelta !== 0) : [];
-    let delta = roundCash(teamRows.reduce((sum, row) => sum + row.cashDelta, 0));
+    // FINANZEN JE SPIELTAG (22.11.): die Saisonbasis ist je Spieltag schon ausgezahlt — die Zeile "Saisonbasis" bucht
+    // hier nur noch den Rest (im Normalfall 0). Rang und Sonderziel bleiben am Saisonende.
+    const jeSpieltag = istJeSpieltagSaison(input.gameState);
+    const basisBereitsGebucht = jeSpieltag ? summeSpieltagBuchungen(input.gameState, team.teamId).sponsorBasis : 0;
+    // RANG-ABSCHLAG (22.11.): die Rangpraemie ist je Spieltag zu 80 % vorgezahlt. Die Zeile "Tabellenplatz" bucht als
+    // SCHLUSSAUSGLEICH nur noch Praemie(Endrang) minus Summe der Abschlaege (darf negativ sein, dann zieht sie ab).
+    const rangBereitsGebucht = jeSpieltag ? summeSpieltagBuchungen(input.gameState, team.teamId).rangAbschlag : 0;
+    // Die Rang-Zeile bleibt auch bei Praemie 0 (Platz 32) in der Liste, wenn Abschlaege gezahlt sind: dann ist der Ausgleich negativ.
+    const teamRows = contract
+      ? preview.rows.filter(
+          (row) => row.teamId === team.teamId && (row.cashDelta !== 0 || (row.kind === "rank" && rangBereitsGebucht !== 0)),
+        )
+      : [];
+    let basisRestAbgezogen = false;
+    let rangRestAbgezogen = false;
+    const zeilenRest = (row: SponsorSettlementRow) => {
+      if (row.kind === "rank" && rangBereitsGebucht !== 0 && !rangRestAbgezogen) {
+        rangRestAbgezogen = true;
+        return roundCash(row.cashDelta - rangBereitsGebucht);
+      }
+      if (row.kind !== "base" || basisBereitsGebucht === 0 || basisRestAbgezogen) return row.cashDelta;
+      basisRestAbgezogen = true;
+      return roundCash(row.cashDelta - basisBereitsGebucht);
+    };
+    const teamRowsRest = teamRows.map((row) => ({ row, betrag: zeilenRest(row) }));
+    let delta = roundCash(teamRowsRest.reduce((sum, entry) => sum + entry.betrag, 0));
     // Audit R2/V2: Gehalt wird IMMER abgezogen — unabhängig davon, ob ein Sponsorvertrag existiert. Vorher
     // war der (einzige) saisonale Gehaltsabzug an `contract` gekoppelt, sodass vertragslose Teams (Mensch
     // ohne Sponsor, passive Teams, abgelaufene AI-Verträge) NIE Gehalt zahlten → systematischer Ökonomie-
     // Skew + KI-Paritätsbruch (AI signt automatisch, Mensch konnte durch Nicht-Unterschreiben den größten
     // Kostenblock dauerhaft vermeiden). getTeamSalaryTotal ist rosterbasiert und braucht keinen Vertrag.
-    if (input.deductSalary) {
+    if (input.deductSalary && jeSpieltag) {
+      // Gehalt ist je Spieltag gebucht; hier nur der Nachtrag fuer nicht gebuchte Spieltage (Normalfall 0). Die Zeile
+      // wird IMMER geschrieben, auch mit 0: sie ist die Marke "Vertragsjahr abgerechnet" (`contract-buyout-season-window`).
+      const nachtrag = ungebuchtesGehalt(input.gameState, team.teamId);
+      delta = roundCash(delta - nachtrag);
+      payoutLogs.push({
+        id: `sponsor-payout:${input.gameState.season.id}:${team.teamId}:salary_deduct:${randomUUID()}`,
+        saveId: input.saveId,
+        seasonId: input.gameState.season.id,
+        teamId: team.teamId,
+        phase: "season_end",
+        componentId: "salary_deduct",
+        cashDelta: nachtrag === 0 ? 0 : -nachtrag,
+        action: "apply",
+        createdAt: new Date().toISOString(),
+      });
+    } else if (input.deductSalary) {
       const salaryTotal = getTeamSalaryTotal(input.gameState, team.teamId);
       if (salaryTotal > 0) {
         delta = roundCash(delta - salaryTotal);
@@ -199,7 +279,9 @@ export function applySponsorSettlement(input: {
     if (delta !== 0) {
       cashByTeamId.set(team.teamId, delta);
     }
-    for (const row of teamRows) {
+    for (const { row, betrag } of teamRowsRest) {
+      // Die Basiszeile mit Restbetrag 0 schreibt kein Log (nichts wird gebucht, die Basis steht je Spieltag im Ledger).
+      if (betrag === 0 && (row.cashDelta !== 0 || (row.kind === "rank" && rangBereitsGebucht !== 0))) continue;
       payoutLogs.push({
         id: `sponsor-payout:${input.gameState.season.id}:${team.teamId}:${row.componentId}:${randomUUID()}`,
         saveId: input.saveId,
@@ -207,7 +289,7 @@ export function applySponsorSettlement(input: {
         teamId: team.teamId,
         phase: "season_end",
         componentId: row.componentId,
-        cashDelta: row.cashDelta,
+        cashDelta: betrag,
         action: "apply",
         createdAt: new Date().toISOString(),
       });
@@ -215,7 +297,7 @@ export function applySponsorSettlement(input: {
     if (!contract) {
       continue;
     }
-    const paidBase = teamRows.some((row) => row.kind === "base" && row.status === "paid");
+    const paidBase = teamRows.some((row) => row.kind === "base" && row.status === "paid") || basisBereitsGebucht !== 0;
     contracts[team.teamId] = {
       ...contract,
       payouts: {
@@ -291,6 +373,18 @@ export function getSeasonSponsorCashByTeam(gameState: GameState): Map<string, nu
     if (log.seasonId !== seasonId) continue;
     if (NICHT_SPONSOR_KOMPONENTEN.has(log.componentId ?? "")) continue;
     add(log.teamId, log.cashDelta);
+  }
+
+  // 1b) FINANZEN JE SPIELTAG (22.11.): die je Spieltag ausgezahlte Saisonbasis steht im Ledger `spieltagFinanzen`, nicht in
+  //     den Logs. Sie gehoert zur Saison-Sponsoreinnahme, sobald die Abrechnung gebucht ist (dann traegt das Log nur noch
+  //     Rang, Sonderziel und den Basis-Rest). Vor der Abrechnung ist die Vorschau (2) schon die volle Saison inklusive
+  //     Basis — die Ledger-Basis dazuzuzaehlen wuerde sie doppelt zeigen.
+  if (istJeSpieltagSaison(gameState)) {
+    for (const team of gameState.teams) {
+      if (!hasSeasonEndPayoutLog(gameState, seasonId, team.teamId)) continue;
+      const ledger = summeSpieltagBuchungen(gameState, team.teamId);
+      add(team.teamId, ledger.sponsorBasis + ledger.rangAbschlag);
+    }
   }
 
   // 2) Projizierter Rest: alles, was noch nicht gebucht ist. `previewSponsorSettlement` lässt

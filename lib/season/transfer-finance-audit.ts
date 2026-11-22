@@ -31,6 +31,8 @@ export type TransferFinanceTeamSeasonRow = {
   netObjectiveRewardCash: number;
   /** Vorstands-Praemien (Siegpraemie, Treuepraemie) der Saison aus dem ungekuerzten Log `vorstandPraemienLogs` (negativ = gezahlt). */
   netPraemienCash: number;
+  /** Finanzen je Spieltag (22.11.): Gehalt, Sponsor-Basis und Gebaeude aus dem Ledger `spieltagFinanzen` (Summe der Saison). */
+  netSpieltagCash: number;
   buyCount: number;
   draftBuyCount: number;
   marketBuyCount: number;
@@ -335,6 +337,11 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
     const apronCashByTeam = getSeasonApronCashByTeam(gameState, seasonId);
     const objectiveRewardCashByTeam = getSeasonObjectiveRewardCashByTeam(gameState, seasonId);
     const praemienCashByTeam = getSeasonPraemienCashByTeam(gameState, seasonId);
+    const spieltagCashByTeam = new Map<string, number>();
+    for (const zeile of gameState.seasonState.spieltagFinanzen ?? []) {
+      if (zeile.seasonId !== seasonId) continue;
+      spieltagCashByTeam.set(zeile.teamId, round((spieltagCashByTeam.get(zeile.teamId) ?? 0) + zeile.cashDelta));
+    }
 
     for (const teamId of teamIds) {
       const buys = transfers.filter((entry) => entry.transferType === "buy" && entry.toTeamId === teamId);
@@ -351,8 +358,18 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       );
       const netTransferCash = round(sellProceeds - buyFeesPaid);
       const teamSponsorLogs = sponsorLogs.filter((log) => log.teamId === teamId);
-      const sponsorCashIn = round(teamSponsorLogs.filter((log) => log.cashDelta > 0).reduce((sum, log) => sum + log.cashDelta, 0));
-      const salaryPaidOut = round(Math.abs(teamSponsorLogs.filter((log) => log.cashDelta < 0).reduce((sum, log) => sum + log.cashDelta, 0)));
+      // Finanzen je Spieltag (22.11.): Sponsor-Basis und Gehalt dieser Saison stehen im Ledger `spieltagFinanzen`, nicht in den
+      // Logs — die Anzeigespalten zaehlen sie mit, die Abstimmung (`netSponsorCash`) bleibt bei den Logs und fuehrt den
+      // Ledger-Anteil in `netSpieltagCash`.
+      const spieltagZeilen = (gameState.seasonState.spieltagFinanzen ?? []).filter((z) => z.seasonId === seasonId && z.teamId === teamId);
+      const sponsorCashIn = round(
+        teamSponsorLogs.filter((log) => log.cashDelta > 0).reduce((sum, log) => sum + log.cashDelta, 0) +
+          spieltagZeilen.reduce((sum, z) => sum + z.sponsorBasis + (z.rangAbschlag ?? 0), 0),
+      );
+      const salaryPaidOut = round(
+        Math.abs(teamSponsorLogs.filter((log) => log.cashDelta < 0).reduce((sum, log) => sum + log.cashDelta, 0)) +
+          Math.abs(spieltagZeilen.reduce((sum, z) => sum + z.gehalt, 0)),
+      );
       const netSponsorCash = round(teamSponsorLogs.reduce((sum, log) => sum + log.cashDelta, 0));
       const netLoanCash = loanCashByTeam.get(teamId) ?? 0;
       const netFacilityCash = facilityCashByTeam.get(teamId) ?? 0;
@@ -360,6 +377,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
       const netApronCash = apronCashByTeam.get(teamId) ?? 0;
       const netObjectiveRewardCash = objectiveRewardCashByTeam.get(teamId) ?? 0;
       const netPraemienCash = praemienCashByTeam.get(teamId) ?? 0;
+      const netSpieltagCash = spieltagCashByTeam.get(teamId) ?? 0;
       const cashStart = cashStartByTeam.get(teamId) ?? null;
       const cashEnd =
         cashEndByTeam.get(teamId) ??
@@ -387,7 +405,8 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
                 netLoanCash -
                 netFacilityCash -
                 netObjectiveRewardCash -
-                netPraemienCash,
+                netPraemienCash -
+                netSpieltagCash,
             )
           : null;
 
@@ -409,6 +428,7 @@ export function buildTransferFinanceAudit(gameState: GameState): TransferFinance
         netFacilityCash,
         netObjectiveRewardCash,
         netPraemienCash,
+        netSpieltagCash,
         buyCount: marketBuys.length,
         draftBuyCount: draftBuys.length,
         marketBuyCount: marketBuys.length,
