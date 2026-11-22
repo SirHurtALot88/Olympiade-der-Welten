@@ -1089,3 +1089,138 @@ Generationen.
 1. **Zuruf:** Weg B (neu rechnen ab dem Zuruf) als Grundlage, und zuerst die Laufzeit einer Begegnung messen?
 2. **Zuruf-Fenster abschaltbar** je Manager, damit der Spieltag kurz bleiben kann?
 3. **Identität und Personal** (Abschnitt 13, Fragen 3 und 4) sind noch offen.
+
+---
+
+# Runde 7 (22.11.): Auto-Ausrüsten, Schmiede mit Glück, Verkaufen, Hierarchie, Identität
+
+Geändert: `ausruestung`, `team`, `kabine`, `verein`. Neu: eigenständige Datei `public/mockups/kiste-demo-22-11.html`
+(Kiste und Schmiede zum Ausprobieren, 19 KB, alles inline).
+
+## 31. Automatisch ausrüsten
+
+Ein Knopf in `ausruestung` (am Lager) und in `team` (Hauptknopf): **„Automatisch ausrüsten“** verteilt Lager und Inventare
+neu für die beiden Disziplinen des anstehenden Spieltags.
+
+- **Regel = die der KI:** jedes Teil an den aufgestellten Spieler, bei dem `Bonus × Matrixgewicht` in einer der beiden
+  Disziplinen am größten ist; Gleichstand nach Spieler-ID. Dieselbe Funktion wie für KI-Teams und delegierte Bereiche.
+- **Bleibt unberührt:** Vorgemerktes (für eine spätere Disziplin reserviert) und von Hand gesperrte Plätze. Einweg-Teile
+  werden nur vorgeschlagen, nicht automatisch verbraucht, außer der Manager erlaubt es in den Einstellungen.
+- **Rückmeldung:** eine Zeile „3 Teile neu verteilt, Teamwert Climbing +1,1“ und ein Rückgängig-Knopf bis zur Abgabe.
+- Die Einsatzliste ruft dieselbe Funktion beim „Auffüllen“ mit auf, damit niemand das Ausrüsten vergisst.
+
+## 32. Schmiede: zwei Wege, und Verkaufen
+
+Chris: Craften darf auch Glück sein. Abschnitt 27 bleibt für die festen Rezepte gültig und bekommt einen zweiten Weg.
+
+| Weg | Rezept | Ausgang | Kosten | Angelehnt an |
+|---|---|---|---|---|
+| **Fest** | zwei **bestimmte** Teile aus dem Rezeptbuch | ein **bestimmtes** Teil (z. B. Sturmhandschuhe + Zielbrille → Fängerhandschuhe) | 0,5 C | Horadrim-Würfel aus Diablo: feste, bekannte Rezepte |
+| **Glück** | drei **gleiche** Teile | eine Stufe höher mit sichtbarer Chance auf zwei: Standard → **80 % Selten, 20 % Episch**; Selten → **85 % Episch, 15 % Legendär**. Welches Teil der Stufe es wird, ist Zufall | 1 Teil | Händler-Rezepte aus Path of Exile: gleiche Dinge werden etwas Besseres |
+| **Fest** | ein Teil + Teile | „+1“ (höchstens „+2“), Reparatur, Umwidmen | 2 bis 8 Teile | wie Abschnitt 27 |
+| **Zerlegen** | ein Teil | Teile: 1 / 2 / 4 / 8 nach Stufe | nichts | Entzaubern in Hearthstone: alles wird eine Währung |
+
+- **Rezeptbuch:** feste Rezepte sind sichtbar, sobald man beide Zutaten einmal besessen hat; neue Rezepte bringen Händler
+  und Kisten. Start mit etwa zehn Rezepten.
+- **Glück mit Grenzen:** die Chance steht am Knopf, es gibt keinen Fehlschlag (mindestens eine Stufe höher ist sicher),
+  die Saat hängt an Spielstand, Team und Zähler (kein Neuladen-Trick). Legendäres kann damit auch aus der Schmiede
+  kommen, aber nur über neun gleiche Standard-Teile oder drei gleiche seltene.
+- **KI:** nutzt den Glücksweg, sobald drei gleiche ungetragene Teile liegen; feste Rezepte, wenn das Ergebnis für einen
+  Stammspieler mehr bringt als beide Zutaten zusammen.
+
+**Verkaufen beim Händler** (in der Händler-Tafel der Woche und in der Schmiede):
+
+| Stufe | Händlerpreis (Startwert) | Verkauf | Anteil |
+|---|---:|---:|---:|
+| Standard | 1,0 C | 0,25 C | 25 % |
+| Selten | 3,0 C | 0,9 C | 30 % |
+| Episch | 6,0 C | 2,1 C | 35 % |
+| Legendär | nicht kaufbar, Richtwert 12 C | 4,8 C | 40 % |
+
+- Mal **Zustand**: ein Teil mit 60 % Haltbarkeit bringt 60 % davon. Kaputte Teile lassen sich nur zerlegen. Einweg-Teile
+  bringen 25 %.
+- **Finanzregeln:** der Erlös unterliegt wie ein Spielerverkauf der **Vorstands-Quote** (bei 90 % sind von 2,1 C nur
+  1,9 C ausgebbar, der Rest bleibt als Puffer auf dem Konto) und fließt in den Investitionstopf.
+- Kaufen und sofort Verkaufen verliert immer 60 bis 75 %: kein Kreisgeschäft. Verkauft wird nur an den Händler, der
+  gerade da ist, oder auf dem Markt der Winterpause.
+- **KI:** verkauft das schwächste Teil, wenn das Lager voll ist und die Teile für nichts gebraucht werden; sonst zerlegt sie.
+
+Die Datei `kiste-demo-22-11.html` spielt beides durch: Kiste mit den angezeigten Chancen und Mitleidszähler, Wahl eins
+aus drei, Lager, fester Weg, Glücksweg, Verkaufen mit Quote, Zerlegen. Sie würfelt wirklich. In Chromium durchgeklickt.
+
+## 33. Kabine: Hierarchie
+
+Chris: eine Team-Hierarchie, **nicht wählbar**; sie ergibt sich aus Beliebtheit im Team und Führungskompetenz.
+
+**Fünf Ebenen** (Mockup `kabine`, Diagramm rechts): Anführer (ein bis zwei), Einflussreich (zwei bis drei), Fest im Team,
+Neuling, Außenseiter.
+
+**Woraus sie sich ergibt** (zwei Werte je Spieler, je 0–100, nach jedem Spieltag neu, träge):
+
+| Wert | Speist sich aus |
+|---|---|
+| **Beliebtheit** | Charisma und Spirit (Attribute), Vereinsjahre, Zahl der Freundschaften, gemeinsame Siege, positive Kabinen-Ereignisse; minus Rivalitäten und Wechselwünsche |
+| **Führung** | Will und Determination (Attribute), passende Traits, Leistung in PP über die Saison, Einsätze als Captain, gehaltene Form in Niederlagen |
+
+Rang = Summe beider Werte im Vergleich zum Kader; die Ebenen haben feste Größen (die besten zwei sind Anführer, wenn sie
+eine Schwelle erreichen, sonst bleibt der Platz leer). Ein Neuzugang ist bis zu fünf Einsätzen Neuling. Außenseiter ist,
+wer keine Beziehung hat **und** unter 40 Moral steht. Der Rang wechselt höchstens eine Ebene je drei Spieltage.
+
+**Was sie bewirkt.**
+- **Ansteckung:** je Spieltag zieht die Moral der Anführer alle um 10 % des Abstands mit, Einflussreiche ihr Grüppchen
+  um 5 %. Ein gut gelaunter Anführer hebt die Kabine, ein verärgerter zieht sie herunter.
+- **Verkäufe:** Anführer verkauft: alle −8, die Fans −5 Stimmung. Einflussreicher: sein Grüppchen −5. Fest im Team: nur
+  Freunde −10 wie bisher. Außenseiter: keine Folge.
+- **Neuzugänge:** starten als Neuling. Ein Star (unter den besten zwei des Kaders) fordert einen Einflussreichen heraus:
+  das löst das Ereignis „Platzhirsch“ aus.
+- **Kabinen-Ereignisse:** im Streit wiegt die Seite des Ranghöheren doppelt; ist ein Anführer unbeteiligt, gibt es die
+  zusätzliche Antwort „den Anführer schlichten lassen“ (ohne Kosten, wirkt halb so stark).
+- **Captain:** einen Anführer als Captain zu setzen gibt +1 Moral für alle Aufgestellten; ein Neuling als Captain kostet
+  die Anführer −2. Die Wahl bleibt frei, die Kabine hat nur eine Meinung dazu.
+
+**Weitere Kabinen-Ideen** (Football-Manager-Art, alle klein):
+- **Grüppchen:** Spieler gleicher Klasse oder Rasse bilden ab drei Mitgliedern ein Grüppchen; ihre Moral wandert
+  gemeinsam (20 % Ansteckung untereinander). Ein Kader aus einem Grüppchen ist stabil, aber kippt als Ganzes.
+- **Versprechen:** in einem Kabinen-Ereignis oder Gespräch kann man einem Spieler etwas zusagen (zwei Einsätze bis
+  Spieltag X, Captain im Derby, Vertragsgespräch). Gehalten +8, gebrochen −12 und Führung der Anführer −5. Höchstens
+  zwei offene Versprechen je Team.
+- **Mannschaftsrat:** vor einer großen Entscheidung (Verkauf eines Einflussreichen, Regel-Abstimmung) sagt die Kabine in
+  einem Satz, was sie davon hält. Nur Anzeige, aber sie macht die Folgen vorher sichtbar.
+- **Rückkehrer und Abschied:** ein Spieler mit vielen Vereinsjahren, der geht, wird zur Legende (Abschnitt 9,
+  Vereinsgeschichte); die Kabine verliert Zusammenhalt für drei Spieltage.
+
+**KI:** nichts zu entscheiden; die Hierarchie wirkt auf ihre Teams genauso. Beim Verkauf rechnet die KI die Moral-Folge
+als Abschlag auf den Preis mit (ein Anführer wird nur mit Aufpreis verkauft). **Last:** zwei Werte und eine Ebene je
+Spieler, vier Grüppchen und zwei Versprechen je Team. **Aufwand:** Hierarchie und Ansteckung M, Grüppchen und Versprechen
+S je Stück; alles On-top über die Moral, die Mechanik bleibt unberührt.
+
+## 34. Verein: Identität wächst, Personal später
+
+Antworten von Chris auf die offenen Fragen aus Abschnitt 13:
+
+**Identität** ist grundlegend und bleibt, kann sich aber langsam entwickeln: „Wenn ich mit Wizards immer mehr Fighter
+picke und das funktioniert, ändert sich ggf. die Priorisierung über die Jahre.“ Das ersetzt die drei wählbaren
+Leitsätze aus Abschnitt 9.
+
+- **Start:** aus der Team-Matrix (die vier Achsen POW / SPE / MEN / SOC und die vorhandenen Teamwerte), als Anteile, die
+  zusammen 100 % ergeben. Nicht wählbar.
+- **Gelebtes Profil je Saison:** aus Kaderzusammensetzung (Klassen, Rassen), Einsätzen und geholten Punkten je Achse.
+- **Drift:** zum Saisonwechsel verschiebt sich die Identität um **höchstens 10–20 %** (Startwert 15 %) des Abstands zum
+  gelebten Profil, **und nur, wenn es Erfolg hatte** (Saisonziel erreicht oder die Achse hat überdurchschnittlich
+  gepunktet). Ohne Erfolg bleibt die Identität stehen.
+- **Anzeige:** Verlauf über die Saisons je Achse („SOC 50 → 46 → 41 %, POW 5 → 8 → 12 %“) im Verein und in der Historie.
+- **Wirkung:** Fans mögen Spieler und Siege, die zur Identität passen (Stimmung); Sponsoren derselben Achse bauen
+  schneller Treue auf; Vorstandsziele werden zur Identität passend gezogen; die **KI kauft nach ihrer Identität** und
+  ändert damit über Jahre ihr Kaderprofil. Auch KI-Teams driften so: das ist ein fünftes, langsames Uhrwerk der Welt.
+- **Last:** vier Zahlen je Team und Saison. **Aufwand:** M.
+
+**Personal** (Trainerin, Scout, Physio): **vorerst nicht.** Aus dem Verein-Baustein und der Reihenfolge herausgenommen;
+im Mockup `verein` steht an der Stelle jetzt die Kabine. Reihenfolge im Verein damit: Fans und Gebäude-Zweck, Identität
+und Vorstand mit Gesichtern, Sponsor-Treue, Vereinsgeschichte; Jugend in Welle 5; Personal später.
+
+## 35. Entschieden in Runde 7
+
+- **Zuruf:** Grundlage ist „neu rechnen ab dem Zuruf“; zuerst wird die Laufzeit einer Begegnung gemessen (Bau-Agent).
+- **Zuruf-Fenster je Manager abschaltbar;** abgeschaltet ruft der Spielplan.
+- **Identität** driftet aus Handeln und Erfolg, **Personal** später.
+- Keine PixelLab-Bestellung in dieser Runde.
