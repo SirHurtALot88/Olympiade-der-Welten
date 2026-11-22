@@ -189,6 +189,7 @@ import iSpyPpsReferenzJson from "@/data/generated/i-spy-pps-referenz.json";
 // vom 10.11. -- derselbe rohe Boxscore-Wert, den die Liga ab jetzt tatsaechlich bucht
 // (g.kaempfer[].wert aus tdmGefecht()), nicht mehr ein Mass der alten PPS-Duell-Bruecke.
 import tdmPpsReferenzJson from "@/data/generated/tdm-pps-referenz.json";
+import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
 
 /**
@@ -512,6 +513,8 @@ type ArenaPpsReferenzJson = {
    * `undefined`.
    */
   feldgroessenTorwart?: ArenaPpsReferenzFeldgroessenRecord;
+  /** Torwart-Zeilen der ALTEN Hockey-Torwart-Regel (vor 22.11.), fuer Spieltage mit Regel "alt". */
+  feldgroessenTorwartAlt?: ArenaPpsReferenzFeldgroessenRecord;
 };
 
 function ladeReferenzFeldgroessenRecord(
@@ -528,6 +531,12 @@ function ladeReferenzFeldgroessenTorwart(
   json: ArenaPpsReferenzJson,
 ): ReadonlyMap<number, ArenaPpsReferenzFeldgroesse> | undefined {
   return json.feldgroessenTorwart ? ladeReferenzFeldgroessenRecord(json.feldgroessenTorwart) : undefined;
+}
+
+function ladeReferenzFeldgroessenTorwartAlt(
+  json: ArenaPpsReferenzJson,
+): ReadonlyMap<number, ArenaPpsReferenzFeldgroesse> | undefined {
+  return json.feldgroessenTorwartAlt ? ladeReferenzFeldgroessenRecord(json.feldgroessenTorwartAlt) : undefined;
 }
 
 const BASKETBALL_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
@@ -553,6 +562,10 @@ const HOCKEY_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(hockeyPpsRefer
  * Torwart-Anteil bleibt aber unabhaengig von der Feldspieleranzahl ungefaehr gleich.
  */
 const HOCKEY_PPS_REFERENZ_FELDGROESSEN_TORWART = ladeReferenzFeldgroessenTorwart(
+  hockeyPpsReferenzJson as ArenaPpsReferenzJson,
+);
+/** Torwart-Referenz der alten Regel (22.11.): wird fuer Hockey-Spieltage mit `hockeyTorwartFuer() === "alt"` gelesen. */
+const HOCKEY_PPS_REFERENZ_FELDGROESSEN_TORWART_ALT = ladeReferenzFeldgroessenTorwartAlt(
   hockeyPpsReferenzJson as ArenaPpsReferenzJson,
 );
 const SPEED_SCHACH_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
@@ -627,6 +640,8 @@ type ArenaImpactKonfig = {
    * Disziplinen ohnehin nie angefragt wird (kein Boxscore-Eintrag traegt dort je `torwart:true`).
    */
   referenzFeldgroessenTorwart?: ReadonlyMap<number, ArenaPpsReferenzFeldgroesse>;
+  /** Torwart-Referenz der alten Torwart-Regel (nur Hockey, 22.11.); fehlt sie, gilt `referenzFeldgroessenTorwart`. */
+  referenzFeldgroessenTorwartAlt?: ReadonlyMap<number, ArenaPpsReferenzFeldgroesse>;
   max: number;
   anteilMitte: number;
   katalogStandardgroesse: number;
@@ -656,6 +671,7 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
     {
       referenzFeldgroessen: HOCKEY_PPS_REFERENZ_FELDGROESSEN,
       referenzFeldgroessenTorwart: HOCKEY_PPS_REFERENZ_FELDGROESSEN_TORWART,
+      referenzFeldgroessenTorwartAlt: HOCKEY_PPS_REFERENZ_FELDGROESSEN_TORWART_ALT,
       max: HOCKEY_INDIVIDUAL_PPS_MAX,
       anteilMitte: HOCKEY_PPS_ANTEIL_MITTE,
       // ANDERS ALS BASKETBALL/GEWICHTHEBEN: Hockeys `Discipline.playerCount` (dataAdapter.ts)
@@ -942,13 +958,18 @@ export function resolveArenaPpsReferenz(
   disciplineId: string,
   playerCount: number | null,
   rolle: "feld" | "torwart" = "feld",
+  /** Hockey-Torwart-Regel des Spieltags (`hockeyTorwartFuer`): "alt" liest die alten Torwart-Zeilen. */
+  torwartRegel: "alt" | "neu" = "neu",
 ): { referenz: ArenaPpsReferenzFeldgroesse; feldgroesseGenutzt: number } {
   const konfig = loeseArenaImpactKonfigAuf(disciplineId);
   // TORWART-EIGENE REFERENZ (Hockey-Produktivierung, s. `ArenaImpactKonfig.
   // referenzFeldgroessenTorwart`-Kommentar): faellt fuer eine Disziplin ohne eigene
   // Torwart-Referenz (Basketball, Gewichtheben) defensiv auf die Feldspieler-Referenz zurueck.
-  const referenzFeldgroessen =
-    (rolle === "torwart" ? konfig.referenzFeldgroessenTorwart : undefined) ?? konfig.referenzFeldgroessen;
+  const torwartKarte =
+    torwartRegel === "alt"
+      ? (konfig.referenzFeldgroessenTorwartAlt ?? konfig.referenzFeldgroessenTorwart)
+      : konfig.referenzFeldgroessenTorwart;
+  const referenzFeldgroessen = (rolle === "torwart" ? torwartKarte : undefined) ?? konfig.referenzFeldgroessen;
   const istGueltig = (referenz: ArenaPpsReferenzFeldgroesse) => referenz.iMittel > 0 && referenz.iKrass > referenz.iMittel;
   const verfuegbareGroessen = [...referenzFeldgroessen.entries()]
     .filter(([, referenz]) => istGueltig(referenz))
@@ -1272,6 +1293,8 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   disciplineId: string = "basketball",
   /** PP-Skala dieser Saison (`ppSkalaModus(gameState)`, lib/resolve/pp-skala.ts); "aus" = Kurve bis 5,5. */
   ppSkala: PpSkalaModus = "aus",
+  /** Hockey-Torwart-Regel dieses Spieltags; "alt" -> alte Torwart-Referenz (gezeigt = gebucht). */
+  torwartRegel: "alt" | "neu" = "neu",
 ): Map<string, number> {
   const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld");
   // TORWART-EIGENE REFERENZ (Hockey-Produktivierung): nur aufgeloest, wenn irgendein Eintrag sie
@@ -1288,7 +1311,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
         // PP-SKALA C2 (docs/design/pp-skala-18-11.md): dieselbe Kurve ohne alten Deckel, Zwei-Anker je
         // Disziplin und Feldgroesse, neuer Deckel 5. Bei "aus" (alte Saison) wird dieser Zweig nie betreten.
         const referenz = eintrag.torwart
-          ? (torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart").referenz)
+          ? (torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart", torwartRegel).referenz)
           : feldReferenz;
         ppsByPlayerId.set(
           eintrag.playerId,
@@ -1301,12 +1324,14 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
             zuschlag: eintrag.torwart ? 0 : ppsAusStationsduellen(disciplineId, eintrag.duelle),
             modus: ppSkala,
             playerCount,
+            // Hockey-Spieltag mit der alten Torwart-Regel: die alten Anker (`hockeyAlt`), gezeigt = gebucht.
+            variante: disciplineId === "hockey" && torwartRegel === "alt" ? "torwartAlt" : undefined,
           }),
         );
         continue;
       }
       if (eintrag.torwart) {
-        torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart").referenz;
+        torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart", torwartRegel).referenz;
         ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, torwartReferenz, konfig.max, konfig.anteilMitte));
       } else {
         // + STATIONSDUELL-BONUS (nur Spurt, sonst 0): reine Spieler-Nebenspur, s. `ppsAusStationsduellen()`.
@@ -1646,6 +1671,7 @@ export async function runBattleModeArenaMatchday(
     fieldSizeGewuerfelt,
     disciplineId,
     ppSkalaModus(gameState, matchdayId),
+    disciplineId === "hockey" ? hockeyTorwartFuer(gameState, matchdayId) : "neu",
   );
 
   // Ein Team ohne Fixture an diesem Spieltag (z. B. unvollstaendige `leagueTeamIds`) bekommt

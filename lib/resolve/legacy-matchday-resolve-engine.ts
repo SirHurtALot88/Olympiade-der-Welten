@@ -52,6 +52,8 @@ import { ARENA_RESOLVED_DISCIPLINE_IDS } from "@/lib/battle/arena-resolved-disci
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { ergebnisSkalaVersionFuer } from "@/lib/resolve/wertungs-skalen";
 import { wendeErgebnisSkalaE1An } from "@/lib/resolve/ergebnis-skala-anwenden";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
+import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type {
   ArenaAusfall,
@@ -1379,6 +1381,14 @@ export function buildLegacyMatchdayResolvePreview(
         spielerZeilen: rawPlayerEntries,
         disciplineId,
         playerCount: legacyScorePlayerCountForThisDiscipline,
+        // Battlefield-Pod: Anker des Formats DIESES Spieltags (alte Spieltage "orte3" behalten ihre Anker).
+        // Hockey-Duell: Anker der Torwart-Regel DIESES Spieltags (alte Regel = alte Anker).
+        podVariante:
+          disciplineId === "battlefield" && battlefieldFormatFuer(base.gameState, base.matchdayId) === "orte3"
+            ? "orte3"
+            : disciplineId === "hockey" && hockeyTorwartFuer(base.gameState, base.matchdayId) === "alt"
+              ? "torwartAlt"
+              : "standard",
       });
     }
 

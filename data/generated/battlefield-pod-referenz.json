@@ -1,6 +1,73 @@
 {
- "hinweis": "Referenz fuer die Buchung des Battlefield-Pods ueber das Gefecht je Ort (02.11., scripts/ziehe-battlefield-pod-referenz.mjs). m90 = 90. Perzentil der positiven Kontrollpunkt-Punkte-Luecken zwischen aufeinanderfolgenden Pod-Plaetzen (resolveBattlefieldPodMargeReferenz), spieler.p50/p995 = Perzentile der rohen Kampfrichterwertung je Kaempfer (resolveBattlefieldPodSpielerPpReferenz/ppAusBattlefieldPodWertung), beides in lib/resolve/mini-dm-pod-resolve.ts. Neu ziehen, wenn BF_FFA_GRUND in battle-mode.engine.js geaendert wird.",
+ "hinweis": "Referenz fuer die Buchung des Battlefield-Pods (scripts/ziehe-battlefield-pod-referenz.mjs): `feldgroessen` = Fuenf-Punkte-Domination (Standard seit 22.11., Format domination5), `feldgroessenOrte3` = Gefecht je Ort (02.11., Rueckweg). m90 = 90. Perzentil der positiven Kontrollpunkt-Punkte-Luecken zwischen aufeinanderfolgenden Pod-Plaetzen (resolveBattlefieldPodMargeReferenz), spieler.p50/p995 = Perzentile der rohen Kampfrichterwertung je Kaempfer (resolveBattlefieldPodSpielerPpReferenz/ppAusBattlefieldPodWertung), beides in lib/resolve/mini-dm-pod-resolve.ts. Neu ziehen, wenn BF_FFA_GRUND in battle-mode.engine.js geaendert wird.",
  "feldgroessen": {
+  "2": {
+   "k": 2,
+   "pods": 2520,
+   "luecken": 7365,
+   "m90": 78,
+   "median": 34,
+   "max": 156,
+   "spieler": {
+    "p50": 181.21,
+    "p995": 804.22,
+    "stichprobe": 20160
+   }
+  },
+  "3": {
+   "k": 3,
+   "pods": 2520,
+   "luecken": 7440,
+   "m90": 86,
+   "median": 38,
+   "max": 142,
+   "spieler": {
+    "p50": 144.13,
+    "p995": 809.06,
+    "stichprobe": 30240
+   }
+  },
+  "4": {
+   "k": 4,
+   "pods": 2520,
+   "luecken": 7030,
+   "m90": 108,
+   "median": 48,
+   "max": 164,
+   "spieler": {
+    "p50": 113.74,
+    "p995": 850.42,
+    "stichprobe": 40320
+   }
+  },
+  "5": {
+   "k": 5,
+   "pods": 2520,
+   "luecken": 6989,
+   "m90": 108,
+   "median": 48,
+   "max": 166,
+   "spieler": {
+    "p50": 99.48,
+    "p995": 917.91,
+    "stichprobe": 50400
+   }
+  },
+  "6": {
+   "k": 6,
+   "pods": 2520,
+   "luecken": 7025,
+   "m90": 110,
+   "median": 46,
+   "max": 168,
+   "spieler": {
+    "p50": 91.33,
+    "p995": 946.04,
+    "stichprobe": 60480
+   }
+  }
+ },
+ "feldgroessenOrte3": {
   "2": {
    "k": 2,
    "pods": 2520,

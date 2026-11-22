@@ -68,6 +68,9 @@ const ECHTZEIT = hat("echtzeit");
 // --format=domination5 (17.11.): misst das Fuenf-Punkte-Format (window.__arena.battlefieldFormat);
 // ohne Schalter das Standardformat "orte3", unveraendert.
 const FORMAT = wert("format");
+// --d5=<json> (22.11.): ueberschreibt Felder des Fuenf-Punkte-Formats (window.__arena.battlefieldD5), z. B.
+// --d5='{"respawnHpSchritt":0}' fuer den Vorher-Stand ohne sinkende HP.
+const D5 = wert("d5");
 
 // --- Kader: zehn Teams aus der Familie ------------------------------------------------
 const familie = JSON.parse(readFileSync(path.join(WURZEL, "data/generated/kaderfamilie-live-save.json"), "utf8"));
@@ -167,6 +170,7 @@ try {
   // (mdffaFormkartenFuer() in battle-mode.engine.js). Ohne die Variable unveraendert.
   if (process.env.OLY_FORM_MODUS) await seite.evaluate((m) => window.__arena.formModusMessung(m), process.env.OLY_FORM_MODUS);
   if (FORMAT) await seite.evaluate((f) => window.__arena.battlefieldFormat(f), FORMAT);
+  if (D5) await seite.evaluate((j) => window.__arena.battlefieldD5(JSON.parse(j)), D5);
   if (!NUR_PP) for (const js of JE_SEITE) {
     for (const versatz of STROEME) {
       const t0 = Date.now();

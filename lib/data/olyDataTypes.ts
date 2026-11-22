@@ -4191,6 +4191,16 @@ export type SeasonState = {
    */
   climbingFormat?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "standard" | "canyon" }> } | null;
   /**
+   * BATTLEFIELD-FORMAT DIESER SAISON (Fuenf-Punkte-Domination live, 22.11., lib/resolve/battlefield-format.ts):
+   * Wechselliste "orte3"/"domination5" je Spieltag, gesetzt beim Laden. Gebuchte Spieltage behalten ihr Format.
+   */
+  battlefieldFormat?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "orte3" | "domination5" }> } | null;
+  /**
+   * HOCKEY-TORWART-REGEL DIESER SAISON (22.11., lib/resolve/hockey-torwart.ts): Wechselliste "alt"/"neu" je Spieltag,
+   * gesetzt beim Laden. Gebuchte Spieltage behalten ihre Regel.
+   */
+  hockeyTorwart?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "alt" | "neu" }> } | null;
+  /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.
    *

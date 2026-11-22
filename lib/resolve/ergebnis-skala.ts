@@ -71,11 +71,20 @@ export const ERGEBNIS_D_RUECKFALL = ERGEBNIS_D_MITTE;
 export const ERGEBNIS_LAGEN: readonly number[] = [0.025, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.975];
 
 export type ErgebnisSkalaFormat = "duell" | "pod";
+/**
+ * Anker-Schluessel in der Kalibrierung. `podOrte3` = Battlefield-Pod im ALTEN Format "Gefecht je Ort" (22.11.): die
+ * Spannen dort (Median Platz 1-4 bei k=4: 104) passen nicht zur Fuenf-Punkte-Domination (158); `pod` gilt fuer das
+ * Standardformat. Gezeigt = gebucht: ein im alten Format gebuchter Spieltag rechnet mit den alten Knoten weiter.
+ */
+type AnkerSchluessel = ErgebnisSkalaFormat | "podOrte3" | "duellTorwartAlt";
+/** Das Battlefield-Format eines Spieltags, soweit es die Pod-Anker betrifft. Andere Disziplinen kennen nur eine Variante. */
+export type PodAnkerVariante = "standard" | "orte3" | "torwartAlt";
+/* `torwartAlt` (Hockey, 22.11.): Duell-Anker eines Spieltags, der mit der alten Torwart-Regel gebucht wurde (`duellTorwartAlt`). */
 export type MargeQuelle = "marge" | "relativ" | "leistung";
 
 type AnkerRoh = { knoten?: number[]; margeQuelle?: MargeQuelle; lP5?: number; lP50?: number; lP95?: number; n?: number };
 type KalibrierungJson = {
-  disziplinen?: Record<string, Partial<Record<ErgebnisSkalaFormat, AnkerRoh & { feldgroessen?: Record<string, AnkerRoh> }>>>;
+  disziplinen?: Record<string, Partial<Record<AnkerSchluessel, AnkerRoh & { feldgroessen?: Record<string, AnkerRoh> }>>>;
 };
 
 export type ErgebnisSkalaAnker = {
@@ -109,8 +118,12 @@ export function ergebnisSkalaAnker(
   disciplineId: string,
   format: ErgebnisSkalaFormat,
   playerCount: number | null | undefined,
+  podVariante: PodAnkerVariante = "standard",
 ): ErgebnisSkalaAnker | null {
-  const eintrag = KALIBRIERUNG.disziplinen?.[disciplineId]?.[format];
+  const eintraege = KALIBRIERUNG.disziplinen?.[disciplineId];
+  const alt =
+    format === "pod" && podVariante === "orte3" ? eintraege?.podOrte3 : format === "duell" && podVariante === "torwartAlt" ? eintraege?.duellTorwartAlt : undefined;
+  const eintrag = alt ?? eintraege?.[format];
   if (!eintrag) return null;
   if (typeof playerCount === "number" && Number.isFinite(playerCount)) {
     const exakt = baueAnker(eintrag.feldgroessen?.[String(Math.round(playerCount))], eintrag);
@@ -243,8 +256,10 @@ export function berechneDuellErgebnisE1(input: {
   seiten?: readonly [number, number] | null;
   leistungEigen: number | null | undefined;
   leistungGegner: number | null | undefined;
+  /** Hockey mit der alten Torwart-Regel: `"torwartAlt"` (alte Duell-Anker). Sonst weglassen. */
+  variante?: PodAnkerVariante;
 }): DuellErgebnisE1 {
-  const anker = ergebnisSkalaAnker(input.disciplineId, "duell", input.playerCount);
+  const anker = ergebnisSkalaAnker(input.disciplineId, "duell", input.playerCount, input.variante ?? "standard");
   const marge = margeFuerAnker(anker, input);
   const d = abstandAusMarge({ remis: input.outcome === "draw", marge, anker });
   const mu = (niveauAusLeistung(input.leistungEigen, anker) + niveauAusLeistung(input.leistungGegner, anker)) / 2;
@@ -346,10 +361,12 @@ export function berechnePodErgebnisE1(input: {
   disciplineId: string;
   playerCount: number | null | undefined;
   sortiert: ReadonlyArray<{ luecke: number; leistung: number | null | undefined }>;
+  /** Battlefield im alten Format "orte3": die alten Anker (s. `AnkerSchluessel`). Sonst weglassen. */
+  podVariante?: PodAnkerVariante;
 }): PodErgebnisE1 {
   const n = input.sortiert.length;
   if (n === 0) return { werte: [], verhaeltnisse: [], bezug: null };
-  const anker = ergebnisSkalaAnker(input.disciplineId, "pod", input.playerCount);
+  const anker = ergebnisSkalaAnker(input.disciplineId, "pod", input.playerCount, input.podVariante ?? "standard");
   if (n === 1) return { werte: [5], verhaeltnisse: [0], bezug: bezugAus(anker) };
   const rohLuecken = input.sortiert.slice(1).map((t) => Math.max(0, t.luecke));
   const rohSpanne = rohLuecken.reduce((a, b) => a + b, 0);

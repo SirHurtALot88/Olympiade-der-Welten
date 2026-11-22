@@ -66,10 +66,10 @@ function vierTeams() {
 }
 
 describe("Battlefield-Format-Umschalter (Lib)", () => {
-  it("Standard ist orte3, die Runner-Option bleibt dann leer (Eingabe/Ergebnis wie vor dem 17.11.)", () => {
-    expect(BATTLEFIELD_POD_FORMAT).toBe("orte3");
-    expect(battlefieldPodFormatOption()).toEqual({});
-    expect(battlefieldPodFormatOption("domination5")).toEqual({ format: "domination5" });
+  it("Standard ist seit 22.11. domination5, die Runner-Option nennt das Format immer ausdruecklich", () => {
+    expect(BATTLEFIELD_POD_FORMAT).toBe("domination5");
+    expect(battlefieldPodFormatOption()).toEqual({ format: "domination5" });
+    expect(battlefieldPodFormatOption("orte3")).toEqual({ format: "orte3" });
   });
 });
 
@@ -95,7 +95,7 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield Domination mit fuenf Punkten
     await browser?.close();
   });
 
-  it("Standardformat unveraendert: format \"orte3\" == ohne Angabe, kein podFormat im Ergebnis", async () => {
+  it("Rueckweg orte3 unveraendert: kein podFormat im Ergebnis; ohne Angabe gilt die Motor-Vorgabe domination5", async () => {
     const teams = vierTeams();
     const r = await seite.evaluate((teams) => {
       const A = (window as unknown as { __arena: Arena }).__arena;
@@ -105,9 +105,9 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield Domination mit fuenf Punkten
         global: A.battlefieldFormat(),
       };
     }, teams);
-    expect(JSON.stringify(r.mit)).toBe(JSON.stringify(r.ohne));
-    expect(r.ohne.podFormat).toBeUndefined();
-    expect(r.global).toBe("orte3");
+    expect(r.mit.podFormat).toBeUndefined();
+    expect(r.ohne.podFormat).toBe("domination5");
+    expect(r.global).toBe("domination5");
   }, LAUF_TIMEOUT_MS);
 
   it("fuenf Punkte, 1 Punkt je Sekunde, Respawn, Aufteilen, Besitzwechsel -- deterministisch", async () => {
@@ -118,7 +118,7 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield Domination mit fuenf Punkten
       return { a: A.spieleBattlefieldPod(teams, 4242, null, o), b: A.spieleBattlefieldPod(teams, 4242, null, o), danach: A.battlefieldFormat() };
     }, teams);
     expect(JSON.stringify(r.a)).toBe(JSON.stringify(r.b));
-    expect(r.danach).toBe("orte3");                    // die Option gilt nur fuer den Lauf
+    expect(r.danach).toBe("domination5");              // die Option gilt nur fuer den Lauf
     expect(r.a.podFormat).toBe("domination5");
     const g = r.a.gefecht!;
     expect(g.orte).toHaveLength(5);
@@ -146,23 +146,29 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield Domination mit fuenf Punkten
 
   // Review D1 (17.11.): mit Respawn ist "einziges stehendes Team" eine Momentaufnahme, kein Sieg-Weg.
   // Im Fuenf-Punkte-Format entscheiden die Punkte -- mehr Punkte heisst nie schlechterer Platz.
-  // Review N5: Echtzeit-Pod (alter Drei-Orte-Kampf) und "domination5" schliessen sich aus.
-  it("Platzierung nach Punkten (kein 'letztes Team steht'-Vorrang), Echtzeit + domination5 abgelehnt", async () => {
+  // Review N5 (seit 22.11.): der Echtzeit-Pod (alter Drei-Orte-Kampf) laeuft ohne ausdrueckliches Format als orte3 und meldet
+  // das (`podFormat`); "echtzeit" + "domination5" ausdruecklich wird abgelehnt (Opus-Review 22.11., Punkt 6).
+  it("Platzierung nach Punkten (kein 'letztes Team steht'-Vorrang), Echtzeit: orte3 gemeldet, domination5 abgelehnt", async () => {
     const teams = vierTeams();
     const r = await seite.evaluate((teams) => {
       const A = (window as unknown as { __arena: Arena }).__arena;
       const laeufe = [1, 7, 42, 1337, 4711, 9001].map((s) =>
         A.spieleBattlefieldPod(teams, s, null, { formSaat: s, jeSeite: 3, format: "domination5" }).teams);
-      let fehlerText = "";
-      try { A.spieleBattlefieldPod(teams, 1, null, { formSaat: 1, jeSeite: 3, format: "domination5", echtzeit: true }); }
-      catch (e) { fehlerText = String(e); }
-      return { laeufe, fehlerText, danach: A.battlefieldFormat() };
+      const echtzeit = A.spieleBattlefieldPod(teams, 1, null, { formSaat: 1, jeSeite: 3, echtzeit: true });
+      let abgelehnt = "";
+      try {
+        A.spieleBattlefieldPod(teams, 1, null, { formSaat: 1, jeSeite: 3, format: "domination5", echtzeit: true });
+      } catch (e) {
+        abgelehnt = String((e as Error).message);
+      }
+      return { laeufe, echtzeit: { format: echtzeit.format, podFormat: echtzeit.podFormat ?? null }, abgelehnt, danach: A.battlefieldFormat() };
     }, teams);
     for (const t of r.laeufe) {
       for (const a of t) for (const b of t) if (a.punkte > b.punkte) expect(a.eventPlatz).toBeLessThan(b.eventPlatz);
     }
-    expect(r.fehlerText).toContain("echtzeit");
-    expect(r.danach).toBe("orte3");
+    expect(r.echtzeit).toEqual({ format: "echtzeit", podFormat: "orte3" });
+    expect(r.abgelehnt).toContain("nur im Format orte3");
+    expect(r.danach).toBe("domination5");
   }, LAUF_TIMEOUT_MS);
 
   it("gezeigt = gebucht: das Replay im Fuenf-Punkte-Format endet exakt im gebuchten Endstand", async () => {
@@ -183,5 +189,38 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield Domination mit fuenf Punkten
     expect(r.ende.lebend).toEqual(r.gebucht.teams.map((t) => t.lebend));
     expect(r.ende.punkte.map((p) => Math.round(p * 10) / 10)).toEqual(r.gebucht.teams.map((t) => t.punkte));
     expect(fehler).toEqual([]);
+  }, LAUF_TIMEOUT_MS);
+
+  // SINKENDE HP BEIM RESPAWN (22.11.): der n-te Respawn bringt max(0,5, 1 - 0,25 n) der vollen HP zurueck.
+  it("Respawn mit sinkenden HP: 75 %, dann 50 % und nie darunter; Konstanten ueber battlefieldD5 aenderbar", async () => {
+    const teams = vierTeams();
+    const r = await seite.evaluate((teams) => {
+      const A = (window as unknown as { __arena: Arena & { battlefieldD5: (n?: unknown) => Record<string, number> } }).__arena;
+      const respawns: { wer: number; hp: number; n: number }[] = [];
+      let hoechstesN = 0;
+      for (const s of [1, 7, 42, 1337, 4711, 9001]) {
+        const e = A.spieleBattlefieldPod(teams, s, null, { formSaat: s, jeSeite: 4, format: "domination5", protokoll: true });
+        for (const tk of e.gefecht!.takte) for (const ev of tk.ereignisse as { typ: string; wer: number; hp: number; n: number }[]) {
+          if (ev.typ === "respawn") { respawns.push({ wer: ev.wer, hp: ev.hp, n: ev.n }); hoechstesN = Math.max(hoechstesN, ev.n); }
+        }
+      }
+      const grund = A.battlefieldD5();
+      const ohne = (() => {
+        A.battlefieldD5({ respawnHpSchritt: 0 });
+        const e = A.spieleBattlefieldPod(teams, 4242, null, { formSaat: 4242, jeSeite: 4, format: "domination5", protokoll: true });
+        A.battlefieldD5(null);
+        return e.gefecht!.takte.flatMap((tk) => tk.ereignisse as { typ: string; hp: number }[]).filter((ev) => ev.typ === "respawn").map((ev) => ev.hp);
+      })();
+      return { respawns, hoechstesN, schritt: grund.respawnHpSchritt, min: grund.respawnHpMin, ohne };
+    }, teams);
+    expect(r.schritt).toBe(0.25);
+    expect(r.min).toBe(0.5);
+    expect(r.respawns.length).toBeGreaterThan(20);
+    expect(r.hoechstesN).toBeGreaterThanOrEqual(2);
+    for (const e of r.respawns) expect(e.hp).toBe(Math.max(0.5, 1 - 0.25 * e.n));
+    expect(r.respawns.some((e) => e.hp === 0.75)).toBe(true);
+    expect(r.respawns.some((e) => e.hp === 0.5)).toBe(true);
+    expect(r.ohne.length).toBeGreaterThan(0);
+    for (const hp of r.ohne) expect(hp).toBe(1);
   }, LAUF_TIMEOUT_MS);
 });

@@ -14,8 +14,12 @@
 // Kaderfest ueber die zehn Teams der Kader-Familie (data/generated/kaderfamilie-live-save.json),
 // alle C(10,4) = 210 Vierergruppen, zwei Saatstroeme.
 //
+// SEIT 22.11. ZWEI REFERENZEN IN DER DATEI: `feldgroessen` = Fuenf-Punkte-Domination (Standard, Format
+// "domination5"), `feldgroessenOrte3` = das alte Gefecht je Ort (Rueckweg, Format "orte3"). Das Format steht je Pod
+// in den Rohdaten (`BattlefieldPodRohdaten.format`); fehlt es, ist es "orte3" (Snapshots von vor dem 22.11.).
+//
 //   node scripts/ziehe-battlefield-pod-referenz.mjs [kaempfe je Gruppe, Standard 6] [--k=2..6]
-//        [--ausgabe=<datei>]
+//        [--format=domination5|orte3] [--ausgabe=<datei>]
 // ===================================================================================
 import { chromium } from "playwright";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -28,6 +32,9 @@ const wert = (name) => { const a = args.find((x) => x.startsWith(`--${name}=`));
 const positionen = args.filter((a) => !a.startsWith("--"));
 const SPIELE = Number(positionen[0] || 6);
 const ZIEL = wert("ausgabe") ? path.resolve(wert("ausgabe")) : path.join(WURZEL, "data/generated/battlefield-pod-referenz.json");
+const FORMAT = wert("format") || "domination5";
+if (!["domination5", "orte3"].includes(FORMAT)) throw new Error("--format: domination5 oder orte3");
+const FELD = FORMAT === "orte3" ? "feldgroessenOrte3" : "feldgroessen";
 const KS = (() => {
   const roh = wert("k");
   if (!roh) return [2, 3, 4, 5, 6];
@@ -57,11 +64,13 @@ const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
 const fest = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const browser = await chromium.launch(existsSync(fest) ? { executablePath: fest } : {});
 const bestehend = existsSync(ZIEL) ? JSON.parse(readFileSync(ZIEL, "utf8")) : { feldgroessen: {} };
+bestehend[FELD] = bestehend[FELD] || {};
 try {
   const seite = await browser.newPage();
   await seite.addInitScript(() => { window.AudioContext = undefined; window.webkitAudioContext = undefined; });
   await seite.goto(pathToFileURL(path.join(WURZEL, "public/mockups/battle-mode.html")).href, { waitUntil: "networkidle" });
   await seite.waitForFunction(() => window.__arena && window.__arena.battlefieldPodSonde, null, { timeout: 60000 });
+  await seite.evaluate((f) => window.__arena.battlefieldFormat(f), FORMAT);
   for (const k of KS) {
     const luecken = [], roh = [];
     let pods = 0;
@@ -81,20 +90,20 @@ try {
         for (const t of ev.teilnehmer) if (typeof t.roh === "number") roh.push(t.roh);
       }
     }
-    bestehend.feldgroessen[String(k)] = {
+    bestehend[FELD][String(k)] = {
       k, pods, luecken: luecken.length,
       m90: r2(perzentil(luecken, 90)), median: r2(perzentil(luecken, 50)), max: r2(Math.max(...luecken)),
       spieler: { p50: r2(perzentil(roh, 50)), p995: r2(perzentil(roh, 99.5)), stichprobe: roh.length },
     };
-    console.log(`k=${k}: ${pods} Pods, m90 ${bestehend.feldgroessen[String(k)].m90}, Spieler p50 ${bestehend.feldgroessen[String(k)].spieler.p50} / p99,5 ${bestehend.feldgroessen[String(k)].spieler.p995}`);
+    console.log(`k=${k}: ${pods} Pods, m90 ${bestehend[FELD][String(k)].m90}, Spieler p50 ${bestehend[FELD][String(k)].spieler.p50} / p99,5 ${bestehend[FELD][String(k)].spieler.p995}`);
   }
 } finally {
   await browser.close();
 }
 bestehend.hinweis =
-  "Referenz fuer die Buchung des Battlefield-Pods ueber das Gefecht je Ort (02.11., scripts/ziehe-battlefield-pod-referenz.mjs). " +
+  "Referenz fuer die Buchung des Battlefield-Pods (scripts/ziehe-battlefield-pod-referenz.mjs): `feldgroessen` = Fuenf-Punkte-Domination (Standard seit 22.11., Format domination5), `feldgroessenOrte3` = Gefecht je Ort (02.11., Rueckweg). " +
   "m90 = 90. Perzentil der positiven Kontrollpunkt-Punkte-Luecken zwischen aufeinanderfolgenden Pod-Plaetzen (resolveBattlefieldPodMargeReferenz), " +
   "spieler.p50/p995 = Perzentile der rohen Kampfrichterwertung je Kaempfer (resolveBattlefieldPodSpielerPpReferenz/ppAusBattlefieldPodWertung), " +
   "beides in lib/resolve/mini-dm-pod-resolve.ts. Neu ziehen, wenn BF_FFA_GRUND in battle-mode.engine.js geaendert wird.";
-writeFileSync(ZIEL, JSON.stringify({ hinweis: bestehend.hinweis, feldgroessen: bestehend.feldgroessen }, null, 1) + "\n");
+writeFileSync(ZIEL, JSON.stringify({ hinweis: bestehend.hinweis, feldgroessen: bestehend.feldgroessen, ...(bestehend.feldgroessenOrte3 && Object.keys(bestehend.feldgroessenOrte3).length ? { feldgroessenOrte3: bestehend.feldgroessenOrte3 } : {}) }, null, 1) + "\n");
 console.log(`geschrieben: ${path.relative(WURZEL, ZIEL)}`);

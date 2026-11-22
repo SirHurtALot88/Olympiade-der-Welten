@@ -1,3 +1,6 @@
+import { stempleBattlefieldFormat } from "@/lib/resolve/battlefield-format";
+import { stempleClimbingFormat } from "@/lib/resolve/climbing-format";
+import { stempleHockeyTorwart } from "@/lib/resolve/hockey-torwart";
 import type {
   DisciplineHighlightRecord,
   DisciplineResultRecord,
@@ -903,7 +906,11 @@ export class LegacyMatchdayResultApplyService {
      * führt nur nach, solange `hasSeasonBeenPlayed` falsch ist. Eine Zeile später wäre das erste
      * Ergebnis schon da und der veraltete Stand für immer festgeschrieben.
      */
-    const gameStateMitLinien = ensureSeasonApronLinesFrozen(save.gameState);
+    // FORMAT-STEMPEL FESTSCHREIBEN (22.11.): das Format dieses Spieltags (Battlefield, Climbing, Hockey-Torwart) steht im Spielstand, BEVOR
+    // das Ergebnis gebucht wird. Ohne das haette ein Spielstand, der zwischen Saisonwechsel und Spieltag 3 nie neu geladen
+    // wurde, beim ersten Neuladen "schon gebucht, kein Stempel -> altes Format" angenommen (Rueckfall der Lade-Migration)
+    // und die im neuen Format gebuchten Spieltage rueckwirkend auf das alte Format gesetzt. Rein und idempotent.
+    const gameStateMitLinien = stempleHockeyTorwart(stempleClimbingFormat(stempleBattlefieldFormat(ensureSeasonApronLinesFrozen(save.gameState))));
     const seasonState = gameStateMitLinien.seasonState;
     const nextGameStateOhnePraemien = {
       ...gameStateMitLinien,
