@@ -365,6 +365,23 @@ const umrechnung = (() => {
   return ergebnis;
 })();
 
+// 22.11.: `--nur-battlefield[=orte3]` mischt NUR den Battlefield-Anker in die bestehende Datei (Laeufe im Format
+// domination5, oder mit =orte3 im alten Format): `disziplinen.battlefield` gilt fuer das Standardformat, das alte
+// steht unter `battlefieldOrte3` (beim ersten Mal vom bisherigen Eintrag uebernommen).
+const nurBattlefield = args.find((a) => a === "--nur-battlefield" || a.startsWith("--nur-battlefield="));
+if (nurBattlefield) {
+  const ziel = new URL("../data/generated/pp-skala-kalibrierung.json", import.meta.url);
+  const bestand = JSON.parse(readFileSync(ziel, "utf8"));
+  const alt = nurBattlefield.endsWith("=orte3");
+  if (!kalibrierung.battlefield) throw new Error("Keine Battlefield-Zellen in den Abzuegen.");
+  if (!alt && bestand.disziplinen.battlefield && !bestand.disziplinen.battlefieldOrte3) bestand.disziplinen.battlefieldOrte3 = bestand.disziplinen.battlefield;
+  bestand.disziplinen[alt ? "battlefieldOrte3" : "battlefield"] = kalibrierung.battlefield;
+  bestand.battlefieldQuellen = { ...(bestand.battlefieldQuellen ?? {}), [alt ? "orte3" : "domination5"]: { gemessenAm: new Date().toISOString().slice(0, 10), saves: quellen.map((x) => x.saveId) } };
+  writeFileSync(ziel, JSON.stringify(bestand, null, 2) + "\n");
+  console.log(`\nBattlefield-Anker (${alt ? "orte3" : "domination5"}) geschrieben: ${ziel.pathname}`);
+  process.exit(0);
+}
+
 if (schreibe) {
   const ziel = new URL("../data/generated/pp-skala-kalibrierung.json", import.meta.url);
   writeFileSync(

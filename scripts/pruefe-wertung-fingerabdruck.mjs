@@ -17,6 +17,10 @@
 //     OLY_CLIMBING_FORMAT=standard) geschuetzt: drei Zeilen `spiele climbing/standard 1|7|42` mit eigener Summe
 //     `CLIMBING-STANDARD ...` AUSSERHALB von GESAMT, mit window.__arena.bahnFlags({climbingFormat:"standard"})
 //     ausdruecklich gesetzt und danach auf die Vorgabe zurueck. `--node` rechnet alles ueber den Node-Motor.
+// GESAMT-STAND (22.11., Battlefield Fuenf Punkte live, docs/design/battlefield-5punkte-22-11.md):
+// `GESAMT 5b9acba4fe42 (75 Eintraege)`; gegenueber `eaafed96150e` aendert sich NUR die Zeile `spieleBattlefieldPod`
+// (4424ef90cb0c -> 2271b1fad9a4): der Pod laeuft in der Motor-Vorgabe "domination5". Das alte Gefecht je Ort steht als
+// `BATTLEFIELD-ORTE3 6413fbdc4641` (drei Zeilen `spieleBattlefieldPod/orte3 <saat>`, die erste ist der alte Wert) AUSSERHALB von GESAMT.
 // GESAMT-STAND (18.11., Canyon live): `GESAMT eaafed96150e (75 Eintraege)`; gegenueber `d3a39030a3ef` aendern sich
 // NUR die drei Zeilen `spiele climbing 1|7|42` (58b9222c223b/b2b7c6e4bfbc/d26ad5352068 -> 310b216c1cc8/727f3c3d16ef/
 // 8f7923e36b5e, die frueheren `spiele climbing/canyon`-Zeilen aus #1633). `CLIMBING-STANDARD` traegt die alten drei.
@@ -155,6 +159,14 @@ try {
       } catch (e) { standard.push([`spiele climbing/standard ${s}`, "FEHLER " + String(e)]); }
       finally { A.bahnFlags({ climbingFormat: null }); }
     }
+    // BATTLEFIELD-POD IM ALTEN FORMAT "ORTE3" (Rueckweg seit Fuenf Punkte live, 22.11., docs/design/battlefield-5punkte-22-11.md):
+    // eigene Eintraege AUSSERHALB von GESAMT; GESAMT rechnet den Pod in der Motor-Vorgabe "domination5". Die erste Zeile
+    // hat dieselbe Saat wie die fruehere `spieleBattlefieldPod`-Zeile und muss deren alten Wert 4424ef90cb0c treffen.
+    const orte3 = [];
+    for (const saat of ["save:s1:md7:bf", "save:s1:md8:bf", "save:s2:md3:bf"]) {
+      try { orte3.push([`spieleBattlefieldPod/orte3 ${saat}`, A.spieleBattlefieldPod(vierTeams, saat, null, { format: "orte3" })]); }
+      catch (e) { orte3.push([`spieleBattlefieldPod/orte3 ${saat}`, "FEHLER " + String(e)]); }
+    }
     // TDM-GEFECHT (21.11.): die Buchung rechnet TDM ueber spieleTdmGefecht() (tdmGefecht), NICHT ueber `spiele tdm`
     // (altes Echtzeit-Duell) -- ohne diese Zeilen war das produktive TDM vom Fingerabdruck ungeschuetzt. Eigene Summe
     // AUSSERHALB von GESAMT, damit GESAMT (75 Eintraege) vergleichbar bleibt.
@@ -163,12 +175,14 @@ try {
       try { tdmGefecht.push([`spieleTdmGefecht ${s}`, A.spieleTdmGefecht("tdm", s)]); }
       catch (e) { tdmGefecht.push([`spieleTdmGefecht ${s}`, "FEHLER " + String(e)]); }
     }
-    return { aus, kontakt, standard, tdmGefecht };
+    return { aus, kontakt, standard, orte3, tdmGefecht };
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
   for (const [name, wert] of ergebnis.standard || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.standard?.length) console.log(`CLIMBING-STANDARD ${h(ergebnis.standard)} (${ergebnis.standard.length} Eintraege, nicht in GESAMT)`);
+  for (const [name, wert] of ergebnis.orte3 || []) console.log(`${h(wert)}  ${name}`);
+  if (ergebnis.orte3?.length) console.log(`BATTLEFIELD-ORTE3 ${h(ergebnis.orte3)} (${ergebnis.orte3.length} Eintraege, nicht in GESAMT)`);
   for (const [name, wert] of ergebnis.tdmGefecht || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.tdmGefecht?.length) console.log(`TDM-GEFECHT ${h(ergebnis.tdmGefecht)} (${ergebnis.tdmGefecht.length} Eintraege, nicht in GESAMT)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.

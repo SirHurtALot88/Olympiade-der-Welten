@@ -11,11 +11,18 @@
 //   npx tsx scripts/werte-ergebnisskala-aus.ts --schreibe-kalibrierung <abzug.json> [...]
 //   npx tsx scripts/werte-ergebnisskala-aus.ts <abzug.json> [...]
 //
+// 22.11.: Battlefield-Pod-Anker je Format. `--nur-battlefield-pod [--format=orte3|domination5]` zieht NUR den Pod-Anker von
+// Battlefield aus den Laeufen und mischt ihn in die bestehende Datei (die uebrigen Disziplinen bleiben byte-gleich);
+// das alte `pod` wandert beim ersten Mal nach `podOrte3`. `--format` sagt, in welchem Format die Laeufe gespielt
+// wurden (Standard domination5) und waehlt beim Messen/Pruefen die passenden Anker und die passende Marge-Referenz.
+//
 // Die Spieler-Leistung L einer Seite ist das Mittel der C2-PP ihrer Spieler: aus den roh-PP mit
 // `skaliereUngedeckelt()` (lib/resolve/pp-skala.ts, committete Anker je Feldgroesse) gerechnet. Laeufe,
 // die NICHT im Modus roh gefahren sind, werden so genommen, wie sie gebucht wurden (Modus an: schon C2).
 // ===================================================================================
 import { readFileSync, writeFileSync } from "node:fs";
+
+import type { BattlefieldFormat } from "@/lib/resolve/battlefield-format";
 
 import { berechneDuellErgebnisE1, berechnePodErgebnisE1, ERGEBNIS_LAGEN, margeFuerAnker } from "@/lib/resolve/ergebnis-skala";
 import { skaliereUngedeckelt } from "@/lib/resolve/pp-skala";
@@ -51,7 +58,7 @@ function altPod(teams: TeamZeile[], feld: number | null): number[] {
       : d === "mini-dm" && quelle === "ffa"
       ? resolveMiniDmFfaMargeReferenz(feld)?.m90
       : d === "battlefield" && quelle === "ffa"
-      ? resolveBattlefieldPodMargeReferenz(feld)?.m90
+      ? resolveBattlefieldPodMargeReferenz(feld, BF_FORMAT)?.m90
       : null;
   let score = 0;
   const scores = teams.map((z, i) => (i === 0 ? 0 : (score -= Math.max(0, z.marge ?? 0))));
@@ -90,7 +97,9 @@ type TeamZeile = {
 };
 
 const args = process.argv.slice(2);
-const schreibe = args.includes("--schreibe-kalibrierung");
+const nurBattlefieldPod = args.includes("--nur-battlefield-pod");
+const schreibe = args.includes("--schreibe-kalibrierung") || nurBattlefieldPod;
+const BF_FORMAT: BattlefieldFormat = args.includes("--format=orte3") ? "orte3" : "domination5";
 const dateien = args.filter((a) => !a.startsWith("--"));
 if (dateien.length === 0) {
   console.error("Aufruf: npx tsx scripts/werte-ergebnisskala-aus.ts [--schreibe-kalibrierung] <abzug.json> [...]");
@@ -139,7 +148,7 @@ laeufe.forEach((lauf, nr) => {
   const feld = feldJeZelle(lauf);
   const leistung = (z: TeamZeile, n: number | null) => {
     if (z.pp.length === 0) return 0;
-    const pp = lauf.roh ? z.pp.map((x) => skaliereUngedeckelt(z.d, x, 0, { modus: "an", playerCount: n })) : z.pp;
+    const pp = lauf.roh ? z.pp.map((x) => skaliereUngedeckelt(z.d, x, 0, { modus: "an", playerCount: n, variante: z.d === "battlefield" && BF_FORMAT === "orte3" ? "orte3" : undefined })) : z.pp;
     return pp.reduce((a, b) => a + b, 0) / pp.length;
   };
   const gesehen = new Set<string>();
@@ -239,12 +248,28 @@ if (schreibe) {
     kalib[d] = eintrag;
   }
   const ziel = new URL("../data/generated/ergebnis-skala-kalibrierung.json", import.meta.url);
+  if (nurBattlefieldPod) {
+    const neuPod = kalib["battlefield"]?.pod;
+    if (!neuPod) throw new Error("Keine Battlefield-Vierergruppen in den Laeufen.");
+    const bestand = JSON.parse(readFileSync(ziel, "utf8"));
+    const bf = bestand.disziplinen.battlefield ?? (bestand.disziplinen.battlefield = {});
+    const schluessel = BF_FORMAT === "orte3" ? "podOrte3" : "pod";
+    if (BF_FORMAT !== "orte3" && bf.pod && !bf.podOrte3) bf.podOrte3 = bf.pod;
+    bf[schluessel] = neuPod;
+    bestand.battlefieldPodQuellen = {
+      ...(bestand.battlefieldPodQuellen ?? {}),
+      [schluessel]: { gemessenAm: new Date().toISOString().slice(0, 10), format: BF_FORMAT, quellen: laeufe.map((l) => ({ saveId: l.saveId, modus: l.roh ? "roh" : "gebucht" })) },
+    };
+    writeFileSync(ziel, JSON.stringify(bestand, null, 2) + "\n");
+    console.log(`Battlefield-Pod-Anker (${schluessel}) geschrieben: ${ziel.pathname}`);
+    process.exit(0);
+  }
   writeFileSync(
     ziel,
     JSON.stringify(
       {
         hinweis:
-          "Ergebnisskala E1 (docs/design/ergebnisskala-18-11.md, lib/resolve/ergebnis-skala.ts): je Disziplin und Format (duell | pod) knoten = Siegmarge (Duell) bzw. Spanne Platz 1 bis 4 (Pod) im nativen Motorwert an den Lagen 0,025/0,05/0,1/0,2/.../0,9/0,95/0,975 der gemessenen Verteilung (Median -> Abstand 3 bzw. Spanne 5, ab 0,975 -> 10); margeQuelle relativ = |a-b|/(a+b) fuer Seitensummen mit stark wechselnder Groessenordnung (Variationskoeffizient > 0,5); margeQuelle leistung = der Motor liefert im Duell weniger als 3 verschiedene Siegmargen, dann Leistungsabstand der Seiten (mittlere C2-PP Sieger minus Verlierer); lP5/lP50/lP95 = Perzentile der mittleren Spieler-PP (Skala C2) einer Seite -> Niveau 0,05/0,5/0,95. feldgroessen: dieselben Anker je Feldgroesse (ab 12 Siegen bzw. 6 Pods), sonst Disziplin-weit. Geschrieben von scripts/werte-ergebnisskala-aus.ts --schreibe-kalibrierung.",
+          "Ergebnisskala E1 (docs/design/ergebnisskala-18-11.md, lib/resolve/ergebnis-skala.ts): je Disziplin und Format (duell | pod) knoten = Siegmarge (Duell) bzw. Spanne Platz 1 bis 4 (Pod) im nativen Motorwert an den Lagen 0,025/0,05/0,1/0,2/.../0,9/0,95/0,975 der gemessenen Verteilung (Median -> Abstand 3 bzw. Spanne 5, ab 0,975 -> 10); margeQuelle relativ = |a-b|/(a+b) fuer Seitensummen mit stark wechselnder Groessenordnung (Variationskoeffizient > 0,5); margeQuelle leistung = der Motor liefert im Duell weniger als 3 verschiedene Siegmargen, dann Leistungsabstand der Seiten (mittlere C2-PP Sieger minus Verlierer); lP5/lP50/lP95 = Perzentile der mittleren Spieler-PP (Skala C2) einer Seite -> Niveau 0,05/0,5/0,95. feldgroessen: dieselben Anker je Feldgroesse (ab 12 Siegen bzw. 6 Pods), sonst Disziplin-weit. Geschrieben von scripts/werte-ergebnisskala-aus.ts --schreibe-kalibrierung. Battlefield-Pod je Format (22.11.): pod = Fuenf-Punkte-Domination (Standard), podOrte3 = altes Gefecht je Ort fuer schon so gebuchte Spieltage; gezogen mit --nur-battlefield-pod [--format=orte3].",
         gemessenAm: new Date().toISOString().slice(0, 10),
         quellen: laeufe.map((l) => ({ saveId: l.saveId, modus: l.roh ? "roh" : "gebucht" })),
         disziplinen: kalib,
@@ -308,6 +333,7 @@ for (const p of pods) {
   const e = berechnePodErgebnisE1({
     disciplineId: p.d,
     playerCount: p.feld,
+    podVariante: p.d === "battlefield" && BF_FORMAT === "orte3" ? "orte3" : "standard",
     sortiert: p.teams.map((z, i) => ({ luecke: i === 0 ? 0 : z.marge ?? 0, leistung: p.leistung[i] })),
   });
   for (let i = 1; i < e.werte.length; i += 1) {

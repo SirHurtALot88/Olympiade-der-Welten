@@ -30,6 +30,7 @@ import {
   type RunMiniDmFfaPodFixturesOptions,
 } from "@/lib/battle/arena-headless-runner";
 import { battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import type { GameState } from "@/lib/data/olyDataTypes";
 
 /**
@@ -446,6 +447,7 @@ export async function runBattlefieldPodFixturesNode(
 ): Promise<Array<BattlefieldPodFixtureResult | null>> {
   if (pods.length === 0) return [];
   const { vorbereitet, einsatzfaehig } = bereiteBattlefieldPodsVor(gameState, pods, options);
+  const format = battlefieldFormatFuer(gameState, options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null);
   const laufbarePods = vorbereitet.filter((_, index) => einsatzfaehig[index]);
   if (laufbarePods.length === 0) return vorbereitet.map(() => null);
   const bootstrapPod = laufbarePods[0]!;
@@ -458,7 +460,7 @@ export async function runBattlefieldPodFixturesNode(
         teams: pod.kaderJeTeam,
         seed: pod.seed,
         platzJeTeam: pod.platzJeTeam,
-        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption() },
+        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption(format) },
       })),
     },
     options.nodeTimeoutMs ?? resolveArenaNodeTimeoutMs(),

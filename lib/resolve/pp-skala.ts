@@ -89,9 +89,14 @@ export function ppSkalaAktiv(gameState?: Parameters<typeof ppSkalaVersionFuer>[0
  * Deckel 5). Bewusst KEIN Sprung auf eine benachbarte Feldgroesse: die Spitze haengt an der Zahl der
  * Einsaetze je Zelle, die Disziplin-weiten Anker mitteln ueber alle Feldgroessen.
  */
-export function ppSkalaAnker(disciplineId: string | null | undefined, playerCount?: number | null): PpSkalaAnker | null {
+export function ppSkalaAnker(
+  disciplineId: string | null | undefined,
+  playerCount?: number | null,
+  /** "orte3": Battlefield-Pod im alten Format (Anker unter `battlefieldOrte3`, 22.11.); sonst weglassen. */
+  variante?: "orte3",
+): PpSkalaAnker | null {
   if (!disciplineId) return null;
-  const eintrag = ANKER_JE_DISZIPLIN.get(disciplineId);
+  const eintrag = (variante === "orte3" ? ANKER_JE_DISZIPLIN.get(`${disciplineId}Orte3`) : undefined) ?? ANKER_JE_DISZIPLIN.get(disciplineId);
   if (!eintrag) return null;
   if (typeof playerCount === "number" && Number.isFinite(playerCount)) {
     const exakt = eintrag.jeFeld.find(([n]) => n === Math.round(playerCount));
@@ -114,12 +119,12 @@ export function skaliereUngedeckelt(
   disciplineId: string,
   ungedeckelt: number,
   zuschlag = 0,
-  optionen: { modus?: PpSkalaModus; playerCount?: number | null } = {},
+  optionen: { modus?: PpSkalaModus; playerCount?: number | null; variante?: "orte3" } = {},
 ): number {
   const modus = optionen.modus ?? "an";
   const basis = Math.max(0, ungedeckelt);
   if (modus === "roh") return runde2(basis + zuschlag);
-  const anker = ppSkalaAnker(disciplineId, optionen.playerCount);
+  const anker = ppSkalaAnker(disciplineId, optionen.playerCount, optionen.variante);
   const neu = anker ? (basis <= 0 ? 0 : PP_SKALA_MAX * Math.pow(basis / anker.rTop, anker.exponent)) : basis;
   return runde2(Math.min(PP_SKALA_MAX, neu + zuschlag));
 }
@@ -140,9 +145,11 @@ export function ppAusKurveSkaliert(input: {
   modus?: PpSkalaModus;
   /** Feldgroesse dieser Disziplin an diesem Spieltag (Anker je Feldgroesse). */
   playerCount?: number | null;
+  /** Battlefield-Pod im alten Format "orte3": die Anker dieses Formats (gezeigt = gebucht, gebuchte Spieltage bleiben). */
+  variante?: "orte3";
 }): number {
   const { referenz } = input;
-  const optionen = { modus: input.modus, playerCount: input.playerCount };
+  const optionen = { modus: input.modus, playerCount: input.playerCount, variante: input.variante };
   const zuschlag = input.zuschlag ?? 0;
   const max = input.max ?? PP_SKALA_ALT_MAX;
   const anteilMitte = input.anteilMitte ?? PP_SKALA_ALT_ANTEIL_MITTE;
