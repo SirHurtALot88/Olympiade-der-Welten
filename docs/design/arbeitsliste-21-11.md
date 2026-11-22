@@ -154,3 +154,4 @@ Transfergerüchte wirken auf Gehaltsforderungen und kommen ins Postfach.
 - [ ] PP-Tagesanker scharf ab nächster Saison (läuft)
 - [ ] Entwicklung Liga-Mittel −1…+1 (läuft)
 - [ ] Vorstand/KI-Kauf Runde 2 inkl. Quote-Vorausschau und Kernschutz bei gutem Angebot (läuft)
+- [ ] Budget-Gespräch mit dem Vorstand und zwei Töpfe ab Saison 1: Konzept und Mockup liegen vor (`docs/design/budget-gespraech-s1-22-11.md`), Bau nach Chris’ „bau das“.

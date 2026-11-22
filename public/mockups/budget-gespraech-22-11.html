@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Budget-Gespräch mit dem Vorstand – Mockup 22.11.</title>
+<!--
+  BUDGET-GESPRAECH MIT DEM VORSTAND, MOCKUP 22.11. Konzept: docs/design/budget-gespraech-s1-22-11.md.
+  Chris 22.11.: "das budget von gehalt und transfers schon in S1 einfuehren ... ein screen ... wo man als menschlicher spieler
+  erstmal die budgets mit dem vorstand verhandelt" und "ja S1 auch mit Vertrauen aus Identitaet, nicht 100 %".
+  Gleiche Tokens, Schriften, Schiene, Hero-Kopf und Karten wie finanzen-modern-18-11.html. Kein App-Code, kein PixelLab
+  (0 Generationen): der Vorstand ist ein SVG.
+  ECHT: Teamnamen, Wappen, Startbudget, Vertrauen/Finanzwert/Ambition der drei Beispielteams (Team-Identitaet,
+        data/generated/ki-kaufverhalten-stammdaten-18-11.json), Sponsor-Anker gerundet, die Regeln und Konstanten
+        (Stufen 100/90/80/70/50, Gehaltsquote mindestens 75 %, Umschicht-Grenze 25/20/17,5/15/10 %, Anzapfen bis 50 %,
+        "Alles auf eine Karte" 5 % Puffer, Gewicht = Vertrauen x 2 + Zusagen gegen den Preis der Bitte).
+  BEISPIEL: Gehalt 6,5 C je Spieler und Saison, Abloesen (8 Stammplaetze je 20,8 C, Ergaenzung je 10 C), Erwartungsrang,
+        die Mitspieler am Tisch, die neuen Preise "Ziel senken" und der Wert "Ruecklage voll halten".
+  URL: ?team=D-P|C-C|C-S &schritt=1|2|3 &amb=tief|ziel|hoch &rl=vorsichtig|normal|mutig &alles=1 &um=<C> &an=1 (Gegenangebot
+       angenommen) &sign=1 &still=1 (ohne Mockup-Leiste)
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem; --r-s:.375rem;
+}
+/* Die ganze Seite haengt an rem: 16 px bei 1920x1080, waechst mit Breite UND Hoehe (16:9 fuellt exakt, 16:10 bekommt Luft). */
+html{font-size:clamp(11px,min(.8333vw,1.4815vh),30px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+a{color:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .leise{color:var(--leise)} .gold{color:var(--gold)}
+
+/* Mockup-Steuerung (gehoert NICHT zum UI) */
+.demo{height:2.375rem;display:flex;align-items:center;gap:.5rem;padding:0 .875rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem;margin:0 .25rem 0 .5rem}
+.demo b:first-child{margin-left:0}
+.demo button{padding:.15rem .6rem;border:1px solid #2b3445;border-radius:999px;color:var(--tinte);font-weight:600}
+.demo button:hover{border-color:var(--gold)} .demo button[aria-pressed=true]{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.demo .welle{margin-left:auto;color:var(--gold);font-weight:600}
+body.still .demo{display:none}
+
+/* Geruest */
+.app{display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - 2.375rem);background:var(--grund)}
+body.still .app{height:100vh}
+.rail{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.625rem 0;background:#080b11;border-right:1px solid var(--linie)}
+.rail .logo{width:2.5rem;height:2.5rem;border-radius:.56rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.625rem}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail a{position:relative;width:2.75rem;height:2.75rem;border-radius:.56rem;display:grid;place-items:center;font-size:1.25rem;color:var(--stumm)}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.625rem;top:.56rem;bottom:.56rem;width:3px;border-radius:2px;background:var(--gold)}
+.rail .luecke{flex:1}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+
+/* Hero-Kopf */
+.hero{position:relative;flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;gap:1.375rem;padding:.875rem 1.25rem 0;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 140% at 30% 0%,rgba(240,195,90,.13),transparent 70%),linear-gradient(90deg,#0b0f16,#06080c 60%)}
+.hk{display:flex;align-items:center;gap:.875rem;padding-bottom:.875rem}
+.hk .crest{width:3.875rem;height:3.875rem;border-radius:.625rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 6px 18px rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk h1{margin:0;font:400 2.125rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hk .sub{margin-top:.3rem;font-size:.94rem;color:var(--leise);font-weight:500;white-space:nowrap}
+.hk .sub b{color:var(--creme);font-weight:600}
+.tabs{display:flex;align-items:flex-end;gap:.625rem;min-width:0}
+.dtab{position:relative;flex:1 1 0;min-width:0;max-width:27rem;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.75rem;padding:.7rem 1.4rem .75rem 1.25rem;
+  background:rgba(18,24,36,.72);border:1px solid var(--linie);border-bottom:0;clip-path:polygon(.875rem 0,100% 0,calc(100% - .875rem) 100%,0 100%);color:var(--leise)}
+.dtab:hover{background:rgba(26,34,49,.9)}
+.dtab.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(18,24,36,.92) 70%);color:var(--tinte)}
+.dtab.an::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--gold)}
+.dtab .nr{width:2.375rem;height:2.375rem;border-radius:.5rem;display:grid;place-items:center;font-size:1.5rem;font-weight:700;background:rgba(0,0,0,.35);border:1px solid var(--linie);color:var(--creme)}
+.dtab.an .nr{color:var(--gold);border-color:rgba(240,195,90,.5)}
+.dtab.ok .nr{color:var(--gut);border-color:rgba(98,211,148,.5)}
+.dtab em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab b{display:block;font:400 1.375rem/1.1 var(--haus);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab .erw{text-align:right;font-size:.8rem;color:var(--stumm);white-space:nowrap}
+.dtab .erw strong{display:block;font-size:1.3rem;line-height:1;font-weight:700;color:var(--creme)}
+.hr{display:flex;align-items:center;gap:1rem;padding-bottom:.875rem}
+.frist{text-align:right;white-space:nowrap}
+.frist strong{display:block;font-size:1.3rem;line-height:1.1;font-weight:700;color:var(--creme)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;height:2.5rem;padding:0 1rem;border-radius:.45rem;border:1px solid var(--linie-2);background:var(--flaeche-2);font-weight:600;font-size:1.05rem;letter-spacing:.02em;white-space:nowrap}
+.btn:hover{background:var(--flaeche-3);border-color:var(--creme)}
+.btn.ja{background:var(--gold);border-color:var(--gold);color:#17120a} .btn.ja:hover{background:#ffd578}
+.btn.klein{height:2rem;padding:0 .7rem;font-size:.94rem}
+.btn[disabled]{opacity:.4;cursor:default;pointer-events:none}
+.marke{display:inline-flex;align-items:center;height:1.1rem;padding:0 .4rem;border-radius:3px;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:#0b0d12;background:var(--leise);flex:none;white-space:nowrap;text-transform:uppercase}
+.marke.gold{background:var(--gold)} .marke.gut{background:var(--gut)} .marke.acht{background:var(--acht)} .marke.rot{background:var(--warn);color:#fff}
+.marke.leer{background:none;border:1px solid var(--linie-2);color:var(--leise)}
+
+/* Arbeitsflaeche: Vorstand | Schritt | Vereinbarung */
+.work{flex:1;min-height:0;display:grid;grid-template-columns:24.5rem minmax(0,1fr) 25.5rem;gap:.75rem;padding:.75rem .875rem}
+.pan{min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden}
+.pk{flex:none;display:flex;align-items:center;gap:.5rem;padding:.55rem .75rem;border-bottom:1px solid var(--linie);min-height:2.875rem}
+.pk h2{margin:0;font:400 1.2rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1}
+.pk .hin{font-size:.85rem;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kb{flex:1;min-height:0;padding:.75rem;display:flex;flex-direction:column;gap:.75rem}
+.fuss{flex:none;display:flex;align-items:center;gap:.625rem;padding:.625rem .75rem;border-top:1px solid var(--linie);background:#0a0d13}
+.fuss .sp{flex:1} .fuss .hin{font-size:.94rem;color:var(--leise)}
+
+/* Vorstand */
+.vs-kopf{display:grid;grid-template-columns:7.5rem minmax(0,1fr);gap:.75rem;align-items:center}
+.vs-kopf svg{width:7.5rem;height:8.4rem;display:block}
+.vs-kopf h3{margin:0;font:400 1.5rem/1.05 var(--haus);color:#fff}
+.vs-kopf p{margin:.3rem 0 0;font-size:.94rem;line-height:1.25;color:var(--leise)}
+.werte{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+.werte div{padding:.4rem .5rem;border:1px solid var(--linie);border-radius:var(--r-s);background:var(--flaeche-2)}
+.werte strong{display:block;font-size:1.5rem;line-height:1;font-weight:700;color:var(--creme)}
+.blase{position:relative;padding:.7rem .8rem;border-radius:var(--r);background:var(--flaeche-2);border:1px solid var(--linie-2);font-size:1.06rem;line-height:1.28}
+.blase::before{content:"";position:absolute;left:2.6rem;top:-.5rem;width:.9rem;height:.9rem;background:var(--flaeche-2);border-left:1px solid var(--linie-2);border-top:1px solid var(--linie-2);transform:rotate(45deg)}
+.blase.zusage{border-color:rgba(98,211,148,.6)} .blase.zusage::before{border-color:rgba(98,211,148,.6)}
+.blase.gegen{border-color:rgba(243,181,74,.7)} .blase.gegen::before{border-color:rgba(243,181,74,.7)}
+.blase.nein{border-color:rgba(255,96,88,.7)} .blase.nein::before{border-color:rgba(255,96,88,.7)}
+.blase .urteil{display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem}
+.blase .urteil b{font:400 1.3rem/1 var(--haus)}
+.blase.zusage .urteil b{color:var(--gut)} .blase.gegen .urteil b{color:var(--acht)} .blase.nein .urteil b{color:var(--warn)}
+.blase .btn{margin-top:.55rem;width:100%}
+.waage{border:1px solid var(--linie);border-radius:var(--r-s);padding:.55rem .65rem;background:#0a0d13}
+.waage .kopf{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.35rem}
+.waage .kopf strong{font-size:1.25rem;font-weight:700}
+.wbalken{position:relative;height:.9rem;border-radius:.45rem;background:var(--flaeche-3);overflow:visible}
+.wbalken i{position:absolute;left:0;top:0;bottom:0;border-radius:.45rem;background:linear-gradient(90deg,#3d8f66,var(--gut))}
+.wbalken i.zu{background:linear-gradient(90deg,#a8792c,var(--acht))}
+.wbalken u{position:absolute;top:-.3rem;bottom:-.3rem;width:3px;background:var(--creme);border-radius:2px}
+.posten{margin:.45rem 0 0;padding:0;list-style:none;font-size:.94rem;display:grid;gap:.15rem}
+.posten li{display:flex;justify-content:space-between;gap:.5rem;color:var(--leise)}
+.posten li b{color:var(--tinte);font-weight:600}
+.regel{font-size:.85rem;line-height:1.25;color:var(--stumm);margin:0}
+.vfolgen{flex:1;min-height:0;display:flex;flex-direction:column;gap:.3rem;border:1px solid var(--linie);border-radius:var(--r-s);padding:.55rem .65rem;background:#0a0d13}
+.vfolgen div{flex:1;display:flex;justify-content:space-between;align-items:center;gap:.5rem;font-size:1.03rem;color:var(--leise);border-bottom:1px dashed var(--linie)}
+.vfolgen div:last-child{border-bottom:0}
+.vfolgen div b{font-weight:700;font-size:1.2rem;white-space:nowrap}
+.gegen-v{flex:1;min-height:0;display:flex;flex-direction:column;border:1px solid var(--linie);border-radius:var(--r);padding:.55rem .7rem;background:var(--flaeche-2)}
+.gegen-v div{flex:1;display:flex;justify-content:space-between;align-items:center;font-size:1.03rem;color:var(--leise);border-bottom:1px dashed var(--linie)}
+.gegen-v div:last-child{border-bottom:0}
+.gegen-v div b{font-weight:700;font-size:1.2rem}
+
+/* Karten der Mitte */
+.raster{flex:1;min-height:0;display:grid;gap:.75rem}
+.raster.lage{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.raster.hebel{grid-template-columns:1fr 1fr 1fr;grid-template-rows:minmax(0,1fr) auto}
+.karte{min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid var(--linie);border-radius:var(--r);background:var(--flaeche-2);padding:.75rem .875rem;overflow:hidden}
+.karte h3{margin:0 0 .15rem;font:400 1.3rem/1.1 var(--haus);color:var(--creme);display:flex;align-items:center;gap:.5rem}
+.karte h3 .sp{flex:1}
+.karte .unter{font-size:.94rem;color:var(--leise);line-height:1.25;margin-bottom:.5rem}
+.karte.breit{grid-column:1/-1}
+.rech{display:flex;flex-direction:column;flex:1;min-height:0;font-size:1.12rem}
+.rech div{flex:1;display:flex;justify-content:space-between;align-items:center;gap:.75rem;padding:.2rem 0;border-bottom:1px dashed var(--linie)}
+.rech div span small{display:block;font-size:.8rem;color:var(--stumm);line-height:1.1}
+.rech div b{font-weight:600;white-space:nowrap}
+.rech div.summe{flex:1.5;border-bottom:0;border-top:2px solid var(--linie-2);margin-top:.15rem;padding-top:.35rem}
+.rech div.summe span{font:400 1.2rem/1 var(--haus);color:var(--creme)}
+.rech div.summe b{font-size:1.9rem;line-height:1;font-weight:700;color:var(--gold)}
+.rech div.summe b small{display:block;font-size:.85rem;color:var(--leise);font-weight:500;text-align:right}
+.leiter{display:flex;flex-direction:column;gap:.3rem;flex:1;min-height:0}
+.leiter div{flex:1;display:grid;grid-template-columns:5.2rem minmax(0,1fr) 3.4rem;align-items:center;gap:.5rem;padding:.3rem .55rem;border-radius:var(--r-s);border:1px solid var(--linie);color:var(--stumm);font-size:1rem}
+.leiter div b{font-weight:700;font-size:1.2rem;text-align:right}
+.leiter div.an{border-color:var(--gold);background:rgba(240,195,90,.12);color:var(--tinte)}
+.leiter div.an b{color:var(--gold)}
+.zielzeile{display:flex;align-items:center;gap:1.25rem;flex:1;min-height:0}
+.zielzeile .rang{font-size:5.5rem;line-height:.85;font-weight:700;color:var(--gold)}
+.zielzeile .rang small{font-size:1.1rem;color:var(--leise);font-weight:500}
+.folgen{display:grid;gap:.3rem;font-size:1.12rem;flex:1}
+.folgen div{display:flex;justify-content:space-between;gap:.5rem;padding:.4rem .6rem;border-radius:var(--r-s);background:rgba(0,0,0,.25)}
+.neu{margin-top:.55rem;padding:.45rem .6rem;border-left:3px solid var(--gold);background:rgba(240,195,90,.08);font-size:.94rem;line-height:1.25;color:var(--tinte);border-radius:0 var(--r-s) var(--r-s) 0}
+
+/* Wahlknoepfe */
+.wahl{display:grid;gap:.4rem;flex:1;min-height:0;grid-auto-rows:1fr}
+.opt{display:grid;grid-template-columns:1.3rem minmax(0,1fr) auto;gap:.55rem;align-items:center;padding:.45rem .65rem;border:1px solid var(--linie);border-radius:var(--r-s);background:rgba(0,0,0,.22)}
+.opt:hover{border-color:var(--linie-2)}
+.opt .punkt{width:1.15rem;height:1.15rem;border-radius:50%;border:2px solid var(--stumm);position:relative}
+.opt[aria-pressed=true]{border-color:var(--gold);background:rgba(240,195,90,.12)}
+.opt[aria-pressed=true] .punkt{border-color:var(--gold)}
+.opt[aria-pressed=true] .punkt::after{content:"";position:absolute;inset:.18rem;border-radius:50%;background:var(--gold)}
+.opt strong{display:block;font-size:1.15rem;font-weight:700;line-height:1.1;color:var(--tinte)}
+.opt span.txt{display:block;font-size:.9rem;line-height:1.2;color:var(--leise)}
+.opt .eff{text-align:right;font-size:.9rem;line-height:1.2;color:var(--leise);white-space:nowrap}
+.opt .eff b{display:block;font-size:1.2rem;font-weight:700;color:var(--creme)}
+.opt[disabled]{opacity:.38;pointer-events:none}
+.sonder{flex:1;display:flex;flex-direction:column;gap:.45rem}
+.sonder ul{margin:0;padding:0 0 0 1.1rem;font-size:1.06rem;line-height:1.3;color:var(--leise);flex:1;display:flex;flex-direction:column;justify-content:space-evenly}
+.sonder .btn{margin-top:auto}
+.sonder .btn[aria-pressed=true]{background:var(--warn);border-color:var(--warn);color:#fff}
+
+/* Schieber */
+.schieb{display:grid;grid-template-columns:13rem minmax(0,1fr) 13rem;gap:1rem;align-items:center}
+.schieb .seite{display:flex;flex-direction:column}
+.schieb .seite.r{text-align:right}
+.schieb .seite strong{font-size:2rem;line-height:1;font-weight:700;color:var(--creme)}
+.schieb .seite small{font-size:.85rem;color:var(--leise)}
+.schieb .mitte{display:flex;flex-direction:column;gap:.3rem}
+.schieb .mitte .skala{display:flex;justify-content:space-between;font-size:.85rem;color:var(--stumm)}
+.schieb .mitte .wert{text-align:center;font-size:1.06rem;color:var(--tinte);font-weight:600}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:1.6rem;background:transparent;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:.55rem;border-radius:.3rem;background:linear-gradient(90deg,var(--heim),var(--flaeche-3) 48%,var(--flaeche-3) 52%,var(--gast))}
+input[type=range]::-moz-range-track{height:.55rem;border-radius:.3rem;background:linear-gradient(90deg,var(--heim),var(--flaeche-3) 48%,var(--flaeche-3) 52%,var(--gast))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--gold);border:3px solid #17120a;margin-top:-.48rem;box-shadow:0 2px 8px rgba(0,0,0,.6)}
+input[type=range]::-moz-range-thumb{width:1.2rem;height:1.2rem;border-radius:50%;background:var(--gold);border:3px solid #17120a}
+input[type=range]:disabled{opacity:.4;cursor:default}
+
+/* Vereinbarung (rechts, Entwurf) */
+.topf{border:1px solid var(--linie);border-radius:var(--r);padding:.6rem .7rem;background:var(--flaeche-2)}
+.topf .zeile{display:flex;align-items:flex-end;justify-content:space-between;gap:.5rem}
+.topf .gross{font-size:2.6rem;line-height:.95;font-weight:700;color:var(--creme)}
+.topf .gross small{font-size:1.1rem;color:var(--leise);font-weight:600}
+.topf .klein{font-size:.94rem;color:var(--leise);text-align:right;line-height:1.2}
+.topf .klein b{color:var(--tinte);font-weight:600}
+.balken{display:flex;height:.7rem;border-radius:.35rem;overflow:hidden;margin-top:.45rem;background:var(--flaeche-3)}
+.balken i{display:block;height:100%}
+.balken .frei{background:var(--heim)} .balken .frei.g{background:var(--gast)} .balken .rl{background:#5b6578} .balken .vb{background:repeating-linear-gradient(135deg,#3a4254 0 4px,#252c3a 4px 8px)}
+.leg{display:flex;flex-wrap:wrap;gap:.15rem .7rem;margin-top:.3rem;font-size:.82rem;color:var(--leise)}
+.leg span::before{content:"";display:inline-block;width:.6rem;height:.6rem;border-radius:2px;margin-right:.3rem;background:var(--c)}
+.eck{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem}
+.eck div{padding:.4rem .5rem;border:1px solid var(--linie);border-radius:var(--r-s);background:var(--flaeche-2)}
+.eck strong{display:block;font-size:1.5rem;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap}
+.kader{border:1px solid var(--linie);border-radius:var(--r);padding:.55rem .7rem;background:var(--flaeche-2)}
+.plaetze{display:grid;grid-template-columns:repeat(14,1fr);gap:.2rem;margin:.4rem 0 .3rem}
+.plaetze i{height:1.5rem;border-radius:3px;background:var(--flaeche-3);border:1px solid var(--linie)}
+.plaetze i.voll{background:var(--gold);border-color:var(--gold)}
+.plaetze i.pflicht.voll{background:var(--gut);border-color:var(--gut)}
+.plaetze i.ziel{box-shadow:inset 0 0 0 2px var(--creme)}
+.kader p{margin:0;font-size:.9rem;line-height:1.25;color:var(--leise)}
+.tisch{display:grid;gap:.3rem}
+.tisch div{display:grid;grid-template-columns:1.9rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.3rem .5rem;border:1px solid var(--linie);border-radius:var(--r-s);font-size:.94rem}
+.tisch img{width:1.9rem;height:1.9rem;border-radius:4px;object-fit:cover}
+.tisch b{font-weight:600;color:var(--tinte);display:block;line-height:1.1}
+.tisch small{color:var(--stumm);font-size:.8rem}
+
+/* Schritt 3: das Blatt */
+.blatt{flex:1;min-height:0;display:grid;grid-template-columns:1.15fr 1fr;gap:.75rem}
+.blatt .spalte{display:flex;flex-direction:column;gap:.75rem;min-height:0}
+.gtopf{flex:1;display:flex;flex-direction:column;border:1px solid var(--linie);border-radius:var(--r);background:var(--flaeche-2);padding:.875rem 1rem;position:relative;overflow:hidden}
+.gtopf::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+.gtopf h3{margin:0;font:400 1.3rem/1 var(--haus);color:var(--creme)}
+.gtopf .riesig{font-size:5.2rem;line-height:.9;font-weight:700;color:#fff;margin-top:.5rem}
+.gtopf .rech{margin-top:.4rem;font-size:1.03rem}
+.gtopf .riesig small{font-size:1.5rem;color:var(--leise);font-weight:600}
+.gtopf .dazu{font-size:1.1rem;color:var(--leise);margin-top:.3rem}
+.gtopf .dazu b{color:var(--tinte);font-weight:600}
+.klauseln{flex:1;min-height:0;border:1px solid var(--linie);border-radius:var(--r);background:var(--flaeche-2);padding:.75rem .875rem;display:flex;flex-direction:column}
+.klauseln h3{margin:0 0 .4rem;font:400 1.3rem/1 var(--haus);color:var(--creme)}
+.klauseln dl{margin:0;flex:1;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr);align-content:space-evenly;gap:.3rem .9rem;font-size:1.12rem;line-height:1.25}
+.klauseln dt{color:var(--leise);white-space:nowrap}
+.klauseln dd{margin:0;color:var(--tinte);font-weight:600}
+.klauseln dd small{display:block;font-weight:500;color:var(--stumm);font-size:.85rem}
+.gilt{padding:.5rem .65rem;border-radius:var(--r-s);background:rgba(98,211,148,.09);border:1px solid rgba(98,211,148,.35);font-size:.94rem;line-height:1.3}
+.stempel{position:absolute;right:1rem;top:.8rem;transform:rotate(-8deg);border:3px solid var(--gut);color:var(--gut);border-radius:.5rem;padding:.25rem .7rem;font:400 1.5rem/1 var(--haus);letter-spacing:.04em;opacity:.95}
+.stempel small{display:block;font:600 .72rem/1.2 var(--zahl);letter-spacing:.12em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-1-1.7-1.5-3-1.5-1.7 0-3 .9-3 2.2 0 3 6 1.400 6 4.300 0 1.300-1.300 2.200-3 2.200-1.400 0-2.600-.6-3.200-1.600M12 6v2M12 16v2"/></symbol>
+  <symbol id="i-buero" viewBox="0 0 24 24"><path d="M4 21V5l8-2v18M12 9l8 2v10M2 21h20M7 8h2M7 12h2M7 16h2M15 14h2M15 17h2"/></symbol>
+  <symbol id="i-pfeil" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-zur" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
+  <symbol id="i-stift" viewBox="0 0 24 24"><path d="M4 20l4-1L19 8l-3-3L5 16zM14 7l3 3"/></symbol>
+  <symbol id="i-haken" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></symbol>
+</svg>
+
+<div class="demo" id="demo"></div>
+<div class="app">
+  <nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img id="raillogo" src="../team-logos/D-P.jpg" alt=""></div>
+    <a href="#" title="Start"><svg class="i"><use href="#i-home"/></svg></a>
+    <a href="#" title="Inbox"><svg class="i"><use href="#i-post"/></svg></a>
+    <a href="#" title="Einsatzliste"><svg class="i"><use href="#i-liste"/></svg></a>
+    <a href="#" title="Saisonstand"><svg class="i"><use href="#i-tab"/></svg></a>
+    <a href="#" title="Kader"><svg class="i"><use href="#i-team"/></svg></a>
+    <a href="#" title="Transfermarkt und Draft"><svg class="i"><use href="#i-markt"/></svg></a>
+    <span class="luecke"></span>
+    <a class="an" href="#" title="Office: Vorstand"><svg class="i"><use href="#i-buero"/></svg></a>
+    <a href="finanzen-modern-18-11.html" title="Finanzen"><svg class="i"><use href="#i-geld"/></svg></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="hk" id="hk"></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Schritte des Gesprächs"></div>
+      <div class="hr" id="hr"></div>
+    </header>
+    <div class="work">
+      <section class="pan" aria-label="Vorstand" id="vorstand"></section>
+      <section class="pan" aria-label="Schritt" id="mitte"></section>
+      <section class="pan" aria-label="Vereinbarung, Entwurf" id="rechts"></section>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+/* ============================== Regeln (aus lib/finance/vorstand-budgetfreigabe.ts und vorstand-gespraech.ts) */
+const STUFEN=[{ab:7.5,q:1,name:"hoch"},{ab:5,q:.9,name:"Standard"},{ab:3,q:.8,name:"niedrig"},{ab:1.5,q:.7,name:"knapp"},{ab:-1e9,q:.5,name:"Sparauflage"}];
+const QUOTEN=[.5,.7,.8,.9,1];
+const UMSCHICHT={1:.25,.9:.2,.8:.175,.7:.15,.5:.1};
+const GEHALTS_UNTERGRENZE=.75, GEHALTS_FAKTOR=.35, ALLES_PUFFER=.05, ANZAPFEN_MAX=.5;
+const ZUSAGE_WERT={zielhoch:{antreiber:8,kaufmann:5,kassenwart:2},deckel:{antreiber:2,kaufmann:4,kassenwart:6},vertrauen:{antreiber:3,kaufmann:3,kassenwart:3},
+  /* BEISPIEL (neu): */ ruecklageVoll:{antreiber:1,kaufmann:3,kassenwart:5}, stufeTiefer:{antreiber:4,kaufmann:4,kassenwart:4}};
+const PREIS={stufe:14,anzapfJeViertel:5,alles:20, /* BEISPIEL (neu): */ zielTief:{antreiber:16,kaufmann:10,kassenwart:6}};
+const ANZAPF_FAKTOR={antreiber:.8,kaufmann:1,kassenwart:1.6};
+const GEGENANGEBOT_SPANNE=10;
+const CHARAKTER={antreiber:{name:"Der Antreiber",satz:"Er will Ergebnisse. Ein höheres Saisonziel überzeugt ihn am meisten."},
+  kaufmann:{name:"Der Kaufmann",satz:"Er wägt ab. Jede Zusage zählt ähnlich."},
+  kassenwart:{name:"Der Kassenwart",satz:"Er hütet die Kasse. Vorsicht und ein Gehaltsdeckel überzeugen ihn."}};
+const ZUSAGE_TEXT={deckel:"Gehaltsdeckel (kein Umschichten ins Gehalt)",vertrauen:"Vertrauen einsetzen (−0,25)"};
+/* Beispielannahmen */
+const GEHALT_JE_SPIELER=6.5, KADERZIEL=13, PFLICHT=8, SPIELTAGE=20, ABLOESE_STAMM=20.8, ABLOESE_ERG=10;
+const TEAMS={
+  "D-P":{name:"Death Peaches",kasse:240,vertrauen:5.7,finanz:3.05,ambition:6.0,sponsor:84,rang:6},
+  "C-C":{name:"Cash Creators",kasse:215,vertrauen:3.76,finanz:9.72,ambition:2.84,sponsor:68,rang:11},
+  "C-S":{name:"Cold Steel",kasse:315,vertrauen:9.0,finanz:8.32,ambition:7.0,sponsor:105,rang:3},
+};
+const P=new URLSearchParams(location.search);
+const Z={team:TEAMS[P.get("team")]?P.get("team"):"D-P",schritt:Math.min(3,Math.max(1,+(P.get("schritt")||1))),
+  amb:["tief","ziel","hoch"].includes(P.get("amb"))?P.get("amb"):"ziel",
+  rl:["vorsichtig","normal","mutig"].includes(P.get("rl"))?P.get("rl"):"normal",
+  alles:P.get("alles")==="1",um:+(P.get("um")||0)||0,extra:[],sign:P.get("sign")==="1"};
+if(P.get("still")==="1")document.body.classList.add("still");
+
+const f1=v=>(Math.round(v*10)/10).toFixed(1).replace(".",",").replace("-","−");
+const f2=v=>(Math.round(v*100)/100).toFixed(2).replace(".",",").replace("-","−");
+const f0=v=>String(Math.round(v)).replace("-","−");
+const pz=q=>Math.round(q*100)+" %";
+const vz=v=>(v>0?"+":"")+f2(v).replace(/0$/,"").replace(/,$/,",0");
+const stufe=v=>STUFEN.find(s=>v>=s.ab);
+const qHoch=q=>QUOTEN[Math.min(QUOTEN.length-1,QUOTEN.indexOf(q)+1)];
+const qTief=q=>QUOTEN[Math.max(0,QUOTEN.indexOf(q)-1)];
+function charakter(t){const s=t.finanz-Math.max(0,t.ambition-5);return {art:s<3.5?"antreiber":s<7?"kaufmann":"kassenwart",spar:s};}
+
+/* Was der Mensch verlangt und was er dafuer zusagt -> Preis und Gewicht (ohne Wuerfel). */
+function antrag(t,z){
+  const ch=charakter(t).art, q0=stufe(t.vertrauen).q, bitten=[], zusagen=[];
+  if(z.alles){bitten.push({txt:"Alles auf eine Karte",p:PREIS.alles});}
+  else{
+    if(z.amb==="hoch"){zusagen.push({txt:"Ziel einen Platz besser",w:ZUSAGE_WERT.zielhoch[ch]});if(q0<1)bitten.push({txt:"Freigabe eine Stufe höher",p:PREIS.stufe});}
+    if(z.amb==="tief"){bitten.push({txt:"Ziel zwei Plätze tiefer",p:PREIS.zielTief[ch]});zusagen.push({txt:"Freigabe eine Stufe tiefer",w:ZUSAGE_WERT.stufeTiefer[ch]});}
+    if(z.rl==="mutig")bitten.push({txt:"Rücklage zur Hälfte anzapfen",p:2*PREIS.anzapfJeViertel*ANZAPF_FAKTOR[ch]});
+    if(z.rl==="vorsichtig")zusagen.push({txt:"Rücklage voll halten",w:ZUSAGE_WERT.ruecklageVoll[ch]});
+  }
+  for(const e of z.extra)zusagen.push({txt:ZUSAGE_TEXT[e],w:ZUSAGE_WERT[e][ch]});
+  const preis=bitten.reduce((s,b)=>s+b.p,0), basis=t.vertrauen*2, gewicht=basis+zusagen.reduce((s,x)=>s+x.w,0);
+  const luecke=Math.max(0,Math.round((preis-gewicht)*10)/10);
+  let urteil=luecke<=0?"zusage":luecke<=GEGENANGEBOT_SPANNE?"gegen":"nein", vorschlag=[], sperre=null;
+  if(z.alles&&t.vertrauen<4){urteil="nein";sperre="Unter Vertrauen 4 gibt es „Alles auf eine Karte“ nicht.";}
+  else if(urteil==="gegen"){
+    const frei=["deckel","vertrauen"].filter(a=>!z.extra.includes(a)).sort((a,b)=>ZUSAGE_WERT[b][ch]-ZUSAGE_WERT[a][ch]);
+    let rest=luecke;for(const a of frei){if(rest<=0)break;vorschlag.push(a);rest-=ZUSAGE_WERT[a][ch];}
+    if(rest>0){vorschlag=[];urteil="nein";}
+  }
+  return {ch,q0,bitten,zusagen,preis,basis,gewicht,luecke,urteil,vorschlag,sperre};
+}
+
+/* Die Toepfe. `wirksam` = nur was der Vorstand zugesagt hat; sonst gilt sein Vorschlag (Standard). */
+function toepfe(t,z,a){
+  const ok=a.urteil==="zusage", alles=ok&&z.alles;
+  const amb=ok&&!z.alles?z.amb:"ziel", rl=ok&&!z.alles?z.rl:"normal";
+  let q=a.q0; if(amb==="hoch")q=qHoch(q); if(amb==="tief")q=qTief(q); if(alles)q=1;
+  const zielgehalt=KADERZIEL*GEHALT_JE_SPIELER, basis=Math.max(t.sponsor,zielgehalt);
+  const gq=q>=1?1:Math.max(GEHALTS_UNTERGRENZE,q), gehalt0=gq*basis;
+  const qr=.05+.2*(Math.min(10,Math.max(1,t.finanz))-1)/9;
+  const rlVoll=Math.max(qr*t.kasse,GEHALTS_FAKTOR*zielgehalt);
+  const s1=rl==="vorsichtig"?1:.5;                       /* Saison 1: halbe Ruecklage, halber Gehaltspuffer */
+  const ruecklage=alles?0:rlVoll*s1;
+  const puffer=alles?0:Math.max(0,GEHALTS_FAKTOR*gehalt0*s1-ruecklage);
+  const angezapft=!alles&&rl==="mutig"?ruecklage*ANZAPFEN_MAX:0;
+  const verfuegbar=alles?t.kasse*(1-ALLES_PUFFER):Math.max(0,t.kasse-ruecklage-puffer);
+  const transfer0=alles?verfuegbar:q*(verfuegbar+angezapft);
+  const grenze=(UMSCHICHT[q]||.25)*gehalt0;
+  const maxG=z.extra.includes("deckel")&&ok?0:grenze, maxT=Math.min(grenze,.5*(ruecklage+puffer));
+  const um=Math.max(-maxT,Math.min(maxG,z.um));
+  const transfer=transfer0-um, gehalt=gehalt0+um;
+  const nT=transfer<=PFLICHT*ABLOESE_STAMM?transfer/ABLOESE_STAMM:PFLICHT+(transfer-PFLICHT*ABLOESE_STAMM)/ABLOESE_ERG;
+  const nG=gehalt/GEHALT_JE_SPIELER, kader=Math.min(14,Math.floor(Math.min(nT,nG)+1e-9));
+  const zielRang=Math.max(1,t.rang+(alles?-2:amb==="hoch"?-1:amb==="tief"?2:0));
+  const folge=alles?{ok:.75,nein:-1}:amb==="hoch"?{ok:.5,nein:-.9}:amb==="tief"?{ok:.3,nein:-.4}:{ok:.5,nein:-.4};
+  const sofort=(ok&&z.extra.includes("vertrauen")?-.25:0)+(rl==="mutig"?-.5:0)+(rl==="vorsichtig"?.2:0);
+  return {q,gq,basis,zielgehalt,gehalt0,qr,rlVoll,ruecklage,puffer,angezapft,verfuegbar,transfer0,grenze,maxG,maxT,um,transfer,gehalt,
+    gesperrt:t.kasse-transfer0,vorbehalt:Math.max(0,t.kasse-transfer0-(ruecklage-angezapft)-puffer),nT,nG,kader,zielRang,folge,sofort,alles,amb,rl,ok};
+}
+
+/* ============================== Vorstand als SVG (Miene je Urteil, Akzent je Charakter) */
+function gesicht(ch,urteil){
+  const akz={antreiber:"#e0637a",kaufmann:"#f0c35a",kassenwart:"#4fc7b2"}[ch];
+  const mund={zusage:"M44 71q11 9 22 0",gegen:"M45 73h20",nein:"M44 75q11 -8 22 0"}[urteil];
+  const braue={zusage:"M38 49q6 -4 12 -1M60 48q6 -3 12 1",gegen:"M38 48l12 0M60 46l12 2",nein:"M38 46l12 4M60 50l12 -4"}[urteil];
+  const extra=ch==="kassenwart"?'<circle cx="44" cy="56" r="7.5" fill="none" stroke="#f4e6c4" stroke-width="1.6"/><circle cx="66" cy="56" r="7.5" fill="none" stroke="#f4e6c4" stroke-width="1.6"/><path d="M51.500 56h7" stroke="#f4e6c4" stroke-width="1.6"/>'
+    :ch==="antreiber"?'<path d="M30 40q25 -22 50 0l-3 -14q-22 -14 -44 0z" fill="#2a2f3b"/>':'<path d="M31 42q6 -16 24 -16t24 16q-10 -8 -24 -8t-24 8z" fill="#8f97a6"/>';
+  return `<svg viewBox="0 0 110 124" role="img" aria-label="Vorstand, ${CHARAKTER[ch].name}">
+    <rect x="1" y="1" width="108" height="122" rx="10" fill="#0a0d13" stroke="rgba(244,230,196,.3)"/>
+    <path d="M12 123q4 -30 43 -30t43 30z" fill="#1c2433"/><path d="M55 93l-9 30h18z" fill="#eef2f8"/><path d="M55 97l-4 6 4 18 4 -18z" fill="${akz}"/>
+    <path d="M40 93l15 12 15 -12 6 4 -21 22 -21 -22z" fill="#121824"/>
+    <rect x="47" y="80" width="16" height="16" rx="5" fill="#c79a78"/>
+    <ellipse cx="55" cy="56" rx="24" ry="28" fill="#dcae8a"/>${extra}
+    <circle cx="44" cy="56" r="2.300" fill="#17120a"/><circle cx="66" cy="56" r="2.300" fill="#17120a"/>
+    <path d="${braue}" fill="none" stroke="#3b2f25" stroke-width="2.600" stroke-linecap="round"/>
+    <path d="M55 58v9l-4 2" fill="none" stroke="#a97c5c" stroke-width="1.800" stroke-linecap="round"/>
+    <path d="${mund}" fill="none" stroke="#7a3b32" stroke-width="2.600" stroke-linecap="round"/></svg>`;
+}
+
+/* ============================== Zeichnen */
+const el=id=>document.getElementById(id);
+function setz(p){Object.assign(Z,p);if(!("extra" in p)&&("amb" in p||"rl" in p||"alles" in p||"team" in p))Z.extra=[];if(!("sign" in p))Z.sign=false;zeichne();}
+function zeichne(nurZahlen){
+  const t=TEAMS[Z.team], a=antrag(t,Z), T=toepfe(t,Z,a), ch=charakter(t);
+  Z.um=T.um;
+  el("raillogo").src=`../team-logos/${Z.team}.jpg`;
+  el("demo").innerHTML=`<b>Mockup</b>Beispielteam`+Object.keys(TEAMS).map(k=>`<button aria-pressed="${k===Z.team}" data-a="team" data-v="${k}">${TEAMS[k].name} · Vertrauen ${f1(TEAMS[k].vertrauen)} → ${pz(stufe(TEAMS[k].vertrauen).q)}</button>`).join("")+
+    `<b>Schritt</b>`+[1,2,3].map(n=>`<button aria-pressed="${n===Z.schritt}" data-a="schritt" data-v="${n}">${n}</button>`).join("")+
+    `<span class="welle">Alle Beträge sind Beispielzahlen, die Regeln sind echt</span>`;
+  el("hk").innerHTML=`<div class="crest"><img src="../team-logos/${Z.team}.jpg" alt=""></div><div><span class="gk">Office · Vorstand</span><h1>Budget-Gespräch</h1>
+    <div class="sub"><b>${t.name}</b> · Saison 1 · vor dem Draft</div></div>`;
+  const titel=[["Lage","Was der Vorstand anbietet",pz(a.q0),"Freigabe"],["Verhandeln","Ziel, Rücklage, Aufteilung",a.urteil==="zusage"?"Zusage":a.urteil==="gegen"?"Gegenangebot":"Ablehnung","Antwort"],["Vereinbarung","Unterschreiben und stempeln",Z.sign?"gestempelt":"offen","Stand"]];
+  el("tabs").innerHTML=titel.map((x,i)=>`<button role="tab" aria-selected="${Z.schritt===i+1}" class="dtab${Z.schritt===i+1?" an":""}${Z.schritt>i+1||(i===2&&Z.sign)?" ok":""}" data-a="schritt" data-v="${i+1}">
+    <span class="nr">${Z.schritt>i+1||(i===2&&Z.sign)?'<svg class="i"><use href="#i-haken"/></svg>':i+1}</span><span><em>Schritt ${i+1} von 3</em><b>${x[0]}</b></span><span class="erw"><strong>${x[2]}</strong>${x[3]}</span></button>`).join("");
+  el("hr").innerHTML=`<div class="frist"><span class="gk">Draft beginnt</span><strong>sobald alle unterschrieben haben</strong></div>`;
+
+  /* ---- links: der Vorstand ---- */
+  const kl={zusage:"zusage",gegen:"gegen",nein:"nein"}[a.urteil], wort={zusage:"Zusage",gegen:"Gegenangebot",nein:"Ablehnung"}[a.urteil];
+  let rede;
+  if(Z.schritt===1)rede=`„Wir kennen uns noch nicht. Mein Vertrauen von <b>${f1(t.vertrauen)}</b> kommt aus dem, wofür dieser Verein steht. Dafür gebe ich <b>${pz(a.q0)}</b> frei. Nehmen Sie das, oder verhandeln Sie.“`;
+  else if(a.sperre)rede=a.sperre+" Erst liefern, dann wetten.";
+  else if(a.urteil==="zusage")rede=a.preis===0&&a.zusagen.length===0?"„Das ist mein Vorschlag. Daran halte ich mich.“":`„Einverstanden.“ Ihr Gewicht <b>${f1(a.gewicht)}</b> deckt den Preis <b>${f1(a.preis)}</b>.`;
+  else if(a.urteil==="gegen")rede=`„Fast.“ Es fehlen <b>${f1(a.luecke)}</b> Punkte. Er stimmt zu mit: <b>${a.vorschlag.map(v=>ZUSAGE_TEXT[v]).join(" und ")}</b>.`;
+  else rede=`„Nein.“ Es fehlen <b>${f1(a.luecke)}</b> Punkte, mehr als Zusagen ausgleichen. Kleiner bitten.`;
+  const skala=Math.max(30,a.preis,a.gewicht)*1.08;
+  el("vorstand").innerHTML=`<div class="pk"><h2>Der Vorstand</h2><span class="sp"></span><span class="hin">antwortet nach fester Regel</span></div>
+  <div class="kb">
+    <div class="vs-kopf">${gesicht(ch.art,Z.schritt===1?"gegen":a.urteil)}<div><span class="gk">Charakter aus der Team-Identität</span><h3>${CHARAKTER[ch.art].name}</h3><p>${CHARAKTER[ch.art].satz}</p></div></div>
+    <div class="werte"><div><span class="gk">Vertrauen</span><strong class="t">${f1(t.vertrauen)}</strong></div><div><span class="gk">Finanzwert</span><strong class="t">${f1(t.finanz)}</strong></div><div><span class="gk">Ambition</span><strong class="t">${f1(t.ambition)}</strong></div></div>
+    <div class="blase ${Z.schritt===1?"":kl}">${Z.schritt===1?"":`<div class="urteil"><b>${wort}</b><span class="sp"></span>${Z.schritt===3&&Z.sign?'<span class="marke gut">gestempelt</span>':""}</div>`}<div>${rede}</div>
+      ${Z.schritt>1&&a.urteil==="gegen"?`<button class="btn ja" data-a="gegenan"><svg class="i"><use href="#i-haken"/></svg>Gegenangebot annehmen</button>`:""}</div>
+    <div class="waage"><div class="kopf"><span class="gk">Gewicht gegen Preis</span><strong class="t ${a.luecke>0?"minus":"plus"}">${f1(a.gewicht)} : ${f1(a.preis)}</strong></div>
+      <div class="wbalken"><i class="${a.luecke>0?"zu":""}" style="width:${Math.min(100,a.gewicht/skala*100)}%"></i>${a.preis>0?`<u style="left:${a.preis/skala*100}%" title="Preis"></u>`:""}</div>
+      <ul class="posten">
+        <li><span>Vertrauen ${f1(t.vertrauen)} × 2</span><b class="t plus">+${f1(a.basis)}</b></li>
+        ${a.zusagen.map(x=>`<li><span>Zusage: ${x.txt}</span><b class="t plus">+${f1(x.w)}</b></li>`).join("")}
+        ${a.bitten.map(x=>`<li><span>Bitte: ${x.txt}</span><b class="t minus">−${f1(x.p)}</b></li>`).join("")||`<li><span>Keine Bitte über den Vorschlag hinaus</span><b class="t">0,0</b></li>`}
+      </ul></div>
+    <div class="vfolgen"><span class="gk">Was das fürs Vertrauen heißt · Ziel Rang ${T.zielRang}</span>
+      <div><span>Ziel erreicht</span><b class="t plus">${vz(T.folge.ok)}</b></div><div><span>Ziel verfehlt</span><b class="t minus">${vz(T.folge.nein)}</b></div>
+      <div><span>Aus Zusagen und Rücklage, nächste Festlegung</span><b class="t ${T.sofort<0?"minus":T.sofort>0?"plus":""}">${T.sofort?vz(T.sofort):"0,0"}</b></div>
+      <div><span>Nächste Stufe nach oben</span><b class="t">${a.q0>=1?"schon 100 %":"ab "+f1(STUFEN[STUFEN.findIndex(x=>x.q===a.q0)-1].ab)}</b></div></div>
+    <p class="regel">Regel: Gewicht ≥ Preis → Zusage. Bis 10 Punkte Lücke → Gegenangebot, wenn Zusagen sie decken. Sonst Ablehnung. Kein Würfel, keine Geldstrafe.</p>
+  </div>`;
+
+  /* ---- Mitte ---- */
+  let m="";
+  if(Z.schritt===1){
+    m=`<div class="pk"><h2>Die Lage vor dem Draft</h2><span class="sp"></span><span class="hin">So kommt der Vorstand auf seinen Vorschlag</span></div><div class="kb"><div class="raster lage">
+      <div class="karte"><h3>Vertrauen → Freigabe</h3><div class="unter">In Saison 1 gibt es kein Vorjahr. Das Startvertrauen ist das Vertrauen aus der Team-Identität.</div>
+        <div class="leiter">${STUFEN.map((s,i)=>`<div class="${s.q===a.q0?"an":""}"><span>${i===0?"ab 7,5":i===1?"ab 5,0":i===2?"ab 3,0":i===3?"ab 1,5":"darunter"}</span><span>${s.name}${s.q===a.q0?` · ${t.name} steht bei ${f1(t.vertrauen)}`:""}</span><b class="t">${pz(s.q)}</b></div>`).join("")}</div></div>
+      <div class="karte"><h3>Transfertopf<span class="sp"></span><span class="marke" style="background:var(--heim)">Ablösen · Gebäude</span></h3><div class="unter">Das Geld bleibt auf dem Konto. Der Vorstand gibt nur einen Teil zum Ausgeben frei.</div>
+        <div class="rech"><div><span>Kasse zum Start</span><b class="t">${f1(t.kasse)} C</b></div>
+          <div><span>− Rücklage nach Finanzwert ${f1(t.finanz)}<small>in Saison 1 die Hälfte von ${f1(T.rlVoll)} C</small></span><b class="t">−${f1(T.ruecklage)} C</b></div>
+          <div><span>− Gehaltspuffer<small>7 Spieltage Gehalt, soweit die Rücklage sie nicht deckt; Saison 1 halb</small></span><b class="t">${T.puffer>.04?"−":""}${f1(T.puffer)} C</b></div>
+          <div><span>× Freigabe</span><b class="t">${pz(T.q)}</b></div>
+          <div class="summe"><span>Transfertopf</span><b class="t">${f1(T.transfer0)} C<small>${f1(T.gesperrt)} C bleiben gesperrt auf dem Konto</small></b></div></div></div>
+      <div class="karte"><h3>Gehaltstopf<span class="sp"></span><span class="marke" style="background:var(--gast)">Verträge</span></h3><div class="unter">Tragbar ist das Höhere aus erwartetem Sponsor und Gehalt eines vollen Kaders. Gekürzt wird höchstens auf 75 %.</div>
+        <div class="rech"><div><span>Sponsor, erwartet</span><b class="t">${f1(t.sponsor)} C</b></div>
+          <div><span>Zielgehalt<small>${KADERZIEL} Spieler × ${f1(GEHALT_JE_SPIELER)} C</small></span><b class="t">${f1(T.zielgehalt)} C</b></div>
+          <div><span>× Gehaltsquote</span><b class="t">${pz(T.gq)}</b></div>
+          <div class="summe"><span>Gehaltstopf je Saison</span><b class="t">${f1(T.gehalt0)} C<small>${f2(T.gehalt0/SPIELTAGE)} C je Spieltag</small></b></div></div></div>
+      <div class="karte"><h3>Saisonziel</h3><div class="unter">Der Vorstand erwartet einen Rang. Erfüllt bringt Vertrauen, verfehlt kostet Vertrauen. Geld nimmt er nie weg.</div>
+        <div class="zielzeile"><div class="rang t">${T.zielRang}.<small> von 16</small></div><div class="folgen"><div><span>Ziel erreicht</span><b class="plus t">${vz(T.folge.ok)} Vertrauen</b></div><div><span>Ziel verfehlt</span><b class="minus t">${vz(T.folge.nein)} Vertrauen</b></div><div><span>Folge im nächsten Jahr</span><b>neue Freigabe-Stufe</b></div></div></div>
+        <div class="neu"><b>Neu ab Saison 1:</b> beide Töpfe gelten vom ersten Pick an, für Mensch und KI gleich. Der Pflichtkader von ${PFLICHT} ist nie gesperrt.</div></div>
+    </div></div>
+    <div class="fuss"><span class="hin">Sie können den Vorschlag so annehmen oder verhandeln. Höchstens drei Schritte.</span><span class="sp"></span>
+      <button class="btn" data-a="schritt" data-v="3">Vorschlag annehmen</button><button class="btn ja" data-a="schritt" data-v="2">Verhandeln<svg class="i"><use href="#i-pfeil"/></svg></button></div>`;
+  }else if(Z.schritt===2){
+    const qH=qHoch(a.q0), qT=qTief(a.q0);
+    const opt=(gr,k,titel,txt,effB,effS,dis)=>`<button class="opt" aria-pressed="${Z[gr]===k&&!Z.alles}" data-a="${gr}" data-v="${k}" ${dis||Z.alles?"disabled":""}><span class="punkt"></span><span><strong>${titel}</strong><span class="txt">${txt}</span></span><span class="eff"><b class="t">${effB}</b>${effS}</span></button>`;
+    m=`<div class="pk"><h2>Verhandeln</h2><span class="sp"></span><span class="hin">Drei Hebel und ein Sonderantrag. Die Antwort links ändert sich sofort.</span></div><div class="kb"><div class="raster hebel">
+      <div class="karte"><h3>1 · Ambition</h3><div class="unter">Höheres Ziel: mehr Freigabe jetzt, mehr Risiko für das Vertrauen.</div><div class="wahl">
+        ${opt("amb","tief","Bescheiden",`Rang ${t.rang+2}, weniger Druck`,pz(qT),"Freigabe",false)}
+        ${opt("amb","ziel","Ziel des Vorstands",`Rang ${t.rang}, sein Vorschlag`,pz(a.q0),"Freigabe",false)}
+        ${opt("amb","hoch","Ehrgeizig",`Rang ${Math.max(1,t.rang-1)}, verfehlt −0,9`,pz(qH),a.q0>=1?"schon voll":"Freigabe",false)}</div></div>
+      <div class="karte"><h3>2 · Rücklage</h3><div class="unter">Die Rücklage ist weich: Sie bestimmt, wie viel der Topf zurückhält.</div><div class="wahl">
+        ${opt("rl","vorsichtig","Vorsichtig","Volle Rücklage ab Saison 1",f1(T.rlVoll)+" C","+0,2 Vertrauen",false)}
+        ${opt("rl","normal","Normal","Halbe Rücklage in Saison 1",f1(T.rlVoll*.5)+" C","Regel",false)}
+        ${opt("rl","mutig","Mutig","Die Hälfte davon anzapfen",f1(T.rlVoll*.25)+" C","−0,5 Vertrauen",false)}</div></div>
+      <div class="karte"><h3>Sonderantrag</h3><div class="unter">Einmal je Saison, ersetzt Ambition und Rücklage.</div><div class="sonder">
+        <ul><li>Bis auf 5 % Puffer ist alles ausgebbar, beide Töpfe 100 %.</li><li>Dafür ein Ziel zwei Plätze besser: Rang ${Math.max(1,t.rang-2)}.</li><li>Erreicht +0,75 Vertrauen, verfehlt −1,0.</li><li>Antrag erst ab Vertrauen 4.</li></ul>
+        <button class="btn" aria-pressed="${Z.alles}" data-a="alles">${Z.alles?"Antrag zurückziehen":"Alles auf eine Karte beantragen"}</button></div></div>
+      <div class="karte breit"><h3>3 · Aufteilung<span class="sp"></span><span class="gk">1 C Transfer = 1 C Jahresgehalt · Grenze ${pz(UMSCHICHT[T.q]||.25)} des Gehaltstopfs${T.maxG===0?" · Gehaltsdeckel zugesagt":""}</span></h3>
+        <div class="schieb"><div class="seite"><span class="gk" style="color:var(--heim)">Transfertopf</span><strong class="t" id="umT">${f1(T.transfer)} C</strong><small>Ablösen, Gebäude</small></div>
+          <div class="mitte"><div class="wert t" id="umW">${Math.abs(T.um)<.05?"Vorschlag des Vorstands, nichts verschoben":T.um>0?`${f1(T.um)} C vom Transfer ins Gehalt`:`${f1(-T.um)} C vom Gehalt in den Transfer`}</div>
+            <input type="range" id="um" aria-label="Aufteilung Transfer und Gehalt" min="${-Math.floor(T.maxT*2)/2}" max="${Math.floor(T.maxG*2)/2}" step="0.5" value="${T.um}" ${T.maxT<.5&&T.maxG<.5?"disabled":""}>
+            <div class="skala t"><span>← bis ${f1(Math.floor(T.maxT*2)/2)} C mehr Transfer</span><span>bis ${f1(Math.floor(T.maxG*2)/2)} C mehr Gehalt →</span></div></div>
+          <div class="seite r"><span class="gk" style="color:var(--gast)">Gehaltstopf je Saison</span><strong class="t" id="umG">${f1(T.gehalt)} C</strong><small class="t" id="umGs">${f2(T.gehalt/SPIELTAGE)} C je Spieltag</small></div></div></div>
+    </div></div>
+    <div class="fuss"><button class="btn" data-a="schritt" data-v="1"><svg class="i"><use href="#i-zur"/></svg>Lage</button><span class="sp"></span>
+      <span class="hin">${a.urteil==="zusage"?"Der Vorstand sagt zu. Weiter zur Vereinbarung.":a.urteil==="gegen"?"Gegenangebot annehmen oder kleiner bitten.":"Abgelehnt: so kommt keine Vereinbarung zustande."}</span>
+      <button class="btn ja" data-a="schritt" data-v="3" ${a.urteil==="zusage"?"":"disabled"}>Zur Vereinbarung<svg class="i"><use href="#i-pfeil"/></svg></button></div>`;
+  }else{
+    const ambTxt=T.alles?"Alles auf eine Karte":T.amb==="hoch"?"Ehrgeizig":T.amb==="tief"?"Bescheiden":"Ziel des Vorstands";
+    const rlTxt=T.alles?"entfällt, 5 % Puffer":T.rl==="vorsichtig"?"vorsichtig, volle Rücklage":T.rl==="mutig"?"mutig, zur Hälfte angezapft":"normal, halbe Rücklage in Saison 1";
+    const zus=[...(T.ok?Z.extra.map(e=>ZUSAGE_TEXT[e]):[])];
+    m=`<div class="pk"><h2>Vereinbarung für Saison 1</h2><span class="sp"></span><span class="hin">${T.ok?"So wird es im Spielstand gestempelt":"Ohne Zusage gilt der Vorschlag des Vorstands"}</span></div><div class="kb"><div class="blatt">
+      <div class="spalte">
+        <div class="gtopf" style="--c:var(--heim)"><h3>Transfertopf</h3><span class="gk">Ablösen und Gebäude · harte Grenze</span>${Z.sign?`<div class="stempel">Vereinbart<small>Saison 1 · ${t.name}</small></div>`:""}
+          <div class="rech">${T.alles?`<div><span>Kasse zum Start</span><b class="t">${f1(t.kasse)} C</b></div><div><span>− 5 % Puffer, sonst alles frei</span><b class="t">−${f1(t.kasse*ALLES_PUFFER)} C</b></div>`:
+            `<div><span>Kasse zum Start</span><b class="t">${f1(t.kasse)} C</b></div><div><span>− Rücklage und Gehaltspuffer${T.angezapft?" (angezapft: +"+f1(T.angezapft)+" C)":""}</span><b class="t">−${f1(T.ruecklage+T.puffer-T.angezapft)} C</b></div><div><span>× Freigabe</span><b class="t">${pz(T.q)}</b></div>`}
+            <div><span>Aufteilung</span><b class="t">${Math.abs(T.um)<.05?"±0,0":T.um>0?"−"+f1(T.um):"+"+f1(-T.um)} C</b></div></div>
+          <div class="riesig t">${f1(T.transfer)} <small>C</small></div><div class="dazu">von <b class="t">${f1(t.kasse)} C</b> Kasse · <b class="t">${f1(t.kasse-T.transfer)} C</b> bleiben auf dem Konto</div></div>
+        <div class="gtopf" style="--c:var(--gast)"><h3>Gehaltstopf</h3><span class="gk">Neue Verträge und Erhöhungen · harte Grenze</span>
+          <div class="rech"><div><span>Tragbar: das Höhere aus Sponsor ${f1(t.sponsor)} C und Zielgehalt ${f1(T.zielgehalt)} C</span><b class="t">${f1(T.basis)} C</b></div><div><span>× Gehaltsquote, nie unter 75 %</span><b class="t">${pz(T.gq)}</b></div>
+            <div><span>Aufteilung</span><b class="t">${Math.abs(T.um)<.05?"±0,0":T.um>0?"+"+f1(T.um):"−"+f1(-T.um)} C</b></div></div>
+          <div class="riesig t">${f1(T.gehalt)} <small>C je Saison</small></div><div class="dazu"><span class="t">${f2(T.gehalt/SPIELTAGE)} C je Spieltag</span> · reicht für etwa <b class="t">${f1(T.nG)}</b> Spieler zu ${f1(GEHALT_JE_SPIELER)} C</div></div>
+      </div>
+      <div class="spalte"><div class="klauseln"><h3>Was vereinbart ist</h3><dl>
+        <dt>Freigabe</dt><dd class="t">${pz(T.q)} Transfer · ${pz(T.gq)} Gehalt<small>Vertrauen ${f1(t.vertrauen)} aus der Team-Identität${T.q!==a.q0?", im Gespräch "+(T.q>a.q0?"angehoben":"gesenkt"):""}</small></dd>
+        <dt>Saisonziel</dt><dd class="t">Rang ${T.zielRang} von 16 · ${ambTxt}<small>erreicht ${vz(T.folge.ok)} · verfehlt ${vz(T.folge.nein)} Vertrauen</small></dd>
+        <dt>Rücklage</dt><dd class="t">${f1(T.ruecklage-T.angezapft)} C · ${rlTxt}<small>weich: Unterschreiten kostet Vertrauen, sperrt aber nichts</small></dd>
+        <dt>Aufteilung</dt><dd class="t">${Math.abs(T.um)<.05?"wie vorgeschlagen":T.um>0?f1(T.um)+" C ins Gehalt verschoben":f1(-T.um)+" C in den Transfer verschoben"}</dd>
+        <dt>Zusagen</dt><dd>${zus.length?zus.join(" · "):"keine weiteren"}${T.sofort?`<small>Vertrauen bei der nächsten Festlegung: ${vz(T.sofort)}</small>`:""}</dd>
+        <dt>Geführt von</dt><dd>Chris (Mensch)<small>delegiert führt die KI dasselbe Gespräch nach derselben Regel</small></dd></dl>
+        <div class="gilt"><b class="plus">Gezeigt = gebucht.</b> Planer, Draft und Kaufsperre lesen genau diese Zahlen (<span class="t">kaufRahmen</span>). Der Pflichtkader von ${PFLICHT} ist nie gesperrt. Nachverhandeln: zwei Gespräche in der Saison.</div></div></div>
+    </div></div>
+    <div class="fuss"><button class="btn" data-a="schritt" data-v="2"><svg class="i"><use href="#i-zur"/></svg>Nachverhandeln</button><span class="sp"></span>
+      <span class="hin">${Z.sign?"Gestempelt. Die Töpfe gelten ab dem ersten Pick.":"Mit der Unterschrift gelten die Töpfe für die ganze Saison."}</span>
+      ${Z.sign?`<button class="btn ja" data-a="nix">Zum Draft<svg class="i"><use href="#i-pfeil"/></svg></button>`:`<button class="btn ja" data-a="sign"><svg class="i"><use href="#i-stift"/></svg>Unterschreiben</button>`}</div>`;
+  }
+  if(nurZahlen&&Z.schritt===2&&el("umT")){   /* waehrend des Ziehens bleibt der Schieber stehen, nur die Zahlen laufen mit */
+    el("umT").textContent=f1(T.transfer)+" C";el("umG").textContent=f1(T.gehalt)+" C";el("umGs").textContent=f2(T.gehalt/SPIELTAGE)+" C je Spieltag";
+    el("umW").textContent=Math.abs(T.um)<.05?"Vorschlag des Vorstands, nichts verschoben":T.um>0?f1(T.um)+" C vom Transfer ins Gehalt":f1(-T.um)+" C vom Gehalt in den Transfer";
+  }else el("mitte").innerHTML=m;
+
+  /* ---- rechts: Entwurf ---- */
+  const k=t.kasse, pr=x=>Math.max(0,x)/k*100;
+  const V0=toepfe(t,{amb:"ziel",rl:"normal",alles:false,um:0,extra:[]},antrag(t,{amb:"ziel",rl:"normal",alles:false,extra:[]}));
+  const dl=d=>Math.abs(d)<.05?"":d>0?"plus":"minus", dv=d=>Math.abs(d)<.05?"±0,0":(d>0?"+":"")+f1(d);
+  el("rechts").innerHTML=`<div class="pk"><h2>${Z.sign?"Vereinbarung":"Entwurf"}</h2><span class="sp"></span><span class="marke ${Z.sign?"gut":T.ok?"gold":"leer"}">${Z.sign?"gestempelt":T.ok?"zugesagt":"Vorschlag gilt"}</span></div>
+  <div class="kb">
+    <div class="topf"><span class="gk" style="color:var(--heim)">Transfertopf</span><div class="zeile"><div class="gross t">${f1(T.transfer)} <small>C</small></div><div class="klein">Kasse <b class="t">${f1(k)} C</b><br>gesperrt <b class="t">${f1(k-T.transfer)} C</b></div></div>
+      <div class="balken"><i class="frei" style="width:${pr(T.transfer)}%"></i><i class="rl" style="width:${pr(T.ruecklage-T.angezapft+T.puffer+Math.max(0,T.um))}%"></i><i class="vb" style="flex:1"></i></div>
+      <div class="leg"><span style="--c:var(--heim)">frei</span><span style="--c:#5b6578">Rücklage, Puffer${T.um>0?", ins Gehalt":""}</span><span style="--c:#3a4254">Vorbehalt des Vorstands</span></div></div>
+    <div class="topf"><span class="gk" style="color:var(--gast)">Gehaltstopf</span><div class="zeile"><div class="gross t">${f1(T.gehalt)} <small>C je Saison</small></div><div class="klein"><span class="t">${f2(T.gehalt/SPIELTAGE)} C</span><br>je Spieltag</div></div>
+      <div class="balken"><i class="frei g" style="width:${Math.min(100,T.gehalt/T.basis*100)}%"></i><i class="vb" style="flex:1"></i></div>
+      <div class="leg"><span style="--c:var(--gast)">frei für Verträge</span><span style="--c:#3a4254">tragbar wären ${f1(T.basis)} C</span></div></div>
+    <div class="eck"><div><span class="gk">Freigabe</span><strong class="t">${pz(T.q)}</strong></div><div><span class="gk">Zielrang</span><strong class="t">${T.zielRang}.</strong></div><div><span class="gk">Rücklage</span><strong class="t">${f1(T.ruecklage-T.angezapft)} C</strong></div></div>
+    <div class="kader"><span class="gk">Kader-Ausblick · Beispielpreise</span>
+      <div class="plaetze">${Array.from({length:14},(_,i)=>`<i class="${i<T.kader?"voll":""}${i<PFLICHT?" pflicht":""}${i===KADERZIEL-1?" ziel":""}"></i>`).join("")}</div>
+      <p>Reicht für etwa <b class="t" style="color:var(--tinte)">${T.kader} Spieler</b> (Pflicht ${PFLICHT}, Ziel ${KADERZIEL}). Es bindet der <b style="color:${T.nT<T.nG?"var(--heim)":"var(--gast)"}">${T.nT<T.nG?"Transfertopf":"Gehaltstopf"}</b>: Ablösen für ${f1(T.nT)}, Gehälter für ${f1(T.nG)} Spieler.${T.kader<PFLICHT?` <b style="color:var(--gut)">Der Pflichtkader von ${PFLICHT} ist trotzdem frei.</b>`:""}</p></div>
+    <div class="gegen-v"><span class="gk">Gegenüber dem Vorschlag des Vorstands</span>
+      <div><span>Transfertopf</span><b class="t ${dl(T.transfer-V0.transfer)}">${dv(T.transfer-V0.transfer)} C</b></div>
+      <div><span>Gehaltstopf je Saison</span><b class="t ${dl(T.gehalt-V0.gehalt)}">${dv(T.gehalt-V0.gehalt)} C</b></div>
+      <div><span>Kader-Ausblick</span><b class="t ${dl(T.kader-V0.kader)}">${T.kader===V0.kader?"gleich":(T.kader>V0.kader?"+":"−")+Math.abs(T.kader-V0.kader)+" Spieler"}</b></div>
+      <div><span>Risiko bei verfehltem Ziel</span><b class="t ${dl(T.folge.nein-V0.folge.nein)}">${vz(T.folge.nein)} Vertrauen</b></div></div>
+    <div class="tisch"><span class="gk">Am Tisch · jeder Manager verhandelt für sich</span>
+      <div><img src="../team-logos/${Z.team}.jpg" alt=""><span><b>Chris · ${t.name}</b><small>selbst</small></span><span class="marke ${Z.sign?"gut":"gold"}">${Z.sign?"unterschrieben":"Schritt "+Z.schritt}</span></div>
+      <div><img src="../team-logos/V-W.jpg" alt=""><span><b>Franky</b><small>selbst</small></span><span class="marke gold">verhandelt</span></div>
+      <div><img src="../team-logos/N-W.jpg" alt=""><span><b>Ramona</b><small>Halbautomatik: KI führt das Gespräch</small></span><span class="marke gut">unterschrieben</span></div>
+    </div>
+  </div>`;
+  const r=el("um");
+  if(r&&!r.dataset.dran){r.dataset.dran="1";r.addEventListener("input",()=>{Z.um=+r.value;Z.sign=false;zeichne(true);});}
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-a]");if(!b)return;
+  const a=b.dataset.a,v=b.dataset.v;
+  if(a==="team")setz({team:v,um:0,alles:false,amb:"ziel",rl:"normal"});
+  else if(a==="schritt")setz({schritt:+v,sign:Z.sign&&+v===3});
+  else if(a==="amb"||a==="rl")setz({[a]:v});
+  else if(a==="alles")setz({alles:!Z.alles});
+  else if(a==="gegenan"){const t=TEAMS[Z.team];setz({extra:[...Z.extra,...antrag(t,Z).vorschlag]});}
+  else if(a==="sign")setz({sign:true});
+});
+if(P.get("an")==="1"){const t=TEAMS[Z.team];Z.extra=antrag(t,Z).vorschlag;}
+zeichne();
+</script>
+</body>
+</html>
