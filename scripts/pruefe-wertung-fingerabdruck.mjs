@@ -17,6 +17,10 @@
 //     OLY_CLIMBING_FORMAT=standard) geschuetzt: drei Zeilen `spiele climbing/standard 1|7|42` mit eigener Summe
 //     `CLIMBING-STANDARD ...` AUSSERHALB von GESAMT, mit window.__arena.bahnFlags({climbingFormat:"standard"})
 //     ausdruecklich gesetzt und danach auf die Vorgabe zurueck. `--node` rechnet alles ueber den Node-Motor.
+// GESAMT-STAND (22.11., Basketball-Puste, docs/design/basketball-puste-22-11.md): `GESAMT ea36f666cc71 (75 Eintraege)`;
+// gegenueber `0310ec4a4e3d` aendern sich NUR die drei Zeilen `spiele basketball 1|7|42` (91a13edbaa37/9cae043e306d/8a75782eceaa ->
+// 1dcbd995722b/4aa24b3936d0/0478707f7e77). Die alte Regel steht als `BASKETBALL-PUSTE-ALT 77aa7158ff0d` (drei Zeilen
+// `spiele basketball/puste-alt <saat>`, die alten Werte) AUSSERHALB von GESAMT.
 // GESAMT-STAND (22.11., Hockey-Torwart-Regel, docs/design/hockey-torwart-22-11.md): `GESAMT 0310ec4a4e3d (75 Eintraege)`;
 // gegenueber `5b9acba4fe42` aendern sich NUR die drei Zeilen `spiele hockey 1|7|42` (c3d67a7dbb14/0af1d2c8ec69/d06c32d9bf5e ->
 // 1e83d67c8161/86de5c3617bf/d7bf5303d471). Die alte Regel steht als `HOCKEY-TORWART-ALT cdc62aeea8e4` (drei Zeilen

@@ -69,7 +69,19 @@ Der Stern bleibt der Stern (Aktionen 38,3 → 36,5 bei 4, 29,5 → 27,2 bei 6); 
 
 (`--basketball-puste=alt` am neuen Motor reproduziert 0,864 / 0,131 / 0,888 Ziffer für Ziffer.) Probeläufe mit stärkeren Wirkungen (Wurf x0,92, Anspielgewicht x0,60): 0,868; mit Boden 0,8: je Spiel 0,850, Saison 0,916; Boden 0,3: 0,862. Die Bewegung liegt überall im Kaderrauschen (Spannweite 0,13): die Mindestschranke 0,75 und das Ziel 0,85 sind nicht in Gefahr.
 
-PP_PLATZHALTER
+## 4. Pp-Abweichung und was die Puste allein nicht kann
+
+`OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs basketball 48 --saat-versatz=0|10000000 --rohdaten=...` (Chromium, je Strom rund 70 Minuten, nacheinander), danach `poole-arena-einfluss.mjs`:
+
+| | Strom 0 | Strom 1 (Versatz 1e7) | gepoolt |
+|---|---:|---:|---:|
+| Pp-Abweichung neu | 13,4 | 19,6 | **15,9** |
+| Pp-Abweichung alt (Bestand) | 12,6 | 12,7 | – |
+
+Pflichtschranke 25 gehalten, angestrebte 15 knapp verfehlt (gepoolt 15,9; Einzelstrom 1 liegt höher, Basketballs Einzelströme sind verrauscht). Über Matrixgewicht: stamina +2,7 (AUSDAUER hat jetzt einen Kanal und überzeichnet leicht, Matrix 6, gemessen 8,7), torment +2,7, power +1,7, speed +0,9; unter: charisma −3,0, intelligence −2,8, awareness −1,4. Der Anstieg gegenüber 12,6 kommt fast vollständig aus stamina und torment (beide über AUSDAUER): ein Hinweis, `ausdauer` im Vorrat (`jeAusdauer` 1,42) bei Gelegenheit etwas zu senken. Eingetragen in `data/generated/disziplin-abnahme.json` (`pp` [13,4, 19,6], `ppMessung.gepoolt` 15,9; alter Stand unter `ppVorPuste`).
+
+**Die Puste allein hilft dem Maru-Fall kaum.** Mit Vorrat, Verbrauch und allen Wirkungen (auch einem Anspielgewicht von 0,6 bei leerer Puste) sank der Geist-Anteil bei vier je Seite nur von 3,9 auf 3,2 bis 3,6 %: Maru ist nicht müde, er wird nicht angespielt, weil sein Passgewicht niedrig ist, und ein müder Stern verliert nur gut ein Viertel seines Gewichts. Erst der **Beteiligungsboden** (jeder Anspielpartner bekommt 50 % des mittleren Passgewichts dazu) bewegt ihn: 3,9 → 1,3 %. Diagnose und Hebel gehören so zusammen: Puste macht Basketball ehrlicher (Ausdauer zählt, der Ballführer ermüdet), der Boden holt die Zuschauer ins Spiel.
+
 
 ## 5. Anker je Regel (C2 und E1)
 
@@ -101,4 +113,4 @@ Aufnahmen aus der **Motor-Seite** (`scripts/screenshot-basketball-puste.mjs`, `d
 
 ## 8. Offen
 
-(a) Anker nicht aus frischen Saves (Abschnitt 5); (b) Pp-Pool nur aus zwei Strömen; (c) bei 2 je Seite ermüden alle stärker als gewollt, bei Bedarf `jePx` nach Feldgröße staffeln; (d) der Beteiligungsboden hebt die Beteiligung des Schwächsten, macht ihn aber nicht zu einem Mitspieler auf Augenhöhe (bei 6 je Seite bleibt ein Geist-Anteil von 5,6 %): das ist die Validität (rho 0,86) im Gegenzug.
+(a) Anker nicht aus frischen Saves (Abschnitt 5); (b) Pp gepoolt 15,9 aus zwei Strömen (angestrebt unter 15; stamina/torment leicht über Matrix, `jeAusdauer` ist der Hebel); (c) bei 2 je Seite ermüden alle stärker als gewollt, bei Bedarf `jePx` nach Feldgröße staffeln; (d) der Beteiligungsboden hebt die Beteiligung des Schwächsten, macht ihn aber nicht zu einem Mitspieler auf Augenhöhe (bei 6 je Seite bleibt ein Geist-Anteil von 5,6 %): das ist die Validität (rho 0,86) im Gegenzug.
