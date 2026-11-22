@@ -71,7 +71,7 @@ const subclassRowsByTeamId = buildRowsByTeamId(typedSource.subclasses.rows);
  * griff für diese Spieler nie (z. B. D-P −10 auf Aqua-Spieler, The Giants +5 auf Behemoths).
  * - Rasse: Chris „fish = aqua“ — die Matrix heißt seitdem selbst `Aqua` (auch der Sheet-Abgleich
  *   übersetzt). `fish` bleibt hier nur als Rückfall für Altdaten (ein Spieler im Pool trägt noch „Fish“).
- * - Subklasse: Matrix `Giant`, Pool `Behemoth` (211 Spieler) — Übersetzung beim Nachschlagen.
+ * - Subklasse: Matrix `Giant`, Pool `Behemoth` (161 Spieler) — Übersetzung beim Nachschlagen.
  */
 const POOL_ZU_MATRIX_TOKEN: Record<string, string> = {
   fish: "aqua",
