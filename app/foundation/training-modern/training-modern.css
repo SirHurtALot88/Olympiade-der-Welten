@@ -1453,3 +1453,49 @@
   font-size: var(--te-text);
   line-height: 1.35;
 }
+
+/* ---------- Belastungs-Verlauf je Intensität (22.11.) ---------- */
+.te-belverlauf {
+  display: block;
+  margin: 2px 0 1px;
+}
+.te-belverlauf svg {
+  display: block;
+  width: 100%;
+  height: 40px;
+  background: rgba(244, 230, 196, 0.04);
+  border-radius: 6px;
+}
+.te-belverlauf__schwelle {
+  stroke: var(--bc-stumm);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+}
+.te-belverlauf__jetzt {
+  fill: var(--bc-tinte);
+}
+.te-belverlauf__aus {
+  fill: none;
+  stroke: var(--bc-stumm);
+  stroke-width: 1.2;
+}
+.te-belverlauf__zeile {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--bc-stumm);
+  font-size: var(--te-klein);
+}
+.te-belastung-hinweis {
+  margin: 2px 0 6px;
+}
+.te-ziel-marke {
+  color: var(--bc-gold);
+}
+.te-top5 {
+  border-top: 1px solid var(--bc-linie);
+}
+.te-top5 .te-kv > b small {
+  color: var(--bc-stumm);
+}

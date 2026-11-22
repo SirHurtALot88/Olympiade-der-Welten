@@ -18,14 +18,15 @@ import { klassenKartenfarbe } from "@/app/foundation/KlassenFarbTag";
 import { FoundationBandSlot } from "@/app/foundation/shell/foundation-band-slot";
 import { BcIcon, BcSeg, BcTable, type BcTableColumn } from "@/components/foundation/broadcast";
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { berechneBelastungsForecast, RISIKO_SCHWELLE, type BelastungsStufenForecast } from "@/lib/training/belastungs-forecast";
 import { prognostiziereDisziplinTraining } from "@/lib/training/disziplin-trainings-prognose";
 import {
   baueTrainingsZielKontext,
   bestimmeAusfallSpielerFuerSpieltag,
   entpackeTrainingsVerlauf,
-  prognostiziereSpieltagsTraining,
   wegeFuerDisziplin,
 } from "@/lib/training/spieltag-training";
+import { baueWirkungVergleich, prognostiziereTrainingAbRueckkehr, waehleTopWirkung } from "@/lib/training/training-wirkung";
 import type { SpieltagsTransparenz, TransparenzAttribut } from "@/lib/training/spieltag-training";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import {
@@ -722,6 +723,43 @@ function Radar({
   );
 }
 
+/* ================================================================ Belastungs-Verlauf (Mini-Sparkline) */
+
+function BelastungsVerlauf({ stufe, jetzt, aktiv }: { stufe: BelastungsStufenForecast | null; jetzt: number; aktiv: boolean }) {
+  if (!stufe || stufe.punkte.length === 0) return null;
+  const B = 220;
+  const H = 40;
+  const n = stufe.punkte.length;
+  const x = (i: number) => 6 + (i / Math.max(1, n)) * (B - 12);
+  const y = (w: number) => H - 4 - (Math.max(0, Math.min(100, w)) / 100) * (H - 8);
+  const pfad = [`M ${x(0).toFixed(1)} ${y(jetzt).toFixed(1)}`, ...stufe.punkte.map((p, i) => `L ${x(i + 1).toFixed(1)} ${y(p.wert).toFixed(1)}`)].join(" ");
+  const ende = stufe.punkte[n - 1]!;
+  const farbe = belastungsZone(ende.wert).farbe;
+  const erst = stufe.ersterUeberSchwelle;
+  return (
+    <span className="te-belverlauf" data-testid="training-belastungsverlauf" data-stufe={stufe.modus}>
+      <svg viewBox={`0 0 ${B} ${H}`} role="img" aria-label={`Belastungsverlauf ${stufe.modus}`} preserveAspectRatio="none">
+        <line x1="0" x2={B} y1={y(RISIKO_SCHWELLE)} y2={y(RISIKO_SCHWELLE)} className="te-belverlauf__schwelle" />
+        <path d={pfad} fill="none" stroke={farbe} strokeWidth={aktiv ? 2.4 : 1.8} vectorEffect="non-scaling-stroke" opacity={aktiv ? 1 : 0.8} />
+        <circle cx={x(0)} cy={y(jetzt)} r="2.6" className="te-belverlauf__jetzt" />
+        {stufe.punkte.map((p, i) =>
+          p.ausfall ? <circle key={p.matchdayId} cx={x(i + 1)} cy={y(p.wert)} r="2.4" className="te-belverlauf__aus" /> : null,
+        )}
+      </svg>
+      <span className="te-belverlauf__zeile">
+        <small>heute {zahl(jetzt, 0)}</small>
+        <small>
+          Sp. {ende.nummer}: <b className="bc-t" style={{ color: farbe }}>{zahl(ende.wert, 0)}</b>
+        </small>
+      </span>
+      <span className="te-belverlauf__zeile">
+        <small>{erst != null ? `Risiko ab Sp. ${erst}` : `unter ${RISIKO_SCHWELLE} bis Saisonende`}</small>
+        <small>max {zahl(stufe.maximum, 0)}</small>
+      </span>
+    </span>
+  );
+}
+
 /* ================================================================ Im Blick */
 
 function ImBlick({
@@ -853,19 +891,36 @@ function ImBlick({
           </p>
         </div>
         {wirkung && wirkung.zeilen.length > 0 ? (
-          <div className="te-blick__saison" data-testid="training-wo-es-ankommt">
+          <div className="te-blick__saison te-blick__ankommt" data-testid="training-wo-es-ankommt">
             <span className="te-gk">Wo das ankommt · Eignung bis Saisonende</span>
-            {wirkung.zeilen.slice(0, 4).map((d) => (
-              <div key={d.disziplinId} className="te-kv">
+            {wirkung.verletztJetzt ? (
+              <p className="te-hinweis is-warn">
+                {wirkung.ersterTrainingsSpieltag
+                  ? `Training ruht, gerechnet ab Spieltag ${wirkung.ersterTrainingsSpieltag.nummer} (Rückkehr).`
+                  : "Bis Saisonende verletzt, daher kein Zuwachs."}
+              </p>
+            ) : null}
+            {waehleTopWirkung(wirkung.zeilen, 6).map((d) => (
+              <div key={d.disziplinId} className="te-kv" data-testid="training-ankommt-zeile">
                 <span>
                   {zielLabel(d.disziplinId)}
-                  {d.kaderRangPrognose != null ? <small className="bc-t"> · Kaderplatz {d.kaderRangPrognose}</small> : null}
+                  {d.istZiel ? <small className="bc-t te-ziel-marke"> · Ziel</small> : null}
+                  {d.kaderRangPrognose != null ? (
+                    <small className="bc-t">
+                      {" "}
+                      · Platz {d.kaderRangHeute != null && d.kaderRangHeute !== d.kaderRangPrognose ? `${d.kaderRangHeute} → ` : ""}
+                      {d.kaderRangPrognose}
+                    </small>
+                  ) : null}
                 </span>
                 <b className="bc-t">
-                  {zahl(d.prognose, 1)} <span className={ton(d.delta)}>{vz(d.delta, 2)}</span>
+                  {zahl(d.heute, 1)} → {zahl(d.prognose, 1)} <span className={ton(d.delta)}>{vz(d.delta, 2)}</span>
                 </b>
               </div>
             ))}
+            {wirkung.eignungsModus === "schaetzung" ? (
+              <p className="te-hinweis">Alle 20 Disziplinen über die Matrix, die sechs größten. Geschätzt, fremde Kader sind verdeckt.</p>
+            ) : null}
           </div>
         ) : null}
         <div className="te-blick__fuss">
@@ -1212,14 +1267,14 @@ function PlanAnsicht({
     new Set([zeile?.ziel?.disziplinId, entwurf[zeile?.playerId ?? ""]?.ziel?.disziplinId].filter((x): x is string => Boolean(x))),
   ).join("|");
   const vorschauMap = useMemo(() => {
-    const karte = new Map<string, ReturnType<typeof prognostiziereSpieltagsTraining>>();
+    const karte = new Map<string, ReturnType<typeof prognostiziereTrainingAbRueckkehr>>();
     if (!vorschauPlayerId) return karte;
     for (const disziplinId of vorschauDisz.split("|").filter(Boolean)) {
       for (const weg of [0, 1, 2] as const) {
         for (const modus of ["leicht", "mittel", "hart"] as const) {
           karte.set(
             `${disziplinId}:${weg}:${modus}`,
-            prognostiziereSpieltagsTraining({
+            prognostiziereTrainingAbRueckkehr({
               gameState,
               playerId: vorschauPlayerId,
               ziel: { disziplinId, weg },
@@ -1237,6 +1292,23 @@ function PlanAnsicht({
     const erg = vorschauMap.get(`${ziel.disziplinId}:${ziel.weg}:${modus}`);
     return erg && !erg.verletzt ? erg : null;
   };
+  // Belastungs-Verlauf je Intensität (Buchungs-Funktionen, `belastungs-forecast.ts`) und die Top-5-Wirkung des Plans.
+  const belastung = useMemo(
+    () => (vorschauPlayerId ? berechneBelastungsForecast({ gameState, playerId: vorschauPlayerId }) : null),
+    [gameState, vorschauPlayerId],
+  );
+  const entwurfsWahl = entwurf[vorschauPlayerId ?? ""];
+  const planZielKey = entwurfsWahl?.ziel ? `${entwurfsWahl.ziel.disziplinId}:${entwurfsWahl.ziel.weg}` : "";
+  const planModusKey = entwurfsWahl?.modus ?? "";
+  const wirkungsVergleich = useMemo(() => {
+    if (!zeile) return null;
+    const bisher = { ziel: zeile.ziel ? { disziplinId: zeile.ziel.disziplinId, weg: zeile.ziel.weg } : null, modus: zeile.modus };
+    const [dz, wg] = planZielKey ? planZielKey.split(":") : [null, null];
+    const neuZiel = dz ? { disziplinId: dz, weg: Number(wg) } : bisher.ziel;
+    const neuModus = (planModusKey || zeile.modus) as PlayerTrainingMode;
+    return baueWirkungVergleich({ gameState, playerId: zeile.playerId, bisher, neu: { ziel: neuZiel, modus: neuModus }, anzahl: 5 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState, zeile?.playerId, zeile?.ziel?.disziplinId, zeile?.ziel?.weg, zeile?.modus, planZielKey, planModusKey]);
   if (!zeile) return <div className="te-tafel te-leer">Keine Spieler im Kader.</div>;
 
   const wahl = entwurf[zeile.playerId] ?? {};
@@ -1257,6 +1329,7 @@ function PlanAnsicht({
   const jetzt = vorschau(zeile.ziel ? { disziplinId: zeile.ziel.disziplinId, weg: zeile.ziel.weg } : null, zeile.modus);
   const neu = vorschau(aktZiel, aktModus);
   const wege = aktZiel ? wegeFuerDisziplin(aktZiel.disziplinId) : [];
+  const aenderungImPlan = !zielGleich(aktZiel, zeile.ziel) || aktModus !== zeile.modus;
 
   return (
     <div className="te-plan" data-testid="training-plan">
@@ -1427,7 +1500,8 @@ function PlanAnsicht({
                   <span className="te-weg__fuss">
                     {p ? (
                       <>
-                        Zuwachs je Spieltag <b className="bc-t bc-plus">{vz(p.summe, 3)}</b> SP
+                        {p.nachVerletzung ? `Ab Spieltag ${p.abSpieltag.nummer} ` : ""}Zuwachs je Spieltag{" "}
+                        <b className="bc-t bc-plus">{vz(p.summe, 3)}</b> SP
                         {(() => {
                           const br = bremseKurz(p.transparenz);
                           return br ? (
@@ -1441,6 +1515,8 @@ function PlanAnsicht({
                           ) : null;
                         })()}
                       </>
+                    ) : zeile.verletzt ? (
+                      "Bis Saisonende verletzt, kein Zuwachs"
                     ) : (
                       "keine Prognose"
                     )}
@@ -1459,6 +1535,12 @@ function PlanAnsicht({
             </small>
           </h3>
           <WunschZeile zeile={zeile} modus={aktModus} vorher={aktModus !== zeile.modus ? zeile.modus : undefined} />
+          {belastung ? (
+            <p className="te-hinweis te-belastung-hinweis" data-testid="training-belastung-hinweis">
+              Belastung ab heute ({zahl(belastung.jetzt, 0)}) bei Einsatz an jedem Spieltag, normale Intensität, Platz mittel. Ab {RISIKO_SCHWELLE}{" "}
+              Verletzungsrisiko. Der Verlauf bis heute wird nicht gespeichert.
+            </p>
+          ) : null}
           <div className="te-modi">
             {MODI.map((m) => {
               const preset = getTrainingModePresentation(m.id);
@@ -1478,7 +1560,7 @@ function PlanAnsicht({
                   </span>
                   <small>{preset.note}</small>
                   <span className="te-kv">
-                    <span>Trainingszuwachs je Spieltag</span>
+                    <span>{p?.nachVerletzung ? `Zuwachs je Spieltag ab Spieltag ${p.abSpieltag.nummer}` : "Trainingszuwachs je Spieltag"}</span>
                     <b className="bc-t bc-plus">{p ? `${vz(p.summe, 3)} SP` : "—"}</b>
                   </span>
                   <span className="te-kv">
@@ -1491,6 +1573,7 @@ function PlanAnsicht({
                     <span>Verletzungsrisiko dann</span>
                     <b className="bc-t">{zahl(risikoProzent(nach), 1)} %</b>
                   </span>
+                  <BelastungsVerlauf stufe={belastung?.stufen[m.id] ?? null} jetzt={belastung?.jetzt ?? zeile.fatigue} aktiv={aktModus === m.id} />
                   {zeile.wunsch ? (
                     <span className="te-kv">
                       <span>Moral durch den Wunsch</span>
@@ -1517,7 +1600,7 @@ function PlanAnsicht({
             {MODI.find((m) => m.id === aktModus)?.name}
           </span>
           <div className="te-kv">
-            <span>Zuwachs nächster Spieltag</span>
+            <span>{neu?.nachVerletzung ? `Zuwachs ab Spieltag ${neu.abSpieltag.nummer} (Rückkehr)` : "Zuwachs nächster Spieltag"}</span>
             <b className="bc-t">
               {jetzt ? vz(jetzt.summe, 3) : "—"} → <span className="bc-plus">{neu ? vz(neu.summe, 3) : "—"}</span> SP
             </b>
@@ -1572,6 +1655,44 @@ function PlanAnsicht({
               </b>
             </div>
           ) : null}
+        </div>
+        <div className="te-vorschau te-top5" data-testid="training-vorschau-top5">
+          <span className="te-gk">Wirkt auf · Top 5 Disziplinen bis Saisonende</span>
+          {wirkungsVergleich && wirkungsVergleich.zeilen.length > 0 ? (
+            <>
+              {wirkungsVergleich.zeilen.map((d) => (
+                <div key={d.disziplinId} className="te-kv" data-testid="training-top5-zeile">
+                  <span>
+                    {zielLabel(d.disziplinId)}
+                    {d.istZiel ? <small className="bc-t te-ziel-marke"> · Ziel</small> : null}
+                    <small className="bc-t"> · jetzt {zahl(d.heute, 1)}</small>
+                  </span>
+                  <b className="bc-t">
+                    {aenderungImPlan ? (
+                      <>
+                        {vz(d.deltaBisher, 2)} → <span className={ton(d.deltaNeu)}>{vz(d.deltaNeu, 2)}</span>
+                      </>
+                    ) : (
+                      <span className={ton(d.deltaNeu)}>{vz(d.deltaNeu, 2)}</span>
+                    )}{" "}
+                    <small>
+                      = {zahl(d.neu, 1)}
+                      {d.kaderRangNeu != null ? ` · Platz ${d.kaderRangNeu}` : ""}
+                    </small>
+                  </b>
+                </div>
+              ))}
+              <p className="te-hinweis">
+                {zeile.verletzt && wirkungsVergleich.ersterTrainingsSpieltag
+                  ? `Training ruht bis zur Rückkehr, gerechnet ab Spieltag ${wirkungsVergleich.ersterTrainingsSpieltag.nummer}. `
+                  : ""}
+                Zuwachs bis Saisonende{aenderungImPlan ? ", bisher → mit Änderung" : ""}.
+                {wirkungsVergleich.eignungsModus === "schaetzung" ? " Geschätzt, fremde Kader verdeckt." : ""}
+              </p>
+            </>
+          ) : (
+            <p className="te-hinweis">Keine Prognose, es fehlt der volle Attributbogen.</p>
+          )}
         </div>
         <div className="te-offen">
           <span className="te-gk">Offene Änderungen · {aenderungen.length}</span>
