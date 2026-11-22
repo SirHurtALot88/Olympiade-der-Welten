@@ -46,6 +46,13 @@ export type WertungsSkalenStempel = {
    * `ppSkalaModusFuerZeile()`); Zeilen ab diesem Spieltag tragen `ppSkala: "c2"`.
    */
   ppAb?: string;
+  /**
+   * PP-TAGESANKER (22.11., lib/resolve/pp-tagesanker.ts, docs/design/pp-tagesanker-live-22-11.md): `true` =
+   * die Spieler-PP dieser Saison werden je Disziplin und Spieltag ueber alle Spieler beider Ligen
+   * neu verteilt (Tagesanker + weiche Kappe). Fehlt das Feld (Saves vor dem 22.11., Umstellung mitten in
+   * der Saison), gilt `false`: die laufende Saison rechnet zu Ende wie bisher. Nur mit `pp: "c2"` wirksam.
+   */
+  ppTagesanker?: boolean;
 };
 
 type Schalter = "an" | "aus" | "aus-sofort" | "roh";
@@ -64,6 +71,16 @@ export function ppSkalaSchalter(): Schalter {
   return leseSchalter(process.env.NEXT_PUBLIC_OLY_PP_SKALA) ?? leseSchalter(process.env.OLY_PP_SKALA) ?? "an";
 }
 
+/**
+ * PP-Tagesanker-Schalter (`OLY_PP_TAGESANKER`, Browser: `NEXT_PUBLIC_OLY_PP_TAGESANKER`): leer | "an" = neue
+ * Saisons bekommen den Tagesanker im Stempel (Standard seit 22.11.), "aus" = Rueckweg (neue Saisons ohne,
+ * gestempelte Saisons rechnen wie gestempelt), "aus-sofort" = Notbremse (ignoriert jeden Stempel).
+ */
+export function ppTagesankerSchalter(): Exclude<Schalter, "roh"> {
+  const s = leseSchalter(process.env.NEXT_PUBLIC_OLY_PP_TAGESANKER) ?? leseSchalter(process.env.OLY_PP_TAGESANKER) ?? "an";
+  return s === "roh" ? "an" : s;
+}
+
 export function ergebnisSkalaSchalter(): Exclude<Schalter, "roh"> {
   const s = leseSchalter(process.env.NEXT_PUBLIC_OLY_ERGEBNIS_SKALA) ?? leseSchalter(process.env.OLY_ERGEBNIS_SKALA) ?? "an";
   return s === "roh" ? "an" : s;
@@ -78,10 +95,14 @@ export function istBattleSpielstand(gameState: { scenarioMeta?: { gameMode?: str
 export function wertungsSkalenFuerNeueSaison(seasonId: string): WertungsSkalenStempel {
   const pp = ppSkalaSchalter();
   const ergebnis = ergebnisSkalaSchalter();
+  const c2 = !(pp === "aus" || pp === "aus-sofort");
+  const tagesanker = ppTagesankerSchalter();
   return {
     seasonId,
-    pp: pp === "aus" || pp === "aus-sofort" ? "alt" : "c2",
+    pp: c2 ? "c2" : "alt",
     ergebnis: ergebnis === "aus" || ergebnis === "aus-sofort" ? "alt" : "e1",
+    // Nur zusammen mit C2 und nur, wenn der Schalter nicht "aus"/"aus-sofort" steht.
+    ppTagesanker: c2 && tagesanker === "an",
   };
 }
 

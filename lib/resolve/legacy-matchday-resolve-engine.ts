@@ -371,6 +371,7 @@ export function buildLegacyMatchdayResolvePreview(
     captainMode: options?.captainMode ?? "selected_captain",
     arenaTeamPointsByDisciplineId: options?.arenaTeamPointsByDisciplineId ?? null,
     arenaIndividualBoxscorePpsByDisciplineId: options?.arenaIndividualBoxscorePpsByDisciplineId ?? null,
+    arenaIndividualBoxscorePpsVorAnkerByDisciplineId: options?.arenaIndividualBoxscorePpsVorAnkerByDisciplineId ?? null,
     arenaAusfallByDisciplineId: options?.arenaAusfallByDisciplineId ?? null,
     // MINI-DM-FFA-ROHDATEN (PR 4, 21.10.): kein heutiger Aufrufer setzt dieses Feld (s.
     // Kommentar an `LegacyResolvePreviewOptions.miniDmFfaPodRohdatenByDisciplineId`) -- der
@@ -1383,6 +1384,11 @@ export function buildLegacyMatchdayResolvePreview(
         spielerZeilen: rawPlayerEntries,
         disciplineId,
         playerCount: legacyScorePlayerCountForThisDiscipline,
+        // PP-TAGESANKER: E1 rechnet auf den C2-PP VOR dem Tagesanker (so sind die Anker gezogen); ohne Eintrag
+        // (kein Tagesanker, Rueckfall auf pps_duell) bleibt es bei `pointsAwarded`.
+        ppVorAnkerByPlayerId: isBattleModeArenaEligible
+          ? resolveOptions.arenaIndividualBoxscorePpsVorAnkerByDisciplineId?.get(disciplineId) ?? null
+          : null,
         // Battlefield-Pod: Anker des Formats DIESES Spieltags (alte Spieltage "orte3" behalten ihre Anker).
         // Hockey-Duell: Anker der Torwart-Regel DIESES Spieltags (alte Regel = alte Anker); Basketball-Duell ebenso mit der Puste-Regel.
         podVariante:

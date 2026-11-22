@@ -128,13 +128,23 @@ export function skaliereUngedeckelt(
   disciplineId: string,
   ungedeckelt: number,
   zuschlag = 0,
-  optionen: { modus?: PpSkalaModus; playerCount?: number | null; variante?: PpSkalaAnkerVariante } = {},
+  optionen: {
+    modus?: PpSkalaModus;
+    playerCount?: number | null;
+    variante?: PpSkalaAnkerVariante;
+    /**
+     * PP-TAGESANKER (lib/resolve/pp-tagesanker.ts): `false` liefert den C2-Wert OHNE den Deckel 5 und ohne
+     * Rundung -- die Eingabe fuer `verteilePpNachTagesanker()`. Standard `true`: unveraendert.
+     */
+    deckel?: boolean;
+  } = {},
 ): number {
   const modus = optionen.modus ?? "an";
   const basis = Math.max(0, ungedeckelt);
   if (modus === "roh") return runde2(basis + zuschlag);
   const anker = ppSkalaAnker(disciplineId, optionen.playerCount, optionen.variante);
   const neu = anker ? (basis <= 0 ? 0 : PP_SKALA_MAX * Math.pow(basis / anker.rTop, anker.exponent)) : basis;
+  if (optionen.deckel === false) return neu + zuschlag;
   return runde2(Math.min(PP_SKALA_MAX, neu + zuschlag));
 }
 
@@ -156,9 +166,11 @@ export function ppAusKurveSkaliert(input: {
   playerCount?: number | null;
   /** Alte Variante ("orte3" Battlefield, "torwartAlt" Hockey, "pusteAlt" Basketball, "gauntletAlt" Breaking): die Anker dieses Formats/dieser Regel (gezeigt = gebucht). */
   variante?: PpSkalaAnkerVariante;
+  /** `false`: ungedeckelt und ungerundet (PP-Tagesanker, s. `skaliereUngedeckelt()`). Standard `true`. */
+  deckel?: boolean;
 }): number {
   const { referenz } = input;
-  const optionen = { modus: input.modus, playerCount: input.playerCount, variante: input.variante };
+  const optionen = { modus: input.modus, playerCount: input.playerCount, variante: input.variante, deckel: input.deckel };
   const zuschlag = input.zuschlag ?? 0;
   const max = input.max ?? PP_SKALA_ALT_MAX;
   const anteilMitte = input.anteilMitte ?? PP_SKALA_ALT_ANTEIL_MITTE;

@@ -295,6 +295,11 @@ E1: je Begegnung 0–10 je Seite (Kantersieg 10:0, Median-Sieg 7:4, Remis bleibt
 „eigener Wert minus Mittel der Gegner“; die Arena zeigt „87 : 79 → 7 : 4“. Anker nachkalibrieren:
 `werte-pp-skala-aus.mjs` dann `werte-ergebnisskala-aus.ts` (je `--schreibe-kalibrierung`). Doku:
 `docs/design/pp-skala-18-11.md` Abschnitt 8, `docs/design/ergebnisskala-18-11.md`.
+**PP-Tagesanker (Chris, 22.11.: „ja“, scharf ab der nächsten Saison):** gegen den Klumpen bei 5,0 werden die Spieler-PP je Disziplin
+und Spieltag über beide Ligen neu verteilt (Mittel der besten drei auf 5,5, weiche Kappe ab 4, Tagesbester um 4,8–5,0).
+Schalter ist der Stempel `seasonState.wertungsSkalen.ppTagesanker` (neues Spiel ab Saison 1 an; bestehender Spielstand erst
+ab dem nächsten Saisonwechsel, gebuchte Spieltage bleiben), jeder Rechenweg fragt `ppTagesankerFuer(gameState, matchdayId)`.
+Rückweg `OLY_PP_TAGESANKER=aus` (neue Saisons), Notbremse `=aus-sofort`. Doku: `docs/design/pp-tagesanker-live-22-11.md`.
 
 ## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
 
