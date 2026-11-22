@@ -17,6 +17,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { ppAusKurveSkaliert, ppSkalaModus } from "@/lib/resolve/pp-skala";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import { buildArenaAufstellung } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import {
   runBattlefieldPodFixtures,
@@ -124,7 +125,10 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
   const rohdatenByPodId = new Map<string, BattlefieldPodRohdaten>();
   const playerPpsByPlayerId = new Map<string, number>();
   const warnings: string[] = [];
-  const referenz = resolveBattlefieldPodSpielerPpReferenz(k);
+  // FORMAT DES SPIELTAGS (22.11., lib/resolve/battlefield-format.ts): Referenz und Rohdaten tragen es, damit ein im
+  // alten Format gebuchter Spieltag auch nach einem Rueckweg-Wechsel mit seiner eigenen Referenz bewertet wird.
+  const format = battlefieldFormatFuer(input.gameState, input.matchdayId);
+  const referenz = resolveBattlefieldPodSpielerPpReferenz(k, format);
   const ppSkala = ppSkalaModus(input.gameState, input.matchdayId);
 
   pods.forEach((pod, index) => {
@@ -148,6 +152,7 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
       podId: pod.id,
       teamIds: pod.teamIds,
       playerCount: k,
+      format,
       teams: ergebnis.teams.map((team) => ({
         teamId: team.teamId,
         eventPlatz: team.eventPlatz,
@@ -163,7 +168,7 @@ export async function runBattlefieldPodMatchday(input: RunBattlefieldPodMatchday
         eintrag.playerId,
         // PP-SKALA C2 (docs/design/pp-skala-18-11.md): Skala aus dem Saison-Stempel.
         ppSkala !== "aus"
-          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz, modus: ppSkala, playerCount: k })
+          ? ppAusKurveSkaliert({ disciplineId: BATTLEFIELD_DISCIPLINE_ID, wert: eintrag.wertung, referenz, modus: ppSkala, playerCount: k, variante: format === "orte3" ? "orte3" : undefined })
           : ppAusBattlefieldPodWertung(eintrag.wertung, referenz),
       );
     }

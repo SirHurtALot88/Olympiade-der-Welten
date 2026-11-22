@@ -135,6 +135,10 @@ describe.skipIf(!chromiumVerfuegbar())("Battlefield-Pod: vier Teams gleichzeitig
     await seite.waitForFunction(() => typeof (window as unknown as { __arena?: unknown }).__arena !== "undefined", null, {
       timeout: LAUF_TIMEOUT_MS,
     });
+    // SEIT 22.11. ist die Motor-Vorgabe "domination5" (Fuenf Punkte live, docs/design/battlefield-5punkte-22-11.md).
+    // Diese Datei schuetzt das Gefecht je Ort ("orte3", Rueckweg): die Seite faehrt es als globales Format;
+    // das Fuenf-Punkte-Format steht in tests/battlefield-domination5.test.ts.
+    await seite.evaluate(() => (window as unknown as { __arena: { battlefieldFormat: (f: string) => string } }).__arena.battlefieldFormat("orte3"));
   }, LAUF_TIMEOUT_MS);
 
   afterAll(async () => {

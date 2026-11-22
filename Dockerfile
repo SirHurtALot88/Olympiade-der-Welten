@@ -35,6 +35,12 @@ ENV NEXT_PUBLIC_OLY_ERGEBNIS_SKALA=$NEXT_PUBLIC_OLY_ERGEBNIS_SKALA
 # Climbing-Format (Canyon live, 18.11., lib/resolve/climbing-format.ts): leer = Canyon, "standard" = Rueckweg.
 ARG NEXT_PUBLIC_OLY_CLIMBING_FORMAT=""
 ENV NEXT_PUBLIC_OLY_CLIMBING_FORMAT=$NEXT_PUBLIC_OLY_CLIMBING_FORMAT
+# Battlefield-Format (Fuenf Punkte live, 22.11., lib/resolve/battlefield-format.ts): leer = fuenf Punkte, "alt" = Rueckweg.
+ARG NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT=""
+ENV NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT=$NEXT_PUBLIC_OLY_BATTLEFIELD_FORMAT
+# Hockey-Torwart-Regel (22.11., lib/resolve/hockey-torwart.ts): leer = neue Regel, "alt" = Rueckweg.
+ARG NEXT_PUBLIC_OLY_HOCKEY_TORWART=""
+ENV NEXT_PUBLIC_OLY_HOCKEY_TORWART=$NEXT_PUBLIC_OLY_HOCKEY_TORWART
 
 COPY . .
 RUN npm run db:generate

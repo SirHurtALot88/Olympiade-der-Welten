@@ -12,6 +12,7 @@ import {
   type ArenaAufstellung,
 } from "@/lib/foundation/battle-arena/arena-aufstellung-adapter";
 import { battlefieldPodFormatOption } from "@/lib/battle/arena-resolved-disciplines";
+import { battlefieldFormatFuer } from "@/lib/resolve/battlefield-format";
 import type { GameState, Player } from "@/lib/data/olyDataTypes";
 import type { ArenaVerletzungsstand } from "@/lib/fatigue/fatigue-injury-service";
 import { seedZuZahl } from "@/lib/battle/arena-seed";
@@ -493,7 +494,7 @@ export type VorbereitetesFixture = {
    * "standard" }`, nur fuer Climbing gesetzt -- derselbe Umschlag-Teil, den der Host fuer die Anzeige setzt
    * (gezeigt = gebucht). Fehlt fuer jede andere Disziplin, deren Umschlag damit Zeichen fuer Zeichen der alte bleibt.
    */
-  formatByDisciplineId?: { climbing: "standard" | "canyon" };
+  formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu" };
 };
 
 /**
@@ -690,7 +691,7 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
     kulisseByDisciplineId: Record<string, string>;
     strategieByDisciplineId?: ArenaStrategieByDisciplineId;
-    formatByDisciplineId?: { climbing: "standard" | "canyon" };
+    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu" };
   }[];
   disziplin: string;
   /** Der Spieltagswurf, s. `RunArenaFixturesOptions.mutatoren` — fuer jedes Fixture derselbe. */
@@ -731,7 +732,7 @@ async function simuliereFixturesImBrowser(payload: {
     aufstellung: ArenaAufstellung;
     kulisseByDisciplineId: Record<string, string>;
     strategieByDisciplineId?: ArenaStrategieByDisciplineId;
-    formatByDisciplineId?: { climbing: "standard" | "canyon" };
+    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu" };
   }) => {
     fenster.__olyArenaKader = {
       heim: kader.heim,
@@ -1777,6 +1778,7 @@ export async function runBattlefieldPodFixtures(
 ): Promise<Array<BattlefieldPodFixtureResult | null>> {
   if (pods.length === 0) return [];
   const { vorbereitet, einsatzfaehig } = bereiteBattlefieldPodsVor(gameState, pods, options);
+  const format = battlefieldFormatFuer(gameState, options.matchdayId !== undefined ? options.matchdayId : gameState.matchdayState?.matchdayId ?? null);
   const seitenPfad = path.resolve(process.cwd(), "public", "mockups", "battle-mode.html");
   if (!existsSync(seitenPfad)) {
     throw new Error(`arena-headless-runner: battle-mode.html nicht gefunden unter ${seitenPfad}.`);
@@ -1810,7 +1812,7 @@ export async function runBattlefieldPodFixtures(
         teams: pod.kaderJeTeam,
         seed: pod.seed,
         platzJeTeam: pod.platzJeTeam,
-        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption() },
+        optionen: { ...(options.k != null ? { jeSeite: options.k } : {}), formSaat: pod.seed, ...battlefieldPodFormatOption(format) },
       })),
       timeoutMs,
     });

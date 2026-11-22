@@ -13268,6 +13268,66 @@
   // gegengeprueft. Bericht: docs/design/hockey-torwart-konstanten-nachgezogen.md.
   const HK_TW_REF=0.871, HK_TW_BASIS=9.13, HK_TW_GSAA_K=2.0;
 
+  // TORWART-REGEL (22.11., docs/design/hockey-torwart-22-11.md): zwei Aenderungen an dem, was ein Torwart halten
+  // kann, beide nur ueber Attribute, die die Matrix schon gewichtet.
+  //   gueteEig   Nebenweg ueber die Eignung. PARADE (awareness/will/determination/health/dexterity) hat auf der
+  //              Kader-Familie praktisch keinen Bezug zur Hockey-Eignung (Korrelation -0,05): ein Torwart mit
+  //              Power 80 und Gesundheit 80 war laut Matrix ein Top-Mann und hielt trotzdem Durchschnitt. Seine
+  //              Parade-Guete ist jetzt ein Mix aus PARADE (Primaerweg) und der auf die PARADE-Skala gelegten
+  //              Eignung `eig` (gueteMitte/eigMitte/eigSteil rechnen die Eignungsskala auf die PARADE-Skala um).
+  //   dauer*     Puste unter Dauerfeuer: jeder Schuss, der den Torwart erreicht, kostet `dauerKosten` Puste
+  //              (der vorhandene Puste-Vorrat aus AUSDAUER, HUD-Leiste unter den Fuessen), die Erholung laeuft
+  //              ueber die bestehende Regeneration; die Guete sinkt um `dauerMax` bei leerer Puste.
+  // `an:false` ist das alte Verhalten Zeichen fuer Zeichen (PARADE pur, kein Puste-Abzug).
+  // Rueckweg im Spiel: OLY_HOCKEY_TORWART=alt (Stempel, s. lib/resolve/hockey-torwart.ts).
+  const HK_TW_REGEL_KONSTANTE={an:true, gueteEig:0.6, gueteMitte:65, eigMitte:56, eigSteil:0.6, dauerKosten:4, dauerMax:12, xgAnteil:0.5, skalaMul:0.92, steil:0.022, f0:0.73, fMin:0.40, fMax:1.15, ref:0.866, basis:9.23};
+  let HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE};
+  // Ist die neue Regel fuer DIESES Spiel an? Ausdruecklich gesetzt (Messhebel `hockeyTorwart()`) gilt das; sonst das gebuchte
+  // Format des Spieltags aus dem Kader-Umschlag (`formatByDisciplineId.hockey`, lib/resolve/hockey-torwart.ts) -- ein mit der
+  // alten Regel gebuchter Spieltag bleibt in der Wiedergabe "alt" (gezeigt = gebucht).
+  // Summe der tatsaechlichen Torwahrscheinlichkeiten je Torwart (WeakMap statt Feld am Spieler: ein neues Feld am Spielerobjekt
+  // landet im Protokoll und verschoebe den Wertungs-Fingerabdruck auch bei unveraendertem Spielverlauf).
+  const HK_XG_AKT=new WeakMap();
+  const HK_TW_MUEDE=new WeakSet();
+  let HK_TW_EXPLIZIT=false;
+  function hkTwAn(){
+    if(HK_TW_EXPLIZIT)return HK_TW_REGEL.an;
+    const f=echterKader&&echterKader.formatByDisciplineId&&echterKader.formatByDisciplineId.hockey;
+    return f==="alt"?false:HK_TW_REGEL.an;
+  }
+  function torwartGuete(tw){
+    const R=HK_TW_REGEL;
+    if(!hkTwAn())return tw.PARADE;
+    let g=tw.PARADE;
+    if(R.gueteEig>0){
+      const e=Math.max(20,Math.min(95,R.gueteMitte+((tw.eig||0)-R.eigMitte)*R.eigSteil));
+      g=(1-R.gueteEig)*g+R.gueteEig*e;
+    }
+    if(R.dauerMax>0&&tw.pusteMax>0)g-=R.dauerMax*(1-pusteAnteil(tw));
+    return g;
+  }
+  // Der Faktor auf die Torwahrscheinlichkeit eines Schusses, der den Torwart erreicht. Alt: PARADE 20 -> 1,00, PARADE 95 -> 0,55
+  // (Steigung 0,006 je Punkt). Neu: dieselbe Mitte (Guete 65 -> f0 0,73), aber steilere Steigung, sodass der Unterschied zwischen
+  // einem guten und einem schwachen Torwart gegen das Schussrauschen eines Spiels sichtbar wird.
+  function torwartFaktor(tw){
+    const R=HK_TW_REGEL;
+    if(!hkTwAn())return 1-Math.max(0,Math.min(0.45,(tw.PARADE-20)*0.0060));
+    return Math.max(R.fMin,Math.min(R.fMax,R.f0-(torwartGuete(tw)-R.gueteMitte)*R.steil));
+  }
+  // Nachziehung der Torzahl: HK_TOR_SKALA haelt die Torzahl, und die neue Torwart-Regel (Dauerfeuer, steilere Guete) verschiebt die
+  // mittlere Fangquote leicht; `skalaMul` zieht sie auf dieselbe Torzahl zurueck. Alt: 1.
+  function torSkalaMul(){ return hkTwAn()?HK_TW_REGEL.skalaMul:1; }
+  function torwartSchussBelastung(tw){
+    const R=HK_TW_REGEL;
+    if(!hkTwAn()||!(R.dauerKosten>0)||!(tw.pusteMax>0))return;
+    tw.puste=Math.max(0,tw.puste-R.dauerKosten);
+    if(tw.puste<tw.pusteMin)tw.pusteMin=tw.puste;
+    // Ticker-Hinweis (nur Anzeige, kein rr()): einmal, wenn die Puste unter 30 % faellt; erst nach der Erholung ueber 60 % wieder.
+    const anteil=pusteAnteil(tw);
+    if(anteil<0.3&&!HK_TW_MUEDE.has(tw)){ HK_TW_MUEDE.add(tw); feed(tw.side,tw.n+" steht unter Dauerfeuer — die Puste geht aus."); }
+    else if(anteil>0.6)HK_TW_MUEDE.delete(tw);
+  }
+
   // H5 (Hockey-Opus-Review Abschnitt 3.3/6, 02.10.): das Verhaeltnis in
   // `punkte*1.5+xg*1.5` wurde beim Einbau (K3) nie gegen Alternativen gesweept — nur
   // "ganz statt halb" wurde verglichen (0,649, schlechter). "Ein Sweep ueber das
@@ -13422,13 +13482,19 @@
         // hat (hockeySchussAusgang, ohne paradeFaktor) — exakt der Nenner, den die echte
         // Analytik fuer GSAx nimmt. Faellt auf GSAA zurueck, solange HK_TORWART_FORMEL
         // (Messhebel, Spielkonstante "gsaa") nicht auf "gsax" steht.
-        const gsaa=()=>{ const schuesse=u.saves+u.gegentore; return schuesse*(1-HK_TW_REF)-u.gegentore; };
+        // TORWART-REGEL (22.11.): Gegentore halb als erwartete Gegentore gebucht (`xgAnteil`) -- dasselbe Prinzip wie K3 bei den
+        // Feldspielern: im Erwartungswert gleich, aber ohne den Muenzwurf, den ein einzelnes Tor bei rund 5 Gegentoren je Spiel
+        // darstellt. Ein Gegentor bleibt der teuerste Posten; nur sein Zufallsanteil wird gedaempft.
+        const gsaa=()=>{ const schuesse=u.saves+u.gegentore;
+          const gegen=hkTwAn()&&HK_TW_REGEL.xgAnteil>0
+            ?(1-HK_TW_REGEL.xgAnteil)*u.gegentore+HK_TW_REGEL.xgAnteil*(HK_XG_AKT.get(u)||0):u.gegentore;
+          return schuesse*(1-(hkTwAn()?HK_TW_REGEL.ref:HK_TW_REF))-gegen; };
         const impact=HK_TORWART_FORMEL==="gsax"
           ?((u.xgGegen||0)-u.gegentore)*HK_TW_GSAX_K
           :gsaa()*HK_TW_GSAA_K;
         // A1/A2 getrennt gewichtet wie beim Feldspieler unten (s. dort) — ein Torwart
         // bekommt in der Praxis fast nie eine Vorlage, die Formel bleibt trotzdem konsistent.
-        return HK_TW_BASIS+impact+u.punkte*3+u.assists1*2+u.assists2*1.5;
+        return (hkTwAn()?HK_TW_REGEL.basis:HK_TW_BASIS)+impact+u.punkte*3+u.assists1*2+u.assists2*1.5;
       }
       // DIE WERTFORMEL, NACHGEZOGEN — drei Befunde des Overseers, alle gemessen:
       //
@@ -16859,9 +16925,10 @@
     // PARADE 20 -> Faktor 1,00 (kein Halt), PARADE 95 -> 0,55. Bewusst gemaessigt: der
     // Torwart soll ein spuerbarer Unterschied sein, aber nicht die einzige Zahl, die
     // ueber ein Spiel entscheidet.
-    const paradeFaktor=tw?1-Math.max(0,Math.min(0.45,(tw.PARADE-20)*0.0060)):1;
+    const paradeFaktor=tw?torwartFaktor(tw):1;
+    if(tw)torwartSchussBelastung(tw);
     const pTor=Math.max(0.01,Math.min(0.60,
-      technik*(tw?HK_TOR_SKALA:HK_TOR_SKALA_LEER)*paradeFaktor));
+      technik*(tw?HK_TOR_SKALA*torSkalaMul():HK_TOR_SKALA_LEER)*paradeFaktor));
     // H2 (Hockey-Opus-Review Abschnitt 2.3/6, 02.10.): GSAx statt GSAA fuer die
     // Torwart-Wertung (feldspielWert, s. dort). GSAx braucht erwartete Gegentore OHNE
     // die Guete DIESES Torwarts — nimmt man `pTor` wie es ist, steckt `paradeFaktor`
@@ -16873,8 +16940,11 @@
     // ueberhaupt erreicht (also nicht geblockt und nicht "vorbei" davor, s. Kommentar
     // oben zu `schuesse=saves+gegentore` an HK_TW_REF) — exakt derselbe Nenner wie GSAA.
     if(tw){
-      const pTorNeutral=Math.max(0.01,Math.min(0.60,technik*HK_TOR_SKALA));
+      const pTorNeutral=Math.max(0.01,Math.min(0.60,technik*HK_TOR_SKALA*torSkalaMul()));
       tw.xgGegen=(tw.xgGegen||0)+pTorNeutral;
+      // Torwart-Regel (22.11.): die TATSAECHLICHE Torwahrscheinlichkeit (mit der Guete DIESES Torwarts) summiert --
+      // das Pendant zum xg der Feldspieler (K3). Kein neuer rr()-Aufruf. Gelesen nur von feldspielWert (xgAnteil).
+      HK_XG_AKT.set(tw,(HK_XG_AKT.get(tw)||0)+pTor);
     }
     if(rr()<pTor)return {ausgang:"tor",torwart:tw,pTor};
     if(!tw)return {ausgang:"vorbei",torwart:null,pTor};
@@ -16973,7 +17043,7 @@
       // per Dekret. Nur der SLOT-Zweig ist der bisherige, frontale Abpraller; die Mehrheit
       // geht jetzt seitlich Richtung Bande/hinter das Tor (s. HK_ABPRALLER_SLOT_*).
       const slotChance=Math.max(HK_ABPRALLER_SLOT_MIN,
-        HK_ABPRALLER_SLOT_BASIS-(tw.PARADE-50)*HK_ABPRALLER_SLOT_K);
+        HK_ABPRALLER_SLOT_BASIS-(torwartGuete(tw)-50)*HK_ABPRALLER_SLOT_K);
       if(rr()<slotChance){
         const streu=18+rr()*34, winkel=(rr()-0.5)*2.0;
         fsLive.ball.frei=haltePuckImFeld({x:torX+rein*Math.cos(winkel)*streu,
@@ -41379,9 +41449,13 @@
   // rechnet fuer N=2 exakt dieselben Zahlen wie vorher — nachgeprueft per Fingerabdruck
   // (tests/battlefield-pod-ffa.test.ts, Teil 1).
   let bfPodKader=null;
-  // BATTLEFIELD-POD-FORMAT (17.11., s. BF_D5): "orte3" (Standard, bit-identisch) | "domination5".
+  // BATTLEFIELD-POD-FORMAT (17.11., s. BF_D5): "domination5" | "orte3". SEIT 22.11. ist "domination5" die
+  // MOTOR-VORGABE (Fuenf-Punkte-Domination mit Respawn bei sinkenden HP, docs/design/battlefield-5punkte-22-11.md);
+  // "orte3" (das Gefecht je Ort, bit-identisch zum Stand vor dem 17.11.) bleibt als Rueckweg, ueber
+  // `optionen.format`, `pod.format` (Host) oder window.__arena.battlefieldFormat("orte3"). Gebucht wird das
+  // Format je Spieltag aus dem Spielstand-Stempel (lib/resolve/battlefield-format.ts), nie aus dieser Vorgabe.
   // Hier oben deklariert, weil reset() beim Laden laeuft; die Leser sind Funktionsdeklarationen.
-  let BF_POD_FORMAT="orte3";
+  let BF_POD_FORMAT="domination5";
   function bfPodFormatPruefen(f){
     if(f!=="orte3"&&f!=="domination5")throw new Error("Battlefield-Format unbekannt: "+f+" (erwartet orte3|domination5)");
     return f;
@@ -59156,6 +59230,7 @@
       }
     }
     const spaeteLabels=[];
+    const hpStufenTags=[];
     for(const u of U){
       const c=kampfSeitenFarbe(u.side);
       const imNebel=disc==="battlefield"&&!bfPodAktiv()&&u.side===1&&!u.down&&!((u.nebelSichtBis||0)>=t);
@@ -59203,6 +59278,14 @@
         const w=30,p=u.hp/u.max;
         ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+26,w,3);
         ctx.fillStyle=p<.34?css("--crit"):css("--ok");ctx.fillRect(x-w/2,y+26,w*p,3);
+        // HP-STUFE NACH DEM RESPAWN (22.11., Fuenf-Punkte-Pod): das Stueck des Balkens, das nach dem Respawn
+        // nicht mehr gefuellt werden kann, ist dunkel schraffiert, dazu die Stufe als kleine Zahl.
+        if(u.bfHp!=null&&u.bfHp<1&&KP&&KP.pod&&KP.pod.format==="domination5"){
+          ctx.fillStyle="rgba(10,10,14,.85)";ctx.fillRect(x-w/2+w*u.bfHp,y+26,w*(1-u.bfHp),3);
+          // Die Zahl wird erst nach den Namen gesetzt (`hpStufenTags`, s. Beschriftungen zuletzt): dort kennt man alle
+          // Namensrechtecke und waehlt eine Lage, die keinen Namen und keine andere Zahl ueberdeckt.
+          hpStufenTags.push({x,y,w,tx:Math.round(u.bfHp*100)+" %",alpha:ctx.globalAlpha});
+        }
         if(u.skills){
           ctx.fillStyle=css("--line");ctx.fillRect(x-w/2,y+30,w,2);
           ctx.fillStyle=css("--away");ctx.fillRect(x-w/2,y+30,w*(u.mp/Math.max(1,u.mpMax)),2);
@@ -59281,6 +59364,38 @@
         ctx.globalAlpha=l.alpha;ctx.font=l.fontStr;
         ctx.strokeStyle="rgba(8,10,14,.85)";ctx.strokeText(l.txt,l.x,l.y);
         ctx.fillStyle=l.farbe;ctx.fillText(l.txt,l.x,l.y);
+      }
+      ctx.restore();
+    }
+    // HP-STUFE (22.11., Fuenf-Punkte-Pod): kleine Zahl neben dem Balken, nie ueber einem Namen. Kandidaten: rechts vom
+    // Balken, links, rechts/links ueber dem Balken; genommen wird die erste Lage ohne Ueberdeckung mit einem Namen
+    // (gemessen mit der Schrift der Beschriftung) oder einer schon gesetzten Zahl. Passt keine, entfaellt die Zahl --
+    // das schraffierte Balkenstueck zeigt die Stufe weiter.
+    if(hpStufenTags.length){
+      ctx.save();
+      const rects=[];
+      for(const l of spaeteLabels){
+        ctx.font=l.fontStr;const hb=ctx.measureText(l.txt).width/2+2;
+        rects.push({x0:l.x-hb,x1:l.x+hb,y0:l.y-7,y1:l.y+7});
+      }
+      ctx.font="700 10px 'Barlow Condensed',sans-serif";ctx.lineWidth=2.5;ctx.strokeStyle="rgba(0,0,0,.85)";ctx.fillStyle="#ffd37a";ctx.textBaseline="middle";
+      const trifft=(r)=>rects.some(q=>r.x0<q.x1&&r.x1>q.x0&&r.y0<q.y1&&r.y1>q.y0);
+      for(const g of hpStufenTags){
+        const tw=ctx.measureText(g.tx).width+2;
+        const kand=[
+          {ax:g.x+g.w/2+3,ay:g.y+27.5,al:"left"},
+          {ax:g.x-g.w/2-3,ay:g.y+27.5,al:"right"},
+          {ax:g.x+g.w/2+3,ay:g.y+19,al:"left"},
+          {ax:g.x-g.w/2-3,ay:g.y+19,al:"right"},
+        ];
+        for(const k of kand){
+          const r={x0:k.al==="left"?k.ax-1:k.ax-tw,x1:k.al==="left"?k.ax+tw:k.ax+1,y0:k.ay-6,y1:k.ay+6};
+          if(trifft(r))continue;
+          rects.push(r);
+          ctx.globalAlpha=g.alpha;ctx.textAlign=k.al;
+          ctx.strokeText(g.tx,k.ax,k.ay);ctx.fillText(g.tx,k.ax,k.ay);
+          break;
+        }
       }
       ctx.restore();
     }
@@ -59429,6 +59544,29 @@
         ctx.globalAlpha=u.down?.25:1; ctx.fillStyle=u.down?"#666":farbe;
         ctx.beginPath(); ctx.arc(x+breite-8-(kopf.length-1-i)*7,y0+hoehe/2,2.6,0,6.283); ctx.fill();
       });
+      // FUENF PUNKTE (22.11.): zweite Zeile -- wie viele der fuenf Orte das Team haelt (gefuellte Kaestchen)
+      // und wer gerade auf den Respawn wartet (Sekunden bis zur Rueckkehr, danach mit weniger HP).
+      if(KP.pod.format==="domination5"){
+        const y1=y0+hoehe+2, h1=16, orteN=KP.orte.length;
+        ctx.globalAlpha=.88; ctx.fillStyle="rgba(8,10,14,.78)"; ctx.fillRect(x,y1,breite,h1);
+        for(let i=0;i<orteN;i++){
+          const o=KP.orte[i], px=x+8+i*13;
+          ctx.globalAlpha=1; ctx.strokeStyle=farbe; ctx.lineWidth=1.2; ctx.strokeRect(px+.5,y1+3.5,9,9);
+          if(o.besitz===s){ ctx.fillStyle=farbe; ctx.fillRect(px+1.5,y1+4.5,7,7); }
+        }
+        const wartend=U.filter(u=>u.side===s&&u.down&&u.bfRespawnT!=null&&u.bfRespawnT>t);
+        const tx=x+8+orteN*13+4;
+        ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.font="700 11px 'Barlow Condensed',sans-serif";
+        if(wartend.length){
+          ctx.fillStyle="#ffd37a";
+          const txt="↻ "+wartend.slice(0,2).map(u=>{ const nm=String(u.n).split(" ").pop(); return (nm.length>9?nm.slice(0,8)+"…":nm)+" "+Math.max(1,Math.ceil(u.bfRespawnT-t))+" s"; }).join(", ")+(wartend.length>2?" +"+(wartend.length-2):"");
+          ctx.fillText(txt,tx,y1+h1/2+.5);
+        } else {
+          ctx.fillStyle="rgba(255,255,255,.62)";
+          const haelt=KP.orte.filter(o=>o.besitz===s).length;
+          ctx.fillText(haelt+" von "+orteN+" Orten",tx,y1+h1/2+.5);
+        }
+      }
     }
     ctx.restore();
   }
@@ -65833,8 +65971,11 @@
     // ECHTZEIT + FUENF PUNKTE (Review N5, 17.11.): der Echtzeit-Pod ist der alte freie Kampf um DREI
     // Orte (KP.orte aus bau()); "domination5" gibt es nur als Gefecht. Die Kombination hiesse fuenf
     // Orte in der Anzeige und drei in der Wertung -- deshalb abgelehnt statt still gemischt.
-    if(echtzeit&&BF_POD_FORMAT==="domination5")
-      throw new Error("spieleBattlefieldPod: 'echtzeit' gibt es nur im Standardformat orte3, nicht mit 'domination5'.");
+    // Seit der Vorgabe domination5 (22.11.) heisst das: ein Echtzeit-Pod OHNE ausdrueckliches Format laeuft im Format orte3
+    // und meldet das in der Ergebniszeile (`podFormat:"orte3"`); die ausdrueckliche Kombination echtzeit + domination5
+    // lehnt `spieleBattlefieldPod()` ab (Review 22.11.), statt still auf orte3 zu fallen.
+    const formatVorLauf=BF_POD_FORMAT;
+    if(echtzeit)BF_POD_FORMAT="orte3";
     const M=MOTOREN.battlefield, art=ARENA_ART.battlefield;
     const g=M.sichern(); if(M.vorher)M.vorher();
     const placeVorher={...place}, persVorher={...persOf}, stummVorher=stumm, jeVorher=art.jeSeite;
@@ -65867,7 +66008,7 @@
       }
       M.lauf();
       const pl=bfPodPlatzierung(), wert=M.wert();
-      return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+t.toFixed(2), format:"echtzeit",
+      return {disziplin:"battlefield", saat:normalisiereSaat(saat), dauer:+t.toFixed(2), format:"echtzeit", podFormat:"orte3",
         besitz:KP.orte.map(o=>o.besitz),
         teams:kader.map((_,s)=>({side:s, name:kampfTeamName(s), punkte:+pl.punkte[s].toFixed(1),
           lebend:pl.lebend[s], rausT:pl.rausT[s]==null?null:+pl.rausT[s].toFixed(2),
@@ -65878,7 +66019,7 @@
           erob:+(u.kpd?u.kpd.erob:0).toFixed(3), amOrt:+(u.kpd?u.kpd.amOrt:0).toFixed(2),
           wechsel:u.kpd?u.kpd.wechsel:0, besucht:u.kpd?u.kpd.besucht.slice():[]}))};
     } finally {
-      stumm=stummVorher; art.jeSeite=jeVorher;
+      stumm=stummVorher; art.jeSeite=jeVorher; BF_POD_FORMAT=formatVorLauf;
       for(const k in place)delete place[k];
       Object.assign(place,placeVorher);
       for(const k in persOf)delete persOf[k];
@@ -65900,6 +66041,12 @@
     const formVorher=FORMKARTE, formatVorher=BF_POD_FORMAT;
     // FORMAT (17.11.): `optionen.format` ("orte3" | "domination5") gilt nur fuer diesen Lauf.
     if(opt.format!=null)BF_POD_FORMAT=bfPodFormatPruefen(opt.format);
+    // ECHTZEIT + FUENF PUNKTE (Review N5 17.11., nach der Vorgabe-Umstellung 22.11. wieder ausdruecklich): der Echtzeit-Pod
+    // kennt nur den alten freien Kampf um drei Orte; wer "domination5" verlangt, bekommt einen Fehler statt stillem orte3.
+    if(opt.echtzeit&&opt.format==="domination5"){
+      BF_POD_FORMAT=formatVorher;
+      throw new Error("spieleBattlefieldPod: 'echtzeit' gibt es nur im Format orte3, nicht mit 'domination5'.");
+    }
     try{
       const r=bfPodLauf(teams,saat,platzJeTeam,opt.jeSeite,(kader)=>{
         FORMKARTE={...FORMKARTE};
@@ -65910,7 +66057,8 @@
           ...(u.roh!=null?{roh:u.roh}:{}), ko:u.ko, down:u.down}))};
       if(r.format==="gefecht"){ aus.ende=r.ende; aus.takte=r.takte; if(opt.protokoll)aus.gefecht=r.gefecht; }
       // Nur ausserhalb des Standards gemeldet -- im Standard bleibt das Ergebnis Zeichen fuer Zeichen das alte.
-      if(BF_POD_FORMAT!=="orte3")aus.podFormat=BF_POD_FORMAT;
+      if(r.format==="gefecht"&&BF_POD_FORMAT!=="orte3")aus.podFormat=BF_POD_FORMAT;
+      if(r.format==="echtzeit")aus.podFormat=r.podFormat;
       return aus;
     } finally { FORMKARTE=formVorher; BF_POD_FORMAT=formatVorher; }
   }
@@ -66394,6 +66542,11 @@
   //    nach Kampfsekunden.
   const BF_D5_GRUND=Object.freeze({
     takte:45, taktSek:2, punkteJeSekunde:1, punkteZumSieg:160, respawnTakte:3,
+    // SINKENDE HP BEIM RESPAWN (22.11., Chris-Auftrag Welle 4): wer faellt, steht nach `respawnTakte` wieder
+    // an der Ecke, aber nur mit einem Teil seiner vollen HP -- der n-te Respawn bringt
+    // max(respawnHpMin, 1 - n * respawnHpSchritt) der vollen HP zurueck (Standard 100 % -> 75 % -> 50 %,
+    // danach bleibt es bei 50 %). Fehler kosten damit etwas, aber niemand scheidet aus und die Spaetphase kippt weiter.
+    respawnHpSchritt:0.25, respawnHpMin:0.5,
     // Wucht je 2-s-Takt als Vielfaches der Wucht je 4-s-Takt im Gefecht je Ort. 0,5 waere dieselbe
     // Wucht je Sekunde; 1v1 dauerte dann ~50 s -- fuer Domination mit Respawn viel zu zaeh. Mit 2,2
     // faellt ein Kaempfer im 1v1 nach rund 12 s (Sonde: 37 K.o. und 8 Besitzwechsel je Spiel).
@@ -66411,6 +66564,8 @@
   let BF_D5=JSON.parse(JSON.stringify(BF_D5_GRUND));
   // (BF_POD_FORMAT und die Format-Leser stehen oben bei bfPodKader -- reset() laeuft beim Laden.)
 
+  // Anteil der vollen HP, mit dem der n-te Respawn zurueckkommt (n >= 1).
+  function bfd5RespawnHp(n){ return Math.max(BF_D5.respawnHpMin,1-n*BF_D5.respawnHpSchritt); }
   function bfd5Gefecht(kaempfer,saat,N){
     const P=BFFFA, D=BF_D5, Z=BFFFA_ZWECK, r=D.taktSek/P.taktSek;
     const wurf=(wer,takt,zweck)=>mdffaZufall(saat,wer,takt,zweck);
@@ -66419,10 +66574,10 @@
     const punkte=new Array(N).fill(0), rausTakt=new Array(N).fill(null);
     const takte=[];
     let gespielt=0, ende="zeit";
-    for(const k of kaempfer){ k.ort=null; k.nach=null; k.ankunft=null; k.basis=true; k.respawnTakt=null;
+    for(const k of kaempfer){ k.ort=null; k.nach=null; k.ankunft=null; k.basis=true; k.respawnTakt=null; k.hpStufe=1;
       k.st.takteAmOrt=new Array(M).fill(0); k.st.respawns=0; }
     const schnapp=()=>({
-      k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus, ort:k.ort, nach:k.nach, basis:!!k.basis})),
+      k:kaempfer.map(k=>({stand:Math.round(k.stand*10)/10, raus:k.raus, ort:k.ort, nach:k.nach, basis:!!k.basis, hp:Math.round(k.hpStufe*100)/100, respawnTakt:k.raus?k.respawnTakt:null})),
       orte:orte.map(o=>({besitz:o.besitz, fortschritt:Math.round(o.fortschritt*1000)/1000, erobertVon:o.erobertVon})),
       punkte:punkte.slice(), rausTakt:rausTakt.slice()});
     // PLANUNG je Team: wer frei ist, sucht den lohnendsten Ort (s. Kopfkommentar). Deterministisch,
@@ -66483,9 +66638,11 @@
       const ereignisse=[];
       // 0) RESPAWN an der Ecke.
       for(const k of kaempfer)if(k.raus&&k.respawnTakt!=null&&k.respawnTakt<=t){
-        k.raus=false; k.respawnTakt=null; k.stand=k.stand0; k.atemWeg=false; k.basis=true; k.ort=null; k.nach=null;
+        k.raus=false; k.respawnTakt=null; k.atemWeg=false; k.basis=true; k.ort=null; k.nach=null;
         k.st.respawns++;
-        ereignisse.push({typ:"respawn", wer:k.idx});
+        k.hpStufe=bfd5RespawnHp(k.st.respawns);
+        k.stand=k.stand0*k.hpStufe;
+        ereignisse.push({typ:"respawn", wer:k.idx, hp:Math.round(k.hpStufe*100)/100, n:k.st.respawns});
       }
       // 1) ANKUNFT.
       for(const k of kaempfer)if(!k.raus&&k.nach!=null&&k.ankunft<=t){
@@ -67212,7 +67369,7 @@
     // Derselbe fuenfte Platzierungsschluessel wie bei der Buchung (bfPodPlatzierungAus `zusatz`).
     KP.pod.zusatz=g.teamWert.slice();
     bfPodSpuren=[];
-    g.kaempfer.forEach((k,i)=>{ const u=U[i]; if(u){ u.bfIdx=i; u.bfAnteil=g.anteil[k.n]||0; u.tgt=null; } });
+    g.kaempfer.forEach((k,i)=>{ const u=U[i]; if(u){ u.bfIdx=i; u.bfAnteil=g.anteil[k.n]||0; u.tgt=null; u.bfHp=1; u.bfRespawnT=null; } });
   }
   const bfPodReplayAktiv=()=>!!(KP&&KP.pod&&KP.pod.replay);
   // Wo ein Kaempfer an einem Ort steht: links (Seite 0/2) oder rechts (1/3) vom Ort, auf der Hoehe
@@ -67317,11 +67474,12 @@
       case "ko": {
         const Z=U_(e.ziel), A=e.wer!=null?U_(e.wer):null; if(!Z||Z.down)break;
         Z.hp=0;
+        if(bfPodFormat()==="domination5"&&!still)Z.bfRespawnT=t+BF_D5.respawnTakte*BF_D5.taktSek;
         // FUENF PUNKTE (17.11.): mit Respawn ist ein K.o. kein Ausscheiden -- eigene, leise Buchung
         // statt schalteAus() (dessen Texte "ist ausgeschieden"/"kann nicht mehr weiter" waeren falsch).
         if(A&&!still&&bfPodFormat()==="domination5"){
-          Z.down=true; Z.st.tode++; A.st.ko++; A.st.koAnteil+=1;
-          feedRoutine(Z.side,Z.n+" fällt gegen "+A.n+" — in "+Math.round(BF_D5.respawnTakte*BF_D5.taktSek)+" s zurück an der Ecke.");
+          Z.down=true; Z.st.tode++; A.st.ko++; A.st.koAnteil+=1; 
+          feedRoutine(Z.side,Z.n+" fällt gegen "+A.n+" — in "+Math.round(BF_D5.respawnTakte*BF_D5.taktSek)+" s zurück an der Ecke, mit weniger HP.");
           schwebe({x:Z.x,y:Z.y-40,txt:"K.o.",life:.9,crit:true});
         }
         else if(A&&!still)schalteAus(Z,A);
@@ -67331,8 +67489,9 @@
       case "team-raus": if(!still)feed(e.side,name(e.side)+" ist ausgeschieden — seine Orte fallen auf neutral.",true,undefined,"kontrollpunkt"); break;
       case "erobert": if(!still)feed(e.side,name(e.side)+" übernimmt Punkt "+bfPodOrtName(e.ort)+".",true,undefined,"kontrollpunkt"); break;
       // FUENF PUNKTE (17.11.): Respawn -- er steht an seiner Ecke wieder auf (still: nur Zustand).
-      case "respawn": { const Z=U_(e.wer); if(Z){ Z.down=false; Z.hp=Z.max; const b=bfd5Basis(Z.side); Z.x=b.x; Z.y=b.y;
-        if(!still)schwebe({x:Z.x,y:Z.y-40,txt:"zurück im Spiel",life:.9}); } break; }
+      case "respawn": { const Z=U_(e.wer); if(Z){ const f=e.hp!=null?e.hp:1; Z.down=false; Z.hp=Math.max(1,Z.max*f); Z.bfHp=f; Z.bfRespawnT=null; const b=bfd5Basis(Z.side); Z.x=b.x; Z.y=b.y;
+        if(!still){ schwebe({x:Z.x,y:Z.y-40,txt:"zurück · "+Math.round(f*100)+" % HP",life:1.1});
+          if(f<1)feedRoutine(Z.side,Z.n+" ist zurück im Spiel, mit nur noch "+Math.round(f*100)+" % der HP."); } } break; }
       default: break;
     }
   }
@@ -73119,6 +73278,16 @@
     },
     // GSAx-Spreizungskonstante, dasselbe Muster — nur fuer die Kalibrierung dieser einen
     // Zahl gebraucht (die Streuung von `xgGegen-gegentore` gegen die Feldspieler-Streuung).
+    // TORWART-REGEL (22.11.) -- MESSHEBEL, dasselbe Muster: `hockeyTorwart(obj|"alt"|null)` stellt die Torwart-Regel
+    // fuer Messung/Rueckweg um und liefert die vorherige zurueck; "alt" = an:false, null = Spielkonstante.
+    hockeyTorwart:(r)=>{
+      const vorher={...HK_TW_REGEL};
+      HK_TW_EXPLIZIT=r!=null;
+      if(r==="alt")HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE,an:false};
+      else if(r&&typeof r==="object")HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE,...r};
+      else HK_TW_REGEL={...HK_TW_REGEL_KONSTANTE};
+      return vorher;
+    },
     hockeyTwGsaxK:(k)=>{
       const vorher=HK_TW_GSAX_K;
       HK_TW_GSAX_K=Number.isFinite(k)?k:HK_TW_GSAX_K_KONSTANTE;
@@ -73276,7 +73445,12 @@
             // `torwart` darueber: liest ein an jeder Einheit ohnehin vorhandenes Feld
             // (s. `bauSpieler`, slotId:sl) nur aus, veraendert keine Mechanik und keinen
             // rr()-Aufruf. Fuer jede andere Disziplin einfach der dort gesetzte Slot.
-            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:eigVon(u),torwart:!!u.torwart,slotId:u.slotId||null}))
+            :istFeldspiel(dId)?[...FSTEAM[0],...FSTEAM[1]].map(u=>({n:u.n,seite:u.side,eig:eigVon(u),torwart:!!u.torwart,slotId:u.slotId||null,
+              // HOCKEY-TORWART-DIAGNOSE (22.11., nur mit `o.hockeyDiag`): Parade-Wert, Ausdauer und die
+              // Schusszaehler des Torwarts je Spiel -- reine Messhilfe, ohne die Option fehlt das Feld.
+              ...(o.hockeyDiag&&u.torwart?{diag:{parade:u.PARADE,ausd:u.AUSDAUER,saves:u.saves,gegentore:u.gegentore,
+                xgGegen:+((u.xgGegen||0).toFixed(3)),xgAkt:+((HK_XG_AKT.get(u)||0).toFixed(3)),pusteMin:+((u.pusteMin||0).toFixed(1)),
+                pusteMax:u.pusteMax||0,punkte:u.punkte}}:{})}))
             // Bei der Arena kommt die REIHE mit. Sie entscheidet, wen die Zielwahl
             // ueberhaupt findet ("naechster" sieht die hintere Reihe kaum), und ist damit
             // die Groesse, an der sich pruefen laesst, ob die Aufstellung die Starken
@@ -73311,6 +73485,7 @@
               // Zeile haette das Feld oben die Einheit NIE erreicht, weil GENAU hier aus
               // `feld` die tatsaechlich zurueckgegebenen `teilnehmer` entstehen.
               ...(u.slotId!=null?{slotId:u.slotId}:{}),
+              ...(u.diag?{diag:u.diag}:{}),
               ...(u.kulisseOW!=null?{eigKulisse:Math.round(u.eigKulisse*100)/100,kulisse:u.kulisse,
                 kulisseOW:Math.round(u.kulisseOW*100)/100}:{}),
               // ZUGANGS-DIAGNOSE durchreichen (s. `feld` oben) — `zugang` ist immer eine
