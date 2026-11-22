@@ -1943,21 +1943,67 @@ Im Mockup `?ansicht=familien` sind die Aufstiegskosten und die Familien-Regel ei
 
 # Runde 12 (22.11.): Reparatur-Benchmark, Postfach, Kadertiefe
 
-## 67. Entscheidung: Reparatur rund 2 C je Saison für einen voll ausgerüsteten Kader
+## 67. Entscheidung: ein Legendäres im Dauereinsatz kostet rund 2 C Reparatur je Saison
 
-Der Reparatur-Anteil am Gegenwert steigt von 30 % auf **37,5 %**. Die Formel aus §48 bleibt, nur die Zeile
-`Reparatur je Einsatz = 37,5 % × Gegenwert je Einsatz` ändert sich. Händlerpreise und Verkauf bleiben.
+*Ersetzt die frühere Fassung dieses Abschnitts („2 C für den voll ausgerüsteten Kader“, ein Missverständnis) und die
+Reparatur- und Händlerspalten in §48.* Chris, 22.11.: „Ich dachte als Benchmark, was ein Top-Item kosten würde, wenn man
+das ständig repariert. Wenn 14 Leute je 3 Items oder so haben, muss das deutlich teurer sein.“
 
-| Stufe | Gegenwert je Einsatz | Reparatur je Einsatz | volle Reparatur (0→100) | kaputt (× 1,5) |
-|---|---:|---:|---:|---:|
-| Standard | 0,012 C | 0,0043 C | 0,09 C | 0,13 C |
-| Selten | 0,022 C | 0,0081 C | 0,16 C | 0,24 C |
-| Episch | 0,043 C | 0,0162 C | 0,32 C | 0,49 C |
-| Legendär | 0,086 C | 0,0324 C | 0,65 C | 0,97 C |
+**Einsatzzahl.** Eine Saison hat 20 Spieltage mit je zwei Disziplinen, also 40 Termine; jede Disziplin kommt zweimal. Ein
+Teil verschleißt 5 % je Einsatz, in dem es wirkt:
 
-Nachgerechnet für 28 Teile (8 Standard × 10 Einsätze, 12 Selten × 8, 6 Episch × 5, 2 Legendär × 6):
-0,34 + 0,78 + 0,49 + 0,39 = **2,0 C je Saison**. Der Kader im Mockup (fünf reparierbare Teile) kommt auf 0,79 C. Das
-ersetzt die Reparaturspalten in §48; die Zahlen in `ausruestung`, `team`, `familien` und in der Demo sind angepasst.
+| Bindung des Teils | wirksame Einsätze je Saison | Verschleiß je Saison |
+|---|---:|---:|
+| allgemein, an einem Stammspieler (spielt rund 65 % der Termine) | 26 | 130 % |
+| allgemein, an einem Ergänzungsspieler | 10 bis 13 | 50 bis 65 % |
+| nur eine Farbe (fünf Disziplinen), Stammspieler | 8 | 40 % |
+| nur eine Disziplin | 2 | 10 % |
+
+**Anker.** Ein Legendäres trägt mit seinen Affixen immer bei, „ständig getragen“ heißt also 26 Einsätze:
+`2,0 C ÷ 26 = 0,075 C je Einsatz`, volle Reparatur (20 Einsätze) **1,50 C**. Die anderen Stufen folgen dem Verhältnis des
+Mehrertrags aus §48 (0,08 : 0,15 : 0,30 : 0,60). Als Formel: `Reparatur je Einsatz = Mehrertrag × 0,125 C`.
+
+| Stufe | Mehrertrag je Einsatz | Reparatur je Einsatz | volle Reparatur | kaputt (× 1,5) | je Saison im Dauereinsatz (26) | nur eine Farbe (8) | nur eine Disziplin (2) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Standard | 0,08 | 0,010 C | 0,20 C | 0,30 C | 0,26 C | 0,08 C | 0,02 C |
+| Selten | 0,15 | 0,019 C | 0,38 C | 0,56 C | 0,49 C | 0,15 C | 0,04 C |
+| Episch | 0,30 | 0,038 C | 0,75 C | 1,13 C | 0,98 C | 0,30 C | 0,08 C |
+| Legendär | 0,60 | 0,075 C | 1,50 C | 2,25 C | **1,95 C** | 0,60 C | 0,15 C |
+
+**Drei Kader.** 14 Spieler × 3 Plätze = 28 Ausrüstung + 14 Verbrauch. Verbrauch wird nicht repariert, sondern nachgekauft
+(eigene Zeile). Ein Team spielt rund 220 Spieler-Einsätze je Saison; je mehr Teile, desto mehr liegen bei
+Ergänzungsspielern und verschleißen langsamer. Gehälter zum Vergleich: 14 × 6,5 C = 91 C.
+
+| Kader | Teile (Standard / Selten / Episch / Legendär) | Einsätze je Teil | Reparatur je Saison | Anteil an 91 C Gehalt | Mehrertrag je Saison |
+|---|---|---:|---:|---:|---:|
+| wenig | 6 (3 / 3 / 0 / 0), alle an Stammspielern | 20 | **1,7 C** | 2 % | rund 14 Punkte |
+| typisch | 14 (4 / 6 / 3 / 1) | 18, das Legendäre 26 | **6,7 C** | 7 % | rund 54 Punkte |
+| voll | 28 (4 / 8 / 10 / 6) | 13, die Legendären 26 | **19,0 C** | 21 % | rund 152 Punkte |
+
+Rechnung „voll“: 4 × 13 × 0,010 + 8 × 13 × 0,019 + 10 × 13 × 0,038 + 6 × 26 × 0,075 = 0,5 + 2,0 + 4,9 + 11,7 = 19,0 C.
+Dazu Verbrauch: 14 Plätze, bei einem Einweg-Teil je Spieler und Spieltag-Einsatz bis zu rund 4 C je Saison für die, die
+jeden Platz füllen (Standard-Verbrauch 0,1 C); üblich ist ein Bruchteil davon.
+
+**Stimmt das Verhältnis von Stärke zu Preis?**
+- Der voll ausgerüstete Kader bringt rund 152 Punkte je Saison, so viel wie 3,4 durchschnittliche Spieler (45 Punkte), und
+  kostet 19 C Reparatur, so viel wie 2,9 Spielergehälter. Je Punkt sind das 0,125 C gegen 0,144 C beim Spieler.
+- Reparatur allein wäre damit etwas billiger als ein Spieler. Das ist zu günstig, weil Ausrüstung keinen Kaderplatz
+  braucht und auf die besten Spieler obendrauf kommt. **Deshalb muss auch der Händlerpreis hoch.**
+- **Vorschlag: Händlerpreis = zwei volle Reparaturen**, also 0,40 / 0,75 / 1,50 / 3,00 C (Legendäres gibt es beim Händler
+  weiter nicht, der Preis gilt für Verkauf und Wert). Damit ist Reparieren nie teurer als Neukaufen (voll 50 %, kaputt
+  75 % vom Neupreis), und Wegwerfen und Nachkaufen lohnt nie.
+- Mit Anschaffung über etwa zwei Saisons Lebensdauer kostet ein Punkt aus Ausrüstung rund 0,19 C, also ein Drittel mehr
+  als ein Punkt aus einem Spieler. Das ist die Abwägung: Ausrüstung ist teurer je Punkt, braucht dafür keinen Platz im
+  Kader und keinen Einsatzplatz. Wer wenig Geld hat, kauft besser einen Spieler; wer oben mitspielt, kauft sich die
+  letzten Punkte über Ausrüstung.
+- Gegen Gebäude: der voll ausgerüstete Kader kostet im Jahr so viel wie der Unterhalt aller Gebäude zusammen; ein
+  typischer so viel wie eine Schmiede Stufe 5 (4,8 C) plus ein Handelsposten.
+- Verkauf bleibt 25 / 30 / 35 / 40 % vom Händlerpreis mal Zustand.
+- **Weiter Startwerte:** die Spalte „Mehrertrag“ kommt aus dem Messplan (§49). Wird ein Legendäres dort stärker oder
+  schwächer gemessen, verschieben sich die anderen Stufen mit, der Anker 2 C bleibt.
+
+Im Mockup stehen die drei Kader in `?ansicht=team`; `ausruestung`, `familien`, `woche` und die Demo tragen die neuen
+Preise.
 
 ## 68. Entscheidung: Trait-Ereignisse
 

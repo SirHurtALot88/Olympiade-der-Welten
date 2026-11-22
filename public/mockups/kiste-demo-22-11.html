@@ -90,7 +90,7 @@ main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:.8rem;
 </main>
 <script>
 var SF=["var(--s0)","var(--s1)","var(--s2)","var(--s3)"],SN=["Standard","Selten","Episch","Legendär"],DREH=[200,300,0,130];
-var PREIS=[.25,.35,.5,1],REP=[.09,.16,.32,.65],VK=[.25,.30,.35,.40],TEILE=[1,2,4,8];
+var PREIS=[.4,.75,1.5,3],REP=[.2,.38,.75,1.5],VK=[.25,.30,.35,.40],TEILE=[1,2,4,8];
 /* Stufen: Standard und Selten = nur +X · Episch = kleiner Effekt · Legendaer = grosser Effekt */
 var K={riegel:[0,"Energieriegel","+3 Stamina","allgemein · Einweg","icon-energieriegel.png"],brille:[0,"Zielbrille","+3 Awareness","I-Spy, TDM","ZB"],kreide:[0,"Kreideblock","+8 Power","Climbing · Einweg","KB"],
  hand:[1,"Sturmhandschuhe","+4 Dexterity","POW-Disziplinen","icon-sturmhandschuhe.png"],falke:[1,"Falkenbrille","+6 Awareness","I-Spy, TDM","FB"],
@@ -99,7 +99,7 @@ var K={riegel:[0,"Energieriegel","+3 Stamina","allgemein · Einweg","icon-energi
  trikot:[3,"Glückstrikot","+9 Charisma","großer Effekt: Moral fällt nie unter 60","GT"],haken:[3,"Enterhaken","Sektion überspringen, Gegner heranziehen","großer Effekt in Climbing, TDM, Battlefield, Mini DM","EN"]};
 var NACH=[["riegel","brille","kreide"],["hand","falke","kseil","ehaken"],["wind","anker"],["trikot","haken"]];
 var MN={seil:"Seil",eisen:"Eisen",feder:"Feder",linse:"Linse",rauch:"Rauchkraut",kristall:"Kristall",banner:"Banner",leder:"Leder",abz:"Ankerkette"},MK=["seil","eisen","feder","linse","rauch","kristall","banner","leder"];
-var Z={ruhm:60,teile:10,kasse:3.2,quote:90,zaehler:3,lager:["brille","brille","kreide","hand","riegel"],mat:{seil:1,leder:1,eisen:2,abz:1},hb:[100,100,60,0,100],auto:false,ausw:[],funde:[],offen:false};
+var Z={ruhm:60,teile:10,kasse:6,quote:90,zaehler:3,lager:["brille","brille","kreide","hand","riegel"],mat:{seil:1,leder:1,eisen:2,abz:1},hb:[100,100,60,0,100],auto:false,ausw:[],funde:[],offen:false};
 function $(i){return document.getElementById(i)}
 function istM(k){return k.charAt(0)==="#"}
 function bild(k){if(istM(k))return '<span class="ic mt">'+MN[k.slice(1)].slice(0,2)+'</span>';var b=K[k][4];return b.length>3?'<span class="ic"><img src="../sprites/beute/'+b+'" alt="" onerror="this.parentNode.className=\'ic sv\';this.parentNode.textContent=\''+K[k][1].slice(0,2)+'\'"></span>':'<span class="ic sv">'+b+'</span>'}
@@ -114,7 +114,7 @@ function wurf(st){var F=FAM[rnd(8)],z=[],top=0,ta=0;for(var i=0;i<=st;i++){var a
  var k="g"+(nr++);K[k]=[st,SW[st]+F[1]+" "+F[0]+" "+SUF[ta],z.join("<br>"),(st+1)+(st?" Affixe":" Affix")+(st===2?" · kleiner Effekt":""),F[3]];return k}
 function aus(st){if(st<3)return wurf(st);var a=NACH[st];return a[rnd(a.length)]}
 function m(k){return Z.mat[k]||0}
-/* Haltbarkeit laeuft neben dem Lager mit; Reparatur voll = 0,09/0,16/0,32/0,65 C je Stufe (37,5 % vom Gegenwert je Einsatz), kaputt x 1,5 */
+/* Haltbarkeit laeuft neben dem Lager mit; Reparatur voll = 0,20/0,38/0,75/1,50 C je Stufe (halber Haendlerpreis; Legendaer im Dauereinsatz rund 2 C je Saison), kaputt x 1,5 */
 function rein(k){Z.lager.push(k);Z.hb.push(100)}
 function raus(i){Z.lager.splice(i,1);Z.hb.splice(i,1)}
 function rkost(i){var f=100-Z.hb[i];return REP[K[Z.lager[i]][0]]*f/100*(f===100?1.5:1)}
@@ -158,7 +158,7 @@ function rezepte(){var g=gew(),n=g.length,st=n?K[g[0]][0]:0,gleich=n===3&&K[g[1]
  var rk=0,ra=0;Z.ausw.forEach(function(i){rk+=rkost(i)});alle().forEach(function(i){ra+=rkost(i)});
  var ok3=gleich&&st<3&&Z.teile>=1,okr=rk>0&&Z.kasse>=rk;
  h+='<div class="rez'+(n?" geht":"")+'"><h3><span style="color:var(--leise)">Auswahl im Lager</span>Glück, verkaufen, zerlegen</h3><p><b>Glück:</b> drei derselben Stufe → sicher eines der nächsten, welches ist Zufall (1 Teil). <b>Verkaufen:</b> 25 / 30 / 35 / 40 % vom Händlerpreis'+(n?", Auswahl <b>"+zahl(vk)+" C</b>, bei Quote "+Z.quote+" % ausgebbar "+zahl(vk*Z.quote/100)+" C":"")+'. <b>Zerlegen:</b> 1 / 2 / 4 / 8 Teile'+(n?", Auswahl <b>"+tl+"</b>":"")+'.</p><button class="btn'+(ok3?" g":"")+'" data-a="g"'+(ok3?"":" disabled")+'>wagen</button> <button class="btn'+(n?" g":"")+'" data-a="v"'+(n?"":" disabled")+'>verkaufen</button> <button class="btn'+(n?" g":"")+'" data-a="z"'+(n?"":" disabled")+'>zerlegen</button></div>'
-  +'<div class="rez geld'+(ra>0?" geht":"")+'"><h3><span>Reparatur</span>Kostet Geld, nicht Teile</h3><p>Voll je Stufe 0,09 / 0,16 / 0,32 / 0,65 C (37,5 % vom Gegenwert je Einsatz) × Verschleiß, kaputt × 1,5. Offen: <b>'+zahl(ra)+' C</b>'+(rk?", Auswahl <b>"+zahl(rk)+" C</b>":"")+'. In der Demo 20 % Verschleiß je Spieltag, im Spiel 5 % je Einsatz.</p><button class="btn'+(okr?" g":"")+'" data-a="r"'+(okr?"":" disabled")+'>Auswahl reparieren</button> <button class="btn'+(Z.auto?" g":"")+'" data-a="auto">Auto-Reparatur: '+(Z.auto?"an":"aus")+'</button> <button class="btn" data-a="tag">Spieltag spielen</button></div>'
+  +'<div class="rez geld'+(ra>0?" geht":"")+'"><h3><span>Reparatur</span>Kostet Geld, nicht Teile</h3><p>Voll je Stufe 0,20 / 0,38 / 0,75 / 1,50 C (halber Händlerpreis; ein Legendäres im Dauereinsatz rund 2 C je Saison) × Verschleiß, kaputt × 1,5. Offen: <b>'+zahl(ra)+' C</b>'+(rk?", Auswahl <b>"+zahl(rk)+" C</b>":"")+'. In der Demo 20 % Verschleiß je Spieltag, im Spiel 5 % je Einsatz.</p><button class="btn'+(okr?" g":"")+'" data-a="r"'+(okr?"":" disabled")+'>Auswahl reparieren</button> <button class="btn'+(Z.auto?" g":"")+'" data-a="auto">Auto-Reparatur: '+(Z.auto?"an":"aus")+'</button> <button class="btn" data-a="tag">Spieltag spielen</button></div>'
   +'<p class="klein">Angelehnt an: Dota-Shop (fertige Teile werden zu größeren), Teamfight Tactics (zwei Bausteine, ein Gegenstand), Händler-Rezepte aus Path of Exile, Entzaubern in Hearthstone. Im Spiel schaltet die Stufe der Schmiede die Schritte frei.</p>';
  return {h:h,st:st,vk:vk,tl:tl,rk:rk}}
 function weg(){Z.ausw.sort(function(a,b){return b-a}).forEach(function(i){raus(i)});Z.ausw=[]}
