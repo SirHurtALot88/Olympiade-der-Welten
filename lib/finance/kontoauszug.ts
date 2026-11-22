@@ -7,8 +7,8 @@
  *
  * Jede Zeile traegt Saison, Spieltag (soweit das Ledger ihn kennt; sonst die Phase), Art, Quelle und
  * Betrag mit Vorzeichen (+ Zufluss, - Abfluss). Heute fallen Sponsor, Gehalt, Apron und Ziele am
- * Saisonende an (Phase `season_end`); mit der Taktung (Stufe 4 des Konzepts) kommen Spieltags-Zeilen
- * hinzu, ohne dass sich dieses Format aendert.
+ * Saisonende an (Phase `season_end`); in Saisons mit Stempel `finanzenJeSpieltag` (22.11.) kommen Gehalt,
+ * Sponsor-Basis und Gebaeude je Spieltag als Zeilen der Phase `saison` hinzu, ohne dass sich dieses Format aendert.
  */
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -22,6 +22,10 @@ export type KontoauszugArt =
   | "vertragsende_abloese"
   | "sponsor"
   | "gehalt_und_sponsor_saisonende"
+  | "gehalt_spieltag"
+  | "sponsor_basis_spieltag"
+  | "gebaeude_einnahme_spieltag"
+  | "gebaeude_unterhalt_spieltag"
   | "apron"
   | "vorstandsziele"
   | "vorstand_praemien"
@@ -104,6 +108,16 @@ export function buildKontoauszuege(gameState: GameState, seasonId?: string | nul
       art: l.phase === "season_end" ? "gehalt_und_sponsor_saisonende" : "sponsor",
       quelle: "sponsorPayoutLogs", text: `${l.phase}${l.componentId ? `:${l.componentId}` : ""}`, betrag: l.cashDelta, zeit: l.createdAt,
     });
+  }
+
+  // 2b) FINANZEN JE SPIELTAG (22.11.): Gehalt, Sponsor-Basis, Gebaeude-Einnahme und -Unterhalt je gespieltem Spieltag, eine
+  //     Zeile je Fluss. Quelle ist das Ledger `spieltagFinanzen`; der Saisonabschluss bucht davon nichts mehr doppelt.
+  for (const b of gameState.seasonState.spieltagFinanzen ?? []) {
+    const basis = { seasonId: b.seasonId, matchdayId: b.matchdayId, phase: "saison" as const, quelle: "spieltagFinanzen", zeit: b.createdAt };
+    add(b.teamId, { ...basis, art: "gehalt_spieltag", text: `Gehalt Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.gehalt });
+    add(b.teamId, { ...basis, art: "sponsor_basis_spieltag", text: `Sponsor-Basis Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.sponsorBasis });
+    add(b.teamId, { ...basis, art: "gebaeude_einnahme_spieltag", text: `Gebäude-Einnahme Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.gebaeudeEinnahme });
+    add(b.teamId, { ...basis, art: "gebaeude_unterhalt_spieltag", text: `Gebäude-Unterhalt Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.gebaeudeUnterhalt });
   }
 
   // 3) Apron.

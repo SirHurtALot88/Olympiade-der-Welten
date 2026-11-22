@@ -1959,6 +1959,29 @@ export type PlayerScoutIntelRecord = {
   parked?: boolean;
 };
 
+/**
+ * FINANZEN JE SPIELTAG (22.11., docs/design/finanzen-je-spieltag-22-11.md): eine Buchung je Team und Spieltag.
+ * Betraege mit Vorzeichen in C (Gehalt und Unterhalt negativ, Sponsor-Basis und Gebaeude-Einnahme positiv), auf 0,1
+ * gerundet; `rest` traegt den Rundungsrest in den naechsten Spieltag (Summe ueber die Saison = Saisonbetrag auf 0,05).
+ */
+export type SpieltagFinanzBuchung = {
+  id: string;
+  seasonId: string;
+  matchdayId: string;
+  /** 1-basiert im Spielplan der Saison. */
+  matchdayIndex: number;
+  /** Spieltage der Saison zum Zeitpunkt der Buchung (der Nenner der Anteile). */
+  matchdayCount: number;
+  teamId: string;
+  gehalt: number;
+  sponsorBasis: number;
+  gebaeudeEinnahme: number;
+  gebaeudeUnterhalt: number;
+  cashDelta: number;
+  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number };
+  createdAt: string;
+};
+
 export type SponsorPayoutLogRecord = {
   id: string;
   saveId: string;
@@ -4171,6 +4194,15 @@ export type SeasonState = {
    * Stempel (bestehender Spielstand) oder gehoert er zu einer anderen Saison, gilt "alt".
    */
   wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string };
+  /**
+   * FINANZEN JE SPIELTAG (22.11., lib/finance/finanzen-je-spieltag.ts): "v1" = Gehalt, Sponsor-Basis, Gebaeude-Einnahme
+   * und -Unterhalt werden je Spieltag zu 1/N gebucht (`spieltagFinanzen`), nur Rang-/Sonderziel-Sponsor, Apron, Ziele
+   * und Kredit bleiben am Saisonende. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der
+   * Stempel oder gehoert er zu einer anderen Saison, gilt der alte Weg (alles am Saisonende).
+   */
+  finanzenJeSpieltag?: { seasonId: string; version: "v1" } | null;
+  /** Ledger der Spieltagsbuchungen (je Team und Spieltag eine Zeile), siehe `SpieltagFinanzBuchung`. */
+  spieltagFinanzen?: SpieltagFinanzBuchung[];
   /**
    * BELASTUNGSREGEL DIESER SAISON (21.11., lib/fatigue/belastung-regel-stempel.ts): "v2" = Last je Platz
    * aus Stufe und Resistenz, Pause nach Spieltag 10, aktive Erholung 4,0. Gesetzt beim Anlegen und beim

@@ -1,4 +1,5 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
+import { istJeSpieltagSaison, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import type { PersistenceService } from "@/lib/persistence/types";
@@ -605,10 +606,15 @@ export async function buildPrizeMoneyPreview(
 
     // Cash danach = Cash vorher + Sponsor + Gebäude − Gehälter − Kreditrate (kein Preisgeld). Dies ist
     // jetzt der Default für ALLE Aufrufer (UI, Season-Workflows, AI-Planung).
+    // FINANZEN JE SPIELTAG (22.11.): Gehalt, Sponsor-Basis und Gebaeude dieser Saison sind teils schon je Spieltag gebucht
+    // und stecken in `currentCash` — die Saisonzahlen oben sind die GANZE Saison, also den gebuchten Teil wieder abziehen.
+    const jeSpieltagGebucht = istJeSpieltagSaison(save.gameState)
+      ? summeSpieltagBuchungen(save.gameState, team.teamId).cashDelta
+      : 0;
     const projectedCash =
       currentCash == null || salaryTotal == null
         ? null
-        : round1(currentCash - salaryTotal + seasonIncome - loanInstallment);
+        : round1(currentCash - salaryTotal + seasonIncome - loanInstallment - jeSpieltagGebucht);
 
     const buildPlacementScenario = (direction: "better" | "worse") => {
       const resolvedStartRank = rankChangePrize.startRank;

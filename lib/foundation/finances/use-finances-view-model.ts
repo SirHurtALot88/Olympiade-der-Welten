@@ -19,6 +19,7 @@ import { getObjectiveCashByTeam } from "@/lib/board/objective-settlement-cash-so
 import { getSponsorEventCashByTeam } from "@/lib/sponsor/sponsor-event-cash-source";
 import { normalizeEconomyMoney, resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamActualSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
+import { istJeSpieltagSaison, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { FINANCE_SPONSOR_INCOME_COMPONENT_KINDS } from "@/lib/foundation/finances/finances-types";
 import type {
@@ -163,7 +164,20 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
         rewardCash: round1(log.cashDelta),
       };
     });
-  const sponsorComponents = [...gebuchteKomponenten, ...projizierteKomponenten];
+  // FINANZEN JE SPIELTAG (22.11.): die je Spieltag ausgezahlte Saisonbasis steht im Ledger, nicht in den Logs. Nach der
+  // Saisonabrechnung gehoert sie in die Aufschluesselung (vorher steckt sie in der Vorschau, die dann noch die volle Basis zeigt).
+  const basisJeSpieltag =
+    istJeSpieltagSaison(gameState) &&
+    (gameState.seasonState.sponsorPayoutLogs ?? []).some(
+      (log) => log.seasonId === gameState.season.id && log.teamId === teamId && log.phase === "season_end",
+    )
+      ? summeSpieltagBuchungen(gameState, teamId).sponsorBasis
+      : 0;
+  const basisKomponenteJeSpieltag =
+    basisJeSpieltag > 0
+      ? [{ kind: "base" as SponsorOfferComponentKind, label: `${getSponsorComponentKindLabel("base")} (je Spieltag gebucht)`, rewardCash: round1(basisJeSpieltag) }]
+      : [];
+  const sponsorComponents = [...basisKomponenteJeSpieltag, ...gebuchteKomponenten, ...projizierteKomponenten];
   // DIE EINE Sponsor-Einnahme dieser Saison — dieselbe Zahl wie im Saisonstand und in der GuV.
   const sponsorTotal = round1(getSeasonSponsorCashByTeam(gameState).get(teamId) ?? 0);
   // Der Schätz-Proxy greift NUR noch, wenn es überhaupt keine Sponsor-Buchung und keinen Vertrag

@@ -14,6 +14,7 @@ import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factor
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
 import { stempleBelastungsRegelBeimAnlegen } from "@/lib/fatigue/belastung-regel-stempel";
+import { stempleFinanzenJeSpieltagBeimAnlegen } from "@/lib/finance/finanzen-je-spieltag";
 import {
   LEAGUE_SIZE,
   buildInitialLeagueAssignment,
@@ -654,8 +655,12 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     // der PP-Skala C2 und der Ergebnisskala E1 (Rueckweg: OLY_PP_SKALA=aus / OLY_ERGEBNIS_SKALA=aus).
     // BELASTUNGSREGEL (21.11.): ein neues Battle-Spiel (20 Spieltage) rechnet ab Saison 1 mit Last je
     // Platz, Resistenz, Pause nach Spieltag 10 und aktiver Erholung 4,0.
-    stempleBelastungsRegelBeimAnlegen(
-      stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)),
+    // FINANZEN JE SPIELTAG (22.11.): Gehalt, Sponsor-Basis und Gebaeude werden ab Saison 1 je Spieltag gebucht
+    // (Rueckweg: OLY_FINANZEN_JE_SPIELTAG=aus).
+    stempleFinanzenJeSpieltagBeimAnlegen(
+      stempleBelastungsRegelBeimAnlegen(
+        stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)),
+      ),
     ),
     input.saveId,
   );
