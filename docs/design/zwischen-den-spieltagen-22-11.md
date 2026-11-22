@@ -1224,3 +1224,157 @@ und Vorstand mit Gesichtern, Sponsor-Treue, Vereinsgeschichte; Jugend in Welle 5
 - **Zuruf-Fenster je Manager abschaltbar;** abgeschaltet ruft der Spielplan.
 - **Identität** driftet aus Handeln und Erfolg, **Personal** später.
 - Keine PixelLab-Bestellung in dieser Runde.
+
+---
+
+# Runde 8 (22.11.): Signatur-Gegenstände, Schmiede und Handelsposten als Gebäude
+
+Neue Ansichten: `bauplan` (Baum und Katalog, filterbar, Felder anklickbar), `haken` (Arena-Moment Climbing), `gebaeude`.
+Die Kisten-Demo hat im Schmiede-Reiter den Bauplan „Seil + Eisen → Enterhaken“ und die neue Glücksregel.
+
+## 36. Glücksregel der Schmiede, neu
+
+Chris: **drei Gegenstände derselben Seltenheit ergeben einen zufälligen der nächstbesseren Stufe.** Standard → Selten,
+Selten → Episch, Episch → Legendär. Das ersetzt die gemischten Chancen aus Abschnitt 32:
+
+- Die **Stufe ist sicher**, zufällig ist nur, **welches** Teil dieser Stufe entsteht (jedes gleich wahrscheinlich).
+- Die drei Teile müssen dieselbe Stufe haben, nicht dieselbe Art.
+- Legendäres darf damit aus der Schmiede kommen: drei epische Teile ergeben einen zufälligen Signatur-Gegenstand.
+- Kosten 1 Teil. Getragene Teile müssen vorher abgelegt werden. Die Saat hängt an Spielstand, Team und Zähler.
+
+## 37. Signatur-Gegenstände: Bauplan wie in Teamfight Tactics und Dota
+
+Chris: „starke kombinierbare Items, die sich stark auf gewisse Dinge auswirken … sowas wie ein Enterhaken, den man im
+Climbing nutzen kann und den man dann auch real sieht in der Diszi und der natürlich das Ergebnis stark verändern kann,
+wenn ihn z. B. ein schwacher Spieler bekommt … nicht nur Items mit +x Stats.“
+
+**Prinzip.** Acht **Grundteile** (selten, je +3 auf ein Attribut): Seil, Eisen, Feder, Linse, Rauchkraut, Kristall,
+Banner, Leder. **Zwei Grundteile ergeben einen Signatur-Gegenstand** (legendär) mit einem **Effekt**, der im Motor
+etwas geschehen lässt und in der Arena zu sehen ist. 36 Paare sind möglich, 26 sind belegt: mindestens einer je
+Disziplin, fünf für alle Disziplinen. Der Baum steht im Mockup `bauplan` als Tafel Grundteil mal Grundteil.
+
+**Katalog** (Effekt = was der Motor bucht; Sicht nur mit Requisiten-Sprites und Effekten über vorhandenen Posen):
+
+| Gegenstand | Rezept | Disziplin | Effekt im Motor | In der Arena | Grenze, Gegenmittel | KI rüstet |
+|---|---|---|---|---|---|---|
+| **Enterhaken** | Seil + Eisen | Climbing | überspringt einmal je Lauf die schwerste Sektion vor dem Träger (feste Flugzeit) | Haken-Sprite, Seil-Linie, Figur gleitet in der Lauf-Pose | nicht in der letzten Sektion | den schwächsten Kletterer |
+| **Rauchbombe** | Eisen + Rauchkraut | TDM | drei Takte lang sind Träger und Nachbarn nicht anvisierbar | Rauchwolke, Namensschilder grau | einmal je Gefecht; Fernglas sieht durch | wer am häufigsten zuerst ausscheidet |
+| **Feldbanner** | Eisen + Banner | Battlefield | der erste eingenommene Punkt zählt fünf Takte doppelt | Banner steckt am Punkt | fällt mit dem Träger | den schnellsten Punktnehmer |
+| **Köder** | Rauchkraut + Leder | Mini DM | Attrappe schluckt den nächsten Angriff auf den Träger | Attrappe neben der Figur, zerplatzt | einmal je Runde; Flächenangriffe treffen beide | die niedrigste Health |
+| **Bleiweste** | Eisen + Leder | Gewichtheben | ein zusätzlicher letzter Versuch am höchsten angesagten Gewicht, Erschöpfung +25 % | Weste über der Figur, vierter Versuch im Zähler | kostet Kraft | nur unter 50 Erschöpfung |
+| **Magnetstab** | Eisen + Feder | Staffel | ein Wechsel kann nicht misslingen und kostet keine Zeit | Stab leuchtet beim Wechsel | einmal je Rennen | den schwächsten Wechsler |
+| **Rückenwind-Segel** | Feder + Banner | Time Trial | längstes gerades Stück +15 % Tempo, Kurven −5 % | Segel hinter der Figur, Windlinien | ein Abschnitt; bei Lage „Sturm“ wirkungslos | die beste Kurvenlage |
+| **Sprungfedern** | Feder + Feder | Spurt | die erste Station ohne Zeitverlust | Federn unter den Füßen | nur die erste Station | den schlechtesten Stationswert |
+| **Linienbrille** | Linse + Linse | Tennis | einmal je Satz wird ein knapper Ausball zum Punkt | Marke auf der Linie, „Challenge“ | nur knappe Bälle | die meisten Fehler |
+| **Torwand** | Eisen + Eisen | Hockey | der Torwart hält einmal je Drittel ein sicheres Tor | Schild vor dem Tor, Puck prallt ab | nur beim Torwart | immer den Torwart |
+| **Feuerwerk** | Rauchkraut + Banner | Showcase | letzte Nummer zählt 1,5-fach, misslingt sie: halb | Feuerwerk oder Blindgänger | Risiko, Chance sichtbar | nur über 70 % Gelingchance |
+| **Joker-Figur** | Rauchkraut + Kristall | Speed-Schach | der schwerste Fehler der Partie wird einmal zurückgenommen | Joker am Brettrand, Zug läuft rückwärts | kostet zehn Sekunden Bedenkzeit | das engste Brett |
+| **Gummistiefel** | Feder + Leder | Takeshi | die erste ausgelöste Falle wirft nicht zurück | Stiefel, Figur prallt ab | Wassergräben zählen nicht | die schwächste Awareness |
+| **Daumenschraube** | Eisen + Kristall | Breaking (Folter-Duell) | der erste Peinigungs-Gang wirkt eine Geräte-Stufe stärker | Gerät in der Hand, Schmerz-Effekt | einmal je Duell; Beißholz hebt es auf | den stärksten Peiniger |
+| **Beißholz** | Kristall + Leder | Breaking (Folter-Duell) | übersteht einmal einen Gang, der zum Aufgeben brächte | Holz, Figur zittert und steht | einmal je Duell | die kürzeste Standzeit |
+| **Eisenmagen** | Leder + Leder | Wettessen | der erste Schwächeanfall entfällt | Magen-Symbol leuchtet | einmal je Wettkampf | die höchste Schlagzahl |
+| **Heiße Hand** | Linse + Banner | Basketball | nach zwei Treffern in Folge geht der nächste Wurf sicher rein | Flammen an Ball und Hand | einmal je Viertel | den besten Werfer |
+| **Spielzugtafel** | Kristall + Banner | Football | ein misslungener vierter Versuch wird wiederholt | Tafel an der Seitenlinie | einmal je Spiel | den Spielmacher |
+| **Spiegeleis** | Feder + Kristall | Eiskunstlauf | der schwerste Sprung kann nicht stürzen | Glitzer unter den Kufen | nur ein Sprung, kein Bonus über „sauber“ | das höchste Sturzrisiko |
+| **Parierdolch** | Eisen + Linse | Fechten | der erste gegnerische Treffer je Gefecht wird pariert | Funken, zweite Klinge | einmal je Gefecht | die schwächste Abwehr |
+| **Fernglas** | Seil + Linse | I-Spy | prüft einmal eine Truhe aus der Ferne, spart den Weg zu einer Niete | Sichtkegel, Niete wird grau | einmal je Halle; sieht auch durch Rauch | den langsamsten Sucher |
+| **Schiedsrichterpfeife** | Banner + Banner | alle | hebt den ersten Signatur-Effekt des Gegners auf | Pfiff, gegnerisches Symbol durchgestrichen | einmal je Begegnung | Derbys, bekannte Signaturen |
+| **Zweite Luft** | Feder + Rauchkraut | alle | im letzten Abschnitt entfällt die Bremse durch Erschöpfung | Atem-Effekt | Erschöpfung danach bleibt | den müdesten Stammspieler |
+| **Glücksmünze** | Kristall + Kristall | alle | negative Tagesform wird einmal neu gezogen | Münze dreht sich vor dem Start | kann wieder negativ fallen | die wichtigste Rolle |
+| **Kapitänsschärpe** | Seil + Banner | alle | Captain-Wirkung gilt zusätzlich für einen Nachbarn | Schärpe, Linie zum Nachbarn | nur am Captain | immer den Captain |
+| **Maske** | Rauchkraut + Rauchkraut | alle | eigene Ausrüstung ist vor dem Spiel für den Gegner verdeckt | Masken-Symbol in der Gegnervorschau | wirkt nur auf die Vorschau | Derbys |
+
+**Leitplanken.**
+- **On top:** Effekte zählen nicht gegen die Schranke 0,75 (Abschnitt 20). Sie sollen Schwächere besser machen können.
+- **Einzigartig:** jeder Signatur-Gegenstand höchstens einmal je Team; je Spieler höchstens einer (belegt einen
+  Ausrüstungsplatz); je Team wirken höchstens zwei Effekte je Disziplin.
+- **Einmal je Spiel** oder je Abschnitt, nie dauerhaft. Kein Effekt gewinnt allein: jeder greift an einer Stelle ein.
+- **Gegenmittel:** die Schiedsrichterpfeife gegen alles, dazu Paare (Fernglas gegen Rauchbombe, Beißholz gegen
+  Daumenschraube). Liga-Lage „Materialkontrolle“ sperrt sie befristet für alle.
+- **Wenige im Umlauf:** Baupläne muss man kennen (drei zum Start, passend zur Identität; weitere von Händlern, aus
+  Kisten, für Wimpel). Bau kostet zwei Grundteile und 6 Teile und braucht Schmiede Stufe 4. Richtwert: zwei bis vier
+  Signatur-Gegenstände je Team nach einer Saison.
+- **Haltbarkeit:** wie andere Ausrüstung (robust, 5 % je Einsatz), reparierbar.
+- **Sichtbar vorher:** Signaturen des Gegners stehen in der Gegnervorschau (außer mit Maske). Kein verstecktes Ass.
+
+**Gezeigt = gebucht.** Der Effekt ist ein Schalter im Motor der jeweiligen Disziplin; er reist wie Format und Zuruf im
+Kader-Umschlag und steht im Eingabe-Hash. Jeder Signatur-Gegenstand bekommt eigene Fingerabdruck-Zeilen außerhalb von
+GESAMT; ohne Gegenstand bleibt GESAMT unverändert. In der Arena: Einblendung beim Auslösen, Kürzel am Namen, verbraucht =
+grau. Nach dem Spiel eine Zeile in „Deine Entscheidungen“ („Enterhaken +1,9“), für beide Seiten.
+
+**Keine neuen Figuren-Animationen.** Jeder Effekt kommt mit einem Requisiten-Sprite, einem Effekt-Bild oder einer
+gezeichneten Linie aus; die Figur bleibt in ihren vorhandenen Posen (Lauf, Angriff, Treffer). Beispiel Enterhaken
+(Mockup `haken`): Haken-Sprite, Seil-Linie, die Figur gleitet in der Lauf-Pose nach oben.
+
+**Aufwand und Risiko** (Einschätzung aus der Doku der Motoren, **nicht am Code geprüft**):
+
+| Stufe | Disziplinen | Warum |
+|---|---|---|
+| **leicht** | Climbing, Spurt, Takeshi, Staffel, Gewichtheben, I-Spy, Breaking, Wettessen | der Motor hat schon einzelne Schritte, an denen ein Schalter greifen kann (Sektionen, Stationen, Fallen, Wechsel, Versuche, Truhen, Gänge) |
+| **mittel** | TDM, Battlefield, Mini DM, Time Trial, Showcase, Eiskunstlauf, Fechten, Speed-Schach | Takte, Punkte oder Nummern sind da, der Effekt braucht aber eigene Regeln (Sichtbarkeit, Zurücknehmen) |
+| **schwer** | Hockey, Basketball, Football, Tennis | Echtzeit-Feldspiele mit Ball; jeder Eingriff verändert viele Folgeereignisse und ist schwer sauber zu zeigen |
+| **überall leicht** | Schiedsrichterpfeife, Glücksmünze, Zweite Luft, Kapitänsschärpe, Maske | greifen vor dem Motor oder an vorhandenen Größen an |
+
+**Pilot (klein starten):** Enterhaken (Climbing), Gummistiefel (Takeshi), Fernglas (I-Spy), Daumenschraube und Beißholz
+(Breaking, als Paar mit Gegenmittel), Schiedsrichterpfeife. Fünf Effekte in vier leichten Disziplinen plus das
+allgemeine Gegenmittel. Jeder Effekt: Motor-Schalter, Fingerabdruck-Zeile, Arena-Einblendung, Opus-Review.
+
+**PixelLab-Schätzung (nichts bestellt):** 8 Grundteil-Icons und 26 Signatur-Icons: 34. Arena-Requisiten (Haken, Banner,
+Attrappe, Weste, Segel, Stiefel, Tafel und weitere): rund 20. Effekte (Rauch, Funken, Glitzer, Wind, Schild, Flammen,
+Feuerwerk, Pfiff): rund 10 bis 20, je nach Endpunkt. **Zusammen rund 65 bis 75 Generationen, der Pilot allein rund 15.**
+Nur Requisiten und Effekte, keine Figuren, keine Animationen.
+
+## 38. Schmiede und Handelsposten als Gebäude
+
+Chris: „Schmiede und Händler könnten sonst auch baubare Gebäude sein! Dann hat man da noch mal Fokus drauf, weil die sogar
+richtig wichtig wären, um stärker zu werden als Team.“ Zwei neue Einträge im bestehenden Gebäudekatalog
+(`lib/facilities/facility-catalog.ts`, fünf Stufen wie Recovery Center und Scouting Office, Kosten in derselben
+Größenordnung). Das ersetzt „die Schmiede steht jedem offen“ aus Abschnitt 27.
+
+**Schmiede**
+
+| Stufe | Schaltet frei | Bau | Unterhalt je Saison (je Spieltag) | Bauzeit |
+|---:|---|---:|---:|---:|
+| 1 | Zerlegen und Reparieren | 7 C | 0,7 C (0,03) | 2 Spieltage |
+| 2 | feste Rezepte, Aufwerten bis +1 | 13 C | 1,2 C (0,06) | 3 |
+| 3 | Glücks-Rezepte (drei derselben Stufe) | 22 C | 2,1 C (0,11) | 3 |
+| 4 | Signatur-Gegenstände aus Grundteilen, Aufwerten bis +2 | 35 C | 3,3 C (0,16) | 4 |
+| 5 | Meisterschmiede: Rezepte kosten halbe Teile, ein zusätzlicher Bauplan je Saison | 54 C | 4,8 C (0,24) | 5 |
+
+Ohne Schmiede kann man Kisten öffnen, anlegen und verkaufen; Kaputtes bleibt kaputt.
+
+**Handelsposten**
+
+| Stufe | Schaltet frei | Bau | Unterhalt je Saison (je Spieltag) | Bauzeit |
+|---:|---|---:|---:|---:|
+| 1 | ein Händler je Woche, drei Angebote, Verkauf zum Grundsatz (25–40 %) | 6 C | 0,6 C (0,03) | 2 |
+| 2 | vier Angebote, Verkauf +5 Punkte | 12 C | 1,1 C (0,06) | 2 |
+| 3 | epische Ware im Angebot, Verkauf +10 Punkte | 20 C | 1,8 C (0,09) | 3 |
+| 4 | Vorbestellung: ein Wunsch für den übernächsten Besuch, Verkauf +15 Punkte | 32 C | 2,8 C (0,14) | 3 |
+| 5 | zwei Händler je Woche, Grundteile regelmäßig, Verkauf +20 Punkte | 50 C | 4,2 C (0,21) | 4 |
+
+Ohne Handelsposten kommt nur jede zweite Woche ein Händler mit zwei Angeboten. Der Markt der Winterpause steht allen
+offen. Auch mit Stufe 5 bleibt der Verkauf bei höchstens 60 % des Händlerpreises: Kaufen und Verkaufen lohnt nie.
+
+- **Finanzen:** Bau und Ausbau aus dem Investitionstopf, hart gegen die Vorstands-Freigabe
+  (`pruefeGebaeudeGegenVorstandFreigabe`), für Mensch und KI gleich. Der Unterhalt wird je Spieltag gebucht.
+  Während der Bauzeit gilt die alte Stufe.
+- **Abwägung:** dasselbe Geld wie Recovery Center, Trainingszentrum, Scouting. Erholung und Training wirken jeden
+  Spieltag auf alle; die Schmiede wirkt nur, wenn Beute da ist, dann aber stark. Wer wenig Geld hat, baut zuerst den
+  Handelsposten, weil Verkaufen Geld bringt.
+- **KI-Regel:** Recovery und Training zuerst bis Stufe 2. Danach: Finanzwert ab 7 → Schmiede bis 3; Finanzwert unter 4 →
+  Handelsposten bis 2, Schmiede nur 1; Ehrgeiz ab 7 und im Rennen → Schmiede 4. Identität: Vereine mit breitem Kader eher
+  Handelsposten, Vereine um wenige Stars eher Schmiede. Deterministisch, eine Tabelle.
+- **Mehrspieler:** je Team getrennt; Bereich „Gebäude“ delegierbar, die delegierte KI hält die Freigabe ein.
+- **Im Mockup:** `gebaeude` zeigt beide mit allen Stufen, Kosten, Unterhalt, Bauzeit und dem Vergleich „was 22 C sonst
+  kaufen“. Die Schmiede-Tafel in `ausruestung` und der Händler in `woche` nennen ihre Stufe und was die nächste bringt.
+- **PixelLab (Schätzung, nichts bestellt):** zwei Gebäude mit je drei Ausbaubildern, 6 bis 10 Generationen. Die Händler
+  selbst wären Figuren und damit freigabepflichtig; im Mockup sind sie Symbole.
+- **Aufwand:** S je Gebäude im Katalog, M für die Stufen-Prüfung in Schmiede und Händler, mit Ausrüstung in Welle 3.
+
+## 39. Offen nach Runde 8
+
+1. **Signatur-Gegenstände als Pilot** mit den fünf genannten, in den leichten Disziplinen?
+2. **Wie stark dürfen sie sein?** Der Enterhaken macht im Mockup aus der Sechsten die Dritte. Ist das die gewünschte
+   Größenordnung, oder eher kleiner oder größer?
+3. **Händler als Figuren** (PixelLab, freigabepflichtig) oder als Symbole?

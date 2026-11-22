@@ -81,7 +81,7 @@ main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:.8rem;
   <div class="truhe" id="truhe"><img class="kranz" src="../sprites/beute/lichtkranz.png" alt=""><img class="zu" src="../sprites/beute/kiste-eisen-zu.png" alt="" id="bz"><img class="offen" src="../sprites/beute/kiste-eisen-offen.png" alt=""></div><span class="hinw">Klick auf die Kiste</span></div>
  <div class="leiste"><button class="btn g" id="nochmal">nochmal öffnen</button><span class="klein" id="kText">Drei Funde, du wählst einen. Die zwei anderen werden zu Teilen.</span></div></section>
 <section class="pan" id="sSchmiede" style="display:none"><div class="pk"><h2>Lager · anklicken zum Auswählen</h2><small id="auswT">nichts gewählt</small></div>
- <div class="pb"><div class="lager" id="lager"></div><div id="log">Wähle Gegenstände im Lager. Rezepte, die gerade gehen, sind golden umrandet.</div></div></section>
+ <div class="pb"><div class="lager" id="lager"></div><div id="log">Probier: <b>Seil + Eisen</b> wählen (Enterhaken), oder drei Standard-Teile (Glück). Was gerade geht, ist golden umrandet.</div></div></section>
 <aside class="pan"><div class="pk"><h2 id="rT">Chancen der Eisenkiste</h2><small id="rS">je Fund, immer sichtbar</small></div>
  <div class="pb" id="rechts"></div></aside>
 </main>
@@ -92,10 +92,12 @@ var PREIS=[1,3,6,12],VK=[.25,.30,.35,.40],TEILE=[1,2,4,8];
 var K={riegel:[0,"Energieriegel","+3 Stamina","allgemein · Einweg","icon-energieriegel.png"],brille:[0,"Zielbrille","+3 Awareness","I-Spy, TDM","ZB"],kreide:[0,"Kreideblock","+8 Power","Climbing · Einweg","KB"],
  hand:[1,"Sturmhandschuhe","+4 Dexterity","POW-Disziplinen","icon-sturmhandschuhe.png"],falke:[1,"Falkenbrille","+6 Awareness","I-Spy, TDM","FB"],spikes:[1,"Spikes","+6 Speed","SPE-Disziplinen","SP"],
  faenger:[1,"Fängerhandschuhe","+4 Dexterity, +3 Awareness","POW-Disziplinen","FH"],
+ seil:[1,"Seil","+3 Dexterity","Grundteil","SE"],eisen:[1,"Eisen","+3 Power","Grundteil","EI"],
+ haken:[3,"Enterhaken","überspringt eine Sektion","Climbing · Effekt, einmal je Lauf","EH"],
  wind:[2,"Windläufer","+10 Speed","Spurt, Staffel","icon-windlaeufer.png"],brett:[2,"Meisterbrett","+10 Intelligence","Speed-Schach","MB"],
  trikot:[3,"Glückstrikot","+9 Charisma, +6 Spirit","SOC-Disziplinen","GT"]};
-var NACH=[["riegel","brille","kreide"],["hand","falke","spikes"],["wind","brett"],["trikot"]];
-var Z={ruhm:60,teile:5,kasse:3.2,quote:90,zaehler:3,lager:["brille","brille","brille","hand","riegel","kreide"],ausw:[],funde:[],offen:false};
+var NACH=[["riegel","brille","kreide"],["hand","falke","spikes","seil","eisen"],["wind","brett"],["trikot","haken"]];
+var Z={ruhm:60,teile:8,kasse:3.2,quote:90,zaehler:3,lager:["brille","brille","kreide","hand","seil","eisen","riegel"],ausw:[],funde:[],offen:false};
 function $(i){return document.getElementById(i)}
 function bild(k){var b=K[k][4],s=K[k][0];return b.length>3?'<span class="ic"><img src="../sprites/beute/'+b+'" alt="" onerror="this.parentNode.className=\'ic sv\';this.parentNode.textContent=\''+K[k][1].slice(0,2)+'\'"></span>':'<span class="ic sv">'+b+'</span>'}
 function zahl(x){return x.toFixed(2).replace(".",",").replace(/0$/,"")}
@@ -119,12 +121,11 @@ function rechtsKiste(){$("rT").textContent="Chancen der Eisenkiste";$("rS").text
  $("rechts").innerHTML='<div class="ch">'+CH.map(function(c,i){return '<i style="width:'+c+'%;background:'+SF[i]+'">'+c+' %</i>'}).join("")+'</div><p class="klein">Standard 40 · Selten 40 · Episch 17 · Legendär 3 %. <b>Mitleidszähler '+Z.zaehler+' von 5:</b> spätestens jede fünfte Eisenkiste zeigt etwas Episches.</p><p class="klein"><b>Eins aus drei:</b> du siehst drei Funde und nimmst einen. Das halbiert das Pech gegenüber einem blinden Zug.</p><p class="klein"><b>Kisten kosten Ruhm</b>, nie Geld. Ruhm gibt es für Punkte am Spieltag.</p><p class="klein"><b>Regie:</b> Klick · rütteln · Lichtkranz in der Farbe der besten Stufe (1,2 s) · Deckel (2,0 s) · drei Funde.</p>'}
 /* ---------- Schmiede ---------- */
 function gew(){return Z.ausw.map(function(i){return Z.lager[i]})}
-function rezepte(){var g=gew(),n=g.length,gleich=n===3&&g[0]===g[1]&&g[1]===g[2],st=n?K[g[0]][0]:0,s=g.slice().sort().join("+");
- var fest={"brille+hand":"faenger","kreide+riegel":"spikes"}[s];
+function rezepte(){var g=gew(),n=g.length,st=n?K[g[0]][0]:0,gleich=n===3&&K[g[1]][0]===st&&K[g[2]][0]===st,s=g.slice().sort().join("+");
+ var fest={"brille+hand":"faenger","eisen+seil":"haken"}[s],kost=fest==="haken"?6:0;
  var r=[];
- r.push(["fest","Fest","Zwei bestimmte ergeben ein bestimmtes Teil","Rezeptbuch: <b>Sturmhandschuhe + Zielbrille → Fängerhandschuhe</b> · <b>Kreideblock + Energieriegel → Spikes</b>. Kosten 0,5 C. Kein Würfel.",!!fest&&Z.kasse>=.5,"zusammenlegen",function(){weg();Z.kasse-=.5;Z.lager.push(fest);sag("Fest: <b>"+K[fest][1]+"</b> ("+SN[K[fest][0]]+") entstanden. 0,5 C bezahlt.")}]);
- var ch=st===0?[0,80,20,0]:[0,0,85,15];
- r.push(["glueck","Glück","Drei gleiche ergeben ein besseres",(gleich&&st<2?"<b>3 × "+K[g[0]][1]+"</b>: ":"Drei gleiche Standard: <b>80 % Selten, 20 % Episch</b>. Drei gleiche Seltene: <b>85 % Episch, 15 % Legendär</b>. ")+'<span class="ch">'+ch.map(function(c,i){return c?'<i style="width:'+c+'%;background:'+SF[i]+'">'+c+' % '+SN[i]+'</i>':""}).join("")+"</span>Welches Teil der Stufe es wird, ist Zufall. Kosten 1 Teil.",gleich&&st<2&&Z.teile>=1,"wagen",function(){var z=wuerfel(ch),k=aus(z);weg();Z.teile-=1;Z.lager.push(k);sag("Glück: <b style='color:"+SF[z]+"'>"+SN[z]+"</b>, es wurde <b>"+K[k][1]+"</b>.")}]);
+ r.push(["fest","Bauplan","Zwei bestimmte ergeben ein bestimmtes Teil","<b>Seil + Eisen → Enterhaken</b> (Legendär, mit Effekt: überspringt im Climbing einmal eine Sektion) · 6 Teile, Schmiede Stufe 4. <b>Sturmhandschuhe + Zielbrille → Fängerhandschuhe</b> · 0,5 C, Stufe 2. Kein Würfel.",!!fest&&(kost?Z.teile>=kost:Z.kasse>=.5),"zusammenlegen",function(){weg();if(kost)Z.teile-=kost;else Z.kasse-=.5;Z.lager.push(fest);sag("Bauplan: <b style='color:"+SF[K[fest][0]]+"'>"+K[fest][1]+"</b> ("+SN[K[fest][0]]+") entstanden. "+K[fest][2]+".")}]);
+ r.push(["glueck","Glück","Drei derselben Stufe ergeben eines der nächsten",(gleich&&st<3?"<b>3 × "+SN[st]+"</b> → sicher <b style='color:"+SF[st+1]+"'>1 × "+SN[st+1]+"</b>. ":"Standard → Selten, Selten → Episch, Episch → Legendär. Die Stufe ist sicher. ")+"Zufall ist nur, <b>welches</b> Teil der Stufe es wird (jedes gleich wahrscheinlich). Kosten 1 Teil, Schmiede Stufe 3.",gleich&&st<3&&Z.teile>=1,"wagen",function(){var k=aus(st+1);weg();Z.teile-=1;Z.lager.push(k);sag("Glück: <b style='color:"+SF[st+1]+"'>"+SN[st+1]+"</b>, es wurde <b>"+K[k][1]+"</b>.")}]);
  var vk=0;g.forEach(function(k){vk+=PREIS[K[k][0]]*VK[K[k][0]]});
  r.push(["geld","Verkaufen","Beim Händler gegen Geld","Standard 25 %, Selten 30 %, Episch 35 %, Legendär 40 % vom Händlerpreis, mal Zustand. "+(n?"Auswahl bringt <b>"+zahl(vk)+" C</b>, davon bei Vorstands-Quote "+Z.quote+" % ausgebbar <b>"+zahl(vk*Z.quote/100)+" C</b>.":"Der Erlös unterliegt der Vorstands-Quote."),n>0,"verkaufen",function(){weg();Z.kasse+=vk;sag("Verkauft für <b>"+zahl(vk)+" C</b>. Ausgebbar davon "+zahl(vk*Z.quote/100)+" C, der Rest bleibt als Puffer auf dem Konto.")}]);
  var tl=0;g.forEach(function(k){tl+=TEILE[K[k][0]]});
@@ -136,7 +137,7 @@ var R=[];
 function zeig(){stand();var h="";for(var i=0;i<16;i++){var k=Z.lager[i];h+=k?'<div class="it'+(Z.ausw.indexOf(i)>=0?" gew":"")+'" style="--sf:'+SF[K[k][0]]+'" data-l="'+i+'">'+bild(k)+'<b>'+K[k][1]+'</b>'+K[k][2]+'</div>':'<div class="it frei"></div>'}
  $("lager").innerHTML=h;$("auswT").textContent=Z.ausw.length?Z.ausw.length+" gewählt":"nichts gewählt";
  R=rezepte();$("rT").textContent="Schmiede und Händler";$("rS").textContent="fest, Glück, verkaufen, zerlegen";
- $("rechts").innerHTML=R.map(function(r,i){return '<div class="rez '+r[0]+(r[4]?" geht":"")+'"><h3><span>'+r[1]+'</span>'+r[2]+'</h3><p>'+r[3]+'</p><button class="btn'+(r[4]?" g":"")+'" data-r="'+i+'"'+(r[4]?"":" disabled")+'>'+r[5]+'</button></div>'}).join("")+'<p class="klein">Angelehnt an: Horadrim-Würfel (feste Rezepte), Händler-Rezepte aus Path of Exile (drei gleiche werden etwas Besseres), Entzaubern in Hearthstone (zerlegen in eine Währung).</p>'}
+ $("rechts").innerHTML=R.map(function(r,i){return '<div class="rez '+r[0]+(r[4]?" geht":"")+'"><h3><span>'+r[1]+'</span>'+r[2]+'</h3><p>'+r[3]+'</p><button class="btn'+(r[4]?" g":"")+'" data-r="'+i+'"'+(r[4]?"":" disabled")+'>'+r[5]+'</button></div>'}).join("")+'<p class="klein">Angelehnt an: Baupläne aus Teamfight Tactics und Dota (zwei Grundteile, ein Gegenstand mit Effekt), Horadrim-Würfel, Händler-Rezepte aus Path of Exile, Entzaubern in Hearthstone. <b>Im Spiel</b> schaltet die Gebäudestufe der Schmiede die Rezepte frei.</p>'}
 function tab(n){$("t0").className=n?"":"an";$("t1").className=n?"an":"";$("sKiste").style.display=n?"none":"";$("sSchmiede").style.display=n?"":"none";if(n)zeig();else rechtsKiste()}
 document.addEventListener("click",function(e){var t=e.target;
  if(t.id==="t0")return tab(0);if(t.id==="t1")return tab(1);
