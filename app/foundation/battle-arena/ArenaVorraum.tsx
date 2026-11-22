@@ -414,7 +414,7 @@ function Teamtafel({ team, disziplinName }: { team: VorstellungTeam; disziplinNa
         <Logo team={team} />
         <div>
           {team.eigen ? <span className="du">Dein Team</span> : null} <ManagerMarke team={team} />
-          <h2>{team.name}</h2>
+          <h2 title={team.name}>{team.name}</h2>
         </div>
       </div>
       <dl>
@@ -468,7 +468,7 @@ function Teamkopf({ team, disziplinName }: { team: VorstellungTeam; disziplinNam
       <Logo team={team} />
       <div className="nm">
         {team.eigen ? <span className="du">Dein Team</span> : null}
-        <h2>{team.name}</h2>
+        <h2 title={team.name}>{team.name}</h2>
         <ManagerMarke team={team} />
       </div>
       <dl>

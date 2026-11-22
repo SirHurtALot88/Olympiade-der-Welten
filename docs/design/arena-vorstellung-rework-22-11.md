@@ -154,4 +154,25 @@ Der lokale Dev-Server der App wurde dreimal vom Speicherlimit beendet (Kompilier
 laufenden App (Arena-Reiter, Zur Arena) ist daher **nicht** gelungen. Stattdessen: die ECHTE Komponente `ArenaVorstellung` mit der ECHTEN Tafel aus einem Wegwerf-Spielstand (Battle, 32 Teams, KI-Aufstellungen ueber
 `applyAiLegacyLineupBatchLocally`), statisch gerendert in einer nachgebauten Huelle (Icon-Schiene 64 px, 40-px-Leiste). 1920x1080 und 2560x1440: Hockey (Feld), Fechten (Buehne), Staffel (Bahn),
 Battlefield (Pod); 1710x1112: Hockey, Battlefield; dazu Mini-DM, Basketball, Football und ein Hockey-Stand mit Form/Moral/Verletzung. Kein Seitenscroll, keine Ueberlappung, kein abgeschnittener Text gemessen.
-Offen: eine Aufnahme aus der laufenden App auf einem Rechner mit genug Speicher.
+Offen war: eine Aufnahme aus der laufenden App (jetzt erledigt, 7.5).
+
+### 7.5 Aufnahme aus der App (22.11.)
+
+Die Vorstellung lief im echten Host. Weg: Produktions-Build (`npm run build`, Webpack; Turbopack lehnt den `node_modules`-Symlink des Worktrees ab) plus `next start` mit
+`NODE_OPTIONS=--max-old-space-size=4096`, kein Speicherproblem (Dev-Server war die Ursache). Spielstand: Wegwerf-Battle-Save, 32 Teams, KI-Aufstellungen fuer alle Teams
+(`scripts/screenshot-arena-vorstellung-bau.ts`, `...-fuelle.ts` fuellt auch das Mensch-Team), Aufnahme mit `scripts/screenshot-arena-vorstellung-app.ts`; Ansicht `view=matchday-arena`,
+dort "Zur Battle Arena". Bilder: `docs/design/arena-vorstellung-rework-22-11/app/` (1920x1080, 2560x1440, 1710x1112; Hockey = Duell/Feldspiel, Eiskunst = Duell/Buehne, Battlefield = Vier-Team-Pod,
+je mit Zeilenklick, Zur Arena, Quick-Sim).
+
+Gemessen: kein Seitenscroll (scrollHeight = Fensterhoehe bei allen drei Groessen), keine Ueberlappung, Klick auf eine Zeile zeigt den Rollentext im Fuss, "Zur Arena" schliesst die
+Vorstellung und startet die Arena (Canvas da), "Quick-Sim" spult durch ("Spiel zu Ende", Vorstellung weg). Konsole: nur zwei 404 auf `/api/media/player-portrait/...` fuer Spieler
+ohne Portraet-Datei (die Marke faellt auf die Initialen zurueck, bestehendes Verhalten, nicht Teil der Vorstellung).
+
+Gefunden und behoben:
+1. **Arena-HUD hing ueber der Vorstellung** (Anzeigetafel mit "0 : 0", Regieleiste, Spielerzeile des Motors schienen durch): der Motor-Container bleibt waehrend Laden/Vorstellung im Layout (der Motor misst
+   ihn), ist jetzt aber `visibility:hidden` (`FoundationBattleArenaHost.tsx`, `data-testid="arena-motor-container"`).
+2. **Kopfzeile bei 16:10 abgeschnitten:** die Arena-Leiste ist fest 56 px hoch, der Kopf-Abstand war 2,6 u (bei 1710 breit nur 37 px). Jetzt `max(57px, 2,6 u)` in der Vollflaeche.
+3. **Langer Spielername abgeschnitten** ("Professor Paran..."): Name umbricht jetzt auf bis zu zwei Zeilen (`line-clamp:2`); Teamnamen in den Pod-Spaltenkoepfen behalten die Ellipse, tragen aber `title`.
+
+Offen: (a) Im Pod-Lauf blieb links ein 72-px-Streifen der Seite dahinter sichtbar (Huelle `left:72`); dort wurde die Disziplin zur Aufnahme per erzwungenem Dropdown-Wechsel umgeschaltet, ein
+natuerlicher Wechsel ueber "Weiter zu Disziplin 2" wurde nicht aufgenommen, daher unklar, ob das die Aufnahme verursacht hat. (b) Mini-DM nicht live aufgenommen (Pod-Probe ueber Battlefield).

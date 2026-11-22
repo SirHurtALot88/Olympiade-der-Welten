@@ -20,6 +20,8 @@
   position:absolute;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) calc(4.6*var(--u));
   padding-top:calc(2.6*var(--u));isolation:isolate;color:var(--tinte);font-family:var(--zahl);font-size:calc(1*var(--u));
   -webkit-font-smoothing:antialiased;text-align:left}
+/* Die Arena-Leiste (Vollflaeche) ist fest 56 px hoch; bei 16:10 ist 2,6 u kleiner und schnitt die Kopfzeile ab (Aufnahme 22.11.). */
+.oly-arena-buehne[data-voll="1"] .oly-vst{padding-top:max(57px,calc(2.6*var(--u)))}
 .oly-vst *{box-sizing:border-box}
 .oly-vst img{display:block}
 .oly-vst button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
@@ -112,7 +114,7 @@
 .oly-vst .spz.leer{display:grid;place-items:center;grid-template-columns:1fr!important;border-style:dashed;color:var(--stumm);font-size:calc(.95*var(--u));background:rgba(8,11,17,.5)}
 .oly-vst .spz.leer::before{display:none}
 .oly-vst .info{min-width:0;display:grid;gap:calc(.22*var(--u))}
-.oly-vst .info .n{font:400 calc(1.55*var(--u))/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 .2em}
+.oly-vst .info .n{font:400 calc(1.55*var(--u))/1.1 var(--haus);color:#fff;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow-wrap:anywhere;padding:0 .2em}
 .oly-vst .tafel.pod .info .n,.oly-vst .tafel.duell .spz.r .info .n{padding-left:0}.tafel.duell .spz.l .info .n{padding-right:.2em}
 .oly-vst .tafel.pod .info .n{font-size:calc(1.2*var(--u))}
 .oly-vst .kl{display:flex;align-items:center;gap:calc(.35*var(--u));font-size:calc(.92*var(--u));font-weight:600;color:var(--kl);white-space:nowrap}

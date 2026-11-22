@@ -1467,7 +1467,9 @@ export default function FoundationBattleArenaHost({
               quickSimGesperrt={spultVor}
             />
           ) : null}
-          {gerenderterKader ? <div ref={containerRef} style={{ marginTop: 10 }} /> : null}
+          {/* Waehrend Laden/Vorstellung bleibt der Motor-Container im Layout (Groessenmessung des Motors), ist aber unsichtbar:
+              sein HUD (Anzeigetafel, Regieleiste, Spielerzeile) haengt sonst ueber der Vorstellung (Aufnahme 22.11.). */}
+          {gerenderterKader ? <div ref={containerRef} style={{ marginTop: 10, visibility: vorraumPhase ? "hidden" : "visible" }} data-testid="arena-motor-container" /> : null}
         </ArenaVollflaecheBuehne>
       </>
     );
