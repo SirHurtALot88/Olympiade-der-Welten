@@ -33,44 +33,76 @@ Kartenwerte alt `[0,2,4,8]`, neu `[2,4,6,8]`. Gezeigt = gebucht: Legacy-Wertung,
 
 ### Schalter und Stempel
 
-`OLY_FORMKARTEN_PLUSMINUS=1` (Server). Er steckt im Regelstand (`FormMoralRegeln.plusMinus`, nur gesetzt wenn an), den der Lineup-Kontext schon zum Browser traegt. **Noch kein Stempel im Spielstand** (Muster `wertungs-skalen.ts`): der Prototyp liest die Umgebung. Vor dem Scharfschalten noetig: Stempel im Saisonstand, Wechsel nur zum Saisonwechsel (Kartenwerte werden beim Anlegen der Saisonkarten gezogen, bestehende Karten bleiben), sonst aendert sich die Wirkung gebuchter Aufstellungen mitten in der Saison.
+Siehe Abschnitt 5: Regel im Spielstand (`seasonState.formkartenRegel`), Rueckweg `OLY_FORMKARTEN_PLUSMINUS=aus`, Notbremse `=aus-sofort`. Ohne Stempel gilt die Regel von 18.11.
 
-## 3. Messung (Schalter an, Node-Motor, Formkarten-Modus echt)
+## 3. Messung (Regel plusminus, Kartenwerte 2/4/6/8, Node-Motor, Formkarten-Modus echt)
 
-`scripts/miss-formkarten-plusminus.mts 12` (abgeleitet von `miss-formkarten-farbregel.mts`, Hook um Gegenfarbe und Kartenwerte erweitert). Spalten: rho je Spiel (Median ueber Kaderfamilie, 12 Spiele) ohne Karte, mit der Regel von heute, nur Gegenfarbe dazu, und volles ± (ohne 0er); letzte Spalten: Anteil der Spiele, in denen der beste Spieler gegenueber „ohne Karte" wechselt (Naeherung fuer „Karte dreht das Ergebnis"; Team-Ergebnisse liefert die Sonde nicht).
+Neu gemessen am 22.11. nach Chris' Wertewechsel auf 2/4/6/8 (alle frueheren Laeufe mit 2/3/5/8 verworfen):
+`OLY_SHARD=i/2 scripts/miss-formkarten-plusminus.mts 12 <out.json>` (Hook um Gegenfarbe und Kartenwerte erweitert). Spalten: rho je Spiel
+(Median ueber Kaderfamilie, 12 Spiele) ohne Karte, mit der Regel von heute (alt: Werte 0/2/4/8, keine Gegenfarbe), nur Gegenfarbe dazu, und
+volles ± (Gegenfarbe + Werte 2/4/6/8). Die beiden letzten Spalten: Anteil der Spiele, in denen der beste Spieler gegenueber „ohne Karte"
+wechselt (Naeherung fuer „Karte dreht das Ergebnis").
 
-| Disziplin | ohne Karte | heute (pm) | +Gegenfarbe | ± (ohne 0, +Gegenfarbe) | Sieger gedreht heute | Sieger gedreht ± |
+| Disziplin | ohne Karte | heute (alt) | +Gegenfarbe | ± (2/4/6/8 + Gegenfarbe) | Sieger gedreht heute | Sieger gedreht ± |
 |---|---:|---:|---:|---:|---:|---:|
-| basketball | 0.837 | 0.850 | 0.840 | 0.841 | 57 % | 62 % |
-| battlefield | 0.617 | 0.610 | 0.601 | 0.606 | 72 % | 85 % |
-| breaking | 0.864 | 0.854 | 0.850 | 0.850 | 33 % | 35 % |
-| climbing | 0.859 | 0.830 | 0.838 | 0.786 | 33 % | 38 % |
-| eiskunstlauf | 0.929 | 0.914 | 0.913 | 0.911 | 20 % | 18 % |
-| fechten | 0.854 | 0.867 | 0.865 | 0.867 | 15 % | 15 % |
-| football | 0.863 | 0.802 | 0.808 | 0.844 | 45 % | 38 % |
-| gewichtheben | 0.890 | 0.899 | 0.899 | 0.893 | 20 % | 25 % |
-| hockey | 0.752 | 0.622 | 0.678 | 0.697 | 48 % | 57 % |
-| i-spy | 0.812 | 0.810 | 0.809 | 0.806 | 40 % | 33 % |
-| mini-dm | 0.325 | 0.133 | 0.333 | 0.315 | 55 % | 63 % |
-| showcase | 0.784 | 0.814 | 0.818 | 0.793 | 17 % | 15 % |
-| speed-schach | 0.922 | 0.925 | 0.919 | 0.923 | 7 % | 7 % |
-| spurt | 0.916 | 0.878 | 0.875 | 0.863 | 13 % | 18 % |
-| staffel | 0.958 | 0.956 | 0.959 | 0.959 | 18 % | 20 % |
-| takeshis-castle | 0.818 | 0.860 | 0.834 | 0.804 | 28 % | 23 % |
-| tdm | 0.901 | 0.914 | 0.908 | 0.888 | 25 % | 28 % |
-| tennis | 0.882 | 0.879 | 0.881 | 0.877 | 15 % | 18 % |
-| time-trial | 0.942 | 0.936 | 0.938 | 0.940 | 27 % | 33 % |
-| wettessen | 0.925 | 0.933 | 0.937 | 0.928 | 13 % | 12 % |
+| basketball | 0.837 | 0.850 | 0.840 | 0.855 | 57 % | 62 % |
+| battlefield | 0.617 | 0.610 | 0.601 | 0.596 | 72 % | 85 % |
+| breaking | 0.864 | 0.854 | 0.850 | 0.858 | 33 % | 35 % |
+| climbing | 0.859 | 0.830 | 0.838 | 0.808 | 33 % | 33 % |
+| eiskunstlauf | 0.929 | 0.914 | 0.913 | 0.910 | 20 % | 23 % |
+| fechten | 0.854 | 0.867 | 0.865 | 0.871 | 15 % | 17 % |
+| football | 0.863 | 0.802 | 0.808 | 0.843 | 45 % | 38 % |
+| gewichtheben | 0.890 | 0.899 | 0.899 | 0.890 | 20 % | 28 % |
+| hockey | 0.754 | 0.654 | 0.728 | 0.735 | 48 % | 48 % |
+| i-spy | 0.812 | 0.810 | 0.809 | 0.805 | 40 % | 48 % |
+| mini-dm | 0.325 | 0.133 | 0.333 | 0.349 | 55 % | 58 % |
+| showcase | 0.784 | 0.814 | 0.818 | 0.805 | 17 % | 17 % |
+| speed-schach | 0.922 | 0.925 | 0.919 | 0.924 | 7 % | 7 % |
+| spurt | 0.916 | 0.878 | 0.875 | 0.880 | 13 % | 25 % |
+| staffel | 0.958 | 0.956 | 0.959 | 0.956 | 18 % | 18 % |
+| takeshis-castle | 0.818 | 0.860 | 0.834 | 0.834 | 28 % | 20 % |
+| tdm | 0.901 | 0.914 | 0.908 | 0.897 | 25 % | 40 % |
+| tennis | 0.882 | 0.879 | 0.881 | 0.877 | 15 % | 20 % |
+| time-trial | 0.942 | 0.936 | 0.938 | 0.938 | 27 % | 35 % |
+| wettessen | 0.925 | 0.933 | 0.937 | 0.933 | 13 % | 15 % |
+| **Mittel** | 0.833 | 0.816 | | 0.828 | 30 % | 34 % |
 
-Lesart: 12 Spiele je Variante sind knapp, Schwankungen von +-0,03 sind Rauschen. Mittel „Sieger gedreht": heute 30 %, mit ± 32 %. Die Plus/Minus-Regel aendert rho kaum (Hockey und Football sogar besser als heute, Climbing und Spurt etwas schlechter), die Werte unter 0,75 bei Battlefield (0,61), Mini-DM (0,31/0,13) und Hockey (0,70) liegen schon **ohne** Karte unter der Schranke dieser Sonde (12 Spiele, Kaderfamilie, Pod-Aufbau); sie sind kein Effekt der neuen Regel, aber ein offener Arbeitsauftrag der Abnahme (Hockey ist laut CLAUDE.md in der Vollmessung 0,67).
+Lesart: 12 Spiele je Variante sind knapp, Schwankungen von +-0,03 sind Rauschen. Mit ± liegt rho im Mittel bei 0.828 (heute 0.816, ohne Karte 0.833):
+die neue Regel ist im Schnitt besser als die von heute. Hockey (0,654 -> 0,735) und Football (0,802 -> 0,843) gewinnen, Climbing (0,830 -> 0,808) verliert etwas, bleibt klar ueber 0,75.
+**Unter 0,75 liegen mit der neuen Regel nur Battlefield (0,596) und Mini-DM (0,349) — beide schon OHNE Karte darunter (0,617 / 0,325), also kein Effekt der Regel,
+sondern der Pod-Aufbau dieser Sonde (12 Spiele, Kaderfamilie); Hockey 0,735 liegt in der Sonde knapp darunter, ohne Karte 0,754 (Rauschen +-0,03; die Vollmessung in
+`docs/design/hockey-torwart-22-11.md` ist die massgebliche).** Kein Disziplin-Rutsch unter die Schranke, der durch die Regel entsteht.
 
-### Pp-Abweichung
+### Pp-Abweichung (Pflichtpruefung, Grenze <= 25, Budget-Methode `einflussVon`, zwei Saatstroeme)
 
-**Nicht gemessen.** `OLY_PP=1` (einflussVon, 16 Laeufe, zwei Saatstroeme) lief fuer Tennis und Basketball ueber 30 Minuten CPU ohne Ergebnis und wurde abgebrochen. Die Karten gehen im Motor als `form` je Spieler ein; Mittelwert ueber die Spiele bleibt gleich (die Gegenfarbe verschiebt nur Anteile zwischen Klassen), die Pp-Abweichung ist deshalb kein grosser Ausschlag, aber **offen** und vor dem Scharfschalten nachzumessen (`OLY_PP=1 OLY_PP_LAEUFE=48 npx tsx scripts/miss-formkarten-plusminus.mts 6 out.json <disziplin>`).
+`OLY_PP=1 OLY_REGELN='pm,pm±' OLY_PP_LAEUFE=16 scripts/miss-formkarten-plusminus.mts 4 <out.json> <disziplin ...>`, mit der Karte als Form je Spieler im Motor
+(Formkarten-Modus echt). **16 Laeufe je Strom statt der ueblichen 48** (auf dieser, mit anderen Sitzungen geteilten Maschine 3 Min fuer Tennis, aber Basketball (6 gegen 6) lief nach 90 Min bei 16 Laeufen und nach weiteren 60 Min bei 12 Laeufen nicht durch und wurde abgebrochen — **Basketball ist damit NICHT gemessen**; ehrliche Einschraenkung: die Absolutwerte sind bei n=16 systematisch eher zu guenstig, siehe `messe-arena-einfluss.mjs`,
+verglichen wird deshalb heute gegen ± mit gleicher Laufzahl).
 
-### Aufnahmen
+| Disziplin (Gattung) | heute (alt), Strom 0 / Strom 1 | ± (2/4/6/8 + Gegenfarbe), Strom 0 / Strom 1 | gepoolt heute -> ± |
+|---|---|---|---|
+| Tennis (Duell) | 6.7 / 6.2 | 7.1 / 6.2 | 6.5 -> 6.7 |
+| Basketball (Feldspiel) | nicht gemessen | nicht gemessen | - |
+| Time-Trial (Bahn) | 10.6 / 10.7 | 12.2 / 11.7 | 10.6 -> 11.9 |
+| Eiskunstlauf (Buehne) | 15.0 / 11.0 | 16.7 / 10.5 | 13.0 -> 13.6 |
 
-**Nicht erstellt.** Der Save-Bau der Einsatzliste-Optik-Pipeline (`scripts/screenshot-einsatzliste-optik.ts bau`, 12 Spieltage Auto-Run) lief ueber 25 Minuten ohne Abschluss und wurde abgebrochen; die Anzeige ist durch Tests (Zerlegung, Gegenfarbe, Vergleichsauswahl, Motor-Eingabe) abgedeckt, aber nicht optisch abgenommen. Nachholen: `flock /tmp/oly-aufnahme.lock` mit `OLY_FORMKARTEN_PLUSMINUS=1`, Ziel `docs/design/formkarten-plusminus-22-11/`.
+Alle drei gemessenen Disziplinen liegen unter der Pflichtschranke 25 (Basketball offen, Nachmessung: `OLY_PP=1 OLY_REGELN='pm,pm±' OLY_PP_LAEUFE=12 npx tsx scripts/miss-formkarten-plusminus.mts 4 out.json basketball` auf einer freien Maschine); die Regel verschiebt die Pp-Abweichung um hoechstens 1.3 Pp. Nicht gemessen: Basketball und die uebrigen 16 Disziplinen
+(die Karte geht dort ueber denselben Form-Kanal ein, die Gegenfarbe verschiebt nur Anteile zwischen Klassen).
+
+### Aufnahmen (aus der echten App, Battle-Spielstand, neues Spiel mit Stempel plusminus)
+
+Unter `docs/design/formkarten-plusminus-22-11/`, Spieltag 1 Battlefield, Disziplinfarbe SOC, bei 1920x1080 und 2560x1440
+(`scripts/screenshot-einsatzliste-optik.ts bau|foto`, neu: `OPTIK_MAX_KOPIEN`, `OPTIK_KARTE`, `OPTIK_KARTE_FARBE`):
+
+- `app-battlefield-1920.png`, `app-battlefield-2560.png`: Einsatzliste mit der Kartenhand 2/4/6/8 (keine 0er, Minuskarten -2/-4/-6/-8).
+- `app-battlefield-karten-1920.png`, `app-battlefield-karten-2560.png`: Reiter Karten-Wirkung mit gelegter Karte Mental +8: Spalte **Gegenfarbe** (Ravager, Berserker/POW: -2,0),
+  Zeile „GEGENFARBE -2,0" in der Teamsumme, Marke „+2,0 -2,0" am Platz, Erklaertext „Abzug fuer 1 POW-Spieler (Gegenfarbe)", Vergleichsliste mit Minuskarten (-6, -8, -8).
+- `app-battlefield-gegner-*.png`: Reiter Gegner (nur zur Vollstaendigkeit).
+
+Selbst angesehen. Abweichungen: (1) die Kartenhand ist kein Mockup-Bestandteil, es gibt fuer Plus/Minus kein eigenes Mockup; verglichen wurde mit der Ansicht vor der Aenderung (Spalte Gegenfarbe und
+Minuskarten in der Vergleichsliste sind neu, sonst unveraendert). (2) Der lange Farbbonus-Satz in der Kartenzeile wird bei 1920 rechts abgeschnitten (bestand schon vor dieser Arbeit,
+durch den Gegenfarb-Zusatz etwas laenger). (3) Bei 1920x1080 ueberlappt die Arena-Beschriftung der Karte mit der Kopfzeile des Einsatz-Reglers (Schonen/Normal/Vollgas) — bestand vorher, nicht angefasst.
+(4) Es wurde nur Battlefield fotografiert (Bau-Zeit des Spielstands); die Anzeige haengt nicht an der Disziplin.
 
 ### Wie oft drehen KI-Karten Ergebnisse?
 
@@ -81,11 +113,28 @@ Nicht direkt messbar mit der Sonde (kein Team-Ergebnis, keine KI-Aufstellung im 
 - `lib/lineups/formkarten-farbregel.ts` (Gegenfarbe, `FARBREGEL_PM_PLUSMINUS`, `GEGENFARBE`, Schalter), `legacy-lineup-modifiers.ts` (Kartenwerte), `formkarten-wirkung.ts`, `lib/morale/form-moral-regeln.ts` (Regelstand).
 - KI: `ai-form-card-season-plan.ts` (`gewicht`, `duellGewicht`, Gegenfarbe im Slot-Wert), `ai-legacy-lineup-batch-apply-service.ts`.
 - Anzeige: `FormMoralBausteine.tsx` (Gegenfarbe, `vergleichAuswahl` zeigt Minuskarten auch **ohne** Schalter), `EinsatzlisteKartenHand.tsx`, `EinsatzlisteModern.tsx`, `form-moral.css`.
+- Stempel (22.11.): `lib/resolve/formkarten-regel.ts` (neu), `lib/data/olyDataTypes.ts`, `new-game-setup-service.ts`, `preseason-workflow-service.ts`, `save-repository.ts`; Regelstand `resolveFormMoralRegeln(env, gameState)`, Adapter und KI lesen den Stempel.
 - Messung/Test: `scripts/miss-formkarten-plusminus.mts`, `scripts/lib/formkarten-farbregel-hook.mjs`, `tests/formkarten-plusminus.test.ts`.
 
-## 5. Offene Entscheidungen fuer Chris
+## 5. Entscheidungen von Chris (22.11.) und Umsetzung
 
-1. Soll die Gegenfarbe (POW/MEN, SPE/SOC, Faktor 0,25) kommen, oder lieber „Erschoepfung" (Karte kostet den Spieler, der sie gelegt hat)?
-2. Kartenwerte `[2,3,5,8]` statt `[0,2,4,8]` ok?
-3. Scharfschalten nur zum Saisonwechsel mit Stempel im Spielstand?
-4. Die Vergleichsliste mit sichtbaren Minuskarten gilt ab sofort auch ohne Schalter (reine Anzeige).
+1. **Gegenfarbe** kommt (nicht „Erschoepfung"). Chris bestaetigt ausdruecklich: jeder Spieler hat genau eine positive Farbe (seine Klassenfarbe) und eine negative (die Gegenfarbe, POW<->MEN, SPE<->SOC); eine Minuswirkung bei der Farbe bleibt negativ, nichts wird abgeschwaecht.
+2. **Kartenwerte 2/4/6/8** (zuerst 2/3/5/8 empfohlen, von Chris auf 2/4/6/8 geaendert).
+3. **Scharf ab der naechsten Saison per Spielstand-Stempel**: `seasonState.formkartenRegel = { seasonId, regel: "plusminus" | "alt" }` (`lib/resolve/formkarten-regel.ts`).
+   Neues Spiel (nur Battle): plusminus ab Saison 1 (`stempleFormkartenRegelBeimAnlegen` in `new-game-setup-service.ts`). Bestehender Spielstand: die Lade-Migration
+   (`stempleFormkartenRegelNachLaden`, `save-repository.ts`) schreibt fuer die laufende Saison „alt" fest, damit schon gezogene Karten und gebuchte Aufstellungen unveraendert bleiben;
+   der Saisonwechsel (`preseason-workflow-service.ts`) stempelt die Folgesaison nach dem Schalter. Manager-Spielstaende bleiben alt (kein Stempel).
+   Rueckweg `OLY_FORMKARTEN_PLUSMINUS=aus` (neue Saisons alt, gestempelte rechnen weiter), Notbremse `=aus-sofort` (ignoriert jeden Stempel; im Browser zusaetzlich `NEXT_PUBLIC_OLY_FORMKARTEN_PLUSMINUS`;
+   ungespielte Karten werden dabei von `ensureLocalFormCardsForSeason` auf die alten Werte zurueckgezogen).
+4. **Vergleichsliste mit sichtbaren Minuskarten** (`vergleichAuswahl`) ist reine Anzeige und gilt seit dem Fix unabhaengig vom Stempel.
+
+### Wer liest die Regel (eine Quelle, gezeigt = gebucht)
+
+Kein Rechenweg liest mehr die Prozess-Variable. `resolveFormMoralRegeln(env, gameState)` setzt `plusMinus` aus `formkartenRegelFuer(gameState)`; daraus bekommt `farbregelAusRegeln` die Regel
+`FARBREGEL_PM_PLUSMINUS`. Gelesen wird sie von: Legacy-Wertung und Vorschau (`context.formMoralRegeln`, gesetzt in `legacy-lineup-local-service.ts` aus dem Spielstand), Einsatzliste und Karten-Wirkung
+(`formkarten-wirkung.ts`), Arena-Aufstellungsadapter (`arena-aufstellung-adapter.ts` rechnet `calculateFormModifierForSide` mit der Regel aus dem Spielstand), KI-Kartenplan
+(`ai-legacy-lineup-batch-apply-service.ts`: Duellgewicht nur bei `plusMinus`, Plan und Einsatzwert nutzen `plan.farbregel`) und die Kartenziehung (`buildGeneratedFormCardRecordsForTeam`).
+Zum Arena-Host/Node-Motor reist die Regel nicht als eigenes Feld: der Umschlag traegt die fertigen Kartenwerte je Spieler (`form`), die der Adapter aus derselben Funktion rechnet.
+`tests/formkarten-plusminus.test.ts` prueft Einsatzliste = Adapter fuer plusminus und fuer alt (auch bei gesetztem Schalter).
+
+**Wertungs-Fingerabdruck:** `node scripts/pruefe-wertung-fingerabdruck.mjs --node` zeigt `GESAMT 0310ec4a4e3d` (75 Eintraege), identisch zum aktuellen main; der Motor wurde nicht angefasst, eine eigene Schutzsumme ist nicht noetig.
