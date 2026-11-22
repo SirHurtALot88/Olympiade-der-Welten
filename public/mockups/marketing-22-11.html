@@ -394,7 +394,7 @@ body.phone #schleier{display:block;position:fixed;inset:0;z-index:60;background:
 body.phone[data-blatt] #schleier{opacity:1;pointer-events:auto}
 body.phone .kontext .ktabs button:last-child{flex:none;width:44px}
 /* ---------- Marketing ---------- */
-.mkt .th,.mkt .tz{grid-template-columns:22px minmax(200px,1.5fr) 124px 54px minmax(110px,1fr) minmax(120px,1fr) 62px 76px 92px}
+.mkt .th,.mkt .tz{grid-template-columns:22px minmax(200px,1.5fr) 124px 54px minmax(110px,1fr) minmax(120px,1fr) 62px 70px 96px 82px}
 .mkt .tz{min-height:40px;cursor:pointer} .mkt .tz.sel{background:rgba(240,195,90,.10);box-shadow:inset 3px 0 0 var(--gold)}
 .mkt .tz:hover{background:rgba(255,255,255,.03)}
 .mkt .th button{font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;text-align:inherit;white-space:nowrap} .mkt .th button.an{color:var(--gold)} .mkt .th .li{text-align:left}
@@ -414,18 +414,40 @@ body.phone .kontext .ktabs button:last-child{flex:none;width:44px}
 .ton.gross{height:26px;margin:4px 6px 0} .ton.gross::before{top:12px;height:3px} .ton.gross::after{top:6px;height:15px} .ton.gross u{top:0;border-width:7px;border-top-width:10px;margin-left:-7px}
 .tonl{display:flex;justify-content:space-between;font-size:12px;color:var(--stumm);letter-spacing:.06em;text-transform:uppercase;font-weight:600}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
-.fbar{display:grid;grid-template-columns:38px minmax(0,1fr) 22px;gap:8px;align-items:center;font-size:13.5px;color:var(--leise)} .fbar b{text-align:right;color:var(--tinte);font-weight:600}
+.fbar{display:grid;grid-template-columns:38px minmax(0,1fr) 30px 78px;gap:8px;align-items:center;font-size:13.5px;color:var(--leise)} .fbar b{text-align:right;color:var(--tinte);font-weight:600}
 .lg{display:grid;grid-template-columns:minmax(0,1fr) 110px 40px;gap:8px;align-items:center;font-size:14.5px;color:var(--leise);line-height:1.2} .lg>:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tinte);font-weight:600} .lg strong{text-align:right;color:var(--creme);font-weight:700}
 .lg.du>:first-child{color:var(--heim)}
 .mgr{flex:none;overflow:visible;grid-template-columns:repeat(3,minmax(0,1fr));padding:10px 12px 12px;border-top:1px solid var(--linie)}
 .kb .herl+.herl{margin-top:8px} .kb .pkopf{display:flex;gap:10px;align-items:center;margin-bottom:8px} .kb .pkopf img{width:54px;height:54px;border-radius:8px;object-fit:cover;border:1px solid var(--linie-2)}
 .kb .pkopf b{font:400 22px/1.05 var(--haus);color:#fff;display:block} .kb .pkopf small{color:var(--leise);font-size:13.5px}
 .dtab{cursor:pointer;max-width:430px} .mkt .tz>.xs:has(.ton){padding-left:10px}
-@media (max-width:1500px){.mkt .th,.mkt .tz{grid-template-columns:22px minmax(170px,1.4fr) 100px 48px minmax(90px,1fr) minmax(90px,1fr) 56px 70px 84px}}
+@media (max-width:1500px){.mkt .th,.mkt .tz{grid-template-columns:22px minmax(170px,1.4fr) 100px 48px minmax(80px,1fr) minmax(80px,1fr) 56px 64px 90px 76px}}
 @media (min-height:1250px){.mkt .tz{min-height:52px;font-size:18px} .mkt .nm img{width:38px;height:38px} .mkt .nm .n2 small{font-size:13.5px} .mkt .big{font-size:27px} .mkt .kl{font-size:15.5px} .mkt .kl small{font-size:13px}}
 @media (max-width:1800px){.mkt .nm .n2 small{font-size:11px;letter-spacing:-.01em}}
 @media (max-height:1180px){.mkt .tz{min-height:38px;font-size:15px} .mkt .nm img{width:26px;height:26px} .mkt .nm .n2{line-height:1.08} .mkt .grp{height:22px} .mgr .txt.lang{display:none} .mgr .sd .in{gap:6px} .lg.opt{display:none}}
-body.phone .mkt .th,body.phone .mkt .tz{grid-template-columns:8px minmax(0,1fr) 54px 64px} body.phone .mkt .xs{display:none} body.phone .mgr{grid-template-columns:minmax(0,1fr)}
+body.phone .mkt .th,body.phone .mkt .tz{grid-template-columns:8px minmax(0,1fr) 50px 50px 58px} body.phone .mkt .xs{display:none} body.phone .mgr{grid-template-columns:minmax(0,1fr)}
+/* Runde 2 */
+.mkt .gd{line-height:1.1;font-weight:700;color:var(--creme);white-space:nowrap} .mkt .gd small{display:block;font-size:11.5px;font-weight:500;color:var(--stumm);letter-spacing:0}
+.ton i.fl{background:#6a7488}
+.fz{display:grid;grid-template-columns:50px minmax(0,1fr);gap:6px;align-items:start;margin-bottom:5px} .fz>span{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600;line-height:16px}
+.fbar em{font-style:normal;font-size:12.5px;text-align:right;white-space:nowrap;color:var(--stumm)} .fbar em.plus{color:var(--gut)} .fbar em.minus{color:var(--warn)} .fbar em small{color:var(--stumm);font-size:11.5px}
+.fbar+.fbar{margin-top:5px}
+.txt.klein{font-size:13px;color:var(--stumm);line-height:1.3} .txt.klein b{color:var(--tinte)}
+.akt2{display:flex;justify-content:flex-end;margin-top:10px}
+.zl.sumz{border-top:1px solid var(--linie-2);padding-top:5px}
+.uk{position:relative;flex:1;min-height:92px;margin:2px 0 0;border-radius:6px;background:#06080c;border:1px solid var(--linie);overflow:hidden}
+.uk svg{position:absolute;inset:0;width:100%;height:100%}
+.uk i{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:var(--creme);border:2px solid #0b0d12;z-index:2}
+.uk i.sel{background:var(--gold);width:13px;height:13px;margin:-6.5px 0 0 -6.5px;z-index:3}
+.uk .ul{position:absolute;font:700 13px/1 var(--zahl);color:var(--gold);white-space:nowrap;z-index:1}
+.uk .ul.mi{left:50%;transform:translateX(-50%);color:var(--leise);font-weight:600;font-size:12px} .uk .ul.mi.go{color:var(--gold)}
+.vleg{display:flex;gap:12px;font-size:12px;color:var(--leise);letter-spacing:.06em;font-weight:600;margin-bottom:8px} .vleg i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.vs{margin-bottom:9px} .vs .gk{display:flex;justify-content:space-between;margin-bottom:4px} .vs .gk em{font-style:normal;color:var(--stumm);letter-spacing:.02em;text-transform:none;font-weight:500;font-size:12.5px}
+.vs.du .gk span{color:var(--heim)}
+.stk{display:flex;height:20px;border-radius:3px;overflow:hidden;gap:2px} .stk i{font:700 12.5px/20px var(--zahl);color:#0b0d12;text-align:center;font-style:normal;min-width:0;overflow:hidden}
+.stk.gs{opacity:.6;outline:1px dashed var(--linie-2);outline-offset:2px}
+@media (max-height:1180px){.uk{min-height:74px}}
+.tonl b{color:var(--gold);font-weight:700;margin-left:4px}
 </style>
 </head>
 <body>
@@ -489,7 +511,7 @@ body.phone .mkt .th,body.phone .mkt .tz{grid-template-columns:8px minmax(0,1fr) 
 <script>
 "use strict";
 var q=new URLSearchParams(location.search);
-/* ---------- Vorschlag: Gewichte (docs/design/marketing-22-11.md Abschnitt 2) ---------- */
+/* ---------- Vorschlag: Gewichte (docs/design/marketing-22-11.md Abschnitt 2, Runde 2 in Abschnitt 9) ---------- */
 /* Trait: [Reichweite, Ton]. Ton +1 = Liebling, -1 = Boesewicht. Traits echt: lib/training/class-progression-config.ts:234-274 */
 var TR={FanFavorite:[12,1],Sexy:[9,.2],Eloquent:[7,.6],Cool:[6,.3],Fearless:[5,.2],FiredUp:[5,0],Ambitious:[3,0],Loyal:[3,.6],Caring:[3,.9],Altruistic:[3,1],Fair:[3,.9],Motivated:[2,.3],Healthy:[1,.2],Resourceful:[1,0],Flexible:[0,0],Diligent:[0,.2],Disciplined:[0,.3],Relaxed:[-1,.2],
         Scandalous:[10,-1],Diva:[8,-.5],Renegade:[7,-.8],Egomaniac:[6,-.6],Feisty:[5,-.5],Cruel:[5,-1],Gambler:[4,-.4],Cheater:[4,-1],Vindictive:[3,-.7],Devious:[3,-.8],ColdBlooded:[3,-.6],Manipulative:[2,-.7],Obsessive:[1,-.1],Mercenary:[-2,-.4],Paranoid:[-2,-.2],Lazy:[-4,-.2],FaintHearted:[-4,0],Timid:[-6,.1]};
@@ -497,142 +519,211 @@ var KLT={Bard:8,Hero:8,Badass:8,Warlord:5,Berserker:4,Mage:3,Rogue:3,Sprinter:3,
 var RAT={Dragon:6,Voidborn:5,Divine:4,Demon:3,Alien:3,Mutant:3,Tauren:2,Aqua:2,Lizard:2};
 /* Klassenfarbe: lib/lineups/legacy-lineup-modifiers.ts:31 (rot POW, gruen SPE, blau MEN, gelb SOC) in den Farben des Finanz-Mockups */
 var KLF={Berserker:"--p1",Warlord:"--p1",Tank:"--p1",Sprinter:"--p4",Rogue:"--p4",Charger:"--p4",Mage:"--p5",Overseer:"--p5",Templar:"--p5",Bard:"--p6",Hero:"--p6",Badass:"--p6",Tactician:"--p6"};
-var BASIS=6.0, NORM=1.2;
+var KFI={Berserker:0,Warlord:0,Tank:0,Sprinter:1,Rogue:1,Charger:1,Mage:2,Overseer:2,Templar:2,Bard:3,Hero:3,Badass:3,Tactician:3};
+var F=["POW","SPE","MEN","SOC"],FV=["--p1","--p4","--p5","--p6"];
+/* Runde 2: Werbegeld je Spieler und Saison (Liga 1): WMAX x ((M - 30) / 70)^2. Haelfte ans Team, hoechstens DECKEL x Gehalt
+   (bei kleinen Gehaeltern hoechstens BODEN), der Rest geht an den Spieler und hebt seine Moral. SOCKEL = Teammarke. */
+var WMAX=10, DECKEL=.15, BODEN=1.5, SOCKEL=4.0, SAISON=4;
+var MORAL=[[5,8],[3,6],[1.5,4],[.5,2]];
 /* ---------- Echte Stammdaten ---------- */
-/* Team: manners/popularity/Farbgewichte aus data/source/team-identities.json, Themen aus team-theme-composition-service.ts (H-R :202, G-G :235) */
-var TEAMS={"H-R":{n:"Hell Raisers",manners:1,pop:5.5,f:[7,8,5,0],mag:["Demon","Hell","Infernal","Devil","Succubus"],meidet:["Divine","Holy","Angel"],profil:"Bösewicht-Fans",satz:"Die Kurve will Schurken. Ein Skandal ist hier Werbung, ein Musterschüler verkauft keine Trikots."},
-           "G-G":{n:"Golden Gladiators",manners:9,pop:8,f:[0,6,6,8],mag:["Divine","Angel","Paladin","Holy","Guardian"],meidet:["Demon","Undead","Infernal"],profil:"Heldenfans",satz:"Die Tribüne will Vorbilder. Ein Liebling verkauft doppelt, ein Skandal kostet Fans."}};
-var LIGA=[["Cold Steel",10],["Golden Gladiators",9],["The Chantry",8.5,1],["Mortal Sin",7.5],["Royal Court",6],["Mayhem Mavericks",2.5,1],["Pirate Crew",1.5],["Hell Raisers",1],["Zero Heroes",1,1]];
-/* Spieler: [Name, Portrait, Rasse, Klasse, Rating, Perzentil im Pool (2.984 Spieler), Traits +, Traits -, Gesinnung, Kader] */
-var SP=[["Mazzikin","mazzikin","Demon","Charger",54,83,["Loyal","Diligent","Eloquent"],["Scandalous","ColdBlooded"],"C-B","H-R"],
- ["Bloodseeker","bloodseeker","Human","Rogue",54,83,["FiredUp","Fearless"],["Cruel","Scandalous","Obsessive"],"C-B","H-R"],
- ["Vixen","vixen","Demon","Mage",44,56,["Eloquent","Sexy","FiredUp"],["Diva","Vindictive","Obsessive"],"N-B","H-R"],
- ["Passion","passion","Demon","Overseer",52,80,["Sexy","Altruistic"],["FaintHearted","Diva"],"C-N","H-R"],
- ["Szel","szel","Demon","Charger",40,45,["FiredUp","Fearless"],["Scandalous","ColdBlooded"],"C-B","H-R"],
- ["Rocky","rocky","Construct","Berserker",46,63,["FiredUp"],["Vindictive","Renegade","ColdBlooded"],"Neutral","H-R"],
- ["Rasca Blutbeere","rasca-blutbeere","Demon","Warlord",44,56,["FiredUp"],["Cruel"],"C-N","H-R"],
- ["Kadis","kadis","Divine","Badass",50,76,["Loyal","Diligent","Caring"],[],"N-G","G-G"],
- ["Auza","auza","Divine","Sprinter",49,72,["Diligent"],["Devious","Feisty","Scandalous"],"C-G","G-G"],
- ["Zhyrak","zhyrak","Divine","Rogue",50,76,["Caring","Motivated","Altruistic"],["FaintHearted"],"N-G","G-G"],
- ["Kayle","kayle","Divine","Rogue",47,67,["Diligent"],["Feisty"],"N-G","G-G"],
- ["Vertessa","vertessa","Human","Templar",49,73,["FiredUp","Cool"],[],"R-N","G-G"],
- ["Elda","elda","Human","Mage",22,2,["Caring","Loyal"],["FaintHearted"],"N-G","G-G"],
- ["Sir Ruckus","sir-ruckus","Animal","Rogue",22,2,["Diligent","Caring","Loyal"],["FaintHearted"],"R-N","G-G"],
- ["Mauler","mauler","Demon","Templar",68,98,["Eloquent","Ambitious","Fearless"],["Egomaniac","Scandalous","Obsessive"],"C-B",""],
- ["Aurelia Rosethorn","aurelia-rosethorn","Divine","Hero",67,97,["Eloquent","FanFavorite"],["Diva"],"N",""],
- ["Zephiroth","zephiroth","Dragon","Warlord",63,95,["Ambitious","FanFavorite","Healthy"],["Feisty","Scandalous"],"Neutral",""],
- ["Com Shepard","com-shepard","Human","Hero",56,88,["Eloquent","FanFavorite","Loyal"],["Devious","Renegade"],"N-G",""],
- ["Luxariel","luxariel","Demon","Bard",36,32,["Sexy","Eloquent"],["Egomaniac","Scandalous","Renegade"],"C-B",""],
- ["King Arthur","king-arthur","Human","Templar",76,100,["Loyal","Ambitious"],["FaintHearted"],"R-G",""],
- ["Jasper Kane","jasper-kane","Alien","Warlord",71,99,["Loyal","Relaxed"],["Timid"],"N-G",""]];
-var Z={team:TEAMS[q.get("team")]?q.get("team"):"H-R",sel:q.get("sel")||"",so:[q.get("so")||"m",-1]};
+/* Team: manners/popularity/Farbgewichte (f0) aus data/source/team-identities.json. mag/meidet: nur echte Rassen (18), Klassen (13)
+   und Traits (36); Vorschlag aus dem Thema in team-theme-composition-service.ts (H-R :202, G-G :235).
+   dr = erfundener Verlauf der Fanfarbe: Ziel (halb Kader, halb Erfolg), Rate und Anlass je Saisonwechsel. */
+var TEAMS={"H-R":{n:"Hell Raisers",manners:1,pop:5.5,f0:[7,8,5,0],
+             mag:{r:["Demon"],k:["Berserker","Warlord"],t:["Cruel","Scandalous","Renegade","FiredUp"]},meidet:{r:["Divine"],k:["Hero"],t:["Fair","Altruistic","Caring","Timid"]},
+             neu:["Mage","Vixen war zwei Saisons das Aushängeschild"],erf:[.3,.35,.35,0],
+             dr:[{z:[6,6,8,0],r:.15,g:"Saisonziel erreicht"},{z:[4,5,11,0],r:.20,g:"Farb-Meister MEN"},{z:[5,7,8,0],r:.10,g:"Kader allein, Ziel verfehlt"}],
+             profil:"Bösewicht-Fans",satz:"Die Kurve will Schurken. Ein Skandal ist hier Werbung, ein Musterschüler verkauft keine Trikots."},
+           "G-G":{n:"Golden Gladiators",manners:9,pop:8,f0:[0,6,6,8],
+             mag:{r:["Divine","Human"],k:["Hero","Templar"],t:["Fair","Altruistic","Caring","FanFavorite"]},meidet:{r:["Demon"],k:[],t:["Cruel","Cheater","Scandalous"]},
+             neu:null,erf:[.05,.45,.25,.25],
+             dr:[{z:[1,7,6,6],r:.10,g:"Kader allein, Ziel verfehlt"},{z:[2,9,5,4],r:.15,g:"Saisonziel erreicht"},{z:[2,10,5,3],r:.20,g:"Farb-Meister SPE"}],
+             profil:"Heldenfans",satz:"Die Tribüne will Vorbilder. Der strahlende Liebling verkauft am besten, aber auch hier schlägt Kante die brave Mitte."}};
+Object.keys(TEAMS).forEach(function(t){var T=TEAMS[t],v=[T.f0.slice()];T.dr.forEach(function(d){var a=v[v.length-1];v.push(a.map(function(x,i){return kl(x+d.r*(d.z[i]-x),Math.max(0,T.f0[i]-6),T.f0[i]+6)}))});T.fv=v;T.f=v[v.length-1];if(T.neu)T.mag.k.push(T.neu[0])});
+/* Spieler: [Name, Portrait, Rasse, Klasse, Rating, Perzentil im Pool (2.984 Spieler), Traits +, Traits -, Gesinnung, Kader, Gehaltsforderung C je Saison] */
+var SP=[["Mazzikin","mazzikin","Demon","Charger",54,83,["Loyal","Diligent","Eloquent"],["Scandalous","ColdBlooded"],"C-B","H-R",11.46],
+ ["Bloodseeker","bloodseeker","Human","Rogue",54,83,["FiredUp","Fearless"],["Cruel","Scandalous","Obsessive"],"C-B","H-R",13.39],
+ ["Vixen","vixen","Demon","Mage",44,56,["Eloquent","Sexy","FiredUp"],["Diva","Vindictive","Obsessive"],"N-B","H-R",8.78],
+ ["Passion","passion","Demon","Overseer",52,80,["Sexy","Altruistic"],["FaintHearted","Diva"],"C-N","H-R",9.68],
+ ["Szel","szel","Demon","Charger",40,45,["FiredUp","Fearless"],["Scandalous","ColdBlooded"],"C-B","H-R",8.09],
+ ["Rocky","rocky","Construct","Berserker",46,63,["FiredUp"],["Vindictive","Renegade","ColdBlooded"],"Neutral","H-R",8.07],
+ ["Rasca Blutbeere","rasca-blutbeere","Demon","Warlord",44,56,["FiredUp"],["Cruel"],"C-N","H-R",8.29],
+ ["Kadis","kadis","Divine","Badass",50,76,["Loyal","Diligent","Caring"],[],"N-G","G-G",9.23],
+ ["Auza","auza","Divine","Sprinter",49,72,["Diligent"],["Devious","Feisty","Scandalous"],"C-G","G-G",9.86],
+ ["Zhyrak","zhyrak","Divine","Rogue",50,76,["Caring","Motivated","Altruistic"],["FaintHearted"],"N-G","G-G",7.54],
+ ["Kayle","kayle","Divine","Rogue",47,67,["Diligent"],["Feisty"],"N-G","G-G",8.84],
+ ["Vertessa","vertessa","Human","Templar",49,73,["FiredUp","Cool"],[],"R-N","G-G",9.09],
+ ["Elda","elda","Human","Mage",22,2,["Caring","Loyal"],["FaintHearted"],"N-G","G-G",2.43],
+ ["Sir Ruckus","sir-ruckus","Animal","Rogue",22,2,["Diligent","Caring","Loyal"],["FaintHearted"],"R-N","G-G",1.52],
+ ["Mauler","mauler","Demon","Templar",68,98,["Eloquent","Ambitious","Fearless"],["Egomaniac","Scandalous","Obsessive"],"C-B","",20.54],
+ ["Aurelia Rosethorn","aurelia-rosethorn","Divine","Hero",67,97,["Eloquent","FanFavorite"],["Diva"],"N","",17.06],
+ ["Zephiroth","zephiroth","Dragon","Warlord",63,95,["Ambitious","FanFavorite","Healthy"],["Feisty","Scandalous"],"Neutral","",17.08],
+ ["Com Shepard","com-shepard","Human","Hero",56,88,["Eloquent","FanFavorite","Loyal"],["Devious","Renegade"],"N-G","",12.14],
+ ["Luxariel","luxariel","Demon","Bard",36,32,["Sexy","Eloquent"],["Egomaniac","Scandalous","Renegade"],"C-B","",6.55],
+ ["King Arthur","king-arthur","Human","Templar",76,100,["Loyal","Ambitious"],["FaintHearted"],"R-G","",17.96],
+ ["Jasper Kane","jasper-kane","Alien","Warlord",71,99,["Loyal","Relaxed"],["Timid"],"N-G","",14.04]];
+var Z={team:TEAMS[q.get("team")]?q.get("team"):"H-R",sel:q.get("sel")||"",so:[q.get("so")||"m",-1],kt:{fan:1,spieler:1,verlauf:1}[q.get("ktab")]?q.get("ktab"):"fan"};
 var phoneFest=q.get("phone")==="1";
 function phone(){return phoneFest||innerWidth<760}
 function kl(x,a,b){return Math.max(a,Math.min(b,x))}
-function zahl(x){var a=Math.abs(Math.round(x*100)/100);return a.toFixed(Math.abs(a*10-Math.round(a*10))>.001?2:1).replace(".",",")}
 function e1(x){x=Math.round(x*10)/10;return (x<0?"−":"")+Math.abs(x).toFixed(1).replace(".",",")}
 function e2(x){return (x<0?"−":"")+Math.abs(x).toFixed(2).replace(".",",")}
 function vzt(x){return (x>0?"+":x<0?"−":"±")+Math.abs(Math.round(x*100)/100).toString().replace(".",",")}
+function pzt(x){x=Math.round(x*100);return (x>0?"+":x<0?"−":"±")+Math.abs(x)+" %"}
 function ic(n){return '<svg class="i"><use href="#i-'+n+'"/></svg>'}
-function esc(s){return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;")}
 function toast(t){var e=document.getElementById("toast");e.textContent=t;e.classList.add("an");clearTimeout(toast.z);toast.z=setTimeout(function(){e.classList.remove("an")},2200)}
 function tonTeam(t){return kl((TEAMS[t].manners-5.5)/4.5,-1,1)}
-function thema(p,t){var T=TEAMS[t];return T.mag.indexOf(p[2])>=0?1:T.meidet.indexOf(p[2])>=0?-1:0}
+/* Thema nur aus echten Feldern: Rasse +-1, Klasse +-0,5, je Trait +-0,5 (Traits zusammen hoechstens +-1), Summe begrenzt auf -1..+1 */
+function thema(p,t){var T=TEAMS[t],tr=p[6].concat(p[7]),x=0,l=[];
+  var r=T.mag.r.indexOf(p[2])>=0?1:T.meidet.r.indexOf(p[2])>=0?-1:0,k=T.mag.k.indexOf(p[3])>=0?.5:T.meidet.k.indexOf(p[3])>=0?-.5:0;
+  if(r)l.push(p[2]+" "+vzt(r));if(k)l.push(p[3]+" "+vzt(k));
+  tr.forEach(function(n){var v=T.mag.t.indexOf(n)>=0?.5:T.meidet.t.indexOf(n)>=0?-.5:0;if(v){x+=v;l.push(n+" "+vzt(v))}});
+  return {v:kl(r+k+kl(x,-1,1),-1,1),l:l}}
+/* Ton-Passung Runde 2: Langweiler-Abschlag -10 % bis Kanten-Bonus +10 %, dazu die Richtung 0,22 x Ton x Ton der Fans */
+function tonPass(ton,kante,tt){return -.10+.20*kante+.22*ton*tt}
+function geld(m,gehalt,plus){var wg=WMAX*Math.pow(Math.max(0,m-30)/70,2)*(plus?1.25:1),deck=Math.max(DECKEL*gehalt,BODEN),team=Math.min(.5*wg,deck),sp=wg-team,mo=0;
+  MORAL.some(function(s){if(sp>=s[0]){mo=s[1];return true}return false});return {wg:wg,team:team,sp:sp,mo:mo,ged:.5*wg>deck+.005}}
 /* Formel des Konzepts: Reichweite = 0,30 x Leistungsperzentil + Ausstrahlung (0..46) + Typ (0..14); Passung 0,6..1,4 */
 function rechne(p,t){
-  var tr=p[6].concat(p[7]),sr=0,st=0;tr.forEach(function(k){sr+=TR[k][0];st+=TR[k][1]*Math.max(TR[k][0],1)});
+  var tr=p[6].concat(p[7]),sr=0,L=0,A=0;tr.forEach(function(k){sr+=TR[k][0];var g=TR[k][1]*Math.max(TR[k][0],1);if(g>0)L+=g;else A-=g});
   var aus=kl(10+1.2*sr,0,46),typ=Math.min(14,(KLT[p[3]]||0)+(RAT[p[2]]||0)),lei=.30*p[5];
-  var ges=/-G$/.test(p[8])?.4:/-B$/.test(p[8])?-.4:0,ton=kl(st/12+ges,-1,1),tt=tonTeam(t),th=thema(p,t);
-  var m0=Math.min(100,lei+aus+typ),pas=kl(1+.25*ton*tt+.15*th,.6,1.4),m=Math.min(100,m0*pas);
-  return {p:p,lei:lei,aus:aus,typ:typ,sr:sr,ton:ton,ges:ges,th:th,tp:ton*tt,m0:m0,pas:pas,m:m,w:BASIS*m/100/NORM};
+  var ges=/-G$/.test(p[8])?.4:/-B$/.test(p[8])?-.4:0,ton=kl((L-A)/12+ges,-1,1),kante=kl((L+A)/20,0,1),tt=tonTeam(t),th=thema(p,t);
+  var fa=kl((TEAMS[t].f[KFI[p[3]]]-5)/5,-1,1),tp=tonPass(ton,kante,tt);
+  var m0=Math.min(100,lei+aus+typ),pas=kl(1+tp+.15*th.v+.05*fa,.6,1.4),m=Math.min(100,m0*pas),g=geld(m,p[10]);
+  return {p:p,lei:lei,aus:aus,typ:typ,sr:sr,ton:ton,kante:kante,ges:ges,th:th.v,thl:th.l,fa:fa,tp:tp,m0:m0,pas:pas,m:m,g:g};
 }
-function merch(l){l=l.slice().sort(function(a,b){return b.m-a.m});return BASIS*((l[0]?l[0].m:0)+.6*(l[1]?l[1].m:0)+.4*(l[2]?l[2].m:0))/100/NORM}
 function trTxt(p){return p[6].concat(p[7]).map(function(k){var r=TR[k];return '<i class="'+(r[0]<0?"fl":r[1]<=-.4&&r[0]>=4?"an":r[1]>=.5&&r[0]>=3?"lb":"")+'">'+k+'</i>'}).join(" · ")}
-function tonAchse(ton,tt,gross){return '<div class="ton'+(gross?" gross":"")+'"><u style="left:'+(50+tt*50)+'%"></u>'+(ton===null?"":'<i style="left:'+(50+ton*50)+'%"></i>')+'</div>'}
+/* Punkt = Spieler (Groesse = Kante, grau = farblos), Dreieck = Fans */
+function tonAchse(ton,tt,gross,kante){var d=Math.round(7+7*(kante||0));return '<div class="ton'+(gross?" gross":"")+'"><u style="left:'+(50+tt*50)+'%"></u>'+(ton===null?"":'<i class="'+(kante<.2?"fl":"")+'" style="left:'+(50+ton*50)+'%;width:'+d+'px;height:'+d+'px;margin-left:-'+d/2+'px;top:'+(8-d/2)+'px"></i>')+'</div>'}
+function chips(l,cls,neu){return l.length?l.map(function(m){return '<span class="marke '+(neu&&m===neu?"gold":cls)+'"'+(neu&&m===neu?' data-tip="Neu seit Saison 3: '+TEAMS[Z.team].neu[1]+'"':"")+'>'+m.toUpperCase()+(neu&&m===neu?" · NEU":"")+'</span>'}).join(""):'<span class="marke leer">KEINE</span>'}
+function stapel(v,gestr){return '<div class="stk'+(gestr?" gs":"")+'">'+v.map(function(x,i){return x>.05?'<i style="flex:'+x+';background:var('+FV[i]+')">'+(x>=1.6?e1(x):"")+'</i>':""}).join("")+'</div>'}
 function zeichne(){
   document.body.classList.toggle("phone",phone());
   var T=TEAMS[Z.team],tt=tonTeam(Z.team);
   var alle=SP.map(function(p){return rechne(p,Z.team)}),kader=alle.filter(function(x){return x.p[9]===Z.team}),markt=alle.filter(function(x){return x.p[9]===""});
   if(!alle.some(function(x){return x.p[1]===Z.sel}))Z.sel=markt[0].p[1];
   var S=alle.filter(function(x){return x.p[1]===Z.sel})[0];
-  var mk=merch(kader),top=kader.slice().sort(function(a,b){return b.m-a.m}),mit=S.p[9]===""?merch(kader.concat([S])):mk;
-  var schnitt=kader.reduce(function(s,x){return s+x.pas},0)/kader.length;
+  var top=kader.slice().sort(function(a,b){return b.m-a.m}),ohne=top[0].g;top[0].g=geld(top[0].m,top[0].p[10],true);top[0].gesicht=true;
+  function summe(l,k){return l.reduce(function(s,x){return s+x.g[k]},0)}
+  var gTeam=summe(kader,"team"),gSp=summe(kader,"sp"),gWg=summe(kader,"wg"),kasse=SOCKEL+gTeam;
   document.getElementById("rlogo").src="../team-logos/"+Z.team+".jpg";
-  document.getElementById("demo").innerHTML='<b>Mockup</b>Team:'+Object.keys(TEAMS).map(function(t){return '<button data-team="'+t+'" aria-pressed="'+(Z.team===t)+'">'+TEAMS[t].n+'</button>'}).join("")+'<span>·</span><button data-phone="1" aria-pressed="'+phone()+'">Phone</button><span class="welle">Vorschlag 22.11. · Spieler, Traits, Kader und Teamwerte echt, Formel und Gewichte sind der Vorschlag</span>';
-  document.getElementById("hk").innerHTML='<div class="crest"><img src="../team-logos/'+Z.team+'.jpg" alt=""></div><div><div class="mdw"><span><span class="sai">Saison 2 · </span>Kader · Marketing</span></div><h1>Marketing</h1><div class="sub"><span class="xs">'+T.n+' · </span>Fanprofil <b>'+T.profil+'</b> · Merch <b>'+e1(mk)+' C</b> je Saison</div></div>';
-  document.getElementById("tabs").innerHTML=Object.keys(TEAMS).map(function(t){var X=TEAMS[t],l=SP.filter(function(p){return p[9]===t}).map(function(p){return rechne(p,t)});
-    return '<button class="dtab'+(Z.team===t?" an":"")+'" role="tab" data-team="'+t+'"><span class="ic">'+ic("fans")+'</span><span><em>'+X.profil+' · Ton '+vzt(tonTeam(t))+'</em><b>'+X.n+'</b></span><span class="erw"><strong class="t">'+e1(merch(l))+'</strong><span>C Merch</span></span></button>'}).join("");
+  document.getElementById("demo").innerHTML='<b>Mockup</b>Team:'+Object.keys(TEAMS).map(function(t){return '<button data-team="'+t+'" aria-pressed="'+(Z.team===t)+'">'+TEAMS[t].n+'</button>'}).join("")+'<span>·</span><button data-phone="1" aria-pressed="'+phone()+'">Phone</button><span class="welle">Vorschlag 22.11. Runde 2 · Spieler, Traits, Gehalt, Kader und Teamwerte echt · Formel, Gewichte und der Verlauf der Fanfarbe sind der Vorschlag</span>';
+  document.getElementById("hk").innerHTML='<div class="crest"><img src="../team-logos/'+Z.team+'.jpg" alt=""></div><div><div class="mdw"><span><span class="sai">Saison '+SAISON+' · </span>Kader · Marketing</span></div><h1>Marketing</h1><div class="sub"><span class="xs">'+T.n+' · </span>Fanprofil <b>'+T.profil+'</b> · <b>'+e1(kasse)+' C</b> ans Team · <b>'+e1(gSp)+' C</b> an die Spieler</div></div>';
+  document.getElementById("tabs").innerHTML=Object.keys(TEAMS).map(function(t){var X=TEAMS[t],l=SP.filter(function(p){return p[9]===t}).map(function(p){return rechne(p,t)}).sort(function(a,b){return b.m-a.m});
+    var s=SOCKEL+l.reduce(function(a,x,i){return a+(i?x.g.team:geld(x.m,x.p[10],true).team)},0);
+    return '<button class="dtab'+(Z.team===t?" an":"")+'" role="tab" data-team="'+t+'"><span class="ic">'+ic("fans")+'</span><span><em>'+X.profil+' · Ton '+vzt(tonTeam(t))+'</em><b>'+X.n+'</b></span><span class="erw"><strong class="t">'+e1(s)+'</strong><span>C ans Team</span></span></button>'}).join("");
   document.getElementById("hr").innerHTML='<div class="frist"><span class="gk">Aushängeschild der Saison</span><strong>'+top[0].p[0]+' · '+Math.round(top[0].m)+'</strong></div>';
-  document.getElementById("vk").innerHTML='<h2>Wer verkauft Trikots?</h2><span class="hin">Marketability = Reichweite × Passung zum Fanprofil. Nicht die Stärke allein.</span><span class="sp"></span>';
+  document.getElementById("vk").innerHTML='<h2>Wer bringt Werbegeld?</h2><span class="hin">Marketability = Reichweite × Passung zum Fanprofil. Kante schlägt die brave Mitte. Das Geld teilen sich Team und Spieler.</span><span class="sp"></span>';
   /* Tabelle */
-  var SO={n:function(x){return x.p[0]},st:function(x){return x.p[4]},r:function(x){return x.m0},ton:function(x){return x.ton},pas:function(x){return x.pas},m:function(x){return x.m},w:function(x){return x.w},kl:function(x){return x.p[3]}};
+  var SO={n:function(x){return x.p[0]},st:function(x){return x.p[4]},r:function(x){return x.m0},ton:function(x){return x.ton},pas:function(x){return x.pas},m:function(x){return x.m},gt:function(x){return x.g.team},gs:function(x){return x.g.sp},kl:function(x){return x.p[3]}};
   function sort(l){var f=SO[Z.so[0]]||SO.m,d=Z.so[1];return l.slice().sort(function(a,b){var A=f(a),B=f(b);return (A<B?-1:A>B?1:0)*d||a.p[0].localeCompare(b.p[0])})}
   function kopf(c,t,cls,tip){return '<button class="'+(cls||"")+(Z.so[0]===c?" an":"")+'" data-so="'+c+'"'+(tip?' data-tip="'+tip+'"':"")+'>'+t+(Z.so[0]===c?(Z.so[1]<0?" ↓":" ↑"):"")+'</button>'}
-  function zeile(x){var p=x.p,gut=x.tp>.15,schl=x.tp<-.15;
-    return '<div class="tz'+(p[1]===Z.sel?" sel":"")+'" data-sel="'+p[1]+'" role="button" tabindex="0"><span></span><span class="nm"><img src="../portraits/'+p[1]+'.jpg" alt=""><span class="n2"><span>'+p[0]+'</span><small>'+trTxt(p)+'</small></span></span>'+
+  function zeile(x){var p=x.p,g=x.g;
+    return '<div class="tz'+(p[1]===Z.sel?" sel":"")+'" data-sel="'+p[1]+'" role="button" tabindex="0"><span></span><span class="nm"><img src="../portraits/'+p[1]+'.jpg" alt=""><span class="n2"><span>'+p[0]+(x.gesicht?' <span class="marke gold" style="vertical-align:1px">GESICHT</span>':"")+'</span><small>'+trTxt(p)+'</small></span></span>'+
       '<span class="kl xs" style="--pc:var('+(KLF[p[3]]||"--leise")+')">'+p[3]+'<small>'+p[2]+' · '+p[8]+'</small></span>'+
       '<span class="t xs">'+p[4]+'</span>'+
       '<span class="rw xs"><div class="wb" style="--pc:var(--p5)"><i style="width:'+x.m0+'%"></i></div><b class="t" style="color:var(--tinte)">'+Math.round(x.m0)+'</b></span>'+
-      '<span class="xs">'+tonAchse(x.ton,tt)+'</span>'+
+      '<span class="xs">'+tonAchse(x.ton,tt,false,x.kante)+'</span>'+
       '<span class="t '+(x.pas>1.05?"plus":x.pas<.95?"minus":"")+'">×'+e2(x.pas)+'</span>'+
       '<span class="t big'+(x.m>=85?" top":"")+'">'+Math.round(x.m)+'</span>'+
-      '<span class="t xs" style="color:var(--creme);font-weight:700">'+e1(x.w)+' C</span></div>'}
+      '<span class="t gd">'+e1(g.team)+' C<small class="xs">'+(g.ged?(DECKEL*p[10]<BODEN?"Deckel 1,5 C":"Deckel 15 % Gehalt"):g.team<.05?"–":Math.round(g.team/p[10]*100)+" % vom Gehalt")+'</small></span>'+
+      '<span class="t gd xs">'+e1(g.sp)+' C<small>'+(g.mo?"Moral +"+g.mo:"–")+'</small></span></div>'}
   var h='<div class="tl mkt"><div class="th"><span></span>'+kopf("n","Spieler · Traits","li")+kopf("kl","Klasse · Rasse","li xs")+kopf("st","Stärke","xs","Rating des Spielers (echt). Zählt über das Perzentil nur zu 30 Punkten von 100.")+
       kopf("r","Reichweite","xs","Wie viel Aufmerksamkeit der Spieler überall bekommt, 0 bis 100:\n0,30 × Leistungsperzentil + Ausstrahlung aus den Traits + Typ aus Klasse und Rasse")+
-      kopf("ton","Ton · Bösewicht ↔ Liebling","xs","Punkt = Spieler, Dreieck = Fanprofil des Teams.\nGleiche Seite hebt die Passung, die andere senkt sie.")+kopf("pas","Passung","","Faktor 0,6 bis 1,4:\n1 + 0,25 × Ton Spieler × Ton Team + 0,15 × Thema")+kopf("m","Market.","","Marketability bei diesem Team = Reichweite × Passung, höchstens 100")+kopf("w","Werbewert","xs","C je Saison als bester Verkäufer des Teams (Liga-1-Basis 6,0 C).\nDer zweite zählt zu 60 %, der dritte zu 40 %.")+'</div>'+
-    '<div class="grp">Kader<small>'+kader.length+' Spieler aus dem Referenzkader · Merch '+e1(mk)+' C je Saison aus den drei besten</small></div>'+sort(kader).map(zeile).join("")+
+      kopf("ton","Ton · Bösewicht ↔ Liebling","xs","Punkt = Spieler, Dreieck = Fanprofil des Teams.\nGroßer Punkt = viel Kante, kleiner grauer Punkt = farblos.\nKante hebt die Passung bei jedem Team, die brave Mitte senkt sie.")+kopf("pas","Passung","","Faktor 0,6 bis 1,4:\n1 − 0,10 + 0,20 × Kante + 0,22 × Ton × Ton der Fans\n+ 0,15 × Thema (Rasse, Klasse, Traits) + 0,05 × Farbe")+kopf("m","Market.","","Marketability bei diesem Team = Reichweite × Passung, höchstens 100")+
+      kopf("gt","ans Team","","Werbegeld je Saison = 10 C × ((Marketability − 30) ÷ 70)²\nDie Hälfte geht in die Kasse, höchstens 15 % des Gehalts\n(bei kleinen Gehältern höchstens 1,5 C). Liga 2: 7,5 C und 1,1 C.")+kopf("gs","an ihn","xs","Der Rest sind eigene Werbeverträge des Spielers.\nSie stehen nicht in der Kasse, sie heben seine Moral:\nab 0,5 C +2 · ab 1,5 C +4 · ab 3 C +6 · ab 5 C +8")+'</div>'+
+    '<div class="grp">Kader<small>'+kader.length+' Spieler aus dem Referenzkader · '+e1(gTeam)+' C ans Team, '+e1(gSp)+' C an die Spieler</small></div>'+sort(kader).map(zeile).join("")+
     '<div class="grp">Auf dem Markt<small>Beispiele aus dem Spielerpool · dieselben Spieler, andere Fans, andere Zahl</small></div>'+sort(markt).map(zeile).join("")+'</div>';
   /* Karten unten */
-  var k1='<div class="sd"><div class="kopf">Wohin es wirkt<small>nur Geld, nie die Wertung</small></div><div class="in">'+
-    '<div class="zl"><span><b>Merch</b> <small>Nr. 1 voll · Nr. 2 zu 60 % · Nr. 3 zu 40 %</small></span><strong class="t plus">'+e1(mk)+' C je Saison</strong></div>'+
-    '<div class="zl"><span><b>Tickets</b> <small>Star-Debüt ab Marketability 75</small></span><strong class="t">×1,3 im ersten Heimspiel</strong></div>'+
-    '<div class="zl"><span><b>Sponsor</b> <small>bleibt, wie er ist</small></span><strong class="t">nur Sonderziel „Gesicht“</strong></div>'+
-    '<div class="zl"><span><b>Marktwert</b> <small>bleibt exakt und unverändert</small></span><strong class="t">Werbewert steht daneben</strong></div>'+
-    '<div class="txt lang">Die Liga-Summe des Merch bleibt gleich: die Zugkraft wird je Saison auf das Liga-Mittel 1,0 geeicht. Marketing verteilt um, es druckt kein Geld.</div></div></div>';
+  var k1='<div class="sd"><div class="kopf">Wohin das Werbegeld geht<small>nur Geld und Moral, nie die Wertung</small></div><div class="in">'+
+    '<div class="zl"><span><b>Werbegeld des Kaders</b> <small>je Saison, gebucht je Spieltag</small></span><strong class="t">'+e1(gWg)+' C</strong></div>'+
+    '<div class="zl"><span>an die Spieler <small>eigene Werbeverträge → Moral</small></span><strong class="t">'+e1(gSp)+' C</strong></div>'+
+    '<div class="zl"><span>ans Team <small>Hälfte, höchstens 15 % des Gehalts</small></span><strong class="t plus">+'+e1(gTeam)+' C</strong></div>'+
+    '<div class="zl"><span>Teammarke <small>Sockel × Stimmung × Fan-Shop</small></span><strong class="t plus">+'+e1(SOCKEL)+' C</strong></div>'+
+    '<div class="zl sumz"><span><b>Marketing in der Kasse</b></span><strong class="t plus">+'+e1(kasse)+' C je Saison</strong></div>'+
+    '<div class="txt lang">Kein Spieler bringt dem Team mehr als 15 % seines Gehalts zurück (unter 10 C Gehalt höchstens 1,5 C). Sponsor und Marktwert bleiben unverändert.</div></div></div>';
   var k2='<div class="sd"><div class="kopf">Aushängeschild<small>eine Wahl je Saison · delegierbar</small></div><div class="in">'+
     '<div class="zl" style="align-items:center"><span class="nm" style="display:flex;gap:8px;align-items:center;color:var(--tinte);font-weight:600"><img src="../portraits/'+top[0].p[1]+'.jpg" alt="" style="width:34px;height:34px;border-radius:6px;object-fit:cover">'+top[0].p[0]+'</span><span class="marke gold">GESICHT DER SAISON</span></div>'+
-    '<div class="zl"><span>Sein Werbewert <small>+25 % als Aushängeschild</small></span><strong class="t plus">'+e1(top[0].w)+' → '+e1(top[0].w*1.25)+' C</strong></div>'+
+    '<div class="zl"><span>Sein Werbegeld <small>+25 % als Aushängeschild</small></span><strong class="t plus">'+e1(ohne.wg)+' → '+e1(top[0].g.wg)+' C</strong></div>'+
+    '<div class="zl"><span>davon ans Team · an ihn</span><strong class="t">'+e1(top[0].g.team)+' · '+e1(top[0].g.sp)+' C</strong></div>'+
+    '<div class="zl"><span>Schub durch Aktionen <small>MVP, Medaille, Szene, Skandal</small></span><strong class="t">Reichweite bis +20</strong></div>'+
     '<div class="zl"><span>Verkauf in der Saison</span><strong class="t minus">Stimmung −8</strong></div>'+
     '<div class="txt lang">Die KI nimmt den Spieler mit der höchsten Marketability unter den besten sechs. Ohne Wahl gilt dasselbe; kein Spieltag wartet.</div></div></div>';
-  var k3='<div class="sd"><div class="kopf">Fanprofile der Liga<small>Ton aus dem Teamwert „manners“</small></div><div class="in" style="gap:5px">'+
-    LIGA.map(function(x){var t=kl((x[1]-5.5)/4.5,-1,1);return '<div class="lg'+(x[0]===T.n?" du":"")+(x[2]?" opt":"")+'"><span>'+x[0]+'</span>'+tonAchse(null,t)+'<strong class="t">'+vzt(Math.round(t*100)/100)+'</strong></div>'}).join("")+'</div></div>';
+  /* Ton-Karte: oben Kante 1, unten die kleinste moegliche Kante (= Betrag des Tons). Die Mitte ist das Tal. */
+  function ux(s){return (s+1)*50} function uy(v){return 50-v/.42*50}
+  var o=[-1,1].map(function(s){return ux(s)+","+uy(tonPass(s,1,tt))}),u=[-1,0,1].map(function(s){return ux(s)+","+uy(tonPass(s,Math.abs(s),tt))});
+  var k3='<div class="sd"><div class="kopf">Ton: Kante schlägt Mitte<small>'+T.profil+' · Ton '+vzt(Math.round(tt*100)/100)+'</small></div><div class="in" style="gap:4px">'+
+    '<div class="uk"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points="'+o[0]+" "+o[1]+" "+u[2]+" "+u[1]+" "+u[0]+'" fill="rgba(240,195,90,.10)"/><line x1="0" x2="100" y1="50" y2="50" stroke="rgba(244,230,196,.22)" stroke-dasharray="2 3" vector-effect="non-scaling-stroke"/>'+
+      '<polyline points="'+o.join(" ")+'" fill="none" stroke="var(--gold)" stroke-width="2" vector-effect="non-scaling-stroke"/><polyline points="'+u.join(" ")+'" fill="none" stroke="var(--leise)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>'+
+      kader.concat(S.p[9]===""?[S]:[]).map(function(x){return '<i class="'+(x===S?"sel":"")+'" style="left:'+ux(x.ton)+'%;top:'+uy(x.tp)+'%" data-tip="'+x.p[0]+': Ton '+vzt(Math.round(x.ton*100)/100)+', Kante '+e2(x.kante)+' → '+pzt(x.tp)+'"></i>'}).join("")+
+      '<span class="ul mi" style="top:'+(uy(-.10)+4)+'%">brav und farblos −10 %</span><span class="ul mi go" style="top:'+(uy(.10)-25)+'%">edgy-charmant +10 %</span></div>'+
+    '<div class="tonl"><span>Bösewicht <b>'+pzt(tonPass(-1,1,tt))+'</b></span><span>Ton des Spielers</span><span>Liebling <b>'+pzt(tonPass(1,1,tt))+'</b></span></div>'+
+    '<div class="txt lang">Gold = viel Kante, grau = so wenig Kante wie möglich. Punkte = dein Kader'+(S.p[9]===""?", gold = "+S.p[0]:"")+'.</div></div></div>';
   document.getElementById("vb").innerHTML=h+'<div class="gr mgr">'+k1+k2+k3+'</div>';
   document.getElementById("vf").innerHTML='<span>Grün = Liebling-Trait · Orange = Anecker-Trait · Grau = farblos</span><span class="sp" style="flex:1"></span><span>Ungescoutet zeigt die App nur eine von fünf Stufen (Scouting-Nebel)</span>';
   /* Kontext */
-  document.getElementById("ctabs").innerHTML='<button class="an">Fanprofil</button><button data-toast="Der Verlauf über die Saison kommt mit dem Bau">Verlauf</button>';
-  var F=["POW","SPE","MEN","SOC"],FV=["--p1","--p4","--p5","--p6"],p=S.p,tr=p[6].concat(p[7]);
+  document.getElementById("ctabs").innerHTML=[["fan","Fanprofil"],["spieler","Spieler"],["verlauf","Verlauf"]].map(function(x){return '<button class="'+(Z.kt===x[0]?"an":"")+'" data-kt="'+x[0]+'">'+x[1]+'</button>'}).join("");
+  var p=S.p,tr=p[6].concat(p[7]),c;
   function z(l,w,k,sm){return '<div class="zl'+(sm?" sum":"")+'"><span>'+l+'</span><strong class="t '+(k||"")+'">'+w+'</strong></div>'}
-  var c='<div class="gk" style="display:flex;justify-content:space-between"><span>'+T.n+'</span><span style="color:var(--heim)">'+T.profil+'</span></div>'+
-    tonAchse(null,tt,true)+'<div class="tonl"><span>Bösewicht</span><span>Ton '+vzt(Math.round(tt*100)/100)+'</span><span>Liebling</span></div>'+
+  function vzk(x){return x>.004?"plus":x<-.004?"minus":""}
+  var kopfT='<div class="gk" style="display:flex;justify-content:space-between"><span>'+T.n+'</span><span style="color:var(--heim)">'+T.profil+'</span></div>';
+  if(Z.kt==="fan"){
+    c=kopfT+tonAchse(null,tt,true)+'<div class="tonl"><span>Bösewicht</span><span>Ton '+vzt(Math.round(tt*100)/100)+'</span><span>Liebling</span></div>'+
     '<div class="txt" style="margin-top:8px">'+T.satz+'</div>'+
-    '<div class="ab2"><div class="gk"><span>Fans mögen</span><em>+15 % Passung</em></div><div class="chips">'+T.mag.map(function(m){return '<span class="marke gut">'+m.toUpperCase()+'</span>'}).join("")+'</div></div>'+
-    '<div class="ab2"><div class="gk"><span>Fans meiden</span><em>−15 % Passung</em></div><div class="chips">'+T.meidet.map(function(m){return '<span class="marke rot">'+m.toUpperCase()+'</span>'}).join("")+'</div></div>'+
-    '<div class="ab2"><div class="gk"><span>Farbe der Fans</span><em>Beliebtheit '+String(T.pop).replace(".",",")+' von 10</em></div>'+F.map(function(f,i){return '<div class="fbar"><span>'+f+'</span><div class="wb" style="--pc:var('+FV[i]+')"><i style="width:'+T.f[i]/20*100+'%"></i></div><b class="t">'+T.f[i]+'</b></div>'}).join("")+'</div>'+
-    '<div class="ab2"><div class="gk"><span>Gewählter Spieler</span><em>'+(p[9]?"im Kader":"auf dem Markt")+'</em></div>'+
-    '<div class="pkopf"><img src="../portraits/'+p[1]+'.jpg" alt=""><div><b>'+p[0]+'</b><small><span style="color:var('+(KLF[p[3]]||"--leise")+');font-weight:600">'+p[3]+'</span> · '+p[2]+' · Stärke '+p[4]+'</small></div></div>'+
+    '<div class="ab2"><div class="gk"><span>Fans mögen</span><em>bis +15 % Passung</em></div>'+
+      '<div class="fz"><span>Rasse</span><div class="chips">'+chips(T.mag.r,"gut")+'</div></div><div class="fz"><span>Klasse</span><div class="chips">'+chips(T.mag.k,"gut",T.neu&&T.neu[0])+'</div></div><div class="fz"><span>Trait</span><div class="chips">'+chips(T.mag.t,"gut")+'</div></div></div>'+
+    '<div class="ab2"><div class="gk"><span>Fans meiden</span><em>bis −15 % Passung</em></div>'+
+      '<div class="fz"><span>Rasse</span><div class="chips">'+chips(T.meidet.r,"rot")+'</div></div><div class="fz"><span>Klasse</span><div class="chips">'+chips(T.meidet.k,"rot")+'</div></div><div class="fz"><span>Trait</span><div class="chips">'+chips(T.meidet.t,"rot")+'</div></div></div>'+
+    '<div class="txt klein">Nur Rassen, Klassen und Traits, die es im Spiel gibt. Rasse ±15 %, Klasse ±7,5 %, je Trait ±7,5 %, zusammen höchstens ±15 %.</div>'+
+    '<div class="ab2"><div class="gk"><span>Farbe der Fans · Saison '+SAISON+'</span><em>driftet je Saison · Start in Klammern</em></div>'+F.map(function(f,i){var d=T.f[i]-T.f0[i];return '<div class="fbar"><span>'+f+'</span><div class="wb" style="--pc:var('+FV[i]+')"><i style="width:'+T.f[i]/20*100+'%"></i><u style="left:'+T.f0[i]/20*100+'%;width:2px;background:var(--creme)"></u></div><b class="t">'+e1(T.f[i])+'</b><em class="t '+vzk(d)+'">'+(Math.abs(d)<.05?"":(d>0?"▲ ":"▼ ")+e1(Math.abs(d)))+' <small>('+T.f0[i]+')</small></em></div>'}).join("")+'</div>'+
+    '<div class="txt klein" style="margin-top:8px">Die Farbe folgt dem Kader und dem Erfolg, höchstens 10 bis 20 % des Abstands je Saison. Beliebtheit '+String(T.pop).replace(".",",")+' von 10.</div>'+
+    '<div class="akt2"><button class="btn klein" data-kt="verlauf">Verlauf ansehen '+ic("r")+'</button></div>';
+  }else if(Z.kt==="spieler"){
+    var g=S.g,fi=KFI[p[3]];
+    c='<div class="pkopf"><img src="../portraits/'+p[1]+'.jpg" alt=""><div><b>'+p[0]+'</b><small><span style="color:var('+(KLF[p[3]]||"--leise")+');font-weight:600">'+p[3]+'</span> · '+p[2]+' · Stärke '+p[4]+' · '+(p[9]?"im Kader":"auf dem Markt")+'</small></div></div>'+
     '<div class="herl">'+z("Leistung <small>0,30 × Perzentil "+p[5]+"</small>",e1(S.lei))+
       z("Ausstrahlung <small>10 + 1,2 × ("+tr.map(function(k){return k+" "+vzt(TR[k][0])}).join(", ")+")</small>",e1(S.aus))+
       z("Typ <small>"+p[3]+" +"+(KLT[p[3]]||0)+" · "+p[2]+" +"+(RAT[p[2]]||0)+"</small>",e1(S.typ))+
       z("<b>Reichweite</b>",String(Math.round(S.m0)),"",1)+'</div>'+
-    '<div class="herl">'+z("Ton des Spielers <small>Traits"+(S.ges?" und Gesinnung "+p[8]:"")+"</small>",vzt(Math.round(S.ton*100)/100))+
-      z("Ton-Passung <small>0,25 × "+vzt(Math.round(S.ton*100)/100)+" × "+vzt(Math.round(tt*100)/100)+"</small>",vzt(Math.round(.25*S.tp*100))+" %",S.tp>0?"plus":S.tp<0?"minus":"")+
-      z("Thema <small>"+p[2]+(S.th>0?" gehört zum Thema":S.th<0?" wird gemieden":" ist neutral")+"</small>",vzt(S.th*15)+" %",S.th>0?"plus":S.th<0?"minus":"")+
+    '<div class="herl">'+z("Kante <small>"+(S.kante<.2?"brav und farblos":S.kante<.6?"etwas Profil":"viel Profil")+" · −10 % + 20 % × "+e2(S.kante)+"</small>",pzt(-.10+.20*S.kante),vzk(-.10+.20*S.kante))+
+      z("Richtung <small>0,22 × Ton "+vzt(Math.round(S.ton*100)/100)+" × Ton der Fans "+vzt(Math.round(tt*100)/100)+"</small>",pzt(.22*S.ton*tt),vzk(S.ton*tt))+
+      z("Thema <small>"+(S.thl.length?S.thl.join(" · "):"nichts davon mögen oder meiden die Fans")+"</small>",pzt(.15*S.th),vzk(S.th))+
+      z("Farbe <small>"+p[3]+" ist "+F[fi]+", Fans "+e1(T.f[fi])+" von 20</small>",pzt(.05*S.fa),vzk(S.fa))+
       z("<b>Marketability hier</b> <small>"+Math.round(S.m0)+" × "+e2(S.pas)+"</small>",String(Math.round(S.m)),"",1)+'</div>'+
-    '<div class="herl">'+z("Werbewert als Nr. 1 <small>6,0 C × "+Math.round(S.m)+" ÷ 120</small>",e1(S.w)+" C")+
-      (p[9]===""?z("Merch mit ihm im Kader",e1(mk)+" → "+e1(mit)+" C",mit>mk+.05?"plus":""):z("Merch des Kaders",e1(mk)+" C"))+'</div></div>';
+    '<div class="herl">'+z("Werbegeld je Saison <small>10 C × (("+Math.round(S.m)+" − 30) ÷ 70)²"+(S.gesicht?" × 1,25 als Gesicht":"")+"</small>",e1(g.wg)+" C")+
+      z("ans Team <small>Hälfte"+(g.ged?", gedeckelt: 15 % von "+e1(p[10])+" C Gehalt"+(DECKEL*p[10]<BODEN?", mindestens 1,5 C":""):"")+"</small>",e1(g.team)+" C","plus")+
+      z("an ihn <small>eigene Werbeverträge, nicht in der Kasse</small>",e1(g.sp)+" C"+(g.mo?" · Moral +"+g.mo:""))+
+      z("<b>Team bekommt zurück</b> <small>Gehalt "+e1(p[10])+" C je Saison</small>",Math.round(g.team/p[10]*100)+" % vom Gehalt","",1)+'</div>'+
+    (p[9]===""?'<div class="txt klein" style="margin-top:8px">Mit ihm im Kader stiege das Marketing in der Kasse von <b>'+e1(kasse)+'</b> auf <b>'+e1(kasse+g.team)+' C</b> je Saison.</div>':"");
+  }else{
+    var kz=[0,0,0,0];kader.forEach(function(x){kz[KFI[x.p[3]]]+=20/kader.length});
+    var ziel=kz.map(function(x,i){return .5*x+.5*T.erf[i]*20}),pr=T.f.map(function(x,i){return x+.15*(ziel[i]-x)});
+    c=kopfT+'<div class="txt" style="margin:6px 0 10px">Die <b>Farbe der Fans</b> ist nicht fest. Sie wandert jede Saison ein Stück zu dem, was das Team spielt und womit es gewinnt.</div>'+
+    '<div class="vleg">'+F.map(function(f,i){return '<span><i style="background:var('+FV[i]+')"></i>'+f+'</span>'}).join("")+'</div>'+
+    T.fv.map(function(v,i){var d=i?T.dr[i-1]:null;return '<div class="vs'+(i===T.fv.length-1?" du":"")+'"><div class="gk"><span>Saison '+(i+1)+(i===T.fv.length-1?" · jetzt":"")+'</span><em>'+(d?"Schritt "+Math.round(d.r*100)+" % · "+d.g:"Start aus der Team-Matrix")+'</em></div>'+stapel(v)+'</div>'}).join("")+
+    '<div class="vs"><div class="gk"><span>Saison '+(SAISON+1)+' · Prognose</span><em>Schritt 15 %, wenn das Saisonziel fällt</em></div>'+stapel(pr,true)+'</div>'+
+    '<div class="herl" style="margin-top:10px">'+z("Kader heute <small>Einsätze je Klassenfarbe</small>",kz.map(e1).join(" · "))+
+      z("Erfolg heute <small>Punkte je Disziplinfarbe</small>",T.erf.map(function(x){return e1(x*20)}).join(" · "))+
+      z("<b>Ziel der Fans</b> <small>halb Kader, halb Erfolg</small>",ziel.map(e1).join(" · "),"",1)+'</div>'+
+    '<div class="herl">'+z("<b>Schritt je Saison</b> <small>Anteil am Abstand zum Ziel</small>","")+
+      z("Kader allein, Saisonziel verfehlt","10 %")+z("Saisonziel erreicht","15 %")+z("Titel, Aufstieg oder Farb-Meister","20 %")+
+      z("Anker <small>nie weiter als 6 Punkte vom Start</small>","±6")+'</div>'+
+    '<div class="txt klein" style="margin-top:8px">'+(T.neu?'<b>Neu gemocht seit Saison 3: '+T.neu[0]+'.</b> '+T.neu[1]+'. Ein Aushängeschild über zwei Saisons bringt seine Klasse auf die Liste (höchstens ein Zugang, der älteste fällt wieder heraus). ':"Keine neue Vorliebe bisher. Ein Aushängeschild über zwei Saisons bringt seine Klasse auf die Liste. ")+'Der Ton der Fans bleibt.</div>';
+  }
   document.getElementById("cb").innerHTML=c;
 }
 document.addEventListener("click",function(e){
-  var x=e.target.closest("[data-team],[data-sel],[data-so],[data-phone],[data-toast]");if(!x)return;var d=x.dataset;
+  var x=e.target.closest("[data-team],[data-sel],[data-so],[data-phone],[data-toast],[data-kt]");if(!x)return;var d=x.dataset;
   if(x.tagName==="A"&&x.getAttribute("href")==="#")e.preventDefault();
   if(d.team){Z.team=d.team}
-  if(d.sel){Z.sel=d.sel}
+  if(d.sel){Z.sel=d.sel;Z.kt="spieler"}
+  if(d.kt){Z.kt=d.kt}
   if(d.so){Z.so=Z.so[0]===d.so?[d.so,-Z.so[1]]:[d.so,d.so==="n"||d.so==="kl"?1:-1]}
   if(d.phone){phoneFest=!document.body.classList.contains("phone")}
   if(d.toast){toast(d.toast)}
   zeichne();
 });
-document.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target.matches(".tz[data-sel]")){e.preventDefault();Z.sel=e.target.dataset.sel;zeichne()}});
+document.addEventListener("keydown",function(e){if((e.key==="Enter"||e.key===" ")&&e.target.matches(".tz[data-sel]")){e.preventDefault();Z.sel=e.target.dataset.sel;Z.kt="spieler";zeichne()}});
 addEventListener("resize",zeichne);
 zeichne();
 </script>

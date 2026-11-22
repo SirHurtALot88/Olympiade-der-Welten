@@ -29,6 +29,9 @@
   NEU 22.11. Runde 3 (Chris): Arena mit Platzarten Stehplatz / Sitzplatz / Loge (?ansicht=wahl &bau=0|1|2), Stufe 0 = 4.000
   Plaetze, Ausbau je Bauteil, Zuschauer-Ereignisse je Heimspiel (Derby, Unwetter, Saisonfinale; EREIG); Medaillenspiegel (Gold/Silber/Bronze je Disziplin) neben dem Farb-Meister.
   docs/design/finanzen-posten-22-11.md Abschnitt (g).
+  NEU 22.11. Runde 4 (Chris): Arena-Ausbau von Hand in 1.000er-Schritten je Bereich (Logen in 100er-Schritten), ?ansicht=wahl
+  &plan=<Steh>,<Sitz>,<Loge> (geplante Schritte). Je Schritt Bau, Unterhalt, "bringt ca. wenn die Fans kommen", Amortisation;
+  die festen Bauteile (Stehtribuene, Sitzrang, Logenring; &bau=) sind ersetzt. Abschnitt (h).
   URL: ?ansicht=kasse|auszug|posten|wahl|hebel|budget|slots|angebote|bonus|fans|merch  &szen=normal|eng|dispo  &st=1..20  &tag=1..21 (Auszug, 21 = Saisonende)
        &preis=-20|0|20|40  &kader=0|1|2  &notv=1  &an=pow,spe,soc  &sel=<posten>  &ctab=lage|quelle|liga
        &phone=1  &still=1  &blatt=kontext
@@ -314,7 +317,7 @@ button.rek{width:100%} button.rek:hover{background:var(--flaeche-2)}
 
 /* ---------- Saisonwahl (22.11. Runde 2): Karten fuellen die Hoehe, Arena-Leiter nur auf hohen Schirmen ---------- */
 .gr.wahl{grid-template-rows:auto 1fr 1fr;align-content:stretch} .gr.wahl .sd .in{justify-content:space-between}
-.pa{display:grid;grid-template-columns:92px 54px minmax(0,1fr) 46px 62px;gap:8px;align-items:center;font-size:14.5px;color:var(--leise);line-height:1.2}
+.pa{display:grid;grid-template-columns:86px 50px minmax(0,1fr) 42px 124px;gap:8px;align-items:center;font-size:14.5px;color:var(--leise);line-height:1.2}
 .pa b{color:var(--tinte);font-weight:600;white-space:nowrap} .pa b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--pc);margin-right:6px}
 .pa>span,.pa>strong{text-align:right;white-space:nowrap} .pa strong{color:var(--creme);font-weight:700;font-size:16px}
 .pa.pk{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600;margin-bottom:-4px} .pa.pk>:first-child{text-align:left}
@@ -324,9 +327,12 @@ button.rek{width:100%} button.rek:hover{background:var(--flaeche-2)}
 .ms.du{background:rgba(242,160,61,.14);box-shadow:inset 3px 0 0 var(--heim);margin:-3px -6px;padding:3px 6px;border-radius:4px}
 .md{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:11.5px;font-weight:700;color:#0b0d12;background:var(--gold)} .md.s{background:#c9d1dc} .md.b{background:#c98a54}
 .fch{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end} .fch .marke b{color:#0b0d12;font-weight:700;margin-left:4px}
-.sd.kom .in{gap:7px} @media (max-height:1180px){.artx{display:none}}
+.sd.kom .in{gap:7px} @media (max-height:1180px){.artx{display:none!important}.pa.pk{display:none}}
+.stp{width:122px;display:inline-flex;align-items:center;justify-content:flex-end;gap:0;border:1px solid var(--linie-2);border-radius:7px;overflow:hidden;justify-self:end}
+.stp button{flex:none;padding:0;width:26px;min-width:0;height:24px;text-align:center;display:block;font:700 17px/1 var(--zahl);color:var(--tinte);background:var(--flaeche-3,#1a2130)} .stp button:hover{background:var(--gold);color:#17120a} .stp button[disabled]{opacity:.3;pointer-events:none}
+.stp strong{flex:1;min-width:0;text-align:center!important;font-size:15px!important;color:var(--stumm)!important} .stp strong.an{color:var(--gold)!important}
 .lei{display:none} .lei .in{gap:0!important;justify-content:flex-start!important}
-.lei .lz{display:grid;grid-template-columns:1.5fr .7fr 1.1fr 1.2fr .7fr 1.1fr 1.1fr 1.2fr;gap:10px;align-items:center;min-height:30px;padding:0 4px;border-bottom:1px solid rgba(244,230,196,.06);font-size:15.5px;color:var(--leise)}
+.lei .lz{display:grid;grid-template-columns:1.5fr .6fr 1.7fr .8fr 1fr 1fr 1fr 1.1fr;gap:10px;align-items:center;min-height:30px;padding:0 4px;border-bottom:1px solid rgba(244,230,196,.06);font-size:15.5px;color:var(--leise)}
 .lei .lz>*{text-align:right;white-space:nowrap} .lei .lz>:first-child{text-align:left} .lei .lz b{color:var(--tinte);font-weight:600} .lei .lz strong{color:var(--creme);font-weight:700}
 .lei .lz.lk{min-height:24px;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--stumm);font-weight:600} .lei .lz.du{background:rgba(242,160,61,.14)} .lei .lz.nx{box-shadow:inset 3px 0 0 var(--gold)}
 @media (min-height:1250px){.gr.wahl{grid-template-rows:auto 1fr 1fr auto}.lei{display:flex}}
@@ -514,7 +520,7 @@ var Z={now:Math.min(N,Math.max(1,+q.get("st")||12)),szen:SZEN[q.get("szen")]?q.g
        ang:{pow:"offen",spe:"offen",soc:"offen",men:"laeuft"},tag:+q.get("tag")||0,sel:q.get("sel")||"tic",
        bq:({"100":1,"85":.85,"70":.7,"50":.5})[q.get("quote")]||.85,um:+q.get("um")||0,vk:q.get("vk")===null?12:+q.get("vk"),fen:q.get("fenster")!=="0",
        pper:q.get("per")==="saison"?"prog":"bisher",pfil:({ist:1,plan:1,neu:1})[q.get("fil")]?q.get("fil"):"alle",psel:q.get("psel")||"tic",pso:{e:["ges",-1],a:["ges",-1]},
-       dk:q.get("dk")===null?1:kl0(+q.get("dk"),2),vers:q.get("vers")===null?1:kl0(+q.get("vers"),2),lager:q.get("lager")===null?2:kl0(+q.get("lager"),4),bau:kl0(+q.get("bau"),2)};
+       dk:q.get("dk")===null?1:kl0(+q.get("dk"),2),vers:q.get("vers")===null?1:kl0(+q.get("vers"),2),lager:q.get("lager")===null?2:kl0(+q.get("lager"),4),plan:(q.get("plan")||"2,0,0").split(",").slice(0,3).map(function(x){return kl0(+x,12)})};while(Z.plan.length<3)Z.plan.push(0);
 function kl0(x,b){return Math.max(0,Math.min(b,Math.round(x)||0))}
 (q.get("an")||"").split(",").forEach(function(f){if(ANG[f]&&f!=="men")Z.ang[f]="an"});
 if(q.get("still"))document.body.classList.add("still");
@@ -566,8 +572,8 @@ function modell(){
       if(geb)P(l,"dis-"+f,"spo","Disziplin-Sponsor "+FARBE[f][0],A.n,d[0]+(tr?" gewonnen":" verloren"),tr?A.bonus:0,"Bonus "+zahl(A.bonus)+" C, wenn das Duell einer "+FARBE[f][0]+"-Disziplin des Spieltags gewonnen wird\nSpieltag "+t+": "+d[0]+" → "+(tr?"Sieg, Bonus gebucht":"verloren, 0,0 C"));
       else P(l,"dis-"+f,"spo","Disziplin-Sponsor "+FARBE[f][0],A.n,d[0]+" · Erwartung "+Math.round(A.chance*100)+" % × "+zahl(A.bonus)+" C",A.bonus*A.chance,"Prognose, nicht gebucht:\nPapierform "+Math.round(A.chance*100)+" % × Bonus "+zahl(A.bonus)+" C = "+zahl(A.bonus*A.chance)+" C");
     });
-    if(heim)P(l,"tic","tic","Zuschauer / Ticketing",(ev?"Heim · "+ev[2].charAt(0)+ev[2].slice(1).toLowerCase()+" "+fx(ev[1]):"Heimspiel · 15.300 Plätze"),"Auslastung "+Math.round(a*100)+" % × Preis "+preisName(pp*100)+(zus?" · ausverkauft, Zuschlag +"+Math.round(zus*100)+" %":""),KAP*a*(1+pp)*(1+zus),
-      "Volles Haus zum Richtpreis = "+zahl(KAP)+" C (9.000 Steh + 5.500 Sitz + 800 Loge)\nNachfrage = 30 % + 85 % × Stimmung "+stim+" ÷ 100, × Preisstufe „"+preisName(pp*100)+"“\n"+(ev?"Ereignis: "+ev[0]+" "+fx(ev[1])+" auf die Nachfrage"+(zus?" → ausverkauft, Tageskarten +"+Math.round(zus*100)+" %":"")+"\n":"")+"Auslastung "+Math.round(a*100)+" % · Ticketpreis "+pz(pp)+" zum Richtpreis\n"+zahl(KAP)+" × "+String(Math.round(a*100)/100).replace(".",",")+" × "+String(Math.round((1+pp)*100)/100).replace(".",",")+(zus?" × "+String(1+zus).replace(".",","):"")+" = "+zahl(KAP*a*(1+pp)*(1+zus))+" C");
+    if(heim)P(l,"tic","tic","Zuschauer / Ticketing",(ev?"Heim · "+ev[2].charAt(0)+ev[2].slice(1).toLowerCase()+" "+fx(ev[1]):"Heimspiel · 14.900 Plätze"),"Auslastung "+Math.round(a*100)+" % × Preis "+preisName(pp*100)+(zus?" · ausverkauft, Zuschlag +"+Math.round(zus*100)+" %":""),KAP*a*(1+pp)*(1+zus),
+      "Volles Haus zum Richtpreis = "+zahl(KAP)+" C (9.000 Steh + 5.000 Sitz + 900 Loge)\nNachfrage = 30 % + 85 % × Stimmung "+stim+" ÷ 100, × Preisstufe „"+preisName(pp*100)+"“\n"+(ev?"Ereignis: "+ev[0]+" "+fx(ev[1])+" auf die Nachfrage"+(zus?" → ausverkauft, Tageskarten +"+Math.round(zus*100)+" %":"")+"\n":"")+"Auslastung "+Math.round(a*100)+" % · Ticketpreis "+pz(pp)+" zum Richtpreis\n"+zahl(KAP)+" × "+String(Math.round(a*100)/100).replace(".",",")+" × "+String(Math.round((1+pp)*100)/100).replace(".",",")+(zus?" × "+String(1+zus).replace(".",","):"")+" = "+zahl(KAP*a*(1+pp)*(1+zus))+" C");
     else P(l,"tic","tic","Zuschauer / Ticketing","Auswärtsspiel","keine Ticket-Einnahme auswärts",0,"Tickets gibt es nur an den 10 Heimspielen der Saison.\nSpieltag "+t+" ist ein Auswärtsspiel: 0,0 C\n(steht hier auch bei 0, damit nichts fehlt)");
     STARS.forEach(function(s,i){
       var fehlt=i===0&&verl, weg=i===2&&Z.notv&&!geb, m=weg?0:s.m*stim/65*(heim?1.5:.5)*(fehlt?.3:1);
@@ -930,14 +936,19 @@ function vHebel(){
 /* ---------- Saisonwahl (22.11. Runde 2, Entscheidungen von Chris; docs/design/finanzen-posten-22-11.md Abschnitt f) ---------- */
 /* Beispielzahlen fuer ein Team der Liga 2. Dauerkarten und Auslastung rechnen mit dem Modell oben (KAP, Stimmung),
    alles andere sind feste Beispielwerte. */
-var DKN=["wenig","normal","viel"], DKA=[.2,.4,.6], DKRAB=.25, ARSTUFE=3;
+var DKN=["wenig","normal","viel"], DKA=[.2,.4,.6], DKRAB=.25;
 /* Runde 3: Platzarten. p = C je 1.000 Plaetze und Heimspiel in Liga 2 (Liga 1: x 1,5). Beispielarena Stufe 4:
    Grundarena (3.000 Steh + 1.000 Sitz) + Stehtribuene + Sitzrang + Logenring = 15.300 Plaetze, volles Haus 1,68 C.
    Liga 1 = Liga 2 x 4/3 (0,08 / 0,16 / 0,80). Sponsor bleibt, wie er ist: Tickets kommen obendrauf. */
-var PA=[{n:"Stehplatz",n2:"Stehplätze",pl:9000,p:.06,v:"--p4"},{n:"Sitzplatz",n2:"Sitzplätze",pl:5500,p:.12,v:"--p5"},{n:"Loge",n2:"Logenplätze",pl:800,p:.6,v:"--gold"}],L1F=4/3;
-var BAU=[{n:"Stehtribüne",pl:6000,k:12,u:.8,hat:1,t:"<b>Stehplätze</b> füllen sich mit der Stimmung: ab Stimmung 70 voll, unter 40 halb leer. Billig im Bau, kleiner Preis."},
-         {n:"Sitzrang",pl:4500,k:20,u:1.2,hat:1,t:"<b>Sitzplätze</b> hängen an der Fanbasis und schwanken wenig. Doppelter Preis, teurer im Bau."},
-         {n:"Logenring",pl:800,k:26,u:1,hat:1,t:"<b>Logen</b> mieten Firmen: Auslastung 20 % + 40 % × Sponsor-Stufe + 40 % × Tabellenplatz. Zehnfacher Preis, die Stimmung ist egal."}];
+/* Runde 4: Ausbau von Hand. sch = Plaetze je Schritt, gr = Grundarena, max = Obergrenze, bau = Staffel [bis Schritt n, C je Schritt],
+   u = Unterhalt je Schritt und Saison. Beispielarena: 9.000 Steh (6 Schritte) + 5.000 Sitz (4) + 900 Logen (9) = 14.900 Plaetze, volles Haus 1,68 C. */
+var PA=[{n:"Stehplatz",n2:"Stehplätze",kz:"Steh",pl:9000,p:.06,v:"--p4",sch:1000,gr:3000,max:15000,bau:[[6,2.0],[12,2.4]],u:.15,t:"<b>Stehplätze</b> füllen sich mit der Stimmung: ab Stimmung 70 voll, unter 40 halb leer. Billig im Bau, kleiner Preis."},
+        {n:"Sitzplatz",n2:"Sitzplätze",kz:"Sitz",pl:5000,p:.12,v:"--p5",sch:1000,gr:1000,max:10000,bau:[[5,4.5],[9,5.4]],u:.25,t:"<b>Sitzplätze</b> hängen an der Fanbasis und schwanken wenig. Doppelter Preis, teurer im Bau."},
+        {n:"Loge",n2:"Logenplätze",kz:"Loge",pl:900,p:.6,v:"--gold",sch:100,gr:0,max:1200,bau:[[6,3.2],[12,3.9]],u:.12,t:"<b>Logen</b> mieten Firmen: Auslastung 20 % + 40 % × Sponsor-Stufe + 40 % × Tabellenplatz. Zehnfacher Preis, die Stimmung ist egal."}],L1F=4/3;
+function paSchritt(a,n){for(var i=0;i<a.bau.length;i++)if(n<=a.bau[i][0])return a.bau[i][1];return a.bau[a.bau.length-1][1]}
+function paHat(a){return Math.round((a.pl-a.gr)/a.sch)} function paMax(a){return Math.round((a.max-a.pl)/a.sch)}
+var FANBASIS=16400;
+Z.plan=Z.plan.map(function(k,i){return Math.min(k,paMax(PA[i]))});
 var LOGE_AUSL=.75;
 function paAusl(T){var si=kl(T.ausl-.04,.2,1),st=kl((KAP*T.ausl-PA[2].pl/1000*PA[2].p*LOGE_AUSL-PA[1].pl/1000*PA[1].p*si)/(PA[0].pl/1000*PA[0].p),.2,1);return [st,si,LOGE_AUSL]}
 var VERS=[["Keine",0,0,0],["Beste 6",.7,6,7.5],["Ganzer Kader",1.2,14,4.86]], VERSQ=.8;
@@ -964,28 +975,37 @@ function vWahl(){
   var so=dkSofort(),fe=dkFehlt(),net=r1(so-fe);
   var dk='<div class="sd"><div class="kopf">Dauerkarten<small>einmal je Saison · vor Spieltag 1</small></div><div class="in">'+
     '<div class="zl" style="align-items:center">'+seg("dk",["Wenig 20 %","Normal 40 %","Viel 60 %"],Z.dk)+'<span class="marke gold" data-tip="Entscheidung 22.11.: 25 % statt 10 %.\nBei 25 % liegt der Gleichstand bei 75 % Auslastung,\nalso bei Stimmung 53, nahe dem Liga-Mittel.">RABATT 25 %</span></div>'+
-    '<div class="zl"><span class="riesig t" style="font-size:34px">+'+zahl(so)+'<small>C sofort in die Kasse</small></span><span style="text-align:right">'+tz(15300*DKA[Z.dk])+' von 15.300 Plätzen<br>fest verkauft · alle drei Platzarten</span></div>'+
+    '<div class="zl"><span class="riesig t" style="font-size:34px">+'+zahl(so)+'<small>C sofort in die Kasse</small></span><span style="text-align:right">'+tz(14900*DKA[Z.dk])+' von 14.900 Plätzen<br>fest verkauft · alle drei Platzarten</span></div>'+
     '<div class="zl"><span>Fehlt an der Tageskasse <small>Auslastung im Saisonschnitt '+Math.round(schS*100)+' %</small></span><strong class="t minus">−'+zahl(fe)+' C</strong></div>'+
     '<div class="zl"><span><b>Netto über die Saison</b></span><strong class="t '+vz(net)+'">'+Cv(net)+'</strong></div>'+
     '<div class="zl"><span>Bei schwacher Saison <small>Auslastung 60 %</small></span><strong class="t plus">'+Cv(KAP*10*DKA[Z.dk]*(1-DKRAB-.6))+'</strong></div>'+
     '<div class="zl"><span>Sofort-Geld der drei Stufen</span><strong class="t">'+DKA.map(function(a){return zahl(KAP*10*a*(1-DKRAB))}).join(" · ")+' C</strong></div>'+
     '<div class="txt">Lohnt sich unter <b>75 % Auslastung</b> (Stimmung 53). Darüber kostet der Rabatt, dafür ist das Geld schon in der Kaufphase da und hängt nicht an der Stimmung.</div></div></div>';
-  /* 2 Arena: Platzarten (Runde 3) */
-  var PAa=PA.map(function(a,i){var s=0;l3.forEach(function(T){s+=paAusl(T)[i]});return l3.length?s/l3.length:0}),plG=PA.reduce(function(s,a){return s+a.pl},0);
-  var empI=-1;PAa.forEach(function(a,i){if(a>=.9&&(empI<0||a>PAa[empI]))empI=i});
-  var emp=l3.length>=3&&empI>=0,nst=ARSTUFE+1,B=BAU[Z.bau],kost=r1(B.k*(1+.2*B.hat)),vollm=B.pl/1000*PA[Z.bau].p*10,
-      s1=r1(vollm*(Z.bau===2?PAa[2]:.6)-B.u),voll=r1(vollm-B.u),jahre=1+(kost-s1)/voll,jahre1=1+(kost-(vollm*L1F*(Z.bau===2?PAa[2]:.6)-B.u))/(vollm*L1F-B.u);
+  /* 2 Arena: Ausbau von Hand in Schritten (Runde 4) */
+  var PAa=PA.map(function(a,i){var s=0;l3.forEach(function(T){s+=paAusl(T)[i]});return l3.length?s/l3.length:0}),plG=PA.reduce(function(s,a){return s+a.pl},0),maxG=PA.reduce(function(s,a){return s+a.max},0);
+  /* Nachfrage je Bereich: unter 90 % = verkaufte Plaetze; darueber mit Ueberhang (im Mockup geschaetzt aus der Auslastung) */
+  var DEM=PA.map(function(a,i){var x=PAa[i];return Math.round(a.pl*(x<.9?x:x+(x-.9)*2.5)/50)*50});
+  var empI=-1;PAa.forEach(function(a,i){if(a>=.9&&paMax(PA[i])>0&&(empI<0||a>PAa[empI]))empI=i});
+  var emp=l3.length>=3&&empI>=0;
+  function paRech(i,k){var a=PA[i],hat=paHat(a),bau=0,n;for(n=1;n<=k;n++)bau+=paSchritt(a,hat+n);
+    var neu=a.pl+k*a.sch,erw=(Math.min(neu,DEM[i])-Math.min(a.pl,DEM[i]))/1000*a.p*10,voll=k*a.sch/1000*a.p*10;
+    return {bau:bau,u:k*a.u,erw:erw,voll:voll,n:k?paSchritt(a,hat+1):0}}
+  var PL=PA.map(function(a,i){return paRech(i,Z.plan[i])}),gB=0,gU=0,gE=0,gV=0;PL.forEach(function(x){gB+=x.bau;gU+=x.u;gE+=x.erw;gV+=x.voll});
+  var nE=r1(gE-gU),nV=r1(gV-gU),geplant=Z.plan.some(function(k){return k>0}),leer=-1;Z.plan.forEach(function(k,i){if(k>0&&PAa[i]<.9&&leer<0)leer=i});
+  var fanMax=1.5*(PA[0].pl+PA[1].pl),fanMaxN=fanMax+1.5*(Z.plan[0]*PA[0].sch+Z.plan[1]*PA[1].sch);
   var nh=null;for(var _h=Z.now+1;_h<=N&&!nh;_h++)if(HEIM[_h])nh=_h;var nev=nh?EREIG[nh]:null;
   function hs(x){return String(Math.round(x*2)/2).replace(".",",")}
-  var ar='<div class="sd kom'+(emp?" wir":"")+'"><div class="kopf">Arena · Platzarten<small>Stufe '+ARSTUFE+' von 5 · '+tz(plG)+' Plätze</small></div><div class="in">'+
+  function sais(k,e){return e>.01?(k/e>30?"über 30 Saisons":"rund "+hs(k/e)+" Saisons"):"nie"}
+  var ar='<div class="sd kom'+(emp?" wir":"")+'"><div class="kopf">Arena · Ausbau von Hand<small>'+tz(plG)+' von '+tz(maxG)+' Plätzen</small></div><div class="in">'+
     '<div class="zl" style="align-items:center"><span class="riesig t" style="font-size:34px">'+Math.round(sch*100)+'<small>% · letzte 3 Heimspiele</small></span>'+(nh?'<span style="text-align:right;line-height:1.5">'+(nev?'<span class="marke '+(nev[1]<1?"rot":"gold")+'" data-tip="'+esc(nev[0])+'\nFaktor auf die Nachfrage. Über 100 % ist ausverkauft;\ndie Tageskarten bekommen dann bis +25 % Zuschlag.">'+nev[2]+' '+fx(nev[1])+' ZUSCHAUER</span>':'<span class="marke leer">KEIN EREIGNIS</span>')+'<br><small style="margin:0">Spieltag '+nh+' · '+GEGNER[nh]+'</small></span>':"")+'</div>'+
-    PA.map(function(a,i){return '<div class="pa" style="--pc:var('+a.v+')" data-tip="'+tz(a.pl)+' '+a.n2+' · Auslastung der letzten 3 Heimspiele · Ertrag je Heimspiel\nMarke bei 90 %: ab dort empfiehlt der Vorstand den Ausbau dieser Platzart"><b>'+a.n+'</b><span class="t">'+tz(a.pl)+'</span><div class="wb"><i style="width:'+kl(PAa[i]*100,0,100)+'%"></i><u style="left:90%;width:2px;background:var(--creme)"></u></div><span class="t">'+Math.round(PAa[i]*100)+' %</span><strong class="t">'+zahl(a.pl/1000*a.p*PAa[i])+' C</strong></div>'}).join("")+
-    '<div class="zl" style="align-items:center"><span>Ausbau auf Stufe '+nst+'</span>'+seg("bau",BAU.map(function(b){return b.n}),Z.bau)+'</div>'+
-    '<div class="zl"><span>+'+tz(B.pl)+' '+PA[Z.bau].n2+' <small>Investitionstopf · '+(B.hat+1)+'. dieser Art, +'+B.hat*20+' %</small></span><strong class="t minus">−'+zahl(kost)+' C</strong></div>'+
-    '<div class="zl"><span>Mehr je Saison <small>erste Saison · volles Haus · nach Unterhalt</small></span><strong class="t plus">+'+e1(s1)+' · +'+e1(voll)+' C</strong></div>'+
-    '<div class="zl"><span><b>Bau bezahlt nach</b> <small>Liga 1: rund '+hs(jahre1)+'</small></span><strong class="t">rund '+hs(jahre)+' Saisons</strong></div>'+
-    '<div class="txt artx">'+B.t+'</div>'+
-    '</div><div class="fuss"><small>'+(emp?"Vorstand empfiehlt: "+BAU[empI].n+" · "+PA[empI].n2+" zu "+Math.round(PAa[empI]*100)+" % voll":"Empfehlung ab 90 % je Platzart · unter 60 % rät der Vorstand ab")+'</small><span class="sp"></span><button class="btn klein'+(emp&&empI===Z.bau?" ja":"")+'" data-toast="Ausbau läuft über die Gebäude-Seite: '+zahl(kost)+' C aus dem Investitionstopf, hart gegen die Freigabe">'+B.n+' bauen</button></div></div>';
+    PA.map(function(a,i){var k=Z.plan[i],mx=paMax(a),nx=k<mx?paSchritt(a,paHat(a)+k+1):0;
+      return '<div class="pa" style="--pc:var('+a.v+')" data-tip="'+tz(a.pl)+' '+a.n2+' von höchstens '+tz(a.max)+' · Nachfrage zuletzt '+tz(DEM[i])+'\nSchritt +'+tz(a.sch)+': Bau '+a.bau.map(function(b,j){return (j?a.bau[j-1][0]+1:1)+". bis "+b[0]+". Schritt "+zahl(b[1])+" C"}).join(", ")+'\nUnterhalt '+zahl(a.u)+' C je Schritt und Saison · volles Haus +'+zahl(a.sch/1000*a.p*10)+' C je Saison\nGebaut: '+paHat(a)+' Schritte'+(nx?" · der nächste kostet "+zahl(nx)+" C":" · Obergrenze erreicht")+'"><b>'+a.n+'</b><span class="t">'+tz(a.pl)+'</span><div class="wb"><i style="width:'+kl(PAa[i]*100,0,100)+'%"></i><u style="left:90%;width:2px;background:var(--creme)"></u></div><span class="t">'+Math.round(PAa[i]*100)+' %</span>'+
+        '<span class="stp"><button data-pm="'+i+',-1"'+(k?"":" disabled")+' aria-label="'+a.n+' ein Schritt weniger">−</button><strong class="t'+(k?" an":"")+'">+'+tz(k*a.sch)+'</strong><button data-pm="'+i+',1"'+(k<mx?"":" disabled")+' aria-label="'+a.n+' ein Schritt mehr">+</button></span></div>'}).join("")+
+    '<div class="zl"><span><b>Kostet</b> <small>'+(geplant?PA.map(function(a,i){return Z.plan[i]?Z.plan[i]+" × "+a.kz+" je "+zahl(PL[i].bau/Z.plan[i])+" C":""}).filter(Boolean).join(" · ")+" · Investitionstopf":"mit + einen Schritt planen · Steh und Sitz 1.000, Loge 100 Plätze")+'</small></span><strong class="t '+(geplant?"minus":"")+'">'+(geplant?"−"+zahl(gB)+" C":"0,0 C")+'</strong></div>'+
+    '<div class="zl"><span><b>Bringt ca.</b> <small data-tip="Erwartet aus der Nachfrage der letzten drei Heimspiele,\nnach '+zahl(gU)+' C Unterhalt je Saison.\nVolles Haus: alle neuen Plätze verkauft.">wenn die Fans kommen · volles Haus '+(nV>=0?"+":"−")+e1(Math.abs(nV))+' C</small></span><strong class="t '+vz(nE)+'">'+(nE>=0?"+":"−")+e1(Math.abs(nE))+' C je Saison</strong></div>'+
+    '<div class="zl"><span><b>Bezahlt nach</b> <small>volles Haus: '+sais(gB,nV).replace("rund ","")+' · Liga 1: '+sais(gB,gV*L1F-gU).replace("rund ","")+'</small></span><strong class="t">'+(geplant?sais(gB,nE):"–")+'</strong></div>'+
+    '<div class="zl artx"><span data-tip="Mehr Plätze bringen nur Geld, wenn mehr Leute kommen wollen, als hineinpassen.\nDie Fanbasis wächst bei vollem Haus um 2 % je Heimspiel\nbis zum Maximum (1,5 × Steh- und Sitzplätze).\nRückbau gibt es nicht; Minus nimmt nur einen geplanten Schritt zurück.">Nachfrage <small>Steh '+tz(DEM[0])+' · Sitz '+tz(DEM[1])+' · Loge '+tz(DEM[2])+'</small></span><span style="text-align:right">Fanbasis '+tz(FANBASIS)+' · Maximum '+tz(fanMax)+(fanMaxN>fanMax?" → "+tz(fanMaxN):"")+'</span></div>'+
+    '</div><div class="fuss"><small>'+(leer>=0?PA[leer].n2+" nur zu "+Math.round(PAa[leer]*100)+" % voll: mehr Plätze bringen dort erst Geld, wenn die Nachfrage steigt":emp?"Vorstand empfiehlt: "+PA[empI].n2+" · zu "+Math.round(PAa[empI]*100)+" % voll, Nachfrage "+tz(DEM[empI]):"Empfehlung ab 90 % je Bereich · unter 60 % rät der Vorstand ab")+'</small><span class="sp"></span><button class="btn klein'+(geplant&&leer<0&&emp?" ja":"")+'"'+(geplant?"":" disabled")+' data-toast="Ausbau läuft über die Gebäude-Seite: '+zahl(gB)+' C aus dem Investitionstopf, hart gegen die Freigabe · wirkt ab dem nächsten Heimspiel">Ausbau beauftragen</button></div></div>';
   /* 3 Versicherung */
   var V=VERS[Z.vers],tag=V[3]/20*VERSQ,ab=V[1]?Math.ceil(V[1]/tag):0,er=versErst();
   var ve='<div class="sd"><div class="kopf">Verletzungs-Versicherung<small>einmal je Saison · Gehaltstopf</small></div><div class="in">'+
@@ -1027,11 +1047,14 @@ function vWahl(){
     '<div class="txt">Freiwillig, nie automatisch. Unter 60 % Freigabe des Vorstands gibt es keinen freiwilligen Kredit; der Pflichtkredit am Kassensturz bleibt.</div>'+
     '</div><div class="fuss"><small>Auszahlung in den Transfertopf</small><span class="sp"></span><button class="btn klein" data-toast="Kreditangebote stehen auf der Seite Kredite: Bank und jedes Team mit freiem Geld">Angebote ansehen '+ic("r")+'</button></div></div>';
   function lzr(k,a,b,c,d,e,f,g,h){return '<div class="lz'+(k?" "+k:"")+'"><span>'+a+'</span><strong class="t">'+b+'</strong><span class="t">'+c+'</span><span class="t">'+d+'</span><span class="t">'+e+'</span><span class="t">'+f+'</span><span class="t">'+g+'</span><strong class="t">'+h+'</strong></div>'}
-  var lei='<div class="sd lei voll"><div class="kopf">Arena-Bauteile<small>Runde 3: Stufe 0 = 4.000 Plätze, je Ausbaustufe ein Bauteil nach Wahl (höchstens fünf) · Werte Liga 2 · Liga 1 · Ziel: 1 % der Einnahmen eines Top-Teams je 1.000 Plätze, der Sponsor bleibt unverändert</small></div><div class="in">'+
-    '<div class="lz lk"><span>Bauteil</span><span>Plätze</span><span>Preis je 1.000 · Heimspiel</span><span>Bau · 1. · 2. · 3. der Art</span><span>Unterhalt</span><span>Volles Haus je Saison</span><span>Mehr je Saison, netto</span><span>Bau bezahlt nach (1. der Art)</span></div>'+
-    lzr("","<b>Grundarena</b> · Stufe 0","4.000","3.000 Steh · 1.000 Sitz","–","–","3,0 · 4,0 C","–","–")+
-    BAU.map(function(b,i){var v2=b.pl/1000*PA[i].p*10,v1=v2*L1F;return lzr(i===Z.bau?"nx":"","<b>"+b.n+"</b>","+"+tz(b.pl),zahl(PA[i].p)+" · "+zahl(PA[i].p*L1F)+" C",zahl(b.k)+" · "+zahl(b.k*1.2)+" · "+zahl(b.k*1.4)+" C",zahl(b.u)+" C",e1(v2)+" · "+e1(v1)+" C","+"+e1(v2-b.u)+" · +"+e1(v1-b.u)+" C",e1(b.k/(v2-b.u))+" · "+e1(b.k/(v1-b.u))+" Saisons")}).join("")+
-    lzr("du","<b>Beispiel Stufe 5</b> · 2 Steh, 2 Sitz, 1 Loge","25.800","15.000 · 10.000 · 800","96,4 C gesamt","5,0 C","25,8 · 34,4 C","+17,8 · +25,4 C","5,4 · 3,8 Saisons")+
+  var vollK=0,vollU=0,vollE=0;PA.forEach(function(a){var n=Math.round((a.max-a.gr)/a.sch);for(var j=1;j<=n;j++)vollK+=paSchritt(a,j);vollU+=n*a.u;vollE+=a.max/1000*a.p*10});
+  var lei='<div class="sd lei voll"><div class="kopf">Ausbau-Leiter je Bereich<small>Runde 4: Grundarena 4.000 Plätze, danach von Hand in Schritten · Werte Liga 2 · Liga 1 · Ziel: 1 % der Einnahmen eines Top-Teams je 1.000 Plätze, der Sponsor bleibt unverändert</small></div><div class="in">'+
+    '<div class="lz lk"><span>Bereich</span><span>Ein Schritt</span><span>Bau je Schritt</span><span>Unterhalt je Schritt</span><span>Bringt voll je Saison</span><span>Netto je Schritt</span><span>Schritt bezahlt nach</span><span>Gebaut · Obergrenze</span></div>'+
+    lzr("","<b>Grundarena</b>","4.000","–","–","3,0 · 4,0 C","–","–","3.000 Steh · 1.000 Sitz")+
+    PA.map(function(a,i){var v2=a.sch/1000*a.p*10,v1=v2*L1F,b0=a.bau[0],b1=a.bau[1];
+      return lzr(Z.plan[i]?"nx":"","<b>"+a.n+"</b>","+"+tz(a.sch),"1.–"+b0[0]+".: "+zahl(b0[1])+" C · "+(b0[0]+1)+".–"+b1[0]+".: "+zahl(b1[1])+" C",zahl(a.u)+" C",zahl(v2)+" · "+zahl(v1)+" C","+"+zahl(v2-a.u)+" · +"+zahl(v1-a.u)+" C",e1(b0[1]/(v2-a.u))+" · "+e1(b0[1]/(v1-a.u))+" Saisons",tz(a.pl)+" · "+tz(a.max))}).join("")+
+    lzr("du","<b>Dein Plan</b> · "+(geplant?PA.map(function(a,i){return Z.plan[i]?"+"+tz(Z.plan[i]*a.sch)+" "+a.kz:""}).filter(Boolean).join(", "):"nichts geplant"),geplant?"+"+tz(Z.plan[0]*1000+Z.plan[1]*1000+Z.plan[2]*100):"–",geplant?zahl(gB)+" C":"–",geplant?zahl(gU)+" C":"–",geplant?e1(gV)+" · "+e1(gV*L1F)+" C":"–",geplant?"erwartet "+(nE>=0?"+":"−")+e1(Math.abs(nE))+" C":"–",geplant?sais(gB,nE).replace("rund ",""):"–",tz(plG+Z.plan[0]*1000+Z.plan[1]*1000+Z.plan[2]*100)+" · "+tz(maxG))+
+    lzr("","<b>Voll ausgebaut</b>",tz(maxG),zahl(vollK)+" C gesamt",zahl(vollU)+" C",e1(vollE)+" · "+e1(vollE*L1F)+" C","+"+e1(vollE-3-vollU)+" · +"+e1(vollE*L1F-4-vollU)+" C",e1(vollK/(vollE-vollU-3))+" · "+e1(vollK/(vollE*L1F-vollU-4))+" Saisons","15.000 · 10.000 · 1.200")+
     '</div></div>';
   var sum=r1(so-V[1]-L.k);
   var kopf='<div class="rech gross d4" style="margin:0"><div><small>Dauerkarten · sofort</small><strong class="t plus">'+Cv(so)+'</strong></div><div><small>Versicherung · Pauschale</small><strong class="t '+(V[1]?"minus":"")+'">'+(V[1]?Cv(-V[1]):"0,0 C")+'</strong></div>'+
@@ -1081,7 +1104,7 @@ var POSTEN=[
  {id:"treue",s:"a",n:"Treueprämie",kat:"bon",topf:"g",st:"ist",f:an({9:.33}),w:"Sofort bei einer Verlängerung.",r:"5 oder 10 % des neuen Jahresgehalts. Beispiel: Sterling verlängert, 10 % × 3,3 C. Entspricht den „Loyalitätsboni“ im FM.",d:"Stufe aus, 5 % oder 10 %.",ki:"Wie beim Menschen.",c:"lib/finance/vorstand-praemien.ts:257"},
  {id:"betr",s:"a",n:"Arena-Betrieb",kat:"bet",topf:"l",st:"plan",ids:["bet"],nur:"heim",w:"Je Heimspiel.",r:"Fester Posten je Heimspiel × (1 + 0,2 × Arena-Stufe).",d:"Keine.",ki:"Wie beim Menschen.",c:"Nicht gebaut (Finanzkonzept V2, Stufe 5)."},
  {id:"reise",s:"a",n:"Reise",kat:"bet",topf:"l",st:"plan",ids:["bet"],nur:"ausw",w:"Je Auswärtsspiel.",r:"Fester Posten je Auswärtsspiel: 0,10 C (Liga 2).",d:"Keine.",ki:"Wie beim Menschen.",c:"Nicht gebaut (Finanzkonzept V2, Stufe 5)."},
- {id:"unt",s:"a",n:"Gebäude · Unterhalt",kat:"geb",topf:"l",st:"ist",f:je(.8),w:"Je Spieltag, 1/20.",r:"Saisonunterhalt aller gebauten Gebäude ÷ 20. Beispiel: Fan Shop 1 (0,4 C) und ein zweites Gebäude der Stufe 1 (0,4 C). Ein Arena-Ausbau auf Stufe 1 käme mit 0,8 C dazu.",d:"Bauen heißt auch unterhalten.",ki:"Rechnet den Unterhalt in die Amortisation.",c:"lib/finance/finanzen-je-spieltag-buchung.ts:49 · lib/facilities/facility-season-end-service.ts:172"},
+ {id:"unt",s:"a",n:"Gebäude · Unterhalt",kat:"geb",topf:"l",st:"ist",f:je(.8),w:"Je Spieltag, 1/20.",r:"Saisonunterhalt aller gebauten Gebäude ÷ 20. Beispiel: Fan Shop 1 (0,4 C) und ein zweites Gebäude der Stufe 1 (0,4 C). Jeder Ausbau-Schritt der Arena kommt mit 0,12 bis 0,25 C je Saison dazu.",d:"Bauen heißt auch unterhalten.",ki:"Rechnet den Unterhalt in die Amortisation.",c:"lib/finance/finanzen-je-spieltag-buchung.ts:49 · lib/facilities/facility-season-end-service.ts:172"},
  {id:"bau",s:"a",n:"Gebäude · Bau und Ausbau",kat:"geb",topf:"t",st:"ist",f:an({0:10}),w:"Sofort bei der Aktion.",r:"Stufenpreis aus dem Katalog. Beispiel: Fan Shop Stufe 1 in der Kaufphase, 10 C.",d:"Welches Gebäude zuerst. Hart gegen die Vorstands-Freigabe.",ki:"Recovery und Training zuerst, dann nach Finanzwert.",c:"lib/facilities/facility-upgrade-service.ts:308 · lib/finance/vorstand-budgetfreigabe.ts:679"},
  {id:"wart",s:"a",n:"Gebäude · Wartung",kat:"geb",topf:"t",st:"ist",f:an({8:.6}),w:"Sofort bei der Aktion.",r:"Stellt den Zustand eines Gebäudes wieder her.",d:"Warten oder Wirkung verlieren.",ki:"Wartet, bevor die Wirkung sinkt.",c:"lib/facilities/facility-maintenance-service.ts:126"},
  {id:"kre",s:"a",n:"Kreditrate und Zins",kat:"kre",topf:"l",st:"ist",ids:["kre"],w:"Heute am Saisonende, geplant je Spieltag.",r:"Annuität je Saison. Der Zins zählt zur GuV, die Tilgung nicht.",d:"Kredit aufnehmen oder vorzeitig ablösen. Entschieden 22.11.: freiwillige Kredite gibt es schon ab Saison 1.",ki:"Leiht nur für Pflichtkader und Notfälle; in Saison 1 nie für den Draft.",c:"lib/finance/loan-service.ts:811 (Rate), :514 (Aufnahme), :1068 (Ablösung), :953 (Notkredit)"},
@@ -1330,7 +1353,7 @@ function gruppen(T){var g={},o=[];T.l.forEach(function(x){if(!x.b)return;if(!(x.
 /* ================= Bedienung ================= */
 function hebelNull(){Z.preis=0;Z.auto=false;Z.spar=0;Z.dispo=0;Z.bonus=0;Z.kader=1;Z.notv=false;Z.ang={pow:"offen",spe:"offen",soc:"offen",men:"laeuft"}}
 document.addEventListener("click",function(e){
-  var x=e.target.closest("[data-szen],[data-phone],[data-reset],[data-now],[data-ber],[data-ans],[data-tag],[data-sel],[data-ctab],[data-blatt],[data-ang],[data-auto],[data-spar],[data-kader],[data-bonus],[data-wer],[data-notv],[data-toast],[data-bq],[data-fen],[data-um0],[data-pso],[data-pper],[data-pfil],[data-psel],[data-dk],[data-vers],[data-lager],[data-bau]");
+  var x=e.target.closest("[data-szen],[data-phone],[data-reset],[data-now],[data-ber],[data-ans],[data-tag],[data-sel],[data-ctab],[data-blatt],[data-ang],[data-auto],[data-spar],[data-kader],[data-bonus],[data-wer],[data-notv],[data-toast],[data-bq],[data-fen],[data-um0],[data-pso],[data-pper],[data-pfil],[data-psel],[data-dk],[data-vers],[data-lager],[data-pm]");
   if(!x)return; var d=x.dataset;
   if(x.tagName==="A"&&x.getAttribute("href")==="#")e.preventDefault();
   if(d.szen){Z.szen=d.szen;hebelNull()}
@@ -1357,7 +1380,7 @@ document.addEventListener("click",function(e){
   if(d.um0){Z.um=0;toast("Umschichtung zurückgenommen")}
   if(d.pso){var ps=d.pso.split(":"),pc0=ps[1]==="ant"?"ges":ps[1],alt=Z.pso[ps[0]];Z.pso[ps[0]]=alt[0]===pc0?[pc0,-alt[1]]:[pc0,pc0==="n"||pc0==="tp"||pc0==="rg"?1:-1]}
   if(d.dk){Z.dk=+d.dk;toast("Dauerkarten: "+DKN[Z.dk]+" · gilt für die ganze Saison")}
-  if(d.bau){Z.bau=+d.bau}
+  if(d.pm){var pm=d.pm.split(",");Z.plan[+pm[0]]=kl0(Z.plan[+pm[0]]+(+pm[1]),paMax(PA[+pm[0]]))}
   if(d.vers){Z.vers=+d.vers;toast("Versicherung: "+VERS[Z.vers][0])}
   if(d.lager){var lg=lagerLage()[+d.lager];if(!lg.ok){toast(lg.n+": Bedingung nicht erfüllt");return}Z.lager=+d.lager;toast("Winterpause: "+lg.n)}
   if(d.pper){Z.pper=d.pper}
