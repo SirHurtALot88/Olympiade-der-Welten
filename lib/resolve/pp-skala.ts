@@ -153,7 +153,7 @@ export function ppAusKurveSkaliert(input: {
   modus?: PpSkalaModus;
   /** Feldgroesse dieser Disziplin an diesem Spieltag (Anker je Feldgroesse). */
   playerCount?: number | null;
-  /** Alte Variante ("orte3" Battlefield, "torwartAlt" Hockey): die Anker dieses Formats/dieser Regel (gezeigt = gebucht). */
+  /** Alte Variante ("orte3" Battlefield, "torwartAlt" Hockey, "pusteAlt" Basketball): die Anker dieses Formats/dieser Regel (gezeigt = gebucht). */
   variante?: PpSkalaAnkerVariante;
 }): number {
   const { referenz } = input;

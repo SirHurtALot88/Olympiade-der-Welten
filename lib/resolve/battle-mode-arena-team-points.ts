@@ -1295,7 +1295,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   /** PP-Skala dieser Saison (`ppSkalaModus(gameState)`, lib/resolve/pp-skala.ts); "aus" = Kurve bis 5,5. */
   ppSkala: PpSkalaModus = "aus",
   /** Regel dieses Spieltags (Hockey-Torwart bzw. Basketball-Puste); "alt" -> alte Torwart-Referenz bzw. alte Anker (gezeigt = gebucht). */
-  torwartRegel: "alt" | "neu" = "neu",
+  regel: "alt" | "neu" = "neu",
 ): Map<string, number> {
   const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld");
   // TORWART-EIGENE REFERENZ (Hockey-Produktivierung): nur aufgeloest, wenn irgendein Eintrag sie
@@ -1312,7 +1312,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
         // PP-SKALA C2 (docs/design/pp-skala-18-11.md): dieselbe Kurve ohne alten Deckel, Zwei-Anker je
         // Disziplin und Feldgroesse, neuer Deckel 5. Bei "aus" (alte Saison) wird dieser Zweig nie betreten.
         const referenz = eintrag.torwart
-          ? (torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart", torwartRegel).referenz)
+          ? (torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart", regel).referenz)
           : feldReferenz;
         ppsByPlayerId.set(
           eintrag.playerId,
@@ -1327,9 +1327,9 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
             playerCount,
             // Hockey-Spieltag mit der alten Torwart-Regel: die alten Anker (`hockeyAlt`), gezeigt = gebucht.
             variante:
-              disciplineId === "hockey" && torwartRegel === "alt"
+              disciplineId === "hockey" && regel === "alt"
                 ? "torwartAlt"
-                : disciplineId === "basketball" && torwartRegel === "alt"
+                : disciplineId === "basketball" && regel === "alt"
                   ? "pusteAlt"
                   : undefined,
           }),
@@ -1337,7 +1337,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
         continue;
       }
       if (eintrag.torwart) {
-        torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart", torwartRegel).referenz;
+        torwartReferenz ??= resolveArenaPpsReferenz(disciplineId, playerCount, "torwart", regel).referenz;
         ppsByPlayerId.set(eintrag.playerId, ppsAusArenaImpact(eintrag.wert, torwartReferenz, konfig.max, konfig.anteilMitte));
       } else {
         // + STATIONSDUELL-BONUS (nur Spurt, sonst 0): reine Spieler-Nebenspur, s. `ppsAusStationsduellen()`.

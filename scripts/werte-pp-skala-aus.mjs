@@ -11,7 +11,7 @@
 //   node scripts/werte-pp-skala-aus.mjs --schreibe-kalibrierung <abzug.json> [weitere.json ...]
 //       schreibt data/generated/pp-skala-kalibrierung.json (Faktor k_d = ZIEL / Median der Tagesbesten)
 // ===================================================================================
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const args = process.argv.slice(2);
 const schreibe = args.includes("--schreibe-kalibrierung");
@@ -396,8 +396,27 @@ if (args.includes("--nur-hockey")) {
   process.exit(0);
 }
 
+// 22.11.: `--nur-basketball` mischt NUR den Basketball-Anker (Laeufe mit der NEUEN Puste-Regel) in die bestehende Datei; der
+// bisherige Eintrag wandert beim ersten Mal nach `basketballPusteAlt` (Spieltage mit der alten Regel, gezeigt = gebucht).
+if (args.includes("--nur-basketball")) {
+  const ziel = new URL("../data/generated/pp-skala-kalibrierung.json", import.meta.url);
+  const bestand = JSON.parse(readFileSync(ziel, "utf8"));
+  if (!kalibrierung.basketball) throw new Error("Keine Basketball-Zellen in den Abzuegen.");
+  if (!bestand.disziplinen.basketballPusteAlt) bestand.disziplinen.basketballPusteAlt = bestand.disziplinen.basketball;
+  bestand.disziplinen.basketball = kalibrierung.basketball;
+  bestand.basketballQuellen = { neu: { gemessenAm: new Date().toISOString().slice(0, 10), saves: quellen.map((x) => x.saveId) } };
+  writeFileSync(ziel, JSON.stringify(bestand, null, 2) + "\n");
+  console.log("\nBasketball-Anker (neue Puste-Regel) geschrieben: " + ziel.pathname);
+  process.exit(0);
+}
+
 if (schreibe) {
   const ziel = new URL("../data/generated/pp-skala-kalibrierung.json", import.meta.url);
+  // Regel-/Format-Varianten (`*Alt`, `*Orte3`, `*PusteAlt`) und die zugehoerigen `*Quellen` stammen aus Sonderlaeufen
+  // (--nur-hockey/--nur-battlefield/--nur-basketball) und duerfen vom vollen Lauf nicht verschwinden.
+  const vorhanden = existsSync(ziel) ? JSON.parse(readFileSync(ziel, "utf8")) : {};
+  const varianten = Object.fromEntries(Object.entries(vorhanden.disziplinen ?? {}).filter(([k]) => /(Alt|Orte3|PusteAlt)$/.test(k) && !(k in kalibrierung)));
+  const quellenErhalten = Object.fromEntries(Object.entries(vorhanden).filter(([k]) => /Quellen$/.test(k) && k !== "quellen"));
   writeFileSync(
     ziel,
     JSON.stringify(
@@ -408,7 +427,8 @@ if (schreibe) {
         gemessenAm: new Date().toISOString().slice(0, 10),
         quellen: quellen.map((x) => ({ saveId: x.saveId, spieltage: x.gespielt })),
         ...(umrechnung ? { umrechnung } : {}),
-        disziplinen: Object.fromEntries(Object.entries(kalibrierung).sort((a, b) => a[0].localeCompare(b[0]))),
+        disziplinen: Object.fromEntries(Object.entries({ ...kalibrierung, ...varianten }).sort((a, b) => a[0].localeCompare(b[0]))),
+        ...quellenErhalten,
       },
       null,
       2,

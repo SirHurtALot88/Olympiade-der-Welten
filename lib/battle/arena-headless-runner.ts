@@ -490,9 +490,10 @@ export type VorbereitetesFixture = {
    */
   strategieByDisciplineId?: ArenaStrategieByDisciplineId;
   /**
-   * CLIMBING-FORMAT DES SPIELTAGS (Canyon live, 18.11., lib/resolve/climbing-format.ts): `{ climbing: "canyon" |
-   * "standard" }`, nur fuer Climbing gesetzt -- derselbe Umschlag-Teil, den der Host fuer die Anzeige setzt
-   * (gezeigt = gebucht). Fehlt fuer jede andere Disziplin, deren Umschlag damit Zeichen fuer Zeichen der alte bleibt.
+   * FORMAT/REGEL DES SPIELTAGS (lib/resolve/climbing-format.ts `arenaFormatByDisciplineId`): `climbing` ("canyon" | "standard",
+   * Canyon live 18.11.), `hockey` (Torwart-Regel "alt" | "neu", 22.11.), `basketball` (Puste-Regel "alt" | "neu", 22.11.), je nur
+   * fuer die eigene Disziplin gesetzt -- derselbe Umschlag-Teil, den der Host fuer die Anzeige setzt (gezeigt = gebucht).
+   * Fehlt fuer jede andere Disziplin, deren Umschlag damit Zeichen fuer Zeichen der alte bleibt.
    */
   formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu"; basketball?: "alt" | "neu" };
 };

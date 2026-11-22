@@ -5,7 +5,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ergebnisSkalaAnker } from "@/lib/resolve/ergebnis-skala";
+import { readFileSync } from "node:fs";
+
+import type { ArenaFixtureResult } from "@/lib/battle/arena-headless-runner";
+import { computeIndividualBoxscorePpsFromFixtureResults } from "@/lib/resolve/battle-mode-arena-team-points";
+import { berechneDuellErgebnisE1, ergebnisSkalaAnker } from "@/lib/resolve/ergebnis-skala";
 import { ppSkalaAnker, skaliereUngedeckelt } from "@/lib/resolve/pp-skala";
 
 describe("Basketball-Anker je Puste-Regel", () => {
@@ -35,5 +39,29 @@ describe("Basketball-Anker je Puste-Regel", () => {
     expect(neu.knoten).not.toEqual(alt.knoten);
     expect(neu.knoten[neu.knoten.length - 1]!).toBeLessThan(alt.knoten[alt.knoten.length - 1]!);
     expect(ergebnisSkalaAnker("hockey", "duell", null, "pusteAlt")).toEqual(ergebnisSkalaAnker("hockey", "duell", null));
+  });
+
+  it("Verdrahtung PP: ein Basketball-Eintrag eines 'alt'-Spieltags rechnet mit den alten Ankern, 'neu' mit den neuen", () => {
+    const fx: ArenaFixtureResult[] = [
+      { homeTeamId: "a", awayTeamId: "b", seiten: [60, 50], boxscore: [{ name: "S", wert: 40, playerId: "s", side: "home" }] },
+    ];
+    const alt = computeIndividualBoxscorePpsFromFixtureResults(fx, 4, "basketball", "an", "alt").get("s")!;
+    const neu = computeIndividualBoxscorePpsFromFixtureResults(fx, 4, "basketball", "an", "neu").get("s")!;
+    expect(alt).not.toBe(neu);
+    // Die neuen Anker sind kleiner, derselbe Rohwert ergibt also mehr PP (nach unten gedeckelt durch 5).
+    expect(neu).toBeGreaterThanOrEqual(alt);
+    // Hockey-Regel "alt" beruehrt Basketball nicht.
+    expect(computeIndividualBoxscorePpsFromFixtureResults(fx, 4, "basketball", "an", "neu").get("s")).toBe(neu);
+  });
+
+  it("Verdrahtung E1: die Variante 'pusteAlt' liefert das alte Duell-Ergebnis, die Resolve-Engine waehlt sie bei gestempeltem alt-Spieltag", () => {
+    const eingabe = { disciplineId: "basketball", playerCount: 4, outcome: "win" as const, marge: 40, leistungEigen: 1.4, leistungGegner: 1.2 };
+    const alt = berechneDuellErgebnisE1({ ...eingabe, variante: "pusteAlt" });
+    const neu = berechneDuellErgebnisE1(eingabe);
+    // Dieselbe Marge liegt in den alten Knoten tiefer (kleinere Lage) als in den neuen (kleineren) Knoten.
+    expect(alt.verhaeltnis).toBeLessThan(neu.verhaeltnis + 1);
+    expect(JSON.stringify(alt.bezug)).not.toBe(JSON.stringify(neu.bezug));
+    const quelle = readFileSync("lib/resolve/legacy-matchday-resolve-engine.ts", "utf8");
+    expect(quelle).toMatch(/disciplineId === "basketball" && basketballPusteFuer\(base\.gameState, base\.matchdayId\) === "alt"\s*\?\s*"pusteAlt"/);
   });
 });

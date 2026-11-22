@@ -12978,7 +12978,7 @@
     // Ticker-Hinweis (nur Anzeige): einmal, wenn die Puste unter 25 % faellt; erst nach der Erholung ueber 55 % wieder.
     if(P.ballJeSek!=null){
       const anteil=u.puste/u.pusteMax;
-      if(anteil<0.25&&!BB_PUSTE_MUEDE.has(u)){ BB_PUSTE_MUEDE.add(u); feed(u.side,u.n+" ist außer Puste."); }
+      if(anteil<0.25&&!BB_PUSTE_MUEDE.has(u)){ BB_PUSTE_MUEDE.add(u); feedRoutine(u.side,u.n+" ist außer Puste."); }
       else if(anteil>0.55)BB_PUSTE_MUEDE.delete(u);
     }
   }
