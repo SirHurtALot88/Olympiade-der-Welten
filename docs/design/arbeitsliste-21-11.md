@@ -136,3 +136,21 @@ Vier Schleifen (Spieltag, Woche, Saison, Ära), fünf Säulen (Kader, Spieltag, 
 - **Ära** später, aber sehr wichtig. Kein Pokal/keine WM vorerst.
 - **Rangtreue (Chris 22.11.): Schranke 0,75 gilt nur gegen die reine Eignung**; alles on top (Form, Moral, Karten,
   Ausrüstung, Zurufe) zählt nicht dagegen — Schwächere dürfen dadurch besser sein.
+
+## Welle 8 — Ausrüstung, Kabine, Postfach (Stand 22.11. abends)
+
+Konzept + Mockups: PR #1687 (`docs/design/zwischen-den-spieltagen-22-11.md`, §1–70). Bauplan Ausrüstung:
+`docs/design/ausruestung-pilot-bauplan-22-11.md` (Phasen 0–5, PM-Entscheidungen Abschnitt C). Chris' Entscheidungen 22.11.:
+Lager 16 Plätze inkl. Materialien, ein Teil je Familie und Spieler, Legendäre I–III nur über Material, Reparatur-Benchmark
+≈ 2 C je Saison voll ausgerüstet, Icons im Sparweg (61 Gen.), Affix-Quoten 60/20/15, Gold-Truhe für Ruhm alle 5 Spieltage,
+Winterpause ohne Transferfenster, Liga-Mittel der Entwicklung −1…+1, Identität driftet ≤ 15–20 % je Saison, Personal später,
+Zuruf in der Arena (neu rechnen ab Zuruf, erst Laufzeit messen, je Manager abschaltbar), Trait-Ereignisse ±2 %,
+Transfergerüchte wirken auf Gehaltsforderungen und kommen ins Postfach.
+
+- [ ] Phase 0 + 1a Ausrüstung (nach Merge von #1687)
+- [ ] Kabine/Moral-Baustein (Moral ±2,5 %, Hierarchie, Kabinen-Ereignisse)
+- [ ] Postfach: Transfergerücht, Schnäppchen, Auflösungswunsch (Antwort-Karten)
+- [ ] Kadertiefe: Balken B überall, A im Teamprofil, C eigenes Team (Ligatabelle ohne)
+- [ ] PP-Tagesanker scharf ab nächster Saison (läuft)
+- [ ] Entwicklung Liga-Mittel −1…+1 (läuft)
+- [ ] Vorstand/KI-Kauf Runde 2 inkl. Quote-Vorausschau und Kernschutz bei gutem Angebot (läuft)
