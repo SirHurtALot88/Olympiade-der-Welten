@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ArenaSpieltagAnsicht } from "@/lib/foundation/battle-arena/arena-spieltag-ansicht";
 import ArenaRegieleiste, { type ArenaRegie } from "@/app/foundation/battle-arena/ArenaRegieleiste";
-import { ArenaLadebild, ArenaVorstellung, type VorraumAusblick } from "@/app/foundation/battle-arena/ArenaVorraum";
+import { ArenaLadebild, ArenaVorstellungAusSpielstand, type VorraumAusblick } from "@/app/foundation/battle-arena/ArenaVorraum";
 import { baueLadeSchritte, baueVorraumTeams } from "@/lib/foundation/battle-arena/arena-vorraum";
 
 import ArenaVollflaecheBuehne from "@/app/foundation/battle-arena/ArenaVollflaecheBuehne";
@@ -1445,12 +1445,18 @@ export default function FoundationBattleArenaHost({
               ausblick={spieltag.ausblick ?? null}
             />
           ) : vorraumPhase === "vorstellung" ? (
-            <ArenaVorstellung
+            <ArenaVorstellungAusSpielstand
+              gameState={gameState}
+              teamIds={vorraumTeamIds}
+              ownTeamId={eigenesTeamId}
+              disciplineId={disziplin}
+              matchdayId={gameState.matchdayState?.matchdayId ?? null}
+              attributeSheets={sheetsByPlayerId}
+              kulisseVarianteId={arenaKulisseByDisciplineId[disziplin] ?? null}
               disziplinName={spieltag.disziplinName ?? disziplin}
               disziplinNr={spieltag.disziplinNr ?? 1}
               disziplinAnzahl={spieltag.disziplinAnzahl ?? 1}
               art={vorraumArt}
-              teams={vorraumTeams}
               hinweis={
                 vorraumArt === "pod"
                   ? "Deine Vierergruppe dieses Spieltags · gezeigt = gebucht"
