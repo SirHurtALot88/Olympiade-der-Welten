@@ -319,7 +319,7 @@ import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/fo
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
-import { normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { istAlterMerklisteLink, normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import {
   prefetchFoundationPanel,
   prefetchFoundationDefaultPanels,
@@ -5278,7 +5278,9 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (requestedView === "scoutingCenterV2") {
-      if (requestedTab === "reports" || requestedTab === "recommended" || requestedTab === "overview") {
+      if (istAlterMerklisteLink(new URL(window.location.href).searchParams.get("view"))) {
+        setScoutingCenterTab("merkliste");
+      } else if (requestedTab === "reports" || requestedTab === "recommended" || requestedTab === "overview" || requestedTab === "merkliste") {
         setScoutingCenterTab(requestedTab);
       }
     }

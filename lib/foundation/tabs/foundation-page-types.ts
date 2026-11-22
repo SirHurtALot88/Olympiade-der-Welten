@@ -82,7 +82,6 @@ export type FoundationView =
   | "trainingV2"
   | "players"
   | "playerProfile"
-  | "merkliste"
   | "teamProfile"
   | "ranks"
   | "diszis"

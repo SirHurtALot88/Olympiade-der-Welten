@@ -24,7 +24,6 @@ export const FOUNDATION_VIEW_IDS = [
   "trainingV2",
   "players",
   "playerProfile",
-  "merkliste",
   "teamProfile",
   "ranks",
   "diszis",
@@ -47,9 +46,24 @@ export const FOUNDATION_VIEW_IDS = [
 
 export type FoundationViewId = (typeof FOUNDATION_VIEW_IDS)[number];
 
+/**
+ * Die Merkliste ist seit 22.11. ein Reiter der Scouting-Seite (Chris: "nicht einzeln in der Navigation, sondern ein Teil von
+ * Scouting mit eigenem Reiter"). Alte Links `view=merkliste` landen deshalb auf Scouting; dieser Marker sagt, dass dort der
+ * Reiter "Merkliste" aktiv sein soll.
+ */
+export const SCOUTING_MERKLISTE_TAB = "merkliste" as const;
+
+export function istAlterMerklisteLink(view: string | null | undefined): boolean {
+  return view === "merkliste" || view === "watchlist" || view === "lesezeichen";
+}
+
 export function normalizeFoundationViewParam(view: string | null | undefined): FoundationViewId | null {
   if (!view) {
     return null;
+  }
+
+  if (istAlterMerklisteLink(view)) {
+    return "scoutingCenterV2";
   }
 
   if (view === "lineup-v2" || view === "lineupV2" || view === "einsatzliste-v2") {

@@ -46,7 +46,6 @@ const PFADE: Partial<Record<FoundationViewId, ReactNode>> = {
       <path d="M4 21c0-4.5 3.5-7 8-7s8 2.5 8 7" />
     </>
   ),
-  merkliste: <path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1L3.2 9.4l6.1-.8z" />,
   trainingCompact: <path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12" />,
   trainingV2: (
     <>

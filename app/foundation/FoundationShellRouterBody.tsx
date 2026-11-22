@@ -1216,6 +1216,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               items={[
                 { id: "overview", label: "Übersicht" },
                 { id: "reports", label: "Scouting Report" },
+                { id: "merkliste", label: "Merkliste" },
               ]}
               activeId={scoutingCenterTab}
               onSelect={(id) => {
@@ -2189,7 +2190,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           </section>
 
           <section className={`panel foundation-scouting-center-v2-panel${getViewClass("scoutingCenterV2")}`}>
-            {activeView === "scoutingCenterV2" ? (
+            {activeView === "scoutingCenterV2" && scoutingCenterTab === "merkliste" ? (
+              <FoundationMerklisteHost {...foundationMerklisteHostProps} />
+            ) : activeView === "scoutingCenterV2" ? (
               <ScoutingCenterV2Client
                 activeTab={scoutingCenterTab}
                 onActiveTabChange={setScoutingCenterTab}
@@ -3197,8 +3200,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
           {activeView === "seasonArchive" ? <FoundationSeasonArchiveHost {...foundationSeasonArchiveHostProps} /> : null}
-
-          {activeView === "merkliste" ? <FoundationMerklisteHost {...foundationMerklisteHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
           {/* S4/A4 (Audit Spieltag): Der frühere Standalone-View `disciplineStage` ist

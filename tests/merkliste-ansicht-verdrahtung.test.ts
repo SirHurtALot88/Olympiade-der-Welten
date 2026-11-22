@@ -16,7 +16,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { FOUNDATION_VIEW_IDS } from "@/lib/foundation/foundation-view-routing";
+import { FOUNDATION_VIEW_IDS, SCOUTING_MERKLISTE_TAB, istAlterMerklisteLink, normalizeFoundationViewParam } from "@/lib/foundation/foundation-view-routing";
 import { FOUNDATION_NAV_GROUPS } from "@/lib/foundation/foundation-nav-config";
 
 const lies = (pfad: string) => readFileSync(join(process.cwd(), pfad), "utf8");
@@ -26,23 +26,27 @@ const SCOPE = lies("lib/foundation/tabs/use-foundation-shell-router-body-scope.t
 const CSS = lies("app/globals.css");
 const ANSICHT = lies("app/foundation/merkliste-v2/MerklisteClient.tsx");
 
-describe("Merkliste ist als Ansicht erreichbar", () => {
-  it("steht in der Ansichts-Liste des Routings", () => {
-    expect(FOUNDATION_VIEW_IDS).toContain("merkliste");
-  });
-
-  it("hat einen Eintrag in der Navigation", () => {
+describe("Merkliste ist ein Reiter der Scouting-Seite (22.11.)", () => {
+  it("ist keine eigene Ansicht und steht nicht einzeln in der Navigation", () => {
+    expect(FOUNDATION_VIEW_IDS).not.toContain("merkliste");
     const alleItems = FOUNDATION_NAV_GROUPS.flatMap((gruppe) => gruppe.items);
-    const eintrag = alleItems.find((item) => item.id === "merkliste");
-    expect(eintrag, "Kein Navigations-Eintrag — die Ansicht waere nur ueber die URL erreichbar").toBeTruthy();
-    expect(eintrag?.label).toBe("Merkliste");
+    expect(alleItems.find((item) => item.id === "merkliste")).toBeUndefined();
+    expect(alleItems.find((item) => item.id === "scoutingCenterV2")).toBeTruthy();
   });
 
-  it("wird vom Shell-Router gerendert und bekommt ihre Props", () => {
-    expect(ROUTER).toContain('activeView === "merkliste"');
+  it("alte Links view=merkliste leiten auf Scouting um, Reiter Merkliste aktiv", () => {
+    expect(normalizeFoundationViewParam("merkliste")).toBe("scoutingCenterV2");
+    expect(istAlterMerklisteLink("merkliste")).toBe(true);
+    expect(istAlterMerklisteLink("scouting-v2")).toBe(false);
+    expect(SCOUTING_MERKLISTE_TAB).toBe("merkliste");
+    expect(SCOPE).toContain('setScoutingCenterTab("merkliste")');
+  });
+
+  it("hat in der Scouting-Unternavigation einen Reiter Merkliste und rendert dort den Host mit Props", () => {
+    expect(ROUTER).toContain('{ id: "merkliste", label: "Merkliste" }');
+    expect(ROUTER).toContain('scoutingCenterTab === "merkliste"');
     expect(ROUTER).toContain("<FoundationMerklisteHost {...foundationMerklisteHostProps} />");
-    // Ohne die Zeile in der Destrukturierung waere `foundationMerklisteHostProps` undefiniert —
-    // genau die Kante, die beim Einbau zuerst gefehlt hat.
+    expect(ROUTER).not.toContain('activeView === "merkliste"');
     expect(ROUTER).toMatch(/^\s{2}foundationMerklisteHostProps,$/m);
   });
 
