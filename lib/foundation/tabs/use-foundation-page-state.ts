@@ -438,12 +438,14 @@ export function useFoundationPageState({
   const [lineupFocusRequestKey, setLineupFocusRequestKey] = useState<string | null>(null);
   const [lineupDraftBoardViewRequest, setLineupDraftBoardViewRequest] = useState<"lineup" | "formBoard" | null>(null);
   const [lineupDraftBoardView, setLineupDraftBoardView] = useState<"lineup" | "formBoard">("lineup");
-  const [scoutingCenterTab, setScoutingCenterTab] = useState<"overview" | "reports" | "recommended">(() => {
+  const [scoutingCenterTab, setScoutingCenterTab] = useState<"overview" | "reports" | "recommended" | "merkliste">(() => {
     if (typeof window === "undefined") return "overview";
+    // Alter Link view=merkliste: bewusst NICHT hier, sondern im Effekt der Schale (`setScoutingCenterTab("merkliste")`). Ein
+    // anderer Startwert als der des Servers laesst React die schon gerenderten Klassen (aktiver Reiter) nicht mehr anfassen.
     const view = normalizeFoundationViewParam(new URL(window.location.href).searchParams.get("view"));
     const tab = parseFoundationTabFromUrl();
     if (view !== "scoutingCenterV2" || !tab) return "overview";
-    if (tab === "reports" || tab === "recommended" || tab === "overview") return tab;
+    if (tab === "reports" || tab === "recommended" || tab === "overview" || tab === "merkliste") return tab;
     return "overview";
   });
   const [scoutingReportSelectedPlayerId, setScoutingReportSelectedPlayerId] = useState<string | null>(null);
