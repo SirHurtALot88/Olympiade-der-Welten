@@ -47,4 +47,15 @@ describe("Review 22.11. Befund 10 / Runde 2: Voll-KI-Menschenteams im Kauffenste
     expect(istTransferAnKiDelegiert(gs, "B")).toBe(true);
     expect(istTransferAnKiDelegiert(gs, "C")).toBe(false);
   });
+
+  it("Saison 1: transfers=KI allein macht kein KI-Team (Draft laeuft); erst mit delegiertem Draft", () => {
+    const gs = stand("season-1");
+    const e = gs.seasonState.teamControlSettings!.B!;
+    expect(istTransferAnKiDelegiert(gs, "B")).toBe(true); // voll_ki delegiert auch den Draft
+    (e as unknown as { delegation: unknown }).delegation = { stufe: "individuell", bereiche: { transfers: "ki", draft: "selbst" } };
+    expect(istTransferAnKiDelegiert(gs, "B")).toBe(false);
+    expect(getTransferControlSettings(gs, "B")?.controlMode).toBe("manual");
+    (e as unknown as { delegation: unknown }).delegation = { stufe: "individuell", bereiche: { transfers: "ki", draft: "ki" } };
+    expect(istTransferAnKiDelegiert(gs, "B")).toBe(true);
+  });
 });

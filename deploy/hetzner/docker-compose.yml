@@ -29,9 +29,6 @@ services:
         # Basketball-Puste (22.11., lib/resolve/basketball-puste.ts): derselbe Weg, ohne eigenen Wert gilt der
         # Server-Schalter OLY_BASKETBALL_PUSTE. Leer = neue Regel.
         NEXT_PUBLIC_OLY_BASKETBALL_PUSTE: ${NEXT_PUBLIC_OLY_BASKETBALL_PUSTE:-${OLY_BASKETBALL_PUSTE:-}}
-        NEXT_PUBLIC_OLY_QUOTE_UEBER_PFLICHTKADER: ${NEXT_PUBLIC_OLY_QUOTE_UEBER_PFLICHTKADER:-${OLY_QUOTE_UEBER_PFLICHTKADER:-}}
-        NEXT_PUBLIC_OLY_BOARD_ERWARTUNG_ANKER: ${NEXT_PUBLIC_OLY_BOARD_ERWARTUNG_ANKER:-${OLY_BOARD_ERWARTUNG_ANKER:-}}
-        NEXT_PUBLIC_OLY_KI_KERNSCHUTZ: ${NEXT_PUBLIC_OLY_KI_KERNSCHUTZ:-${OLY_KI_KERNSCHUTZ:-}}
         # Breaking-Format (22.11., lib/resolve/breaking-format.ts): derselbe Weg, ohne eigenen Wert gilt der
         # Server-Schalter OLY_BREAKING_FORMAT. Leer = Tag-Team.
         NEXT_PUBLIC_OLY_BREAKING_FORMAT: ${NEXT_PUBLIC_OLY_BREAKING_FORMAT:-${OLY_BREAKING_FORMAT:-}}

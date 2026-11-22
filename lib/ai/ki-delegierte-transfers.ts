@@ -11,7 +11,11 @@ import { getCurrentSeasonNumber } from "@/lib/foundation/season-history-clamp";
  */
 export function istTransferAnKiDelegiert(gameState: GameState, teamId: string): boolean {
   const e = gameState.seasonState?.teamControlSettings?.[teamId];
-  return e != null && e.controlMode === "manual" && isBereichDelegiert(e, "transfers");
+  if (e == null || e.controlMode !== "manual" || !isBereichDelegiert(e, "transfers")) return false;
+  // Saison 1: der Draft laeuft. Delegierte Transfers allein lassen die KI dort NICHT kaufen; nur zusammen mit dem delegierten Draft.
+  const nummer = getCurrentSeasonNumber(gameState);
+  if (nummer == null || nummer < 2) return isBereichDelegiert(e, "draft");
+  return true;
 }
 
 /** Kontrolleinstellung fuer Transferdienste: delegierte Menschenteams erscheinen als KI (nur gelesen, nie gespeichert). */

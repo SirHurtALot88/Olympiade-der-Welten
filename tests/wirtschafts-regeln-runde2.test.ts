@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { KERN_VERKAUF_LOG, planOrganicSellsForTeam } from "@/lib/ai/organic-squad/draft-adapter";
+import { KERN_VERKAUF_LOG, kernAngebotGenuegt, planOrganicSellsForTeam } from "@/lib/ai/organic-squad/draft-adapter";
 import { ROSTER_MIN } from "@/lib/ai/organic-squad/types";
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";
 import type { GameState, Player, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
@@ -239,12 +239,26 @@ describe("Runde 2, Punkte 3 und 10: Kernschutz mit Ausnahme fuer gute Angebote",
 
   it("in Finanznot (Kasse unter dem Puffer) darf er gehen, und der Verkauf steht in der Messspur", () => {
     KERN_VERKAUF_LOG.length = 0;
+    process.env.OLY_KERN_VERKAUF_LOG = "1";
     const neu = plan("neu", -5);
+    delete process.env.OLY_KERN_VERKAUF_LOG;
     const verkauft = neu.decisions.map((d) => d.playerId);
     if (verkauft.includes("star")) {
       expect(KERN_VERKAUF_LOG.some((e) => e.playerId === "star" && e.grund === "finanznot")).toBe(true);
     }
     // wenigstens: der Kernschutz haelt nicht gegen Finanznot
     expect(plan("neu", 400).decisions.length).toBeLessThanOrEqual(neu.decisions.length + 9);
+  });
+});
+
+describe("PM 22.11.: Angebots-Ausnahme des Kernschutzes (realisierter Preis / Marktwert)", () => {
+  it("ueber der Schwelle (Rang 1: 1,5, Rang 2: 1,4, Rang 3: 1,3) wird verkauft, darunter geschuetzt", () => {
+    expect(kernAngebotGenuegt(0, 1.51)).toBe(true);
+    expect(kernAngebotGenuegt(0, 1.49)).toBe(false);
+    expect(kernAngebotGenuegt(1, 1.4)).toBe(true);
+    expect(kernAngebotGenuegt(1, 1.39)).toBe(false);
+    expect(kernAngebotGenuegt(2, 1.3)).toBe(true);
+    expect(kernAngebotGenuegt(2, 1.29)).toBe(false);
+    expect(kernAngebotGenuegt(0, null)).toBe(false);
   });
 });

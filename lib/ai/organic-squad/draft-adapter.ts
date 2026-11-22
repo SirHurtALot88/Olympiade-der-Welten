@@ -972,7 +972,11 @@ const KERNSCHUTZ_ANZAHL = 3;
  * je besser der Spieler im eigenen Kader, desto hoeher die Schwelle: Rang 1 = 1,5, Rang 2 = 1,4, Rang 3 = 1,3.
  */
 export const KERN_ANGEBOT_FAKTOR = [1.5, 1.4, 1.3] as const;
-/** Messspur (Prozess-global, nur fuer Messskripte): jeder geplante Verkauf eines Kernspielers samt Faktor und Grund. */
+/** Reicht das Angebot (realisierter Preis / Marktwert) fuer einen Kernspieler dieses Rangs (0 = bester)? */
+export function kernAngebotGenuegt(rang: number, faktor: number | null): boolean {
+  return faktor != null && faktor >= KERN_ANGEBOT_FAKTOR[Math.min(Math.max(0, rang), KERN_ANGEBOT_FAKTOR.length - 1)]!;
+}
+/** Messspur (Prozess-global, nur mit `OLY_KERN_VERKAUF_LOG=1`, fuer Messskripte): jeder geplante Verkauf eines Kernspielers samt Faktor und Grund. */
 export const KERN_VERKAUF_LOG: Array<{ teamId: string; playerId: string; rang: number; faktor: number | null; grund: "gutes_angebot" | "finanznot" }> = [];
 
 export type OrganicSellDecision = {
@@ -1177,7 +1181,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       const rang = kernRang!.get(view.playerId);
       if (rang == null || finanznot) return false;
       const faktor = angebotFaktor(view);
-      return !(faktor != null && faktor >= KERN_ANGEBOT_FAKTOR[Math.min(rang, KERN_ANGEBOT_FAKTOR.length - 1)]!);
+      return !kernAngebotGenuegt(rang, faktor);
     };
     let best: OrganicPlayerView | null = null;
     let bestUtility = -Infinity;
@@ -1222,7 +1226,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     }
 
     const verkaufterKernRang = kernRang.get(best.playerId);
-    if (verkaufterKernRang != null) {
+    if (verkaufterKernRang != null && process.env.OLY_KERN_VERKAUF_LOG === "1") {
       KERN_VERKAUF_LOG.push({ teamId: input.team.teamId, playerId: best.playerId, rang: verkaufterKernRang + 1, faktor: kernFaktor.get(best.playerId) ?? null, grund: finanznot ? "finanznot" : "gutes_angebot" });
     }
     held.splice(held.indexOf(best), 1);

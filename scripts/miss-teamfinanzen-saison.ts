@@ -51,6 +51,7 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
+process.env.OLY_KERN_VERKAUF_LOG ??= "1";
 import { KERN_VERKAUF_LOG } from "@/lib/ai/organic-squad/draft-adapter";
 import { fuehreKiPreseasonLaufAus } from "@/lib/ai/ai-preseason-background-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
