@@ -84,7 +84,7 @@ export function formatMatchdayHighlight(highlight: HighlightLike): MatchdayHighl
     }
     case "missing_lineup_warning": {
       const team = text(payload["teamName"]);
-      value = team ? `${team} trat${inDisziplin} ohne Einsatzliste an` : null;
+      value = team ? `${team} trat${inDisziplin} ohne Taktik an` : null;
       break;
     }
     case "injury_event": {

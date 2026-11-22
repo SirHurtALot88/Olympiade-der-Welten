@@ -105,7 +105,7 @@ function buildPreseasonStats(
 
 // Nächster anstehender Schritt der Preseason-Automatik (grob nach Modus abgeleitet).
 function preseasonNextStep(mode: FoundationActivityPreseasonRunSnapshot["mode"]): string | null {
-  if (mode === "setup_draft") return "danach: Einsatzlisten & Training";
+  if (mode === "setup_draft") return "danach: Taktiken & Training";
   if (mode === "season_market") return "danach: Saisonstart";
   return null;
 }
@@ -223,7 +223,7 @@ export function buildFoundationActivities(input: FoundationActivityInput): Found
     const summary = input.aiLineupEnsure;
     activities.push({
       id: "ai-lineup-ensure",
-      label: "KI setzt Einsatzlisten",
+      label: "KI setzt Taktiken",
       detail: summary
         ? `${summary.readyTeams}/${summary.totalTeams} Teams bereit`
         : "Lineups werden generiert",

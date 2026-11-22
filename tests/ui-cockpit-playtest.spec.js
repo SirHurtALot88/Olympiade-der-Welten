@@ -370,7 +370,7 @@ test("local cockpit flow is playable through the UI", async ({ page }) => {
   await page.goto(`${BASE_URL}/foundation?view=lineup`);
   await expect(page).toHaveURL(/view=lineup/);
   const lineupSection = page.getByTestId("foundation-lineup");
-  await expect(lineupSection.getByRole("heading", { name: "Einsatzliste" }).first()).toBeVisible({ timeout: STEP_TIMEOUT_MS });
+  await expect(lineupSection.getByRole("heading", { name: "Taktik" }).first()).toBeVisible({ timeout: STEP_TIMEOUT_MS });
   await expect(lineupSection.getByRole("button", { name: "Lineup speichern" })).toBeVisible({ timeout: STEP_TIMEOUT_MS });
 
   console.log("[ui-cockpit] seed lineups");

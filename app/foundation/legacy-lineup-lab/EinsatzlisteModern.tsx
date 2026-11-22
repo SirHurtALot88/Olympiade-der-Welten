@@ -514,12 +514,12 @@ export default function EinsatzlisteModern(props: Props) {
     if (!kannBedienen || !onApplyAssignments) return;
     const { neu, geleert } = leereSlots(slots.map((slot) => ({ key: slot.key, side: slot.disciplineSide })), selections, was);
     if (geleert === 0) {
-      meldung(was === "alle" ? "Die Einsatzliste ist schon leer." : `${disziplin(was)?.displayName ?? "Diese Disziplin"} ist schon leer.`);
+      meldung(was === "alle" ? "Die Taktik ist schon leer." : `${disziplin(was)?.displayName ?? "Diese Disziplin"} ist schon leer.`);
       return;
     }
     onApplyAssignments(
       neu,
-      was === "alle" ? "Einsatzliste geleert" : `${disziplin(was)?.displayName ?? was.toUpperCase()} geleert`,
+      was === "alle" ? "Taktik geleert" : `${disziplin(was)?.displayName ?? was.toUpperCase()} geleert`,
       was === "alle" ? "Alle Plätze" : `${geleert} Plätze in ${disziplin(was)?.displayName ?? was.toUpperCase()}`,
     );
   };
@@ -957,7 +957,7 @@ export default function EinsatzlisteModern(props: Props) {
           <p className="elm-leer" role="status" aria-busy="true">Spieltag-Kontext wird geladen…</p>
         ) : (
           <div className="elm-leer" role="alert" data-testid="lineup-context-unavailable">
-            <p>Die Einsatzliste liess sich fuer diesen Spieltag nicht aufbauen.</p>
+            <p>Die Taktik liess sich fuer diesen Spieltag nicht aufbauen.</p>
             {errors.length > 0 ? <p>{uebersetzeLineupFehlerListe(errors).join(" · ")}</p> : <p>Es kam kein Spieltags-Kontext. Bitte die Seite neu laden.</p>}
           </div>
         )}
@@ -1591,7 +1591,7 @@ export default function EinsatzlisteModern(props: Props) {
     </>
   );
 
-  /* ---- Taktik ---- */
+  /* ---- Einsatzliste ---- */
   const formSteuerung = formCardControlsBySide?.[seite] ?? null;
   const formWartet = formCardSavePendingSide?.[seite] ?? false;
   const strategieVorlagen = getDisciplineStrategie && onUpdateDisciplineStrategie ? strategieVorlagenFuer(dSeite?.disciplineId ?? null) : [];
@@ -1613,7 +1613,7 @@ export default function EinsatzlisteModern(props: Props) {
         kulisseUrl={einsatzlisteKulisseBild(disziplin(seite)?.disciplineId, kulisse?.varianteId)}
         wappen={getStaticTeamLogoUrl(context.team.id) ?? context.team.logoPath ?? null}
         wappenAlt={context.team.name}
-        dachzeile={<>Einsatzliste · Spieltag {context.matchday.index}</>}
+        dachzeile={<>Taktik · Spieltag {context.matchday.index}</>}
         titel={context.team.name}
         untertitel={<><b>{context.season.name}</b> · {lineupFlowSummary.selectedCount} von {slots.length} Plätzen besetzt</>}
         mitte={SEITEN.map((s) => {
@@ -1654,7 +1654,7 @@ export default function EinsatzlisteModern(props: Props) {
               <BcIcon name="team" /> Team &amp; Spieltag
             </button>
             {onOpenNachDemSpieltag ? <button type="button" className="bc-btn bc-btn--klein" onClick={onOpenNachDemSpieltag} data-bc-tip="Form und Moral nach dem letzten Spieltag">Nach dem Spieltag</button> : null}
-            <button type="button" className="bc-btn bc-btn--klein" onClick={() => setzeEinsatzlisteLook("klassisch")} data-bc-tip="Zur bisherigen Einsatzliste wechseln" aria-label="Klassische Ansicht">
+            <button type="button" className="bc-btn bc-btn--klein" onClick={() => setzeEinsatzlisteLook("klassisch")} data-bc-tip="Zur bisherigen Taktik wechseln" aria-label="Klassische Ansicht">
               Klassisch
             </button>
           </>
@@ -2070,7 +2070,7 @@ export default function EinsatzlisteModern(props: Props) {
           <strong className="bc-t">{gesamtOffen ? "–" : f0(ges)}</strong>
           <small>Spieltag erwartet</small>
         </div>
-        <span className="elm-leeren bc-nurdesk" role="group" aria-label="Einsatzliste leeren" data-testid="elm-leeren">
+        <span className="elm-leeren bc-nurdesk" role="group" aria-label="Taktik leeren" data-testid="elm-leeren">
           <button type="button" className="bc-btn" disabled={!kannBedienen || !onApplyAssignments} onClick={() => leeren(seite)} data-testid="elm-leeren-seite" data-bc-tip="Nur die gerade gewählte Disziplin leeren">
             {disziplin(seite)?.displayName ?? seite.toUpperCase()} leeren
           </button>

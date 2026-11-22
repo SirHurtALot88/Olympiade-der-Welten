@@ -90,7 +90,7 @@ export const ROOM_FLOW_STEPS: RoomFlowStepDefinition[] = [
   // RoomFlowStepId) bleibt für Alt-Reads bestehen, wird aber nicht mehr erzeugt.
   { stepId: "training", label: "Training prüfen", cta: "Weiter: Training prüfen", targetView: "trainingV2", aiAutoStep: true },
   { stepId: "finalize_transfers", label: "Transfers finalisieren", cta: "Transfers finalisieren", targetView: "cockpit", aiAutoStep: true },
-  { stepId: "lineup", label: "Einsatzliste setzen", cta: "Weiter: Einsatzliste", targetView: "lineup", aiAutoStep: true },
+  { stepId: "lineup", label: "Taktik setzen", cta: "Weiter: Taktik", targetView: "lineup", aiAutoStep: true },
   { stepId: "formcards", label: "Formkarten setzen", cta: "Weiter: Formkarten", targetView: "lineup", aiAutoStep: true },
   { stepId: "arena", label: "Arena starten", cta: "Arena starten", targetView: "matchdayArena", aiAutoStep: false },
   { stepId: "result", label: "Spieltagsergebnis ansehen", cta: "Spieltagsergebnis ansehen", targetView: "matchdayArena", aiAutoStep: false },

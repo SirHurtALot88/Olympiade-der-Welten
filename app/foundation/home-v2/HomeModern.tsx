@@ -216,7 +216,7 @@ function KarteDuell({ k, ligaName, onOpen }: { k: SpieltagsKarte; ligaName: stri
       {k.einsatz ? (
         <div className="hm-st" data-testid="hm-einsatz">
           <span>
-            Einsatzliste
+            Taktik
             <span className="hm-pp" aria-hidden="true">
               {Array.from({ length: Math.min(k.einsatz.benoetigt, 12) }, (_, i) => (
                 <i key={i} className={i < k.einsatz!.gesetzt ? "" : "hm-o"} />
@@ -284,7 +284,7 @@ function SpieltagKarte({ p, sd }: { p: HomeV2ClientProps; sd: StartseiteDaten })
         <h2>Spieltag {n?.nummer ?? sd.gespielteSpieltage + 1}</h2>
         {n?.heim != null ? <span className={`hm-marke${n.heim ? "" : " hm-g"}`}>{n.heim ? "Heimspiel" : "Auswärts"}</span> : null}
         <span className="hm-sp" />
-        <button type="button" className="hm-mehr" onClick={p.onOpenLineup}>Zur Einsatzliste <span aria-hidden="true">›</span></button>
+        <button type="button" className="hm-mehr" onClick={p.onOpenLineup}>Zur Taktik <span aria-hidden="true">›</span></button>
       </div>
       <div className="hm-pb">
         {g ? (

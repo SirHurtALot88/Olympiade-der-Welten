@@ -1056,7 +1056,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
 
               <article className={`panel cockpit-step ${getCockpitStepTone(cockpitLineupStatus.status)}`}>
                 <div className="panel-header">
-                  <h3>4. Einsatzlisten Status</h3>
+                  <h3>4. Taktik-Status</h3>
                   <span className={getCockpitStatusPillClass(cockpitLineupStatus.status)}>{getCockpitStatusLabel(cockpitLineupStatus.status)}</span>
                 </div>
                 <p>{cockpitLineupStatus.message}</p>
@@ -1101,7 +1101,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                       syncFoundationViewInUrl("lineup");
                     }}
                   >
-                    Einsatzliste öffnen
+                    Taktik öffnen
                   </button>
                 </div>
                 <div className="panel inset-panel" style={{ marginTop: 14 }}>
@@ -1279,7 +1279,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                             syncFoundationViewInUrl("lineup");
                           }}
                         >
-                          Einsatzliste öffnen
+                          Taktik öffnen
                         </button>
                         <button
                           className="secondary-button"
@@ -1728,7 +1728,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                 <div className="panel-header">
                   <div className="stack">
                     <h3>6. Auto-Teams aufstellen</h3>
-                    <p className="muted">Nur automatisch gefuehrte Teams mit aktiver Freigabe werden lokal als Einsatzliste gespeichert.</p>
+                    <p className="muted">Nur automatisch gefuehrte Teams mit aktiver Freigabe werden lokal als Taktik gespeichert.</p>
                   </div>
                   <span className={getCockpitStatusPillClass(cockpitAiLineupStatus.status)}>{getCockpitStatusLabel(cockpitAiLineupStatus.status)}</span>
                 </div>
@@ -1781,7 +1781,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                   </article>
                 </div>
                 <div className="transfer-context-banner" style={{ marginTop: 12 }}>
-                  <strong>Nur Einsatzlisten</strong>
+                  <strong>Nur Taktiken</strong>
                   <span>Manual und Passive Teams bleiben unverändert. Es gibt hier keine Result-, Standings- oder Cash-Aktion.</span>
                 </div>
                 <div className="inline-toggle-row" style={{ marginTop: 12 }}>
@@ -1842,7 +1842,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                         : "";
                       const overwriteHint =
                         cockpitAiOverwriteExisting && cockpitAiBatchApplyFeed.summary.wouldOverwrite > 0
-                          ? ` ${cockpitAiBatchApplyFeed.summary.wouldOverwrite} bestehende Einsatzlisten werden ersetzt.`
+                          ? ` ${cockpitAiBatchApplyFeed.summary.wouldOverwrite} bestehende Taktiken werden ersetzt.`
                           : "";
                       const confirmed = window.confirm(
                         `Jetzt ${cockpitAiBatchApplyFeed.summary.plannedLineups} AI-Lineups lokal speichern?${warningHint}${overwriteHint}`,
@@ -2298,7 +2298,7 @@ function FoundationCockpitPanelComponent(props: FoundationCockpitPanelProps) {
                     syncFoundationViewInUrl("lineup");
                   }}
                 >
-                  Einsatzliste öffnen
+                  Taktik öffnen
                 </button>
               </article>
 

@@ -37,7 +37,7 @@ export default function FoundationLineupPanel({
       <div className="panel-header" data-testid="foundation-lineup-v2">
         <div className="stack season-panel-head">
           <TooltipHeading as="h2" tooltip={teamTooltip}>
-            Einsatzliste
+            Taktik
           </TooltipHeading>
         </div>
       </div>
