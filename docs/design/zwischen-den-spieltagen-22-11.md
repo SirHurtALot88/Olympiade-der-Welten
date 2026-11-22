@@ -2255,16 +2255,18 @@ gegen das Profil der Marke; bei Gleichstand der mit dem geringsten Alkohol-Risik
 ### 76.2 Essens-Abo (ersetzt Einzel-Essen und den Großteil der Ernährungs-Zähler)
 
 Team-weit **eine von fünf Stufen,** Wahl zum Saisonstart und in der Winterpause (sonst fest), Standard Stufe 3, delegierbar,
-die KI wählt nach Finanzwert (unter 4 Stufe 1 bis 2, 4 bis 6 Stufe 3, ab 7 Stufe 4, ab 9 Stufe 5). Kosten je Saison für das ganze
-Team, Wirkung je Spieler und Spieltag. Aus dem Gehaltstopf ist es nicht, sondern wie ein Gebäude-Unterhalt aus dem Investitionstopf.
+die KI wählt nach Finanzwert (unter 4 Stufe 1 bis 2, 4 bis 6 Stufe 3, ab 7 Stufe 4, ab 9 Stufe 5). Wirkung je Spieler und Spieltag.
+**Preis und Topf wurden in Runde 17 geändert (§77): der Preis gilt je Spieler, nicht mehr als Team-Pauschale, und der Posten
+läuft im Gehaltstopf.** Die Spalte „Kosten“ unten ist deshalb der Preis je Spieler und Saison; die Team-Pauschalen 0,5/1,0/1,5/2,5/3,5 C
+der Runde 16 gelten nicht mehr.
 
-| Stufe | Name | Kosten je Saison | Vorteil | Nachteil |
+| Stufe | Name | Preis je Spieler und Saison | Vorteil | Nachteil |
 |---|---|---:|---|---|
-| 1 | Imbissbude | 0,5 C | Moral +1, +1 Power im Einsatz | 10 % je Spieler und Spieltag verstimmter Magen (−3 % Eignung an diesem Spieltag); zählt für die Fast-Food-Saisonschwelle |
-| 2 | Kantine | 1,0 C | Moral +1 | 4 % Magen-Risiko |
-| 3 | Hausmannskost | 1,5 C | neutral | kein Risiko, keine Boni |
-| 4 | Sportküche | 2,5 C | Erholung +5 % | kein Risiko |
-| 5 | Ernährungsteam | 3,5 C | Erholung +8 %, Verletzungsrisiko −5 %, +1 Stamina im Einsatz | Lazy-Spieler −1 Moral (Gemecker) |
+| 1 | Imbissbude | 0,10 C | Moral +1, +1 Power im Einsatz | 10 % je Spieler und Spieltag verstimmter Magen (−3 % Eignung an diesem Spieltag); zählt für die Fast-Food-Saisonschwelle |
+| 2 | Kantine | 0,18 C | Moral +1 | 4 % Magen-Risiko |
+| 3 | Hausmannskost | 0,25 C | neutral | kein Risiko, keine Boni |
+| 4 | Sportküche | 0,40 C | Erholung +5 % | kein Risiko |
+| 5 | Ernährungsteam | 0,60 C | Erholung +8 %, Verletzungsrisiko −5 %, +1 Stamina im Einsatz | Lazy-Spieler −1 Moral (Gemecker) |
 
 **Traits:** Healthy bekommt Stufe 4 und 5 doppelt und hat das halbe Magen-Risiko; FaintHearted +5 Punkte Magen-Risiko; Lazy
 +1 Moral bei Stufe 1 und 2. Nichts liegt über +3 im Einsatz; die Erholungs- und Verletzungswerte sind Dauerwerte und klein.
@@ -2283,22 +2285,11 @@ Team, Wirkung je Spieler und Spieltag. Aus dem Gehaltstopf ist es nicht, sondern
   (Attribut im Einsatz, Eignung des Tages, Erholung, Verletzungsrisiko, Moral). In der Zerlegung (§54) läuft der Partner-Schub in
   der Spalte „Gegenstand“, ein verstimmter Magen in „Belastung“.
 
-### 76.3 Kosten je Saison
+### 76.3 Kosten je Saison (neu gerechnet in §77.2)
 
-Partner 0 C. Funde: etwa fünf Händler-Artikel je Saison à 0,06 C, rund 0,3 C (Truhen-Funde kosten nichts).
-
-| Abo-Stufe | Abo | Funde | Summe je Saison | Anteil an der Reparatur voll (~19 C) |
-|---|---:|---:|---:|---:|
-| 1 | 0,5 C | 0,3 C | 0,8 C | 4 % |
-| 2 | 1,0 C | 0,3 C | 1,3 C | 7 % |
-| 3 (Standard) | 1,5 C | 0,3 C | 1,8 C | 9 % |
-| 4 | 2,5 C | 0,3 C | 2,8 C | 15 % |
-| 5 | 3,5 C | 0,3 C | 3,8 C | 20 % |
-
-Vergleich: ein Legendäres im Dauereinsatz kostet etwa 2 C Reparatur je Saison (§67), Stufe 5 also knapp zwei Legendäre für das
-ganze Team (0,25 C je Spieler bei 14). Runde 15 lag bei 1,2 bis 1,5 C üblich und bis 3,6 C im Höchstmaß, Runde 16 ist damit im
-selben Bereich, aber ohne Pflichteinkauf und ohne Mikromanagement. Die Wahl ist eine Teamentscheidung zwischen Geld und
-Risiko, nicht ein Wochenspiel.
+Partner 0 C. Funde: etwa fünf Händler-Artikel je Saison à 0,06 C, rund 0,3 C (Truhen-Funde kosten nichts). Das Abo kostet je Spieler
+und Saison (Tabelle oben, Herleitung der Team-Werte in §77.1); der Vergleich gegen Reparatur und Legendäre steht in §77.5. Die
+Zahlen der Runde 16 (Pauschale fürs Team, Summe 0,8 bis 3,8 C) sind abgelöst.
 
 ### 76.4 Offen und Prüfung
 
@@ -2306,3 +2297,81 @@ Risiko, nicht ein Wochenspiel.
 - Anzeige im Spiel: Partner und „liefert heute“ in der Einsatzliste, Abo in der Woche und im Verein; Vergabe zeigt = bucht.
 - Mehrspieler: Partner und Abo je Team, delegierbar mit Voll selbst, Halbautomatik und Voll KI.
 - Mockup: Abo-Karten haben bei wenigen Chips viel Leerraum, im Bau kann dort die Wirkung je Spieler als Beispielzeile stehen.
+
+## 77. Runde 17: Essens-Abo je Spieler und in den Finanzen
+
+Chris, 22.11., wörtlich: „essen kostet nur 1,5 pro season? das ist ja n schnapper — Du müsstest x pro season pro spieler oder so
+machen und dann wie viel das hier konkret pro spieltag wäre und das muss dann natürlich in die finanz sicht auch rein“. Entscheidung der
+Projektleitung, damit gebaut werden kann; die Zahlen sind Startwerte zum Messen. Die Wirkungen der fünf Stufen (§76.2) bleiben
+unverändert, geändert werden Preis, Abrechnung und Topf.
+
+Mockups: `public/mockups/zwischen-den-spieltagen-22-11.html?ansicht=verbrauch` (Abo-Karten), `public/mockups/finanzen-modern-18-11.html`
+(Ansichten `budget` und `auszug`). Aufnahmen aus den Mockups bei 1920×1080:
+![Verbrauch 1920](zwischen-den-spieltagen-22-11/verbrauch-1920.png)
+![Finanzen Budgets 1920](zwischen-den-spieltagen-22-11/finanzen-budget-1920.png)
+![Finanzen Spieltags-Abrechnung 1920](zwischen-den-spieltagen-22-11/finanzen-guv-1920.png)
+(Selbst angesehen: kein Überlauf, kein abgeschnittener Text, kein Seitenscroll, keine JS-Fehler; die Budgetansicht scrollt wie schon
+vorher innerhalb ihrer Karte, nicht die Seite.)
+
+### 77.1 Preis je Spieler, abgerechnet je Spieltag
+
+- **Preis je Spieler und Saison,** verbucht **je Spieltag** (Saison geteilt durch 20) **für jeden Spieler im Kader, auch Verletzte:**
+  wer im Kader steht, isst mit. Wer mitten in der Saison kommt oder geht, zahlt ab bzw. bis zu diesem Spieltag (wie das Gehalt).
+- Wirkung der Stufen unverändert (§76.2). Traits, Zähler und Saisonschwelle unverändert.
+
+| Stufe | Name | je Spieler / Saison | je Spieler / Spieltag (÷ 20) | Team 14 Spieler / Saison | Team 14 / Spieltag | Anteil an typischen Gehaltskosten (14 × 6,5 C ≈ 91 C) |
+|---|---|---:|---:|---:|---:|---:|
+| 1 | Imbissbude | 0,10 C | 0,005 C | 1,40 C | 0,070 C | 1,5 % |
+| 2 | Kantine | 0,18 C | 0,009 C | 2,52 C | 0,126 C | 2,8 % |
+| 3 (Standard) | Hausmannskost | 0,25 C | 0,0125 C | 3,50 C | 0,175 C | 3,8 % |
+| 4 | Sportküche | 0,40 C | 0,020 C | 5,60 C | 0,280 C | 6,2 % |
+| 5 | Ernährungsteam | 0,60 C | 0,030 C | 8,40 C | 0,420 C | 9,2 % |
+
+Kader 8 (Pflichtkader) kostet in Stufe 3 2,0 C je Saison (0,10 C je Spieltag), ein 14er-Kader 3,5 C (0,175 C je Spieltag). Die Buchung je
+Spieltag wird auf 0,01 C gerundet angezeigt (0,175 C erscheint als 0,17 oder 0,18 C), die Saisonsumme bleibt exakt.
+
+### 77.2 Finanzen: Posten „Verpflegung (Essens-Abo)“ im Gehaltstopf
+
+- **Eigener Posten im Gehaltstopf** (Chris: „muss in die Finanzsicht auch rein“), kein Gebäude-Unterhalt mehr. Er läuft je Spieler mit wie das
+  Gehalt: in der **Gehaltsvorschau** (Karte „Gehaltsbudget“: Gehälter, Verpflegung, Summe der laufenden Kosten) und als eigene Zeile in der
+  **Spieltags-Abrechnung (GuV)**, je Spieltag gebucht.
+- **Anzeigeregel (CLAUDE.md):** groß der Wert je Saison, klein darunter der je Spieltag. In der Vorschau: „Verpflegung (Essens-Abo,
+  Stufe 3, 14 Spieler)“ groß 3,5 C, klein 0,175 C je Spieltag.
+- **Vorstands-Kürzung wie bei Gehältern:** der Posten zählt zum Gehaltstopf und unterliegt dessen Freigabe (höchstens auf 75 % gekürzt).
+  Wird der Topf zu knapp für Gehälter plus Verpflegung, **fällt das Abo automatisch um eine Stufe, nie unter Stufe 1,** und es kommt eine
+  Nachricht ins Postfach (Typ Finanz, mit Stufe alt/neu und der Ersparnis). Sobald der Topf wieder reicht, bleibt die niedrigere Stufe bis zur
+  nächsten freien Wahl (Saisonstart oder Winterpause); die KI-Teams folgen derselben Regel.
+- **Kaufen und Verpflichten** erhöhen die Verpflegungskosten sofort. Die **Kaufvorschau** zeigt „Gehalt + Verpflegung“ (z. B. 6,5 C + 0,25 C
+  je Saison, je Spieltag 0,325 + 0,0125 C); die Prüfung gegen den Gehaltstopf rechnet beides, Mensch und KI gleich. Beim Verkauf fließt
+  die Verpflegung zusammen mit dem Gehalt zu 100 % in den Gehaltstopf zurück.
+- Mehrspieler: Abo je Team, delegierbar wie bisher (§76.4); der Posten steht in der Finanzsicht jedes Managers getrennt.
+
+### 77.3 Anzeige im Mockup (Verbrauch)
+
+Jede Abo-Karte zeigt groß „x C“ mit „je Spieler · Saison“, klein darunter „y C je Spieltag“, am Fuß „dein Kader (14 Spieler): z C je Saison ·
+w C je Spieltag“. Hero-Kennzahl: „0,25 C, Abo je Spieler · Saison“. Das Finanz-Mockup trägt den Posten im Gehaltsbudget (laufend 71,5 C statt
+68 C; Rangbonus-Erwartung im Mockup von 52,6 auf 56,6 C angehoben, damit das Gehaltsbudget im Beispiel nicht ohne Not ins Minus kippt) und
+in der GuV; ein Notverkauf (13 statt 14 Spieler) senkt die Verpflegung mit.
+
+### 77.4 Messung beim Bau
+
+- Verpflegung in der Saisonbilanz ausweisen (Spielstand-Messlauf mit 32 KI-Teams, nicht ein Preset mit menschlichem Team): Anteil an den
+  Gehaltskosten je Stufe sollte bei 1,5 bis 9 % liegen, sonst nachziehen.
+- Prüfen, dass kein KI-Team durch die automatische Stufensenkung dauerhaft auf Stufe 1 fällt (Zähler der Senkungen je Saison).
+- Gezeigt = gebucht: Kaufvorschau, GuV und Gehaltsvorschau lesen dieselbe Funktion für Verpflegung (eine Wahrheit, wie bei den Formkarten).
+
+### 77.5 Kosten-Vergleich (ersetzt die Tabelle aus §76.3)
+
+Abo für ein 14er-Team plus Funde (0,3 C) gegen die Reparatur voll ausgerüsteter Spieler (~19 C, §67):
+
+| Abo-Stufe | Abo (Team 14) | Funde | Summe je Saison | Anteil an der Reparatur voll (~19 C) | Legendäre à ~2 C |
+|---|---:|---:|---:|---:|---:|
+| 1 | 1,40 C | 0,3 C | 1,7 C | 9 % | 0,7 |
+| 2 | 2,52 C | 0,3 C | 2,8 C | 15 % | 1,4 |
+| 3 (Standard) | 3,50 C | 0,3 C | 3,8 C | 20 % | 1,9 |
+| 4 | 5,60 C | 0,3 C | 5,9 C | 31 % | 3,0 |
+| 5 | 8,40 C | 0,3 C | 8,7 C | 46 % | 4,4 |
+
+Vergleich: ein Legendäres im Dauereinsatz kostet etwa 2 C Reparatur je Saison (§67); das Standard-Abo kostet für 14 Spieler fast zwei
+Legendäre, Stufe 5 gut vier. Gegenüber Runde 16 (1,8 C im Standard) ist die Verpflegung damit rund doppelt so teuer und wächst mit dem
+Kader, so wie Chris es wollte: der Abo-Preis ist eine echte Entscheidung zwischen Geld und Risiko, kein Schnäppchen mehr.

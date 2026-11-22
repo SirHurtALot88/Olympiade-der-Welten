@@ -524,6 +524,7 @@ main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0
 .as>em{font-style:normal;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;color:var(--gold)}
 .as h5{margin:0;font:400 1.25rem/1 var(--haus);color:#fff} .as strong{font:600 1.5rem/1 var(--zahl);color:var(--creme)} .as small{font-size:.74rem;color:var(--stumm)}
 .as .cc{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;margin:.2rem 0} .as .chip{height:auto;min-height:1.3rem;padding:.12rem .45rem;white-space:normal;font-size:.7rem;line-height:1.1;letter-spacing:.03em;text-transform:none}
+.as .sj{font:600 .9rem/1 var(--zahl);color:var(--leise);letter-spacing:.03em} .as .kd{font-size:.82rem;color:var(--leise);line-height:1.2;padding-top:.3rem;border-top:1px solid var(--linie)} .as .kd b{color:var(--creme);font-size:.95rem}
 .as .hn{margin-top:auto;font-size:.78rem;color:var(--leise);line-height:1.15}
 .sk{display:flex;justify-content:space-between;margin:.4rem 0 .5rem;padding-top:.3rem;border-top:2px solid var(--linie-2);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:var(--stumm)}
 .fd{display:grid;grid-template-columns:4.6rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.35rem 0;border-top:1px solid var(--linie);font-size:.82rem;color:var(--leise);line-height:1.15} .fd:first-child{border-top:0} .fd b{color:#fff} .fd .lo{font-size:.78rem;height:1.9rem}
@@ -911,21 +912,22 @@ var PT=[["Red Bull","#1e3a8a","#ffd200","Red Bull","Tempo · Speed","Bahn, Spurt
  ["Club-Mate","#1f5f3a","#f0c35a","Club-Mate","Köpfchen · Awareness","Schießen, Taktik, Bühne, Rätsel",[["Original","+3 Awareness",""],["Granat","+2 Awareness, +2 Intelligence",""],["Winter","+3 Intelligence",""]]],
  ["Carlsberg","#0f6b3a","#fff","Carlsberg","Geselligkeit · Spirit","Showdisziplinen, Teams mit Charisma",[["Pilsner","+2 Spirit, Moral +2","Alkohol +1"],["Elephant","+3 Charisma, Moral +1","Alkohol +2"],["0,0 %","+2 Charisma, Moral +1",""]]]];
 var GEW=0;
-/* Abo: [Stufe, Name, Kosten, Vorteile, Nachteile, Hinweis] */
-var AB5=[[1,"Imbissbude","0,5",["Moral +1","+1 Power im Einsatz"],["10 % verstimmter Magen: −3 % Eignung","zählt zur Fast-Food-Saisonschwelle"],"billig und gelegentlich mit Folgen"],
- [2,"Kantine","1,0",["Moral +1"],["4 % Magen-Risiko"],"fast ohne Haken"],
- [3,"Hausmannskost","1,5",[],[],"neutral, kein Risiko, keine Boni"],
- [4,"Sportküche","2,5",["Erholung +5 %"],[],"schonend, kein Risiko"],
- [5,"Ernährungsteam","3,5",["Erholung +8 %","Verletzungsrisiko −5 %","+1 Stamina im Einsatz"],["Lazy-Spieler: Moral −1"],"am schonendsten, am teuersten"]];
-var ABG=2;
+/* Abo: [Stufe, Name, Kosten je Spieler und Saison (C), Vorteile, Nachteile, Hinweis]; Abrechnung je Spieltag im Gehaltstopf, Kader im Mockup 14 Spieler */
+var AB5=[[1,"Imbissbude",.10,["Moral +1","+1 Power im Einsatz"],["10 % verstimmter Magen: −3 % Eignung","zählt zur Fast-Food-Saisonschwelle"],"billig und gelegentlich mit Folgen"],
+ [2,"Kantine",.18,["Moral +1"],["4 % Magen-Risiko"],"fast ohne Haken"],
+ [3,"Hausmannskost",.25,[],[],"neutral, kein Risiko, keine Boni"],
+ [4,"Sportküche",.40,["Erholung +5 %"],[],"schonend, kein Risiko"],
+ [5,"Ernährungsteam",.60,["Erholung +8 %","Verletzungsrisiko −5 %","+1 Stamina im Einsatz"],["Lazy-Spieler: Moral −1"],"am schonendsten, am teuersten"]];
+var ABG=2, ABN=14;
+function cz(x,d){return x.toFixed(d).replace(".",",")}
 function verbrauch(){
  var E=[["zyra","Zyra",1,0,""],["maru","Maru",3,1,"Magen fast an der Schwelle"],["emilia","Emilia",0,2,""],["conan","Conan",2,0,""],["queen-loriana","Loriana",0,2,"Kater bei 3"],["amarie","Amarie",0,0,"Healthy: halbes Risiko"]],SWE=[4,3];
  function em(v,j,f){var h="";for(var i=0;i<(j?4:6);i++)h+='<i class="'+(i<v?"an":"")+(i===SWE[j]-1?" swl":"")+'"></i>';return '<span class="em" style="--f:'+f+'">'+h+'</span>'}
  var g=PT[GEW];
  function art(x){return '<li><b>'+x[0]+'</b> <span class="plus">'+x[1]+'</span>'+(x[2]?' <span class="minus">'+x[2]+'</span>':"")+'</li>'}
  function chips(v,n){return v.map(function(x){return '<span class="chip g">+ '+x+'</span>'}).join("")+n.map(function(x){return '<span class="chip w">− '+x+'</span>'}).join("")}
- return hero({kul:[kul("wettessen","bierzelt"),kul("showcase","buehne")],kick:"Ausrüstung · Verbrauch · Partner und Abo",titel:"Getränke-Partner und Essens-Abo",lage:"<b>Ein Partner je Saison, ein Abo fürs ganze Team.</b> Zwei Getränke liefert der Partner gratis je Spieltag, automatisch vergeben · nice to have, nie stärker als ein Standard-Teil",
-   kpi:[["6","Getränke-Partner"],["0 C","Partner je Saison"],["2","gratis je Spieltag"],["1,5 C","Abo, Stufe 3 (Standard)"]],cta:["Zur Einsatzliste","Umlegen ist erlaubt, nicht nötig"]})
+ return hero({kul:[kul("wettessen","bierzelt"),kul("showcase","buehne")],kick:"Ausrüstung · Verbrauch · Partner und Abo",titel:"Getränke-Partner und Essens-Abo",lage:"<b>Ein Partner je Saison, ein Abo je Spieler.</b> Zwei Getränke liefert der Partner gratis je Spieltag, automatisch vergeben · nice to have, nie stärker als ein Standard-Teil",
+   kpi:[["6","Getränke-Partner"],["0 C","Partner je Saison"],["2","gratis je Spieltag"],["0,25 C","Abo je Spieler · Saison"]],cta:["Zur Einsatzliste","Umlegen ist erlaubt, nicht nötig"]})
  +'<div class="vb">'
  +'<div style="display:grid;grid-template-rows:auto minmax(0,1fr);gap:.72rem;min-height:0">'
  +pan("","Getränke-Partner · Saison 3",'<div class="vp">'+PT.map(function(m,i){return '<div class="vm'+(i===GEW?" gew":"")+'"><span class="lo" style="background:'+m[1]+';color:'+m[2]+'">'+m[0]+'</span><h5>'+m[3]+(i===GEW?'<span class="chip d">gewählt</span>':"")+'</h5><em>'+m[4]+'</em><ul>'+m[6].map(art).join("")+'</ul><span class="pz"><b>Passt zu:</b> '+m[5]+'</span></div>'}).join("")+'</div>'
@@ -934,9 +936,9 @@ function verbrauch(){
   +'<div class="lh2">'+po("maru")+'<span><b>Red Bull Sugarfree</b> <span class="plus">+2 Speed, +2 Dexterity</span><br>an <b>Maru</b> · Wettessen, Abstand 3,4 % zu Dire Legion</span></div>'
   +'<button class="btn lh3">Umlegen</button></div>'
   +'<div class="fz"><b>Kostet nichts, zahlt nichts.</b> Wahl beim Saisonstart, Wechsel nur zum Saisonwechsel; delegierbar wie der Sponsor, die KI wählt nach dem Disziplin-Profil des Kaders. Vergeben wird an die zwei knappsten Duelle, je an den Aufgestellten mit dem größten Bonus × Matrixgewicht. Die zwei zählen in die Grenze <b>3 je Team und Spieltag</b>; der dritte Platz bleibt für Funde. Marken als Text in CSS.</div>','<span class="re">ein Partner je Saison</span>')
- +pan("","Essens-Abo · fünf Stufen für das ganze Team",'<div class="ar">'+AB5.map(function(x,i){return '<div class="as'+(i===ABG?" gew":"")+(i===2?" std":"")+'"><span class="pk5"><i></i></span><em>Stufe '+x[0]+(i===2?" · Standard":"")+'</em><h5>'+x[1]+'</h5><strong class="t">'+x[2]+' C</strong><small>je Saison, ganzes Team</small><div class="cc">'+(x[3].length||x[4].length?chips(x[3],x[4]):'<span class="chip s">kein Bonus, kein Risiko</span>')+'</div><span class="hn">'+x[5]+'</span></div>'}).join("")+'</div>'
+ +pan("","Essens-Abo · fünf Stufen, Preis je Spieler",'<div class="ar">'+AB5.map(function(x,i){return '<div class="as'+(i===ABG?" gew":"")+(i===2?" std":"")+'"><span class="pk5"><i></i></span><em>Stufe '+x[0]+(i===2?" · Standard":"")+'</em><h5>'+x[1]+'</h5><strong class="t">'+cz(x[2],2)+' C</strong><small>je Spieler · Saison</small><span class="sj">'+cz(x[2]/20,3)+' C je Spieltag</span><div class="cc">'+(x[3].length||x[4].length?chips(x[3],x[4]):'<span class="chip s">kein Bonus, kein Risiko</span>')+'</div><span class="hn">'+x[5]+'</span><span class="kd">dein Kader ('+ABN+' Spieler)<br><b>'+cz(x[2]*ABN,2)+' C je Saison</b> · '+cz(x[2]*ABN/20,3)+' C je Spieltag</span></div>'}).join("")+'</div>'
   +'<div class="sk"><span>günstig: mehr Magenverstimmung gegen kurzfristigen Schub</span><span>teuer: schonend und gesünder</span></div>'
-  +'<div class="fz"><b>Wahl zum Saisonstart und in der Winterpause,</b> sonst fest; delegierbar, die KI wählt nach Finanzwert. <b>Traits:</b> Healthy bekommt Stufe 4 und 5 doppelt und hat das halbe Magen-Risiko; FaintHearted +5 Punkte Magen-Risiko; Lazy +1 Moral bei Stufe 1 und 2. Alles unter +3, on top.</div>','<span class="re">Kosten je Saison · Reparatur voll ca. 19 C</span>')
+  +'<div class="fz"><b>Jeder Spieler im Kader isst mit, auch Verletzte.</b> Wahl zum Saisonstart und in der Winterpause, sonst fest; delegierbar, die KI wählt nach Finanzwert. Neuer Spieler: Verpflegung steigt sofort (Kaufvorschau: Gehalt + Verpflegung); bei zu knappem Gehaltstopf fällt das Abo automatisch eine Stufe. <b>Traits:</b> Healthy bekommt Stufe 4 und 5 doppelt und hat das halbe Magen-Risiko; FaintHearted +5 Punkte Magen-Risiko; Lazy +1 Moral bei Stufe 1 und 2. Alles unter +3, on top.</div>','<span class="re">Posten „Verpflegung“ im Gehaltstopf</span>')
  +'</div>'
  +'<div style="display:grid;grid-template-rows:auto minmax(0,1fr);gap:.72rem;min-height:0">'
  +pan("","Funde im Lager",'<div class="fd"><span class="lo" style="background:#c62828;color:#fff">DÖNER</span><span><b>Döner</b> <span class="plus">+3 Power, +2 Health</span><br><span class="minus">20 % Magen</span> · Magen +2</span><span class="chip s">Eisentruhe</span></div><div class="fd"><span class="lo" style="background:#ff5a00;color:#fff">Aperol</span><span><b>Aperol Spritz</b> <span class="plus">+4 Charisma, Moral +2</span><br><span class="minus">−2 Awareness</span> · Alkohol +1</span><span class="chip s">Händler</span></div><div class="fd"><span class="lo" style="background:#2e7d32;color:#fff">BOWL</span><span><b>Poke Bowl</b> <span class="plus">+3 Stamina, +2 Health</span><br>kein Haken</span><span class="chip s">Holztruhe</span></div><div class="fz"><b>Einzelartikel sind nur noch Funde:</b> aus Truhen und als seltene Gelegenheit beim Händler, kein Pflichteinkauf. Sie belegen den dritten Platz je Spieltag.</div>','<span class="re">3 Artikel</span>')
