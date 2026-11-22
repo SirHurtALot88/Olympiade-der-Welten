@@ -31,6 +31,7 @@ import { stempleClimbingFormat } from "@/lib/resolve/climbing-format";
 import { stempleHockeyTorwart } from "@/lib/resolve/hockey-torwart";
 import { stempleFormkartenRegelNachLaden } from "@/lib/resolve/formkarten-regel";
 import { stempleBasketballPuste } from "@/lib/resolve/basketball-puste";
+import { stempleBreakingFormat } from "@/lib/resolve/breaking-format";
 import { stempleBattlefieldFormat } from "@/lib/resolve/battlefield-format";
 import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-salary-factor-backfill";
 import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
@@ -1440,7 +1441,8 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): gleiches Muster.
   // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): gleiches Muster.
   // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): ohne Stempel rechnet die laufende Saison "alt" zu Ende.
-  const gameStateWithoutBaseline = stempleFormkartenRegelNachLaden(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+  // BREAKING-FORMAT (22.11., lib/resolve/breaking-format.ts): gleiches Muster.
+  const gameStateWithoutBaseline = stempleFormkartenRegelNachLaden(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
@@ -1464,7 +1466,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  ))))))));
+  )))))))));
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
     sourcePlayers: loadBaselineSourcePlayers(),

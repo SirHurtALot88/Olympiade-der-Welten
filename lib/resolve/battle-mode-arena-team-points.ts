@@ -149,6 +149,8 @@ import showcasePpsReferenzJson from "@/data/generated/showcase-pps-referenz.json
 // dieselbe Paarungs-/Seed-Mechanik, dieselben Quantile).
 import eiskunstlaufPpsReferenzJson from "@/data/generated/eiskunstlauf-pps-referenz.json";
 import breakingPpsReferenzJson from "@/data/generated/breaking-pps-referenz.json";
+// Referenz des alten Formats (Gauntlet, 22.11.): fuer Breaking-Spieltage, die im Gauntlet gebucht wurden (gezeigt = gebucht).
+import breakingGauntletPpsReferenzJson from "@/data/generated/breaking-pps-referenz-gauntlet.json";
 import wettessenPpsReferenzJson from "@/data/generated/wettessen-pps-referenz.json";
 import tennisPpsReferenzJson from "@/data/generated/tennis-pps-referenz.json";
 import fechtenPpsReferenzJson from "@/data/generated/fechten-pps-referenz.json";
@@ -191,6 +193,7 @@ import iSpyPpsReferenzJson from "@/data/generated/i-spy-pps-referenz.json";
 import tdmPpsReferenzJson from "@/data/generated/tdm-pps-referenz.json";
 import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
+import { breakingFormatFuer } from "@/lib/resolve/breaking-format";
 import { ppAusKurveSkaliert, ppSkalaModus, type PpSkalaModus } from "@/lib/resolve/pp-skala";
 
 /**
@@ -585,6 +588,9 @@ const EISKUNSTLAUF_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
 const BREAKING_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
   breakingPpsReferenzJson as ArenaPpsReferenzJson,
 );
+const BREAKING_PPS_REFERENZ_FELDGROESSEN_GAUNTLET = ladeReferenzFeldgroessen(
+  breakingGauntletPpsReferenzJson as ArenaPpsReferenzJson,
+);
 const WETTESSEN_PPS_REFERENZ_FELDGROESSEN = ladeReferenzFeldgroessen(
   wettessenPpsReferenzJson as ArenaPpsReferenzJson,
 );
@@ -643,6 +649,8 @@ type ArenaImpactKonfig = {
   referenzFeldgroessenTorwart?: ReadonlyMap<number, ArenaPpsReferenzFeldgroesse>;
   /** Torwart-Referenz der alten Torwart-Regel (nur Hockey, 22.11.); fehlt sie, gilt `referenzFeldgroessenTorwart`. */
   referenzFeldgroessenTorwartAlt?: ReadonlyMap<number, ArenaPpsReferenzFeldgroesse>;
+  /** Feld-Referenz des alten Formats (nur Breaking-Gauntlet, 22.11.): gilt fuer Spieltage mit `regel === "alt"`; fehlt sie, gilt `referenzFeldgroessen`. */
+  referenzFeldgroessenAlt?: ReadonlyMap<number, ArenaPpsReferenzFeldgroesse>;
   max: number;
   anteilMitte: number;
   katalogStandardgroesse: number;
@@ -735,6 +743,7 @@ const ARENA_IMPACT_KONFIG_JE_DISZIPLIN: ReadonlyMap<string, ArenaImpactKonfig> =
     "breaking",
     {
       referenzFeldgroessen: BREAKING_PPS_REFERENZ_FELDGROESSEN,
+      referenzFeldgroessenAlt: BREAKING_PPS_REFERENZ_FELDGROESSEN_GAUNTLET,
       max: BREAKING_INDIVIDUAL_PPS_MAX,
       anteilMitte: BREAKING_PPS_ANTEIL_MITTE,
       // Discipline.playerCount ist 4, NICHT 6.
@@ -970,7 +979,9 @@ export function resolveArenaPpsReferenz(
     torwartRegel === "alt"
       ? (konfig.referenzFeldgroessenTorwartAlt ?? konfig.referenzFeldgroessenTorwart)
       : konfig.referenzFeldgroessenTorwart;
-  const referenzFeldgroessen = (rolle === "torwart" ? torwartKarte : undefined) ?? konfig.referenzFeldgroessen;
+  const referenzFeldgroessen =
+    (rolle === "torwart" ? torwartKarte : undefined) ??
+    (torwartRegel === "alt" && konfig.referenzFeldgroessenAlt ? konfig.referenzFeldgroessenAlt : konfig.referenzFeldgroessen);
   const istGueltig = (referenz: ArenaPpsReferenzFeldgroesse) => referenz.iMittel > 0 && referenz.iKrass > referenz.iMittel;
   const verfuegbareGroessen = [...referenzFeldgroessen.entries()]
     .filter(([, referenz]) => istGueltig(referenz))
@@ -1297,7 +1308,7 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
   /** Regel dieses Spieltags (Hockey-Torwart bzw. Basketball-Puste); "alt" -> alte Torwart-Referenz bzw. alte Anker (gezeigt = gebucht). */
   regel: "alt" | "neu" = "neu",
 ): Map<string, number> {
-  const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld");
+  const { referenz: feldReferenz } = resolveArenaPpsReferenz(disciplineId, playerCount, "feld", regel);
   // TORWART-EIGENE REFERENZ (Hockey-Produktivierung): nur aufgeloest, wenn irgendein Eintrag sie
   // ueberhaupt braucht (s. Schleife unten) -- `resolveArenaPpsReferenz()` faellt fuer Basketball/
   // Gewichtheben ohnehin auf `feldReferenz` zurueck, ein zweiter Aufruf hier waere fuer die beiden
@@ -1331,7 +1342,9 @@ export function computeIndividualBoxscorePpsFromFixtureResults(
                 ? "torwartAlt"
                 : disciplineId === "basketball" && regel === "alt"
                   ? "pusteAlt"
-                  : undefined,
+                  : disciplineId === "breaking" && regel === "alt"
+                    ? "gauntletAlt"
+                    : undefined,
           }),
         );
         continue;
@@ -1681,7 +1694,11 @@ export async function runBattleModeArenaMatchday(
       ? hockeyTorwartFuer(gameState, matchdayId)
       : disciplineId === "basketball"
         ? basketballPusteFuer(gameState, matchdayId)
-        : "neu",
+        : disciplineId === "breaking"
+          ? breakingFormatFuer(gameState, matchdayId) === "gauntlet"
+            ? "alt"
+            : "neu"
+          : "neu",
   );
 
   // Ein Team ohne Fixture an diesem Spieltag (z. B. unvollstaendige `leagueTeamIds`) bekommt

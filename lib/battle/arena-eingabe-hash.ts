@@ -15,6 +15,7 @@ import { ppSkalaModus } from "@/lib/resolve/pp-skala";
 import { climbingFormatFuer } from "@/lib/resolve/climbing-format";
 import { hockeyTorwartFuer } from "@/lib/resolve/hockey-torwart";
 import { basketballPusteFuer } from "@/lib/resolve/basketball-puste";
+import { breakingFormatFuer } from "@/lib/resolve/breaking-format";
 
 /**
  * PP-SKALA IM EINGABE-HASH (18.11.): der Vorlauf rechnet die Spieler-PP mit (Boxscore -> PP). Wechselt
@@ -119,7 +120,9 @@ export function berechneArenaEingabeHash(input: {
       // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): nur fuer Hockey, aus demselben Grund.
       ...(input.disciplineId === "hockey" ? { hockeyTorwart: hockeyTorwartFuer(input.gameState, input.matchdayId) } : {}),
       // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): nur fuer Basketball, aus demselben Grund.
-      ...(input.disciplineId === "basketball" ? { basketballPuste: basketballPusteFuer(input.gameState, input.matchdayId) } : {}) }))
+      ...(input.disciplineId === "basketball" ? { basketballPuste: basketballPusteFuer(input.gameState, input.matchdayId) } : {}),
+      // BREAKING-FORMAT (22.11., lib/resolve/breaking-format.ts): nur fuer Breaking, aus demselben Grund.
+      ...(input.disciplineId === "breaking" ? { breakingFormat: breakingFormatFuer(input.gameState, input.matchdayId) } : {}) }))
     .digest("hex");
 }
 

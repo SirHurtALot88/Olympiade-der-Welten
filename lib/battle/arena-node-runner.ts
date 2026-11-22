@@ -115,7 +115,7 @@ type DuellAuftrag = {
     /** Strategie-Vorlage je Disziplin [Heim, Gast]; fehlt bei neutral/Flagge aus (s. `bereiteFixturesVor`). */
     strategieByDisciplineId?: Record<string, [string | null, string | null]>;
     /** Climbing-Format des Spieltags (Canyon live, 18.11.); nur fuer Climbing gesetzt (s. `bereiteFixturesVor`). */
-    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu"; basketball?: "alt" | "neu" };
+    formatByDisciplineId?: { climbing?: "standard" | "canyon"; hockey?: "alt" | "neu"; basketball?: "alt" | "neu"; breaking?: "gauntlet" | "tagteam" };
   }>;
 };
 

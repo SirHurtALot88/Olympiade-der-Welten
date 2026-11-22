@@ -1860,7 +1860,7 @@ function delegatedDraftLacksFormCards(
   );
 }
 
-const HUMAN_SIDE_MODIFIER_KEYS = ["mutatorTrait1", "mutatorTrait2", "strategie", "zurufPlan"] as const;
+const HUMAN_SIDE_MODIFIER_KEYS = ["mutatorTrait1", "mutatorTrait2", "strategie", "zurufPlan", "breakingWaffen"] as const;
 
 /**
  * Fuehrt die Modifier des Menschen mit denen der KI zusammen — der Mensch gewinnt.

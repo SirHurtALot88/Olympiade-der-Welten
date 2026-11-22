@@ -4251,6 +4251,11 @@ export type SeasonState = {
    */
   basketballPuste?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "alt" | "neu" }> } | null;
   /**
+   * BREAKING-FORMAT DIESER SAISON (22.11., lib/resolve/breaking-format.ts): Wechselliste "gauntlet"/"tagteam" je Spieltag,
+   * gesetzt beim Laden. Gebuchte Spieltage behalten ihr Format.
+   */
+  breakingFormat?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "gauntlet" | "tagteam" }> } | null;
+  /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.
    *
@@ -4479,6 +4484,12 @@ export type LineupDraftModifierSide = {
    * Gelesen nur hinter der Flagge `OLY_STRATEGIE_VORLAGEN` (Standard aus).
    */
   strategie?: string | null;
+  /**
+   * BREAKING-WAFFENFOLGE je Spieler (22.11., docs/design/breaking-tagteam-22-11.md): Spieler-Id -> Waffe je eigenem Gang
+   * ("wucht" | "hieb" | "zermuerbung" | null = die KI waehlt). Genau eine Waffe je Gang; der Index zaehlt die eigenen Gaenge
+   * (die Folge wiederholt sich). Fehlt das Feld oder ein Eintrag, waehlt die KI deterministisch (Konterwahl).
+   */
+  breakingWaffen?: Record<string, Array<string | null>> | null;
   /**
    * ZURUF-PLAN (Konzept 4.2): höchstens zwei vorab gesetzte Wenn-dann-Anweisungen. Im Pilot
    * Wettessen bewusst NICHT gelesen — Bühnen-Würfe fallen vorab, Bühnen haben keinen Zuruf

@@ -46,6 +46,7 @@ import { schaetzeGegnerAufstellung, type GegnerSchaetzung } from "@/lib/lineups/
 import { uebersetzeLineupFehlerListe } from "@/lib/lineups/lineup-fehlertexte";
 import type { MatchdayIntensityStage } from "@/lib/lineups/matchday-slot-roles";
 import { normalisiereStrategie, strategieVorlagenFuer } from "@/lib/lineups/strategie-vorlagen";
+import { BREAKING_DISCIPLINE_ID, BREAKING_WAFFEN } from "@/lib/lineups/breaking-waffen";
 import { baueSlotBelastungsVorschau, slotEinsatzProjektion, type SlotBelastungsVorschau } from "@/lib/lineups/einsatzliste-belastung";
 import { BELASTUNGS_STUFEN_TEXT } from "@/lib/fatigue/belastung-regel";
 
@@ -244,6 +245,7 @@ export default function EinsatzlisteModern(props: Props) {
     spieltagsGegner = null,
     getDisciplineStrategie,
     onUpdateDisciplineStrategie,
+    breakingWaffen,
     formCardControlsBySide,
     onAssignDisciplineFormCard,
     formCardSavePendingSide,
@@ -1972,6 +1974,38 @@ export default function EinsatzlisteModern(props: Props) {
                   </div>
                 );
               })()
+            ) : null}
+            {breakingWaffen && dSeite?.disciplineId === BREAKING_DISCIPLINE_ID && breakingWaffen.aktiv ? (
+              <div className="elm-waffen" data-testid={`elm-waffen-${seite}`}>
+                <span className="bc-gk">Waffen je Gang</span>
+                <small>
+                  Jeder Spieler nutzt in jedem Gang genau eine Waffe und darf sie von Gang zu Gang wechseln. Nur Slot 1 beginnt im Ring; wer danach
+                  eingewechselt wird, entscheidet die Wechsel-KI (Umlauf-Regel, Standzeit, Schutz). „KI“ wählt die Waffe, die beim aktuellen Gegner am schwächsten gedeckt ist.
+                </small>
+                {breakingWaffen.spieler(seite).map((sp) => {
+                  const folge = breakingWaffen.folge(seite, sp.activePlayerId);
+                  return (
+                    <div className="elm-waffen-zeile" key={sp.activePlayerId}>
+                      <span className="elm-waffen-name"><b>{sp.slotNr}</b> {sp.name}</span>
+                      {[0, 1, 2].map((gang) => (
+                        <select
+                          key={gang}
+                          aria-label={`${sp.name}, Gang ${gang + 1}`}
+                          data-testid={`elm-waffe-${seite}-${sp.slotNr}-${gang + 1}`}
+                          disabled={!kannBedienen}
+                          value={folge[gang] ?? ""}
+                          onChange={(e) => breakingWaffen.setze(seite, sp.activePlayerId, gang, e.target.value || null)}
+                        >
+                          <option value="">KI</option>
+                          {BREAKING_WAFFEN.map((w) => (
+                            <option key={w.id} value={w.id} title={w.profil}>{w.name}</option>
+                          ))}
+                        </select>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
             ) : null}
           </div>
           {formSteuerung && kartenWirkungJeSeite[seite] ? (

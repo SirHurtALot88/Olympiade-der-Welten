@@ -101,31 +101,36 @@
     "breaking": {
       "feldgroessen": {
         "2": {
-          "rTop": 2.32,
-          "rMed": 0.565,
-          "zellen": 6
+          "rTop": 4.9,
+          "rMed": 1.035,
+          "zellen": 2
+        },
+        "3": {
+          "rTop": 4.13,
+          "rMed": 1.31,
+          "zellen": 2
         },
         "4": {
-          "rTop": 3.45,
-          "rMed": 0.73,
+          "rTop": 3.38,
+          "rMed": 0.87,
           "zellen": 4
         },
         "5": {
-          "rTop": 3,
-          "rMed": 0.905,
-          "zellen": 2
+          "rTop": 6.53,
+          "rMed": 1.34,
+          "zellen": 4
         },
         "6": {
-          "rTop": 3.97,
-          "rMed": 0.955,
+          "rTop": 9.09,
+          "rMed": 1.53,
           "zellen": 4
         }
       },
-      "rTop": 3.55,
-      "rMed": 0.79,
-      "faktor": 1.4085,
-      "medianTagesbester": 3.55,
-      "zellen": 20,
+      "rTop": 4.9,
+      "rMed": 1.3,
+      "faktor": 1.0204,
+      "medianTagesbester": 4.9,
+      "zellen": 16,
       "zellenRoh": 16,
       "zensiert": 0
     },
@@ -788,6 +793,37 @@
       "zellen": 20,
       "zellenRoh": 16,
       "zensiert": 1
+    },
+    "breakingGauntletAlt": {
+      "feldgroessen": {
+        "2": {
+          "rTop": 2.32,
+          "rMed": 0.565,
+          "zellen": 6
+        },
+        "4": {
+          "rTop": 3.45,
+          "rMed": 0.73,
+          "zellen": 4
+        },
+        "5": {
+          "rTop": 3,
+          "rMed": 0.905,
+          "zellen": 2
+        },
+        "6": {
+          "rTop": 3.97,
+          "rMed": 0.955,
+          "zellen": 4
+        }
+      },
+      "rTop": 3.55,
+      "rMed": 0.79,
+      "faktor": 1.4085,
+      "medianTagesbester": 3.55,
+      "zellen": 20,
+      "zellenRoh": 16,
+      "zensiert": 0
     }
   },
   "battlefieldQuellen": {
@@ -810,6 +846,17 @@
         "new-game-1795320560244-cu3xl0",
         "new-game-1795321179875-0hhj8s",
         "new-game-1795321821877-4vjatg"
+      ]
+    }
+  },
+  "breakingQuellen": {
+    "neu": {
+      "gemessenAm": "2026-11-22",
+      "saves": [
+        "new-game-1795345638100-ovrzm5",
+        "new-game-1795346327522-lagan7",
+        "new-game-1795347007533-anpdcb",
+        "new-game-1795347739784-h1794w"
       ]
     }
   }

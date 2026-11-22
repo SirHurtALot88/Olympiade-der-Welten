@@ -1,3 +1,4 @@
+import { BREAKING_DISCIPLINE_ID, bereinigeBreakingWaffen } from "@/lib/lineups/breaking-waffen";
 import { resolveFormMoralRegeln } from "@/lib/morale/form-moral-regeln";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { requireLocalPersistedSave } from "@/lib/persistence/resolve-local-save";
@@ -1611,6 +1612,20 @@ export function saveLocalLegacyLineupDraft(
   // `saveLocalLegacyLineupDraftBatch`, das nie automatisch gefuellt hat. Ein zweiter
   // Auswahlweg neben der Doktrin waere nur eine zweite Quelle fuer dieselbe Groesse.
   const resolvedModifiers = normalizeLineupDraftModifiers(modifiers);
+  // BREAKING-WAFFENFOLGE (22.11.): beim Speichern validieren (nur eingesetzte Spieler dieser Seite, gueltige Kennungen, hoechstens 6 Eintraege).
+  for (const side of ["d1", "d2"] as const) {
+    const sideModifier = resolvedModifiers[side];
+    if (!sideModifier.breakingWaffen) continue;
+    const erlaubt = new Set<string>();
+    for (const entry of normalizedEntries) {
+      if (entry.disciplineSide !== side || entry.disciplineId !== BREAKING_DISCIPLINE_ID) continue;
+      erlaubt.add(entry.playerId);
+      if (entry.activePlayerId) erlaubt.add(entry.activePlayerId);
+    }
+    const sauber = bereinigeBreakingWaffen(sideModifier.breakingWaffen, erlaubt);
+    if (sauber) sideModifier.breakingWaffen = sauber;
+    else delete sideModifier.breakingWaffen;
+  }
   const nextDraft: LineupDraft = {
     lineupId,
     saveId: effectiveParams.saveId,

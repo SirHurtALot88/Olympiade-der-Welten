@@ -124,7 +124,7 @@ try {
   let seite;
   if (NODE) {
     const { oeffneNodeSeite } = await import("./lib/node-arena-seite.mjs");
-    seite = nodeSeite = await oeffneNodeSeite(path.join(WURZEL, "public", "mockups"));
+    seite = nodeSeite = await oeffneNodeSeite(process.env.OLY_MOCKUP_DIR ? path.resolve(process.env.OLY_MOCKUP_DIR) : path.join(WURZEL, "public", "mockups"));
   } else {
     seite = await browser.newPage();
     await seite.addInitScript(() => { window.AudioContext = undefined; });
@@ -201,7 +201,16 @@ try {
       catch (e) { pusteAlt.push([`spiele basketball/puste-alt ${s}`, "FEHLER " + String(e)]); }
       finally { A.basketballPuste(null); }
     }
-    return { aus, kontakt, standard, orte3, tdmGefecht, torwartAlt, pusteAlt };
+    // BREAKING IM ALTEN FORMAT "GAUNTLET" (Rueckweg seit Tag-Team, 22.11., docs/design/breaking-tagteam-22-11.md): eigene Eintraege
+    // AUSSERHALB von GESAMT; GESAMT rechnet Breaking im Tag-Team (Motor-Vorgabe). Der Gauntlet (Slot 1 gegen Slot 1, Sieger bleibt
+    // stehen) muss die frueheren `spiele breaking`-Zeilen bitgleich treffen.
+    const gauntletAlt = [];
+    if (A.breakingFormat) for (const s of SAATEN) {
+      try { A.breakingFormat("gauntlet"); gauntletAlt.push([`spiele breaking/gauntlet ${s}`, A.spiele("breaking", s)]); }
+      catch (e) { gauntletAlt.push([`spiele breaking/gauntlet ${s}`, "FEHLER " + String(e)]); }
+      finally { A.breakingFormat(null); }
+    }
+    return { aus, kontakt, standard, orte3, tdmGefecht, torwartAlt, pusteAlt, gauntletAlt };
   }, { DISZIPLINEN, SAATEN, vierKader, vierTeams, KULISSEN_EFFEKT, KONTAKT_FLAG, KONTAKT_AUS, KONTAKT_ZWANG });
   for (const [name, wert] of ergebnis.aus) console.log(`${h(wert)}  ${name}`);
   console.log(`GESAMT ${h(ergebnis.aus)} (${ergebnis.aus.length} Eintraege)`);
@@ -213,6 +222,8 @@ try {
   if (ergebnis.torwartAlt?.length) console.log(`HOCKEY-TORWART-ALT ${h(ergebnis.torwartAlt)} (${ergebnis.torwartAlt.length} Eintraege, nicht in GESAMT)`);
   for (const [name, wert] of ergebnis.pusteAlt || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.pusteAlt?.length) console.log(`BASKETBALL-PUSTE-ALT ${h(ergebnis.pusteAlt)} (${ergebnis.pusteAlt.length} Eintraege, nicht in GESAMT)`);
+  for (const [name, wert] of ergebnis.gauntletAlt || []) console.log(`${h(wert)}  ${name}`);
+  if (ergebnis.gauntletAlt?.length) console.log(`BREAKING-GAUNTLET ${h(ergebnis.gauntletAlt)} (${ergebnis.gauntletAlt.length} Eintraege, nicht in GESAMT)`);
   for (const [name, wert] of ergebnis.tdmGefecht || []) console.log(`${h(wert)}  ${name}`);
   if (ergebnis.tdmGefecht?.length) console.log(`TDM-GEFECHT ${h(ergebnis.tdmGefecht)} (${ergebnis.tdmGefecht.length} Eintraege, nicht in GESAMT)`);
   // Nach GESAMT, damit ein diff der ersten 76 Zeilen gegen einen Lauf ohne Schalter direkt geht.
