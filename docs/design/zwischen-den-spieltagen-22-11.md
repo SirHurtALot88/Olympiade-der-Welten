@@ -816,3 +816,119 @@ Auswertung im Messskript). Die Skala der PP (bester Spieler um 5 je Disziplin) b
 
 **Offen bleiben** die fünf Fragen aus Abschnitt 18 und aus Abschnitt 13 die Fragen 1 (Korridor des Liga-Mittels), 3
 (Identität), 4 (Personal) und 5 (Stilprobe Kiste).
+
+---
+
+# Runde 5 (22.11.): Kabine und Moral, Nachträge
+
+## 23. Baustein B18: Kabine und Moral
+
+Chris: „moral soll sich stärker ändern oder schwanken, oder es gibt events zwischen spielern in den teams die sich positiv
+oder negativ auswirken können, oder items dafür die man nutzen kann etc“. Ausgangslage: Moral wirkt heute höchstens
+±0,67 % auf die Eignung und bewegt sich träge (`docs/design/form-moral-17-11.md`). Mockup `?ansicht=kabine`.
+
+### (a) Stärkere Schwankung
+
+- **Dosis:** `Wirkung = (Moral − 50) ÷ 50 × 2,5 %` auf die Eignung, also **±2,5 %** an den Rändern statt ±0,67 %. Das ist ein
+  On-top-Effekt und zählt nicht gegen die Schranke 0,75 (Abschnitt 20). Er steht als Zeile in der Einsatzliste und in
+  „Deine Entscheidungen“, für beide Seiten.
+- **Änderung je Spieltag (Startwerte):**
+
+  | Anlass | Moral |
+  |---|---:|
+  | Einsatz und Sieg | +3 |
+  | beste oder bester des Spieltags | +5 |
+  | Einsatz und Niederlage | −2 |
+  | einsatzfähig auf der Bank | −3 |
+  | ab dem dritten Mal Bank in Folge | −5 |
+  | Serie: drei Siege / drei Niederlagen (ganzes Team) | +4 / −4 |
+  | Derby-Sieg (ganzes Team) | +5 |
+  | Freund oder Freundin verkauft (einmalig) | −10 |
+  | Vertrag verlängert (einmalig) | +8 |
+  | Rückkehr zur Mitte | 10 % des Abstands zu 50 |
+
+  Schnelle Ausschläge, langsame Rückkehr: nach fünf Spieltagen Bank steht ein Spieler um 34 statt um 47. Ein verletzter
+  Spieler verliert keine Moral für die Bank.
+- **Zielbild für die Eichung** (Saison mit 32 KI-Teams): Streuung der Moral in der Liga etwa 15 Punkte; je Spieltag liegen
+  10–15 % der Kaderspieler unter 40 und 10–15 % über 70; ein Stammspieler schwankt über eine Halbserie um mindestens 12
+  Punkte. Die Team-Wirkung am Spieltag liegt meist zwischen −1 % und +1 %, in Extremfällen bei ±2 %.
+- **Kabinen-Stimmung** je Team = Mittel der Moral + Zusammenhalt (Beziehungen und Serie, −10 bis +10). Sie steuert, welche
+  Kabinen-Ereignisse anstehen, und färbt Fans und Vorstand.
+
+### (b) Kabinen-Ereignisse im eigenen Team
+
+Im Unterschied zu den ligaweiten Lagen betreffen sie nur das eigene Team. Deshalb gilt:
+
+- **Gleiche Häufigkeit für alle:** jedes Team bekommt genau **zwei je Halbserie**, an Spieltagen aus der Saat des
+  Spielstands. Niemand hat mehr Pech oder Glück als ein anderer.
+- **Auslöser aus dem Spielstand:** an einem Ereignis-Spieltag werden alle Typen geprüft, deren Bedingung erfüllt ist; der
+  mit der stärksten Bedingung gewinnt, der Zufall entscheidet nur bei Gleichstand. Ist nichts erfüllt, gibt es „Ruhige
+  Woche“ (kleiner Bonus), damit die Zahl gleich bleibt.
+
+| Ereignis | Auslöser | Antworten (je 2–3, feste sichtbare Folgen) |
+|---|---|---|
+| **Platzhirsch** | zwei Spieler derselben Klasse unter den besten drei, einer ist Captain | einen stützen (+6 / −10) · Aussprache (beide +3, Training der Woche halb) · laufen lassen (beide −2 je Spieltag, kann Rivalität werden) |
+| **Streit** | zwei Spieler auf demselben Platz, einer dreimal Bank; Stimmung unter 40 | schlichten (kostet eine Aktionskarte) · Partei ergreifen · Geldstrafe geht nicht: der Vorstand straft nie, also „Sondertraining für beide“ (Erschöpfung +6) |
+| **Freundschaft** | zwei Spieler fünfmal gemeinsam eingesetzt und gewonnen | fördern (Beziehung entsteht: gemeinsam aufgestellt je +1 Moral) · nichts tun |
+| **Mentor und Schützling** | starker Spieler und einer mit großem Abstand zum Potential, gleiche Klasse oder Achse | zusammenspannen (Schützling trainiert +10 %, Mentor −1 Erholung) · getrennt lassen |
+| **Heimweh** | neu verpflichtet, in den ersten fünf Spieltagen höchstens ein Einsatz | Einsatz zusagen (bindet einen Platz am nächsten Spieltag, +8) · Gespräch (+3) · abwarten (−4) |
+| **Feier** | drei Siege in Folge, Derby-Sieg oder Wimpel; Stimmung über 75 | feiern lassen (alle +5, Erschöpfung +3) · Fokus halten (Captain +3, Rest ±0) |
+| **Ruhige Woche** | nichts erfüllt | alle +1 |
+
+- **Beziehungen** bleiben als wenige Paare je Team bestehen (höchstens vier): Freunde, Rivalen, Mentor und Schützling. Sie
+  wirken klein und dauerhaft (gemeinsam aufgestellt ±1 Moral je Spieltag) und einmalig stark, wenn einer verkauft wird.
+- **KI:** Nachschlagetabelle je Ereignis aus der Team-Matrix (Harmonie, Ehrgeiz) und der Tabellenlage, deterministisch.
+  Delegierte Teams (Bereich „Woche“) bekommen die KI-Antwort; ein Spieltag wartet nicht.
+- **Mehrspieler:** Kabinen-Ereignisse sind privat; die Mitspieler sehen nur die öffentliche Folge (z. B. Wechselwunsch).
+
+### (c) Moral-Gegenstände
+
+Im selben Lager wie die Ausrüstung, von Händlern (eigener Händlertyp „Wirtin“), aus Kisten oder als Aktionskarte:
+
+| Gegenstand | Art | Wirkung (Startwert) |
+|---|---|---|
+| Teamabend | Verbrauch | alle +6 Moral, einmal |
+| Mannschaftsfahrt | Verbrauch, nur Winterpause | alle +10, ein offener Streit endet |
+| Friedenspfeife | Verbrauch | beendet eine Rivalität zwischen zwei Spielern |
+| Glücksbringer | Ausrüstung (Körper) | Moral des Trägers fällt nicht unter 40 |
+| Kapitänsbinde | Ausrüstung (Körper), nur Captain | bei Sieg +2 Moral für alle Aufgestellten |
+| Tagebuch | Ausrüstung (Kopf) | Rückkehr zur Mitte doppelt so schnell (dämpft beide Richtungen) |
+
+Sie belegen dieselben Plätze wie andere Ausrüstung: wer den Glücksbringer trägt, verzichtet auf ein Attribut-Teil.
+
+### (d) Anzeige
+
+- **Kabine** als Ansicht unter Kader: je Spieler Gesicht in Farbe plus Zahl (wie `BcMoralGesicht`, kein Herz, kein Emoji),
+  Verlauf der letzten acht Spieltage, Grund in einem Satz, Wirkung in Prozent; sortierbar.
+- **Kabinen-Stimmung** je Team als eine Zahl mit Zerlegung; auf Startseite und in der Woche als Zeile.
+- Offenes Ereignis mit den beiden Beteiligten und den Antworten; Liste der Beziehungen.
+- Im Spielerprofil der Moralverlauf über die Saison (der Form-Verlauf liegt schon in `playerFormState[].verlauf`; die
+  Moral bekommt dasselbe Feld).
+
+### Wirkung, KI, Last, Aufwand
+
+- **Wechselwirkung:** Rotation bekommt einen zweiten Preis neben der Erschöpfung (Bank kostet Moral); Verkäufe und
+  Verlängerungen wirken in die Kabine; Kaderbreite 14 heißt mehr Bankspieler und damit mehr Moral-Arbeit. Fans und der
+  Traditionalist im Vorstand lesen die Stimmung. Verbindet Kader, Spieltag und Verein.
+- **KI:** stellt wie heute auf; die Bank-Abzüge gelten für sie genauso. Zusätzlich eine Regel in der Aufstellung: ein
+  Spieler unter 35 Moral bekommt Vorrang, wenn sein Platzwert höchstens 3 % schlechter ist. Antworten per Tabelle,
+  Moral-Gegenstände nutzt sie, wenn die Stimmung unter 45 fällt.
+- **Last:** je Spieler ein Verlauf von 20 Werten je Saison, je Team höchstens vier Paare und vier Ereignisse: rund 12 KB
+  je Saison. Kein Rechenweg je Spieltag außer der Fortschreibung, die es schon gibt.
+- **Aufwand:** Dosis und Raten S (Schalter und Stempel im Spielstand nach dem Muster `OLY_FORM_MORAL`, damit eine laufende
+  Saison nicht mitten im Lauf umspringt), Messung S, Ereignisse und Beziehungen M, Gegenstände S nach der Ausrüstung,
+  Ansicht M. **Welle 2** (Dosis, Raten, Ansicht, Ereignisse), Gegenstände mit Welle 3.
+- **Abnahme:** Zielbild aus (a); die Mechanik ohne On-top bleibt unverändert (Fingerabdruck); Vergleich der Endtabellen mit
+  alter und neuer Dosis: höchstens zwei Plätze Verschiebung im Mittel; kein Team sinkt allein durch Kabinen-Ereignisse um
+  mehr als einen Platz.
+
+## 24. Nachträge
+
+- Die Übersicht `?ansicht=rahmen` führt jetzt B15 (Potential, das wandert), B16 (Zuruf im Spiel), B17 (Regel-Abstimmung
+  auf Zeit) und B18 (Kabine und Moral); „Spielweisen“ ist kein eigener Baustein mehr.
+- In `?ansicht=welt` ist der Satz zum Formatwechsel je Saison gestrichen; Formate ändern sich nur per befristeter
+  Regel-Abstimmung.
+- Die Klicks (Karte, Antwort auf Lage und Kabine, Lager, Haltung, Fund) und die laufende Kisten-Animation sind in
+  Chromium geprüft: die drei Takte folgen bei 0 / 1,2 / 2,0 Sekunden, die Karten sind danach sichtbar, „nochmal öffnen“
+  startet neu. Dabei gefunden und behoben: Karten in der neuen Woche und die Haltungs-Knöpfe reagierten nicht auf Klicks.
+- **Kadergröße:** die Obergrenze bleibt bei 14 (Chris). Dass die KI tiefer kauft, baut ein anderer Agent.
