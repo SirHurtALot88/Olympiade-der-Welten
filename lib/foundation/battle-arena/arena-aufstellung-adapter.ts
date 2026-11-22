@@ -237,10 +237,9 @@ export function buildArenaAufstellung(
     // BREAKING-WAFFENFOLGE (22.11., docs/design/breaking-tagteam-22-11.md): die vom Manager gesetzte Waffe je eigenem Gang.
     // Nur fuer Breaking und nur, wenn mindestens ein gueltiger Eintrag gesetzt ist; sonst ist der Eintrag exakt der alte.
     if (eintrag.disciplineId === BREAKING_DISCIPLINE_ID && (eintrag.disciplineSide === "d1" || eintrag.disciplineSide === "d2")) {
-      const folge = normalisiereBreakingWaffen(
-        entwurf.modifiers?.[eintrag.disciplineSide]?.breakingWaffen?.[eintrag.activePlayerId ?? spielerId] ??
-          entwurf.modifiers?.[eintrag.disciplineSide]?.breakingWaffen?.[spielerId],
-      );
+      const plan = entwurf.modifiers?.[eintrag.disciplineSide]?.breakingWaffen;
+      // Rueckfall auf die Spieler-Id auch dann, wenn die Folge unter der Kader-Zeilen-Id nur aus "KI" besteht.
+      const folge = normalisiereBreakingWaffen(plan?.[eintrag.activePlayerId ?? spielerId]) ?? normalisiereBreakingWaffen(plan?.[spielerId]);
       if (folge) aufstellung[name] = { ...aufstellung[name], waffen: folge };
     }
     // Ohne gueltige Seite (alte/teilweise Staende, Messsonden) laesst sich keine Kartenwahl zuordnen:

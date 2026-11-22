@@ -100,33 +100,38 @@
     },
     "breaking": {
       "feldgroessen": {
+        "2": {
+          "rTop": 4.9,
+          "rMed": 1.035,
+          "zellen": 2
+        },
         "3": {
-          "rTop": 4.61,
-          "rMed": 1.25,
+          "rTop": 4.13,
+          "rMed": 1.31,
           "zellen": 2
         },
         "4": {
-          "rTop": 5.64,
-          "rMed": 0.77,
-          "zellen": 2
+          "rTop": 3.38,
+          "rMed": 0.87,
+          "zellen": 4
         },
         "5": {
-          "rTop": 3.89,
-          "rMed": 0.97,
-          "zellen": 2
+          "rTop": 6.53,
+          "rMed": 1.34,
+          "zellen": 4
         },
         "6": {
-          "rTop": 4.33,
-          "rMed": 1.805,
-          "zellen": 2
+          "rTop": 9.09,
+          "rMed": 1.53,
+          "zellen": 4
         }
       },
-      "rTop": 4.61,
-      "rMed": 1.17,
-      "faktor": 1.0846,
-      "medianTagesbester": 4.61,
-      "zellen": 8,
-      "zellenRoh": 8,
+      "rTop": 4.9,
+      "rMed": 1.3,
+      "faktor": 1.0204,
+      "medianTagesbester": 4.9,
+      "zellen": 16,
+      "zellenRoh": 16,
       "zensiert": 0
     },
     "climbing": {
@@ -848,8 +853,10 @@
     "neu": {
       "gemessenAm": "2026-11-22",
       "saves": [
-        "new-game-1795342536154-v8n4am",
-        "new-game-1795343360415-n35owe"
+        "new-game-1795345638100-ovrzm5",
+        "new-game-1795346327522-lagan7",
+        "new-game-1795347007533-anpdcb",
+        "new-game-1795347739784-h1794w"
       ]
     }
   }

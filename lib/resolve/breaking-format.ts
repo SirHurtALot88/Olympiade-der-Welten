@@ -121,7 +121,7 @@ export function stempleBreakingFormat<T extends Pick<GameState, "seasonState" | 
 }
 
 /**
- * DIE PUSTE-REGEL EINES SPIELTAGS. Mit gueltigem Stempel: der letzte Wechsel, dessen Spieltag nicht nach
+ * DAS BREAKING-FORMAT EINES SPIELTAGS. Mit gueltigem Stempel: der letzte Wechsel, dessen Spieltag nicht nach
  * `matchdayId` liegt (unbekannter Spieltag: der zuletzt gueltige). Ohne Stempel (ein Spielstand, der noch
  * nicht durch die Lade-Migration ging, oder ein Manager-Spielstand): dieselbe Regel auf dem Stempel, den die
  * Migration setzen wuerde.

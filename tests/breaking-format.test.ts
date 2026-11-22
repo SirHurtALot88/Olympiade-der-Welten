@@ -77,16 +77,16 @@ describe("Breaking-Format: Stempel beim Laden", () => {
 
   it("Abschalt-Schalter: ab dem naechsten Spieltag 'alt', gebuchte Tag-Team-Spieltage bleiben Tag-Team; wieder an haengt erneut an", () => {
     delete process.env.OLY_BREAKING_FORMAT;
-    let g = stempleBreakingFormat(spielstand([]));
+    let g: any = stempleBreakingFormat(spielstand([]));
     // md-1 und md-2 im Tag-Team gebucht
-    g = { ...g, seasonState: { ...(g as never as { seasonState: object }).seasonState, matchdayResults: [{ seasonId: "s1", matchdayId: "md-1" }, { seasonId: "s1", matchdayId: "md-2" }] } } as never;
+    g = { ...g, seasonState: { ...g.seasonState, matchdayResults: [{ seasonId: "s1", matchdayId: "md-1" }, { seasonId: "s1", matchdayId: "md-2" }] } } as never;
     process.env.OLY_BREAKING_FORMAT = "gauntlet";
     g = stempleBreakingFormat(g);
     expect(breakingFormatFuer(g, "md-1")).toBe("tagteam");
     expect(breakingFormatFuer(g, "md-2")).toBe("tagteam");
     expect(breakingFormatFuer(g, "md-3")).toBe("gauntlet");
     // md-3 im Standard gebucht, dann wieder an
-    g = { ...g, seasonState: { ...(g as never as { seasonState: { matchdayResults: object[] } }).seasonState, matchdayResults: [...(g as never as { seasonState: { matchdayResults: object[] } }).seasonState.matchdayResults, { seasonId: "s1", matchdayId: "md-3" }] } } as never;
+    g = { ...g, seasonState: { ...g.seasonState, matchdayResults: [...g.seasonState.matchdayResults, { seasonId: "s1", matchdayId: "md-3" }] } } as never;
     delete process.env.OLY_BREAKING_FORMAT;
     g = stempleBreakingFormat(g);
     expect(["md-1", "md-2", "md-3", "md-4"].map((id) => breakingFormatFuer(g, id))).toEqual(["tagteam", "tagteam", "gauntlet", "tagteam"]);

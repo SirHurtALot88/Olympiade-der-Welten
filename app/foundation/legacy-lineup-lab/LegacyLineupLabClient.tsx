@@ -1,5 +1,6 @@
 "use client";
 
+import { breakingFormatFuer } from "@/lib/resolve/breaking-format";
 import { geltendeFarbregel, kartenEffekt, kartenEffektText } from "@/lib/lineups/formkarten-wirkung";
 import type { FormMoralRegeln } from "@/lib/morale/form-moral-regeln";
 import dynamic from "next/dynamic";
@@ -5323,8 +5324,9 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
 	      const folge = [...(alle[activePlayerId] ?? [])];
 	      while (folge.length <= gang) folge.push(null);
 	      folge[gang] = waffe;
-	      while (folge.length > 0 && folge[folge.length - 1] === null) folge.pop();
-	      if (folge.length > 0) alle[activePlayerId] = folge;
+	      // Mindestens drei Gaenge halten (null = KI): der Motor wiederholt die Folge mit ihrer Laenge, ein gekuerztes ["wucht"] hiesse "immer Wucht".
+	      while (folge.length < 3) folge.push(null);
+	      if (folge.some((w) => w !== null)) alle[activePlayerId] = folge;
 	      else delete alle[activePlayerId];
 	      if (Object.keys(alle).length > 0) seite.breakingWaffen = alle;
 	      else delete seite.breakingWaffen;
@@ -6490,6 +6492,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         getDisciplineStrategie={strategieVorlagenAktiv ? getDisciplineStrategie : undefined}
         onUpdateDisciplineStrategie={strategieVorlagenAktiv ? updateDisciplineStrategie : undefined}
         breakingWaffen={{
+          aktiv: breakingFormatFuer(props.embeddedGameState ?? context?.gameState ?? null, params.matchdayId) === "tagteam",
           spieler: (seite) => breakingWaffenSpieler(seite),
           folge: (seite, activePlayerId) => modifiers[seite]?.breakingWaffen?.[activePlayerId] ?? [],
           setze: updateBreakingWaffe,

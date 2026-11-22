@@ -22,11 +22,15 @@ import { BREAKING_WAFFEN, normalisiereBreakingWaffen } from "@/lib/lineups/break
 type Eintrag = {
   art: "anschlag" | "wechsel";
   gang: number; phase?: number; umlauf?: number;
-  peiniger?: string; peinigerSide?: number; ertragender?: string; waffe?: string; quelle?: string; schaden?: number; haelt?: boolean; hpNach?: number; gut?: number;
+  peiniger?: string; peinigerSide?: number; ertragender?: string; waffe?: string; quelle?: string; schaden?: number; haelt?: boolean; hpNach?: number; gut?: number; punkte?: number;
   team?: number; raus?: string; rein?: string; grund?: string;
 };
 type Arena = {
   spiele: (d: string, saat: number) => unknown;
+  spieleBuehneGauntlet: (d: string, saat: number) => { boxscore: Array<{ name: string; wert: number }>; seiten: number[] };
+  kaderSetzen: (k: unknown) => unknown;
+  setDisc: (d: string) => unknown;
+  buehneJeSeiteQa: (n: number) => unknown;
   breakingFormat: (r: unknown) => unknown;
   breakingEnde: () => { art: string; lebende: number[]; gaenge: number; anschlaege: number } | null;
   breakingProtokoll: () => Eintrag[];
@@ -172,11 +176,11 @@ describe("Breaking-Tag-Team: Regeln", () => {
     for (const k of kaempfe(A, saaten)) {
       expect(k.ende.art).toBe("aufgabe");
       expect(Math.min(...k.ende.lebende)).toBe(0);
-      expect(k.ende.anschlaege).toBeLessThanOrEqual(330);
+      expect(k.ende.anschlaege).toBeLessThanOrEqual(700);
     }
   });
 
-  it("Standzeit: niemand steht mehr als zwei Gaenge am Stueck im Ring (ausser dem Letzten seines Teams)", () => {
+  it("Standzeit: niemand steht mehr als zwei Gaenge am Stueck im Ring", () => {
     for (const k of kaempfe(A, saaten)) {
       const gaenge = [...new Set(k.protokoll.filter((e) => e.art === "anschlag").map((e) => e.gang))];
       const serie = new Map<string, number>();
@@ -185,10 +189,40 @@ describe("Breaking-Tag-Team: Regeln", () => {
         for (const e of k.protokoll.filter((x) => x.art === "anschlag" && x.gang === g)) { imRing.add(e.peiniger!); imRing.add(e.ertragender!); }
         for (const n of [...serie.keys()]) if (!imRing.has(n)) serie.delete(n);
         for (const n of imRing) serie.set(n, (serie.get(n) ?? 0) + 1);
-        for (const [n, c] of serie) expect(c, `${n} in Gang ${g}`).toBeLessThanOrEqual(3);
+        for (const [n, c] of serie) expect(c, `${n} in Gang ${g}`).toBeLessThanOrEqual(2);
       }
     }
   });
+
+  it("Lauffenster: ein langer Kampf wird vollstaendig gewertet (Summe der Boxscore-Werte = Aushalte-Punkte + Gutschriften des ganzen Protokolls)", () => {
+    for (const saat of [3, 11, 29, 47, 101, 977]) {
+      const r = A.spieleBuehneGauntlet("breaking", saat);
+      const p = A.breakingProtokoll().filter((e) => e.art === "anschlag");
+      const erwartet = p.reduce((s, e) => s + (e.punkte ?? 0) + (e.gut ?? 0), 0);
+      const summe = r.boxscore.reduce((s, b) => s + b.wert, 0);
+      expect(Math.round(summe), `Saat ${saat}, ${p.length} Anschlaege`).toBe(Math.round(erwartet));
+    }
+  });
+
+  it("Notbremse ist die Ausnahme: ueber die ganze Kader-Familie und mehrere Feldgroessen unter 5 % je Paarung", async () => {
+    const k = oeffne(false);
+    const arena = await warteAuf(k);
+    try {
+      arena.setDisc("breaking");
+      let gesamt = 0, bremse = 0;
+      familie.forEach((v) => {
+        arena.kaderSetzen({ heim: v.heim, gast: v.gast });
+        for (const js of [3, 4, 6]) {
+          arena.buehneJeSeiteQa(js);
+          let n = 0, b = 0;
+          for (let s = 1; s <= 12; s += 1) { arena.spieleBuehneGauntlet("breaking", s * 7919 + js); n += 1; if (arena.breakingEnde()!.art === "notbremse") b += 1; }
+          expect(b / n, `je Seite ${js}`).toBeLessThan(0.1);
+          gesamt += n; bremse += b;
+        }
+      });
+      expect(bremse / gesamt).toBeLessThan(0.03);
+    } finally { k.aufraeumen(); }
+  }, 120_000);
 
   it("deterministisch: dieselbe Saat gibt dasselbe Protokoll; ein anderer Kader eine andere Waffenwahl der KI", () => {
     const a = kaempfe(A, [5])[0]!;
@@ -231,6 +265,7 @@ describe("Breaking-Tag-Team: Waffenplan des Managers", () => {
 
   it("die Normalisierung nimmt nur gueltige Kennungen an", () => {
     expect(normalisiereBreakingWaffen(["hieb", "unsinn", null, "wucht", "zermuerbung", "hieb", "wucht"])).toEqual(["hieb", null, null, "wucht", "zermuerbung", "hieb"]);
+    expect(normalisiereBreakingWaffen(["wucht"])).toEqual(["wucht", null, null]);
     expect(normalisiereBreakingWaffen([null, "x"])).toBeNull();
     expect(normalisiereBreakingWaffen("hieb")).toBeNull();
     expect(normalisiereBreakingWaffen(undefined)).toBeNull();

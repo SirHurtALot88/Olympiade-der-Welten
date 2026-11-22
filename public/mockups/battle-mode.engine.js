@@ -29119,9 +29119,9 @@
   // REGELN. 6 gegen 6, je Team EINER im Ring. Ein GANG = zwei Phasen: A peinigt (B haelt aus), danach B peinigt (A haelt aus).
   // Nach jedem Gang wechseln beide Teams gleichzeitig und verdeckt (deterministische KI, kein rr()). Umlauf-Regel: niemand
   // kommt ein zweites Mal rein, bevor alle lebenden Teamkameraden dran waren; Standzeit hoechstens 2 Gaenge am Stueck;
-  // Geraete-Eskalation je Umlauf (I/II/III, Schaden x1/x1,4/x1,9), damit der Kampf durch Aufgabe endet (Notbremse nach
-  // dem dritten Umlauf: Zahl der Gebrochenen, dann Rest-HP-Anteil).
-  // HP = 150 + 1,5 x NERVEN je Spieler; Schaden des Peinigers aus TECHNIK (0,6) und SPITZENMOMENT (0,4), gedeckelt auf
+  // Geraete-Eskalation je Umlauf (I/II/III, Schaden x1/x1,5/x2,2, ab Umlauf 4 x3/x4), damit der Kampf durch Aufgabe endet (Notbremse nach Umlauf 5 oder 700 Anschlaegen, nur an Gang-Grenzen; gemessen 0,3 %; nach
+  // Notbremse: Zahl der Gebrochenen, dann Rest-HP-Anteil).
+  // HP = 200 + 1,5 x NERVEN je Spieler; Schaden des Peinigers aus TECHNIK (0,6) und SPITZENMOMENT (0,4), gedeckelt auf
   // +-15 % (HP-Bilanz); dem Peiniger wird je Anschlag eine GUTSCHRIFT gebucht (Qual-Punkte): erwarteter Schaden dieses Anschlags
   // (Mittel aus halten/brechen der Waffe x Eskalation) x TT.k x Wertungsfaktor aus TECHNIK/SPITZENMOMENT (`ttGutFaktor`, Steigung
   // TT.gutSteil, ohne Deckel). Sie haengt an SEINEM Schlag, nicht am Haltewurf des Gegners (sonst traegt jeder Treffer fremdes
@@ -29150,9 +29150,9 @@
     zermuerbung: {id:"zermuerbung", name:"Zermürbung", n:10,halt:4, bricht:10,  erh:0,  kanal:"NERVEN",       geraete:[0,3,4]}
   };
   const TT_WAFFEN_IDS=["wucht","hieb","zermuerbung"];
-  const TT_KONSTANTE={hpBasis:150, hpNerven:1.5, eskal:[1,1.5,2.2], stufeJeUmlauf:3, peinigerDeckel:0.15, peinigerSteil:0.30,
-    k:4.0, standzeit:2, schutzAnteil:0.25, konterSchwelle:0, konterVorsprung:10, erholRate:0.06, umlaufMax:5,
-    anschlagMax:330, gangMax:90, verschnaufen:0.04, gutErwartet:true, gutSteil:3.0};
+  const TT_KONSTANTE={hpBasis:200, hpNerven:1.5, eskal:[1,1.5,2.2,3,4], stufeJeUmlauf:3, peinigerDeckel:0.15, peinigerSteil:0.30,
+    k:3.0, standzeit:2, schutzAnteil:0.25, konterSchwelle:0, konterVorsprung:10, erholRate:0.06, umlaufMax:5,
+    anschlagMax:700, gangMax:120, verschnaufen:0.04, gutErwartet:true, gutSteil:3.0, bruchBonus:0};
   let TT={...TT_KONSTANTE, waffen:{...TT_WAFFEN_KONSTANTE}};
   let TT_EXPLIZIT=false, TT_AN_HEBEL=true;
   function ttAn(){
@@ -29227,11 +29227,11 @@
     const phase=(p,z,wahl,umlauf,phaseNr)=>{
       const w=TT.waffen[wahl.id], pT=p.side, zT=z.side;
       const stufeUm=Math.min(TT.eskal.length-1,umlauf-1);
-      for(let i=0;i<w.n&&anschlaege<TT.anschlagMax;i++){
+      for(let i=0;i<w.n;i++){
         z.gegnerN=p.n; p.gegnerN=z.n;
         const ri=z.runden.length;
         const provoziert=z.WAGNIS>=GAUNTLET_PROVOKATION_SCHWELLE;
-        const stufe=Math.min(FOLTER_GERAETE.length-1,stufeUm*TT.stufeJeUmlauf+(provoziert?1:0));
+        const stufe=Math.min(FOLTER_GERAETE.length-1,Math.min(2,stufeUm)*TT.stufeJeUmlauf+(provoziert?1:0));
         const r=gauntletRunde(z,ri,art,{stufe,familie:w.id,provoziert});
         const hpVor=z.hp;
         const schaden=Math.max(1,Math.round((r.haelt?w.halt:w.bricht)*TT.eskal[stufeUm]*ttSchadenFaktor(p)));
@@ -29243,7 +29243,7 @@
         const gut=TT.gutErwartet?Math.round(TT.k*0.5*(w.halt+w.bricht)*TT.eskal[stufeUm]*ttGutFaktor(p)):Math.round(TT.k*echt);
         anschlaege++;
         const rec={punkte:r.punkte,ereignis:r.ereignis,gegnerN:p.n,bout:gang,hpVor,hpNach:z.hp,hpMax:z.hpMax,
-          stufe:w.geraete[stufeUm],familie:w.id,provoziert,schaden:echt,
+          stufe:w.geraete[Math.min(2,stufeUm)],familie:w.id,provoziert,schaden:echt,
           tt:true,gut,peinigerN:p.n,peinigerSide:pT,waffe:w.id,waffeQuelle:wahl.quelle,umlauf,gang,phase:phaseNr,
           anschlagNr:i+1,phasenN:w.n,wechsel:null,snap:null};
         z.runden.push(rec);
@@ -29251,8 +29251,13 @@
         rec.snap=snapDe({umlauf,gang,phase:phaseNr,peiniger:pT,ertrager:zT,haelt:r.haelt});
         if(wechselNotiz.length){ rec.wechsel=wechselNotiz; wechselNotiz=[]; }
         buehneQueue.push(z);
-        ttProtokoll.push({art:"anschlag",gang,phase:phaseNr,umlauf,peiniger:p.n,peinigerSide:pT,ertragender:z.n,waffe:w.id,quelle:wahl.quelle,schaden:echt,haelt:r.haelt,hpNach:z.hp,gut});
-        if(z.hp<=0)return true;
+        ttProtokoll.push({art:"anschlag",gang,phase:phaseNr,umlauf,peiniger:p.n,peinigerSide:pT,ertragender:z.n,waffe:w.id,quelle:wahl.quelle,schaden:echt,haelt:r.haelt,hpNach:z.hp,gut,punkte:r.punkte});
+        if(z.hp<=0){
+          // Bruch-Bonus: wer den Gegner mitten in der Phase bricht, bekommt die Gutschrift der restlichen Anschlaege der Phase dazu
+          // (sonst wuerde fruehes Brechen bestraft). Wird mit diesem Anschlag enthuellt.
+          if(TT.gutErwartet&&TT.bruchBonus&&i<w.n-1)rec.gut+=Math.round(TT.bruchBonus*(w.n-1-i)*TT.k*0.5*(w.halt+w.bricht)*TT.eskal[stufeUm]*ttGutFaktor(p));
+          return true;
+        }
       }
       return false;
     };
@@ -29293,7 +29298,7 @@
       // Die Waffe wird erst zu Beginn der eigenen Phase gewaehlt; der Plan zaehlt die Gaenge, in denen der Spieler wirklich peinigt.
       const wahl0=ttWaffeWaehlen(p0,p1); ttSt.get(p0).gaenge++;
       if(phase(p0,p1,wahl0,umlauf,1))bruch=p1;
-      else if(anschlaege<TT.anschlagMax){
+      else{
         const wahl1=ttWaffeWaehlen(p1,p0); ttSt.get(p1).gaenge++;
         if(phase(p1,p0,wahl1,umlauf,2))bruch=p0;
       }
@@ -29512,6 +29517,10 @@
       const GRUND={gebrochen:"gebrochen",standzeit:"Standzeit erreicht",schutz:"unter 25 % HP",konter:"Konter"};
       ttFenster.eintraege.forEach((e,i)=>ttText(e.raus+" → "+e.rein+" ("+(GRUND[e.grund]||e.grund)+")",px(620),y+px(42)+i*px(18),px(12),farbe[e.team],"center"));
       if(!ttFenster.eintraege.length)ttText("beide bleiben im Ring",px(620),y+px(48),px(13),"#9aa7ba","center");
+    }
+    // ---- Notbremse: Entscheidung nach Rest-HP (nur wenn der Kampf so endet und alles gezeigt ist) ----
+    if(done&&ttEnde&&ttEnde.art==="notbremse"){
+      ttText("NOTBREMSE · Entscheidung: Zahl der Lebenden, dann Rest-HP",px(620),px(262),px(16),"#f0c35a","center");
     }
     // ---- Aufgabe ----
     if(letzterGauntletBruch){
@@ -38250,7 +38259,7 @@
             wert:z=>z.r.length&&z.r[z.r.length-1].hpNach<=0?"raus":(ttBauteAktiv&&ttGezeigt&&!ttAktive().includes(z.u)?"Bank":"im Ring"),
             farbe:v=>v==="raus"?"var(--crit)":"var(--ok)"}
         ]:[]),
-        {id:"schnitt",kopf:"Ø", top:true, titel:"Punkte je Durchgang", wert:z=>z.r.length?Math.round(z.u.summe/z.r.length):null},
+        {id:"schnitt",kopf:"Ø", top:true, titel:"Punkte je Durchgang", wert:z=>z.r.length?Math.round(z.r.reduce((a,r)=>a+r.punkte,0)/z.r.length):null},
         {id:"best", kopf:"Best", top:true, titel:"bester Durchgang", wert:z=>z.r.length?Math.max(...z.r.map(r=>r.punkte)):null},
         {id:"letzt",kopf:"Letzt", titel:"letzter Durchgang", wert:z=>z.r.length?z.r[z.r.length-1].punkte:null},
         {id:"fail", kopf:w.failKopf||"Fehl", titel:art.failWort, wert:z=>z.r.filter(r=>r.ereignis===art.failWort).length||null},
@@ -69861,7 +69870,9 @@
                     SANDSACK_PAR_FILM=a.SANDSACK_PAR_FILM??null; SANDSACK_PAR_SZENE=a.SANDSACK_PAR_SZENE??null;},
       vorher:()=>{disc=bd; buehneDisc=bd;},
       bau:(saat)=>{buehneDisc=bd; bauBuehne(saat);},
-      lauf:()=>{let g=0; while(!done&&g<120){ stepBuehne(1/60); g+=1/60; }},
+      // Tag-Team (22.11.): das Fenster richtet sich nach der Warteschlange (ein Anschlag je rundenDauer), sonst wuerde ein langer Kampf nach
+      // 120 s abgeschnitten und der Rest fehlte in u.summe. Alle anderen Buehnen bleiben bei 120 s (bitgleich).
+      lauf:()=>{let g=0; const grenze=(ttBauteAktiv&&bd==="breaking")?Math.max(120,buehneQueue.length*BUEHNE_ART[bd].rundenDauer*1.1+5):120; while(!done&&g<grenze){ stepBuehne(1/60); g+=1/60; }},
       namen:()=>TEILNEHMER.map(u=>u.n),
       // Duell (Speed-Schach, I-Spy): "besser" ist der eigene Vorteil am Brett, nicht die
       // absolute Punktesumme — ein Brett kann man mit wenigen, aber besseren Zuegen
@@ -72685,6 +72696,8 @@
     // laeuft immer bis GENAU ein Team komplett aufgebraucht ist (oder beide Teams leer sind,
     // ein praktisch ausgeschlossener Randfall) -- `seiten` ist deshalb entweder [>=1,0] oder
     // [0,>=1], nie [0,0] bei echten Aufstellungen. Kein `gesamtKg`-Tiebreak noetig.
+    // TAG-TEAM (22.11.): endet fast immer ebenfalls durch Aufgabe (Notbremse gemessen 0,3 %); bei der Notbremse mit gleicher Zahl Lebender
+    // entscheidet der Rest-HP-Anteil ueber +0,5 (`ttSeitenZusatz`), sonst bleibt es ein Remis.
     spieleBuehneGauntlet:(bd,saat)=>{
       if(typeof BUEHNE_ART==="undefined"||!BUEHNE_ART[bd]||!BUEHNE_ART[bd].gauntlet)return null;
       const M=MOTOREN[bd]; if(!M)return null;

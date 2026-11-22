@@ -340,7 +340,7 @@ Muster Hockey-Torwart / Climbing-Canyon / Battlefield:
 
 ---
 
-## 10. Bau (22.11.) — was gebaut wurde und wo es vom Konzept abweicht
+## 10. Bau (22.11.; Zahlen in 10.2, 11 und 12 sind der Stand VOR der Review, die gültigen stehen in Abschnitt 15) — was gebaut wurde und wo es vom Konzept abweicht
 
 Motor: `baueTagTeam()` in `public/mockups/battle-mode.engine.js`, neben `baueGauntlet()` (der bleibt als Rückweg unangetastet). Format-Stempel
 `seasonState.breakingFormat` (`lib/resolve/breaking-format.ts`), Schalter `OLY_BREAKING_FORMAT=alt`, Kader-Umschlag
@@ -363,8 +363,8 @@ braucht — gemessen, Abschnitt 11.) Ein „Durchgang“ ist ein **Gang**: in je
 Waffe. Die Gerätestufe (I/II/III) hängt am Umlauf, nicht an der Waffe; die Gerätenamen sind die vorhandenen Platzhalter-Zeichen (`FOLTER_GERAETE`).
 
 **Wer wählt.** Der Manager setzt in der Einsatzliste je Spieler eine Waffenfolge (Taktik-Block „Waffen je Gang“, drei Felder je Spieler: Gang 1, 2, 3,
-danach wiederholt sich die Folge; `LineupDraftModifierSide.breakingWaffen[activePlayerId]`). Die Reihenfolge der Slots **ist** die Wechselreihenfolge;
-Wechsel gibt es nur vorab (Reihenfolge, Plan), nie live — damit bleibt jeder Spieltag ohne Eingabe berechenbar und mehrspielertauglich. Was er nicht setzt
+danach wiederholt sich die Folge; `LineupDraftModifierSide.breakingWaffen[activePlayerId]`). Nur Slot 1 beginnt im Ring; wer danach eingewechselt wird, entscheidet die Wechsel-KI (Umlauf-Regel, Standzeit, Schutz, Anker zuletzt), nicht die Slot-Reihenfolge;
+Wechsel gibt es nur vorab (Plan und KI-Regeln), nie live — damit bleibt jeder Spieltag ohne Eingabe berechenbar und mehrspielertauglich. Was er nicht setzt
 („KI“), füllt die KI deterministisch und ohne zusätzlichen Zufall: die Waffe, deren Kanal beim aktuellen Gegner am schwächsten ist (Konterwahl, Gleichstand
 Wucht, Hieb, Zermürbung). KI-Teams und delegierte Bereiche nutzen dieselbe Funktion; ein vom Menschen gesetzter Plan bleibt bei Delegation erhalten
 (`HUMAN_SIDE_MODIFIER_KEYS`, „Mensch überschreibt, KI respektiert“).
@@ -467,3 +467,26 @@ Disziplinen entfallen: GESAMT außerhalb der drei Breaking-Zeilen ist bitgleich.
 2. PixelLab-Arena und Geräte-Requisiten (Konzept 6) unverändert offen, nichts bestellt.
 3. Dritter Save für die C2/E1-Anker (mehr Zellen je Feldgröße).
 4. Der Waffenblock der Einsatzliste braucht einen Sichtabgleich in der echten App.
+
+## 15. Nachtrag nach der unabhängigen Review (22.11.)
+
+Muss-Fixe und Verbesserungen, in der Reihenfolge der Review. Die Zahlen hier ersetzen die Abschnitte 10.2 bis 12.
+
+| Punkt | Stand |
+|---|---|
+| M1 Lauffenster | `MOTOREN.breaking.lauf()` schnitt nach 120 s ab; lange Kämpfe fehlten in `u.summe`. Jetzt richtet sich das Fenster nach der Warteschlange (`max(120, Länge x rundenDauer x 1,1 + 5)`), nur für Breaking im Tag-Team; alle anderen Bühnen und der Gauntlet bleiben bei 120 s (bitgleich). Test: Summe der Boxscore-Werte = Aushalte-Punkte + Gutschriften des ganzen Protokolls. |
+| M2 Waffenfolge | Die Einsatzliste strich Nullen am Ende, der Motor wiederholt mit der tatsächlichen Länge (`["wucht"]` hieß „immer Wucht“). Jetzt wird jede Folge auf mindestens drei Gänge mit „KI“ aufgefüllt (UI, `normalisiereBreakingWaffen`, Speichern). |
+| Notbremse | Obergrenze 330 auf 700 Anschläge, Abbruch nur an Gang-Grenzen (nicht mehr mitten in der Phase), Eskalation bis Umlauf 5 (x1 / 1,5 / 2,2 / 3 / 4), Geräte-Anzeige bleibt bei Stufe III. Gemessen über die ganze Kader-Familie (5 Paarungen) und die Feldgrößen 2 bis 6, je 30 Kämpfe: **0,3 % Notbremse** (2 von 750), höchstens 3 % in einer Paarung (6 je Seite). Vorher 6,7 % gesamt, 67 % in einer Paarung. Sonde: `scripts/sonde-breaking-tagteam.mjs --je-seite=2,3,4,5,6`. |
+| HP / Gutschrift | HP 200 + 1,5 x NERVEN (vorher 150), k 3 (vorher 4). Grund: rho je Feldgröße 3 und 4 stieg von 0,77 / 0,79 auf 0,80 / 0,83 bei Pp 10,0 (hpBasis 200 mit k 4 gab Pp 17,7, hpBasis 260 27,6, mit größerem HP-Faktor 24,4). |
+| Bruch-Bonus (Rest der Phase gutschreiben) | gebaut (`bruchBonus`), gemessen, **aus**: rho 0,896 auf 0,891 (n=96), Pp 8,4 auf 12,6. Frühes Brechen wird nicht bestraft genug, um die Abnahme zu verschlechtern. Die Entkopplung Gutschrift von Schaden bleibt eine bewusste Entscheidung (Abschnitt 10.2). |
+| rho je Feldgröße (n=96, Median Kader-Familie) | Feldgröße 2: 0,679 (Gauntlet 0,701), 3: 0,799 (0,759), 4: 0,830 (0,764), 5: 0,886 (0,823), 6: 0,909 (0,847). **Feldgröße 2 liegt unter 0,75**, im alten Gauntlet ebenfalls (0,701); bei vier Spielern je Spiel ist die Rangkorrelation sehr verrauscht (Spannweite 0,55). Offen, siehe unten. |
+| rho gesamt | n=48: 0,915, n=96: 0,909 (Saison 0,944); Gauntlet 0,856. |
+| Pp | Strom 0 / 10 000 000: 10,0 / 13,9, gepoolt 10,4. |
+| Fingerabdruck | GESAMT **fe1dc086d68d**; Breaking-Zeilen 618a78380a90 / 9fcfb85a5f9a / ae3a91006f01. `BREAKING-GAUNTLET 031655024229` und alle anderen Schutzsummen unverändert. |
+| Einsatzliste | Waffenblock nur im Tag-Team-Format (`breakingFormatFuer(...) === "tagteam"`); Text korrigiert (nur Slot 1 beginnt); beim Speichern validiert (`bereinigeBreakingWaffen`: nur eingesetzte Spieler dieser Seite, höchstens 6 Einträge, gültige Kennungen). Rückfall auf die Spieler-Id auch bei reiner KI-Folge unter der Zeilen-Id. |
+| Anzeige | Spalte „Ø“ rechnet ohne Gutschrift; bei Notbremse steht „Entscheidung: Zahl der Lebenden, dann Rest-HP“ im Bild. |
+| Tests | Eingabe-Hash (Format und Plan), Delegation (Mensch gewinnt), Lauffenster, Standzeit strikt <= 2, Notbremse über die Kader-Familie, kurze Folgen, Speichern. |
+
+Anker: C2 und E1 sowie die PP-Referenz wurden nach den Konstantenänderungen neu gezogen (4 frische Battle-Saves à 20 Spieltage, `OLY_PP_SKALA=roh`, Quick-Sim, 16 Zellen; Feldgröße 2 bis 6 je 2 bis 4 Zellen). C2 disziplinweit rTop 4,9 / rMed 1,3, je Feldgröße rTop 4,9 / 4,13 / 3,38 / 6,53 / 9,09 und rMed 1,04 / 1,31 / 0,87 / 1,34 / 1,53. Die Kurvenform (Exponent ln(Anteil Mitte)/ln(rMed/rTop)) liegt damit je Feldgröße zwischen 0,78 und 1,21 (disziplinweit 1,04); der frühere Ausreißer (0,70 gegen 1,59) stammte aus nur 2 Zellen je Feldgröße. Feldgrößen mit nur 2 Zellen (2 und 3) bleiben unsicher; mehr Saves würden sie festigen.
+
+Offen nach der Review: Feldgröße 2 (rho 0,68, wie schon im Gauntlet unter 0,75); die widersprüchlichen Kurvenformen der C2-Anker je Feldgröße (Exponent 0,70 gegen 1,59) werden mit den neuen Zellen geprüft, siehe `disziplin-abnahme.json`.

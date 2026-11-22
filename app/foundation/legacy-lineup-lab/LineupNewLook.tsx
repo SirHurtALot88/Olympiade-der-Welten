@@ -197,6 +197,8 @@ export type LineupNewLookProps = Pick<
    * einen Eintrag (`null` = die KI waehlt). Fehlt die Prop, gibt es keinen Waffenblock.
    */
   breakingWaffen?: {
+    /** Nur im Tag-Team-Format gesetzt (`breakingFormatFuer(...) === "tagteam"`); im alten Gauntlet gibt es keine Waffenwahl. */
+    aktiv: boolean;
     spieler: (disciplineSide: "d1" | "d2") => Array<{ activePlayerId: string; name: string; slotNr: number }>;
     folge: (disciplineSide: "d1" | "d2", activePlayerId: string) => Array<string | null>;
     setze: (disciplineSide: "d1" | "d2", activePlayerId: string, gang: number, waffe: string | null) => void;

@@ -1975,12 +1975,12 @@ export default function EinsatzlisteModern(props: Props) {
                 );
               })()
             ) : null}
-            {breakingWaffen && dSeite?.disciplineId === BREAKING_DISCIPLINE_ID ? (
+            {breakingWaffen && dSeite?.disciplineId === BREAKING_DISCIPLINE_ID && breakingWaffen.aktiv ? (
               <div className="elm-waffen" data-testid={`elm-waffen-${seite}`}>
                 <span className="bc-gk">Waffen je Gang</span>
                 <small>
-                  Jeder Spieler nutzt in jedem Gang genau eine Waffe und darf sie von Gang zu Gang wechseln. Die Reihenfolge der Slots ist die
-                  Wechselreihenfolge. „KI“ wählt die Waffe, die beim aktuellen Gegner am schwächsten gedeckt ist.
+                  Jeder Spieler nutzt in jedem Gang genau eine Waffe und darf sie von Gang zu Gang wechseln. Nur Slot 1 beginnt im Ring; wer danach
+                  eingewechselt wird, entscheidet die Wechsel-KI (Umlauf-Regel, Standzeit, Schutz). „KI“ wählt die Waffe, die beim aktuellen Gegner am schwächsten gedeckt ist.
                 </small>
                 {breakingWaffen.spieler(seite).map((sp) => {
                   const folge = breakingWaffen.folge(seite, sp.activePlayerId);

@@ -346,9 +346,9 @@
   },
   "breaking": {
    "chassis": "buehne",
-   "rhoJeSpiel": 0.9,
-   "rhoSpannweite": 0.115,
-   "rhoSaison": 0.93,
+   "rhoJeSpiel": 0.915,
+   "rhoSpannweite": 0.104,
+   "rhoSaison": 0.951,
    "rhoMessung": {
     "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs --node 48 breaking -- Breaking Tag-Team, 22.11.",
     "spiele": 48,
@@ -357,8 +357,8 @@
     "statistik": "Median ueber die Kader-Familie"
    },
    "pp": [
-    8.7,
-    10.2
+    10.0,
+    13.9
    ],
    "ppMessung": {
     "befehl": "OLY_FORM_MODUS=echt node scripts/messe-arena-einfluss.mjs breaking 48 (+ --saat-versatz=10000000), Chromium; gepoolt (poole-arena-einfluss.mjs) 9,2",
@@ -369,13 +369,13 @@
      0,
      10000000
     ],
-    "gepoolt": 9.2
+    "gepoolt": 10.4
    },
    "datum": "2026-11-22",
    "commit": "64698a61",
    "rhoFrisch": true,
    "ppFrisch": true,
-   "anmerkung": "BREAKING TAG-TEAM 22.11. (docs/design/breaking-tagteam-22-11.md, Fingerabdruck GESAMT ea36f666cc71 -> f1706311a59b, nur spiele breaking 1/7/42): 6 gegen 6, Gang mit zwei Phasen, verdeckter Wechsel, Waffe frei waehlbar; rho je Spiel 0,856 -> 0,900 (n=48; 0,906 bei n=24, 0,897 bei n=96), Saison 0,881 -> 0,930, Pp 8,7 / 10,2, gepoolt 9,2. Altes Format als Rueckweg bit-identisch (BREAKING-GAUNTLET). | VORHER: FORMKARTEN ECHT (18.11.): seit diesem Stand liest breaking die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): das Rezept liess intelligence (Matrixgewicht 2) in keiner Unterfertigkeit vorkommen -- es trug faktisch 0 statt 2 (Fund von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt intelligence 6 in NERVEN, zugleich ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (health/power/determination/will/dexterity, s. Kommentar am Rezept). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 14,3/13,9 -> 12,5/10,2 (intelligence 0 -> 0,8/1,2 %, health 12,8/13,4 -> 14,8/15,0 % gegen Matrix 18), rho je Spiel 0,867 -> 0,860 (Spannweite 0,169, Saison 0,923) -- die rho-Bewegung liegt weit innerhalb des Kaderrauschens. Damit erfuellt breaking als letzte der neun Buehnen-Disziplinen die Struktur-Pruefung, der Guard ist fuer alle neun scharf. Vorher (Task #136): rho 0,801 -> 0,867 (n=24), Gegenprobe n=48 0,868; bleibt wegen der grossen Spannweite vorsorglich auf der Beobachtungsliste.",
+   "anmerkung": "BREAKING TAG-TEAM 22.11. (docs/design/breaking-tagteam-22-11.md, Fingerabdruck GESAMT ea36f666cc71 -> fe1dc086d68d, nur spiele breaking 1/7/42): 6 gegen 6, Gang mit zwei Phasen, verdeckter Wechsel, Waffe frei waehlbar; rho je Spiel 0,856 -> 0,915 (n=48; 0,909 bei n=96), Saison 0,881 -> 0,951, Pp 10,0 / 13,9, gepoolt 10,4 (Stand nach der Review: HP 200, k 3, Notbremse 0,3 %). Altes Format als Rueckweg bit-identisch (BREAKING-GAUNTLET). | VORHER: FORMKARTEN ECHT (18.11.): seit diesem Stand liest breaking die gespielte Formkarte statt der Ersatzkarte; Kopfwerte mit OLY_FORM_MODUS=echt gemessen, die Ersatzkarten-Werte stehen unter formkarten.ersatzVorher.  | VORHER: BUDGET-KONSERVIERUNG 15.11. (Task #133, Chris: 'budget konservierung sollte eigentlich jetzt fuer alle 20 diszis schon gelten!'): das Rezept liess intelligence (Matrixgewicht 2) in keiner Unterfertigkeit vorkommen -- es trug faktisch 0 statt 2 (Fund von tests/buehne-rezept-budget-guard.test.ts, PR #1470). Jetzt intelligence 6 in NERVEN, zugleich ein multiplikativer Zeilenschritt gegen die gemessenen Anteile (health/power/determination/will/dexterity, s. Kommentar am Rezept). Gemessen auf main fbcdc6fab plus diesem Rezept: Pp 14,3/13,9 -> 12,5/10,2 (intelligence 0 -> 0,8/1,2 %, health 12,8/13,4 -> 14,8/15,0 % gegen Matrix 18), rho je Spiel 0,867 -> 0,860 (Spannweite 0,169, Saison 0,923) -- die rho-Bewegung liegt weit innerhalb des Kaderrauschens. Damit erfuellt breaking als letzte der neun Buehnen-Disziplinen die Struktur-Pruefung, der Guard ist fuer alle neun scharf. Vorher (Task #136): rho 0,801 -> 0,867 (n=24), Gegenprobe n=48 0,868; bleibt wegen der grossen Spannweite vorsorglich auf der Beobachtungsliste.",
    "formkarten": {
     "modus": "echt",
     "quelle": "docs/design/formkarten-alle-disziplinen-18-11.md",
@@ -390,6 +390,25 @@
      "datum": "2026-11-15",
      "commit": "fbcdc6fab"
     }
+   },
+   "rhoJeFeldgroesse": {
+    "befehl": "OLY_FORM_MODUS=echt node scripts/miss-alle-disziplinen.mjs --node 96 breaking --je-seite=<n>",
+    "spiele": 96,
+    "tagteam": {
+     "2": 0.679,
+     "3": 0.799,
+     "4": 0.83,
+     "5": 0.886,
+     "6": 0.909
+    },
+    "gauntlet": {
+     "2": 0.701,
+     "3": 0.759,
+     "4": 0.764,
+     "5": 0.823,
+     "6": 0.847
+    },
+    "hinweis": "Feldgroesse 2 liegt in beiden Formaten unter 0,75 (vier Spieler je Spiel, Spannweite 0,55); offen."
    }
   },
   "wettessen": {
