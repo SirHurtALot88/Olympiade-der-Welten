@@ -99,8 +99,23 @@ export function stufeFuerVertrauen(vertrauen: number): { stufe: VorstandStufe; a
   return { stufe: "sparauflage", anteil: VORSTAND_STUFEN[VORSTAND_STUFEN.length - 1]!.anteil };
 }
 
+/**
+ * Untergrenze der Quote in SAISON 1 (Budget-Gespraech 23.11., PM-Entscheid nach Messlauf A: Abbruchkriterium gerissen, 9 Teams unter 10
+ * Spielern und Bottom-4-Staerke 37,1 statt 37,4): in der ersten Saison gibt der Vorstand mindestens 80 % frei, die Stufen 70 % und 50 %
+ * gibt es erst ab Saison 2. Gilt nur mit dem Stempel `toepfeS1` und nur in Saison 1.
+ */
+export const S1_QUOTE_UNTERGRENZE = 0.8;
+
 /** Wie viel Budget der Vorstand diesem Team fuer Transfers freigibt. Fuer KI und Mensch dieselbe Funktion. */
 export function resolveVorstandFreigabe(gameState: GameState, teamId: string): VorstandFreigabe {
+  const f = resolveVorstandFreigabeRoh(gameState, teamId);
+  if ((saisonNummer(gameState) ?? 1) <= 1 && f.grund === "vertrauen" && f.anteil < S1_QUOTE_UNTERGRENZE - 1e-9) {
+    return { ...f, anteil: S1_QUOTE_UNTERGRENZE, stufe: "niedrig" };
+  }
+  return f;
+}
+
+function resolveVorstandFreigabeRoh(gameState: GameState, teamId: string): VorstandFreigabe {
   if (!istVorstandBudgetfreigabeAktiv()) {
     return { teamId, stufe: "hoch", anteil: 1, vertrauen: null, grund: "abgeschaltet" };
   }

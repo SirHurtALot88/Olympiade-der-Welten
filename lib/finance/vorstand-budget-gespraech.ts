@@ -34,6 +34,7 @@ import {
   berechneVorstandBudgetStand,
   lesVorstandZustand,
   QUOTEN_STUFEN,
+  S1_QUOTE_UNTERGRENZE,
   stufeFuerVertrauen,
   VORSTAND_STUFEN,
   type VorstandBudgetStand,
@@ -312,6 +313,9 @@ export function beurteileBudgetWahl(gameState: GameState, teamId: string, wahl: 
     if (wahl.ambition === "hoch") {
       if (zielRang != null && zielRang > 1) zusagen.push({ text: "Ziel einen Platz besser", punkte: ZUSAGE_WERT.zielhoch[charakter] });
       if (q0 < 1 - 1e-9) bitten.push({ text: "Freigabe eine Stufe höher", punkte: BITTE_PREIS.stufe });
+    }
+    if (wahl.ambition === "tief" && q0 <= S1_QUOTE_UNTERGRENZE + 1e-9 && saisonNr(gameState) <= 1) {
+      sperre ??= "In Saison 1 gibt der Vorstand mindestens 80 % frei: eine Stufe tiefer geht nicht.";
     }
     if (wahl.ambition === "tief") {
       bitten.push({ text: "Ziel zwei Plätze tiefer", punkte: BUDGET_PREIS_ZIEL_SENKEN[charakter] });

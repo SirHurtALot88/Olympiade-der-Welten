@@ -334,7 +334,7 @@ export default function BudgetGespraech({ gameState, teamId, onAktion, kannSchre
             <h3>1 · Ambition</h3>
             <div className="unter">Höheres Ziel: mehr Freigabe jetzt, mehr Risiko für das Vertrauen.</div>
             <div className="wahl">
-              {opt("ambition", "tief", "Bescheiden", zr != null ? `Rang ${zr + 2}, weniger Druck` : "weniger Druck", prozent(qTief), "Freigabe", q <= 0.5)}
+              {opt("ambition", "tief", "Bescheiden", zr != null ? `Rang ${zr + 2}, weniger Druck` : "weniger Druck", prozent(qTief), "Freigabe", q <= 0.5 || (saisonNr <= 1 && q <= 0.8))}
               {opt("ambition", "ziel", "Ziel des Vorstands", zr != null ? `Rang ${zr}, sein Vorschlag` : "sein Vorschlag", prozent(q), "Freigabe")}
               {opt("ambition", "hoch", "Ehrgeizig", zr != null ? `Rang ${Math.max(1, zr - 1)}, verfehlt −0,9` : "verfehlt −0,9", prozent(qHoch), q >= 1 ? "schon voll" : "Freigabe")}
             </div>

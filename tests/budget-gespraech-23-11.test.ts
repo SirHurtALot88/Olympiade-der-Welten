@@ -75,15 +75,16 @@ describe("Toepfe und Quote ab Saison 1", () => {
     expect(resolveVorstandFreigabe(fixture({ stempel: "alt" }), "H-2").anteil).toBe(1);
   });
 
-  it("Startvertrauen = Identitaet: 7,4 -> 90 %, 2,4 -> 70 %, 9 -> 100 %", () => {
+  it("Startvertrauen = Identitaet: 7,4 -> 90 %, 2,4 -> 70 % (in Saison 1 mindestens 80 %), 9 -> 100 %", () => {
     const gs = fixture();
     expect(startVertrauenAusIdentitaet(gs, "H-1")).toBe(7.4);
     expect(resolveVorstandFreigabe(gs, "H-1").anteil).toBe(0.9);
-    expect(resolveVorstandFreigabe(gs, "H-2").anteil).toBe(0.7);
+    // Saison 1: Untergrenze 80 % (Messlauf A riss das Abbruchkriterium); ab Saison 2 gilt die 70 %-Stufe.
+    expect(resolveVorstandFreigabe(gs, "H-2").anteil).toBe(0.8);
     expect(resolveVorstandFreigabe(gs, "K-1").anteil).toBe(1);
     const s = berechneVorstandBudgetStand(gs, "H-2");
     expect(s.gedeckelt).toBe(true);
-    expect(s.wirksamerAnteil).toBe(0.7);
+    expect(s.wirksamerAnteil).toBe(0.8);
     // Rücklage und Gehaltspuffer stecken im Topf; der Pflichtkader 8 bleibt quotenfrei (leerer Kader: Kaderpflicht-Freigabe).
     expect(s.herleitung.verfuegbar).toBeLessThan(200);
     expect(s.kaderpflicht.aktiv).toBe(true);
