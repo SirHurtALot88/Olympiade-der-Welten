@@ -140,7 +140,7 @@ describe("Fix 3: Rueckweg und Stempel", () => {
   it("OLY_TRAINING_JE_SPIELTAG=aus setzt fuer neue Saisons den Stempel alt; OLY_ENTWICKLUNG hat Vorrang", () => {
     delete process.env.OLY_ENTWICKLUNG;
     delete process.env.OLY_TRAINING_JE_SPIELTAG;
-    expect(entwicklungsRegelSchalter()).toBe("neu");
+    expect(entwicklungsRegelSchalter()).toBe("neu2");
     process.env.OLY_TRAINING_JE_SPIELTAG = "aus";
     expect(entwicklungsRegelSchalter()).toBe("alt");
     process.env.OLY_ENTWICKLUNG = "neu";

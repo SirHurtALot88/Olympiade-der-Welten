@@ -7,6 +7,7 @@ import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-p
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 import { trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
+import { entwicklungsParameterFuer } from "@/lib/training/entwicklung-neu";
 import {
   fuehreTagZusammen,
   leistungFuerTag,
@@ -291,7 +292,7 @@ export function accumulateMatchdayTrainingProgress(input: {
         if (entwicklungNeu && zuwachs && attributeSheetStats) {
           const einheiten = new Map<string, number>();
           const leistung: AttributWerte = ppIndex
-            ? leistungFuerTag({ index: ppIndex, matchdayId, player: spielerJetzt, verlauf, einheiten })
+            ? leistungFuerTag({ index: ppIndex, matchdayId, player: spielerJetzt, verlauf, einheiten, parameter: entwicklungsParameterFuer(gameState) })
             : {};
           if (ppIndex) {
             if (einheiten.size > 0) eintrag.y = Object.fromEntries([...einheiten].map(([id, e]) => [id, Math.round(e * 1000) / 1000]));
@@ -434,7 +435,7 @@ function schliesseOffeneZuwaechseEinesSpielers(
       }
       const einheiten = new Map<string, number>();
       const index = ppTagesIndex(input.gameState);
-      const l = leistungFuerTag({ index, matchdayId: e.m, player, verlauf: alle.slice(0, position), einheiten });
+      const l = leistungFuerTag({ index, matchdayId: e.m, player, verlauf: alle.slice(0, position), einheiten, parameter: entwicklungsParameterFuer(input.gameState) });
       const tag = fuehreTagZusammen({ vorher: pickAttributes(stats), deckel, t: e.z ?? {}, a: e.a ?? {}, l });
       const fertig: TrainingsSpieltagEintrag = { ...e };
       delete fertig.o;

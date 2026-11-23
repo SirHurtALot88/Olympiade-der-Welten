@@ -4,6 +4,8 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import {
   entwicklungNeuFuer,
   entwicklungsRegelFuer,
+  entwicklungsRegelSchalter,
+  entwicklungVerteilungFuer,
   entwicklungsRegelFuerSpielmodus,
   stempleEntwicklungsRegelBeimAnlegen,
   stempleEntwicklungsRegelNachLaden,
@@ -31,7 +33,7 @@ describe("Entwicklungsregel: Stempel im Spielstand", () => {
 
   it("neues Spiel: neu ab Saison 1, idempotent; die Prozessvariable wirkt nur beim Stempeln", () => {
     const gs = stempleEntwicklungsRegelBeimAnlegen(neuesSpiel());
-    expect(gs.seasonState.entwicklungsRegel).toEqual({ seasonId: "season-1", regel: "neu" });
+    expect(gs.seasonState.entwicklungsRegel).toEqual({ seasonId: "season-1", regel: "neu2" });
     expect(stempleEntwicklungsRegelBeimAnlegen(gs)).toBe(gs);
     process.env.OLY_ENTWICKLUNG = "alt";
     expect(entwicklungNeuFuer(gs)).toBe(true);
@@ -54,7 +56,24 @@ describe("Entwicklungsregel: Stempel im Spielstand", () => {
       seasonState: { ...geladen.seasonState, seasonId: "season-2", entwicklungsRegel: entwicklungsRegelFuerSpielmodus(geladen, "season-2") },
     } as GameState;
     expect(entwicklungsRegelFuer(geladen)).toBe("alt");
-    expect(entwicklungsRegelFuer(wechsel)).toBe("neu");
+    expect(entwicklungsRegelFuer(wechsel)).toBe("neu2");
+    expect(entwicklungNeuFuer(wechsel)).toBe(true);
+    expect(entwicklungVerteilungFuer(wechsel)).toBe(true);
+  });
+
+  it("neu (22.11.) bleibt neu und ist keine Verteilungs-Saison; neu2 ist beides", () => {
+    const stempel = (regel: "neu" | "neu2") =>
+      ({ season: { id: "s" }, seasonState: { seasonId: "s", entwicklungsRegel: { seasonId: "s", regel } } }) as unknown as GameState;
+    expect(entwicklungNeuFuer(stempel("neu"))).toBe(true);
+    expect(entwicklungVerteilungFuer(stempel("neu"))).toBe(false);
+    expect(entwicklungNeuFuer(stempel("neu2"))).toBe(true);
+    expect(entwicklungVerteilungFuer(stempel("neu2"))).toBe(true);
+    process.env.OLY_ENTWICKLUNG = "neu";
+    expect(entwicklungsRegelSchalter()).toBe("neu");
+    process.env.OLY_ENTWICKLUNG = "alt";
+    expect(entwicklungsRegelSchalter()).toBe("alt");
+    delete process.env.OLY_ENTWICKLUNG;
+    expect(entwicklungsRegelSchalter()).toBe("neu2");
   });
 });
 

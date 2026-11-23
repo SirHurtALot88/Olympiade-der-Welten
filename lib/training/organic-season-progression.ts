@@ -9,7 +9,8 @@ import type {
 } from "@/lib/data/olyDataTypes";
 import { ppSkalaUmrechnung } from "@/lib/resolve/pp-skala";
 import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
-import { entwicklungsParameter, ertragsFaktor, trainingsBudgetFaktor } from "@/lib/training/entwicklung-neu";
+import { entwicklungsParameter, entwicklungsParameterFuer, ertragsFaktor, trainingsBudgetFaktor, type EntwicklungsParameter } from "@/lib/training/entwicklung-neu";
+import { trainingsGueteFuerSpieler } from "@/lib/training/trainings-guete-spieler";
 import {
   fokusDominanz,
   istDiligent,
@@ -862,7 +863,7 @@ function offenerAnteil(rest: EntwicklungsRest): { z: AttributWerte; a: AttributW
  *  - Ohne gebuchten Spieltag: die Erwartung aus der Vorsaison; ohne Vorsaison 0.
  * Offene Spieltage (`o`) zaehlen mit ihrem erwarteten L zum Rest.
  */
-function restLeistung(player: Player, rest: EntwicklungsRest): AttributWerte {
+function restLeistung(player: Player, rest: EntwicklungsRest, parameter: EntwicklungsParameter): AttributWerte {
   const summe: AttributWerte = {};
   const addiere = (werte: AttributWerte, faktor = 1) => {
     for (const [attribute, wert] of Object.entries(werte) as Array<[PlayerGeneratorAttributeName, number]>) {
@@ -872,7 +873,7 @@ function restLeistung(player: Player, rest: EntwicklungsRest): AttributWerte {
   const tage = rest.zukunft + rest.offen.length;
   if (tage <= 0) return summe;
   const gebucht = rest.verlauf.filter((e) => e.s === "t" && !e.o);
-  const erwartung = leistungsErwartungJeTag(player);
+  const erwartung = leistungsErwartungJeTag(player, parameter);
   const gewicht = erwartung ? entwicklungsParameter().erwartungGewichtTage : 0;
   const nenner = gebucht.length + gewicht;
   if (nenner <= 0) return summe;
@@ -1315,13 +1316,14 @@ export function buildOrganicSeasonProgression(input: {
   // ist ausserhalb des Tagesmodus (`nurTraining`) die PROGNOSE des noch nicht gebuchten Rests (Saisonende: nichts mehr, wenn
   // je Spieltag gebucht wird; mit abgeschaltetem Training je Spieltag der Rutsch ueber die ganze Saison).
   const entNeu = entwicklungNeuFuer(input.gameState);
-  const entP = entwicklungsParameter();
+  const entP = entwicklungsParameterFuer(input.gameState);
   const entRest = entNeu && !input.nurTraining ? bestimmeEntwicklungsRest(input.gameState, input.player) : null;
-  const entLeistungRest = entRest ? restLeistung(input.player, entRest) : null;
+  const entLeistungRest = entRest ? restLeistung(input.player, entRest, entP) : null;
   const entOffen = entRest ? offenerAnteil(entRest) : null;
-  const entAbbauFaktor = entRest ? ligaAbbauFaktor(input.gameState) : 1;
+  const entGuete = entRest ? trainingsGueteFuerSpieler(input.gameState, input.player) : null;
+  const entAbbauFaktor = entRest ? ligaAbbauFaktor(input.gameState) * (entGuete?.abbauFaktor ?? 1) : 1;
   const entBudgetFaktor = entRest
-    ? trainingsBudgetFaktor(istDiligent(input.player), fokusDominanz(entRest.verlauf), entP)
+    ? trainingsBudgetFaktor(istDiligent(input.player), fokusDominanz(entRest.verlauf), entP) * (entGuete?.faktor ?? 1)
     : 1;
   const baseTrainingBudgetRoh =
     input.accumulatedBaseTrainingBudget != null && Number.isFinite(input.accumulatedBaseTrainingBudget)
