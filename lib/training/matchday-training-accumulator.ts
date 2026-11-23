@@ -6,6 +6,15 @@ import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player
 import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
+import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
+import {
+  fuehreTagZusammen,
+  leistungFuerTag,
+  nettoDesEintrags,
+  ppTagesIndex,
+  type AttributWerte,
+} from "@/lib/training/entwicklung-tag";
+import { resolvePlayerPotentialRecordFromGameState } from "@/lib/scouting/player-attribute-ceiling-service";
 import {
   baueTrainingsZielKontext,
   berechneSpieltagsZuwachs,
@@ -124,6 +133,9 @@ export function accumulateMatchdayTrainingProgress(input: {
   // bisherige Ablauf (nur Modus zaehlen + Trainingslast), Zuwachs am Saisonende.
   const jeSpieltag = isTrainingJeSpieltagAktiv();
   const mitZuwachs = jeSpieltag && input.mitZuwachs !== false;
+  // ENTWICKLUNG NEU, Runde 2: je Spieltag Training + Leistung (PP gegen den Liga-Median) - Abbau, gebucht und im Verlauf gezeigt.
+  const entwicklungNeu = mitZuwachs && entwicklungNeuFuer(gameState);
+  const ppIndex = entwicklungNeu && !spieltagOffen ? ppTagesIndex(gameState) : null;
   const ausfall: ReadonlySet<string> = jeSpieltag
     ? (input.ausfallSpielerIds ?? bestimmeAusfallSpielerFuerSpieltag(gameState, matchdayId))
     : new Set<string>();
@@ -157,7 +169,7 @@ export function accumulateMatchdayTrainingProgress(input: {
       // Abschluss-Commit bucht ihn auch fuer ihn — sonst bliebe er ewig offen. Keine Last, kein
       // neuer Eintrag: nur das schon Festgelegte wird gebucht.
       if (spieltagOffen) return player;
-      const abgeschlossen = schliesseOffeneZuwaechseEinesSpielers(player, { seasonId, matchdayId, now });
+      const abgeschlossen = schliesseOffeneZuwaechseEinesSpielers(player, { seasonId, matchdayId, now, gameState });
       if (!abgeschlossen) return player;
       if (abgeschlossen.attributeChanged) attributeChanged = true;
       mutated = true;
@@ -197,7 +209,7 @@ export function accumulateMatchdayTrainingProgress(input: {
       // Abschluss-Commit nach einer Teilbuchung: der beim D1-Commit festgelegte Zuwachs (`o: true`)
       // landet jetzt auf den Attributen — dieselben Zahlen, kein neues Ziel, kein neuer Wurf.
       if (!spieltagOffen && priorEintrag?.o) {
-        const abgeschlossen = schliesseOffeneZuwaechseEinesSpielers(player, { seasonId, matchdayId, now });
+        const abgeschlossen = schliesseOffeneZuwaechseEinesSpielers(player, { seasonId, matchdayId, now, gameState });
         if (abgeschlossen) {
           if (abgeschlossen.attributeChanged) attributeChanged = true;
           mutated = true;
@@ -223,9 +235,9 @@ export function accumulateMatchdayTrainingProgress(input: {
       delete modeByMatchday[matchdayId];
     }
     // Ein noch offener Zuwachs (`o`) steht nicht auf den Attributen — dann gibt es nichts zurueckzunehmen.
-    if (priorEintrag?.s === "t" && priorEintrag.z && !priorEintrag.o && attributeSheetStats) {
+    if (priorEintrag?.s === "t" && (priorEintrag.z || priorEintrag.p || priorEintrag.a) && !priorEintrag.o && attributeSheetStats) {
       const zurueck = { ...attributeSheetStats } as NonNullable<Player["attributeSheetStats"]>;
-      for (const [attribute, wert] of Object.entries(priorEintrag.z) as Array<[PlayerGeneratorAttributeName, number]>) {
+      for (const [attribute, wert] of Object.entries(nettoDesEintrags(priorEintrag)) as Array<[PlayerGeneratorAttributeName, number]>) {
         const aktuell = zurueck[attribute];
         if (typeof aktuell === "number") zurueck[attribute] = roundValue(aktuell - wert, 3);
       }
@@ -254,6 +266,7 @@ export function accumulateMatchdayTrainingProgress(input: {
               ziel: bestimmt.ziel,
               quelle: bestimmt.quelle,
               modus: mode,
+              spieltagId: matchdayId,
             })
           : null;
         eintrag = {
@@ -265,7 +278,35 @@ export function accumulateMatchdayTrainingProgress(input: {
           i: mode,
           l: roundValue(fatigueShare, 3),
         };
-        if (zuwachs && attributeSheetStats && Object.keys(zuwachs.zuwachs).length > 0) {
+        if (entwicklungNeu && zuwachs && attributeSheetStats) {
+          const leistung: AttributWerte = ppIndex
+            ? leistungFuerTag({ index: ppIndex, matchdayId, player: spielerJetzt, verlauf })
+            : {};
+          const tag = fuehreTagZusammen({
+            vorher: pickAttributes(attributeSheetStats),
+            deckel: zuwachs.deckel,
+            t: zuwachs.zuwachs,
+            a: zuwachs.abbau,
+            l: leistung,
+          });
+          const hatT = Object.keys(tag.t).length > 0;
+          const hatP = Object.keys(tag.p).length > 0;
+          const hatA = Object.keys(tag.a).length > 0;
+          if (hatT) eintrag.z = tag.t;
+          if (hatP) eintrag.p = tag.p;
+          if (hatA) {
+            eintrag.a = tag.a;
+            if (zuwachs.abbauFaktor !== 1) eintrag.f = zuwachs.abbauFaktor;
+          }
+          if (hatT || hatP || hatA) {
+            if (spieltagOffen) {
+              eintrag.o = true;
+            } else {
+              attributeSheetStats = bucheNettoAufAttribute(attributeSheetStats, nettoDesEintrags(eintrag));
+              attributeChanged = true;
+            }
+          }
+        } else if (zuwachs && attributeSheetStats && Object.keys(zuwachs.zuwachs).length > 0) {
           const { neu, gebucht } = bucheZuwachsAufAttribute(attributeSheetStats, zuwachs.zuwachs);
           if (neu) {
             eintrag.z = gebucht;
@@ -337,6 +378,20 @@ function bucheZuwachsAufAttribute(
   return Object.keys(gebucht).length > 0 ? { neu, gebucht } : { neu: null, gebucht };
 }
 
+/** Netto-Aenderung (mit Vorzeichen) je Attribut auf den Bogen legen; Wert nie unter 1. */
+function bucheNettoAufAttribute(
+  stats: NonNullable<Player["attributeSheetStats"]>,
+  netto: Partial<Record<PlayerGeneratorAttributeName, number>>,
+): NonNullable<Player["attributeSheetStats"]> {
+  const neu = { ...stats } as NonNullable<Player["attributeSheetStats"]>;
+  for (const [attribute, wert] of Object.entries(netto) as Array<[PlayerGeneratorAttributeName, number]>) {
+    const vorher = neu[attribute];
+    if (typeof vorher !== "number") continue;
+    neu[attribute] = Math.max(1, roundValue(vorher + wert, 3));
+  }
+  return neu;
+}
+
 /**
  * Offene Zuwaechse (`o: true`, festgehalten beim D1-Teil-Commit) eines Spielers auf die Attribute buchen
  * und den Eintrag abschliessen. Mit `matchdayId` nur der Eintrag dieses Spieltags, sonst alle offenen der
@@ -344,7 +399,7 @@ function bucheZuwachsAufAttribute(
  */
 function schliesseOffeneZuwaechseEinesSpielers(
   player: Player,
-  input: { seasonId: string; matchdayId?: string | null; now: string },
+  input: { seasonId: string; matchdayId?: string | null; now: string; gameState?: GameState },
 ): { player: Player; attributeChanged: boolean } | null {
   const akku = player.seasonTrainingAccumulator;
   if (!akku || akku.seasonId !== input.seasonId || !akku.verlauf) return null;
@@ -352,8 +407,33 @@ function schliesseOffeneZuwaechseEinesSpielers(
   if (!akku.verlauf.some(betroffen)) return null;
   let stats = player.attributeSheetStats;
   let attributeChanged = false;
-  const verlauf = akku.verlauf.map((e) => {
+  const neuRegel = Boolean(input.gameState && entwicklungNeuFuer(input.gameState));
+  const verlauf = akku.verlauf.map((e, position, alle) => {
     if (!betroffen(e)) return e;
+    if (neuRegel && input.gameState && stats) {
+      // Entwicklung neu: Training (`z`) und Abbau (`a`) stehen seit D1 fest; die Leistung des GANZEN Spieltags kommt jetzt dazu.
+      const record = resolvePlayerPotentialRecordFromGameState({ gameState: input.gameState, playerId: player.id });
+      const deckel: AttributWerte = {};
+      for (const [attribute, wert] of Object.entries(record?.hiddenAttributeCeiling ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) {
+        if (typeof wert === "number") deckel[attribute] = Math.min(99, wert);
+      }
+      const l = leistungFuerTag({ index: ppTagesIndex(input.gameState), matchdayId: e.m, player, verlauf: alle.slice(0, position) });
+      const tag = fuehreTagZusammen({ vorher: pickAttributes(stats), deckel, t: e.z ?? {}, a: e.a ?? {}, l });
+      const fertig: TrainingsSpieltagEintrag = { ...e };
+      delete fertig.o;
+      delete fertig.z;
+      delete fertig.p;
+      delete fertig.a;
+      if (Object.keys(tag.t).length > 0) fertig.z = tag.t;
+      if (Object.keys(tag.p).length > 0) fertig.p = tag.p;
+      if (Object.keys(tag.a).length > 0) fertig.a = tag.a;
+      const netto = nettoDesEintrags(fertig);
+      if (Object.keys(netto).length > 0) {
+        stats = bucheNettoAufAttribute(stats, netto);
+        attributeChanged = true;
+      }
+      return fertig;
+    }
     const { neu, gebucht } = bucheZuwachsAufAttribute(stats, e.z ?? {});
     const abgeschlossen: TrainingsSpieltagEintrag = { ...e };
     delete abgeschlossen.o;
@@ -395,6 +475,7 @@ export function schliesseOffeneTrainingsZuwaechse(
       seasonId: gameState.season.id,
       matchdayId: input?.matchdayId ?? null,
       now,
+      gameState,
     });
     if (!abgeschlossen) return player;
     mutated = true;

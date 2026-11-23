@@ -14,6 +14,7 @@ import {
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 import { getMatchdayBookedTrainingIds } from "@/lib/training/organic-season-progression";
 import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
+import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
 
 /**
  * Kumulierte Trainings-Prognose der laufenden Saison (ein Wert pro Attribut, kein Spieltag-Verlauf).
@@ -109,6 +110,11 @@ export function buildPlayerSeasonTrainingForecast(input: {
   if (playedMatchdayIds.length === 0) return null;
 
   const totalMatchdays = resolveSeasonTotalMatchdays(gameState);
+  // ENTWICKLUNG NEU, Runde 2: alles ist je Spieltag gebucht (Training z, Leistung p, Abbau a) -- die Historie summiert genau diese
+  // Eintraege (gezeigt = gebucht) und rechnet nichts hoch. Kein abgeschnittener Spielstand je Spieler (S4).
+  if (entwicklungNeuFuer(gameState) && isTrainingJeSpieltagAktiv()) {
+    return baueNeuHistorie({ gameState, player, seasonId, totalMatchdays, matchdaysPlayed: playedMatchdayIds.length });
+  }
   const lastCanonicalIndex =
     orderIndex.get(playedMatchdayIds[playedMatchdayIds.length - 1]) ?? playedMatchdayIds.length - 1;
 
@@ -252,6 +258,61 @@ export function buildPlayerSeasonTrainingForecast(input: {
     performanceTotal: round1(performanceTotal),
     regressionTotal: round1(regressionTotal),
     offenTotal: round1(offenTotal),
+    attributes,
+  };
+}
+
+function baueNeuHistorie(input: {
+  gameState: GameState;
+  player: Player;
+  seasonId: string;
+  totalMatchdays: number;
+  matchdaysPlayed: number;
+}): PlayerSeasonTrainingForecast {
+  const accumulator = input.player.seasonTrainingAccumulator!;
+  const zero = () =>
+    Object.fromEntries(PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => [attribute, 0])) as Record<PlayerGeneratorAttributeName, number>;
+  const training = zero();
+  const leistung = zero();
+  const abbau = zero();
+  const offen = zero();
+  for (const e of accumulator.verlauf ?? []) {
+    if (e.s !== "t") continue;
+    for (const attribute of PROGRESSION_ATTRIBUTE_ORDER) {
+      const z = e.z?.[attribute] ?? 0;
+      training[attribute] += z;
+      leistung[attribute] += e.p?.[attribute] ?? 0;
+      abbau[attribute] += e.a?.[attribute] ?? 0;
+      if (e.o) offen[attribute] += z;
+    }
+  }
+  const baseline = accumulator.startAttribute ?? input.player.attributeSheetStats ?? null;
+  let netCumulative = 0;
+  const attributes = PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => {
+    const cumulative = round1(training[attribute] + leistung[attribute] - abbau[attribute]);
+    netCumulative += cumulative;
+    const baseValue = baseline?.[attribute];
+    return {
+      attribute,
+      cumulative,
+      projectedValue: typeof baseValue === "number" ? round1(baseValue + cumulative) : cumulative,
+      training: round1(training[attribute]),
+      performance: round1(leistung[attribute]),
+      regression: round1(-abbau[attribute]),
+      offen: round1(offen[attribute]),
+    };
+  });
+  const summe = (werte: Record<PlayerGeneratorAttributeName, number>) => PROGRESSION_ATTRIBUTE_ORDER.reduce((a, k) => a + werte[k], 0);
+  return {
+    seasonId: input.seasonId,
+    matchdaysPlayed: input.matchdaysPlayed,
+    totalMatchdays: input.totalMatchdays,
+    netCumulative: round1(netCumulative),
+    trainingTotal: round1(summe(training)),
+    spilloverTotal: 0,
+    performanceTotal: round1(summe(leistung)),
+    regressionTotal: round1(-summe(abbau)),
+    offenTotal: round1(summe(offen)),
     attributes,
   };
 }

@@ -8,15 +8,7 @@ import {
   stempleEntwicklungsRegelBeimAnlegen,
   stempleEntwicklungsRegelNachLaden,
 } from "@/lib/resolve/entwicklung-regel";
-import {
-  ENTWICKLUNGS_PARAMETER_STANDARD,
-  entwicklungsKurve,
-  entwicklungsKurvenSkala,
-  ertragsFaktor,
-  fokusFaktor,
-  trainingsAnkommFaktor,
-  verfallSumme,
-} from "@/lib/training/entwicklung-neu";
+import { ENTWICKLUNGS_PARAMETER_STANDARD, ertragsFaktor, fokusFaktor } from "@/lib/training/entwicklung-neu";
 import { applyAttributeCeilingSeasonDrift } from "@/lib/scouting/player-attribute-ceiling-service";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 
@@ -81,32 +73,6 @@ describe("Entwicklung neu: Bausteine", () => {
     // Anschluss an den alten Zustandsschritt "closing" (0,45 bei 5 Punkten Abstand).
     expect(ertragsFaktor(5)).toBeGreaterThan(0.4);
     expect(ertragsFaktor(5)).toBeLessThan(0.55);
-  });
-
-  it("Ankomm-Faktor: gut die Haelfte ohne Einsaetze, 1,0 in der Mitte, 1,4 an der Spitze", () => {
-    const p = ENTWICKLUNGS_PARAMETER_STANDARD;
-    expect(trainingsAnkommFaktor(0, 1, p)).toBeCloseTo(0.6, 5);
-    expect(trainingsAnkommFaktor(20, 0.5, p)).toBeCloseTo(1.0, 5);
-    expect(trainingsAnkommFaktor(20, 1, p)).toBeCloseTo(1.4, 5);
-    expect(trainingsAnkommFaktor(20, 0, p)).toBeCloseTo(0.6, 5);
-  });
-
-  it("Verfall nur nach Ausfalltagen, nie negativ", () => {
-    const p = { ...ENTWICKLUNGS_PARAMETER_STANDARD, verfallJeAusfalltag: 0.25 };
-    expect(verfallSumme(0, p)).toBe(0);
-    expect(verfallSumme(4, p)).toBeCloseTo(1, 5);
-    expect(verfallSumme(-3, p)).toBe(0);
-  });
-
-  it("Entwicklungskurve: Vorzeichen bleibt, kleine Summen werden gedaempft, grosse verstaerkt, Deckel haelt", () => {
-    const p = ENTWICKLUNGS_PARAMETER_STANDARD;
-    expect(entwicklungsKurve(0, p)).toBe(0);
-    expect(Math.abs(entwicklungsKurve(2, p))).toBeLessThan(2);
-    expect(Math.abs(entwicklungsKurve(10, p))).toBeGreaterThan(10);
-    expect(entwicklungsKurve(-10, p)).toBeCloseTo(-entwicklungsKurve(10, p), 8);
-    expect(entwicklungsKurve(500, p)).toBe(p.kurveMax);
-    expect(entwicklungsKurvenSkala(3, p)).toBeGreaterThan(0);
-    expect(entwicklungsKurvenSkala(0, p)).toBe(1);
   });
 
   it("Fokus-Faktor: Ziel gehalten gibt mehr, dauernd gewechselt weniger", () => {

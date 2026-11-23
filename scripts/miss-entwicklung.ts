@@ -34,6 +34,7 @@ import { runLocalSeasonCompletion, SEASON_COMPLETION_CONFIRM_TOKEN } from "@/lib
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
+import { ppTagesIndex } from "@/lib/training/entwicklung-tag";
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -79,6 +80,20 @@ type Zeile = {
   evS: number;
   evP: number;
   evR: number;
+  /** Runde 2: Summen der je Spieltag gebuchten Teile (Training z, Leistung p mit Vorzeichen, Abbau a) und die Teile von p. */
+  sumZ: number;
+  sumP: number;
+  sumPPlus: number;
+  sumPMinus: number;
+  sumA: number;
+  diligent: boolean;
+  /** Messfall Bank (`--bank`): zusaetzlich verpflichteter Spieler, der vorwiegend auf der Bank sitzt. */
+  bank?: boolean;
+  /** Je Spieltag der Saison (Reihenfolge `matchdayIds`): gebuchtes Training, Abbau und PP-Abstand zum Liga-Median (null = kein Einsatz) -- fuer die Offline-Eichung. */
+  tagZ?: number[];
+  tagA?: number[];
+  tagAbstand?: Array<number | null>;
+  tagVerletzt?: boolean[];
 };
 
 function potWerte(gs: GameState): Record<string, number> {
@@ -130,7 +145,7 @@ function leistungsDaten(gs: GameState) {
     pp.set(e.playerId, (pp.get(e.playerId) ?? 0) + Number(e.basePoints ?? 0));
     einsaetze.set(e.playerId, (einsaetze.get(e.playerId) ?? 0) + 1);
   }
-  const verlauf = new Map<string, { halten: boolean; dominanz: number; tage: number; ausfall: number; training: number }>();
+  const verlauf = new Map<string, { halten: boolean; dominanz: number; tage: number; ausfall: number; training: number; p: number; pPlus: number; pMinus: number; a: number }>();
   for (const p of gs.players) {
     const akku = p.seasonTrainingAccumulator;
     if (!akku || akku.seasonId !== gs.season.id) continue;
@@ -141,7 +156,16 @@ function leistungsDaten(gs: GameState) {
     const mitZiel = [...jeZiel.values()].reduce((a, b) => a + b, 0);
     const haupt = Math.max(0, ...jeZiel.values());
     const training = trainiert.reduce((s, z) => s + Object.values(z.z ?? {}).reduce((a, b) => a + (b as number), 0), 0);
+    let sumP = 0;
+    let sumPPlus = 0;
+    let sumPMinus = 0;
+    let sumA = 0;
+    for (const z of trainiert) {
+      for (const w of Object.values(z.p ?? {})) { sumP += w as number; if ((w as number) > 0) sumPPlus += w as number; else sumPMinus += w as number; }
+      for (const w of Object.values(z.a ?? {})) sumA += w as number;
+    }
     verlauf.set(p.id, {
+      p: sumP, pPlus: sumPPlus, pMinus: sumPMinus, a: sumA,
       halten: mitZiel >= 12 && haupt / Math.max(1, mitZiel) >= 0.6,
       dominanz: r2(haupt / Math.max(1, mitZiel)),
       tage: trainiert.length,
@@ -179,6 +203,12 @@ function kennzahlen(zeilen: Zeile[]) {
     starkBesserVerdientPct: stark.length ? r2((stark.filter(verdient).length / stark.length) * 100) : null,
     starkBesserN: stark.length,
     trainingMittel: r2(zeilen.reduce((a, z) => a + z.training, 0) / Math.max(1, n)),
+    leistungMittel: r2(zeilen.reduce((a, z) => a + z.sumP, 0) / Math.max(1, n)),
+    leistungPlusMittel: r2(zeilen.reduce((a, z) => a + z.sumPPlus, 0) / Math.max(1, n)),
+    leistungMinusMittel: r2(zeilen.reduce((a, z) => a + z.sumPMinus, 0) / Math.max(1, n)),
+    abbauMittel: r2(zeilen.reduce((a, z) => a + z.sumA, 0) / Math.max(1, n)),
+    // Anteil Training an den Zuwaechsen (Training / (Training + positive Leistung)); Chris: 60 / 40.
+    trainingsAnteilPct: r2((zeilen.reduce((a, z) => a + z.sumZ, 0) / Math.max(1e-9, zeilen.reduce((a, z) => a + z.sumZ + z.sumPPlus, 0))) * 100),
     potDeltaMittel: r2(zeilen.reduce((a, z) => a + (z.potDelta ?? 0), 0) / Math.max(1, zeilen.filter((z) => z.potDelta != null).length)),
     deckeDriftMittel: r2(zeilen.reduce((a, z) => a + (z.deckeDrift ?? 0), 0) / Math.max(1, zeilen.filter((z) => z.deckeDrift != null).length)),
     deckeDeltaMittel: r2(zeilen.reduce((a, z) => a + (z.deckeDelta ?? 0), 0) / Math.max(1, zeilen.filter((z) => z.deckeDelta != null).length)),
@@ -210,6 +240,32 @@ async function main() {
     if (flag("nur-anlage")) { console.log(`SAVE_ID=${saveId}`); return; }
   }
   const get = () => persistence.getSaveById(saveId)!;
+  // MESSFALL BANK (`--bank K [--bank-teams N]`): N Teams (Standard 8) bekommen K zusaetzliche Spieler (aus den Freien, nach Staerke
+  // knapp unter dem eigenen Kader), die ueber den Kader hinaus mittrainieren, aber kaum aufgestellt werden.
+  const bankIds = new Set<string>();
+  const bankK = Number(arg("bank", "0")) || 0;
+  if (bankK > 0 && !flag("nur-abschluss")) {
+    const gs0 = get().gameState;
+    const imKader = new Set(gs0.rosters.map((r) => r.playerId));
+    const frei = gs0.players.filter((p) => !imKader.has(p.id) && p.attributeSheetStats && (gs0.playerPotential ?? []).some((e) => e.playerId === p.id)).sort((a, b) => (a.rating ?? 0) - (b.rating ?? 0));
+    const teamIds = [...new Set(gs0.rosters.map((r) => r.teamId))].sort().slice(0, Number(arg("bank-teams", "8")) || 8);
+    const neueRoster = [...gs0.rosters];
+    for (const teamId of teamIds) {
+      const eigene = gs0.rosters.filter((r) => r.teamId === teamId);
+      const werte = eigene.map((r) => gs0.players.find((p) => p.id === r.playerId)?.rating ?? 0).sort((a, b) => a - b);
+      const ziel = werte[Math.min(2, werte.length - 1)] ?? 0;
+      for (let k = 0; k < bankK; k += 1) {
+        let besterIdx = 0;
+        for (let i = 0; i < frei.length; i += 1) if (Math.abs((frei[i]!.rating ?? 0) - ziel) < Math.abs((frei[besterIdx]!.rating ?? 0) - ziel)) besterIdx = i;
+        const p = frei.splice(besterIdx, 1)[0];
+        if (!p) break;
+        bankIds.add(p.id);
+        neueRoster.push({ ...eigene[0]!, id: `roster-bank-${p.id}`, playerId: p.id, teamId });
+      }
+    }
+    persistence.saveSingleplayerState(saveId, { ...gs0, rosters: neueRoster });
+    log(`Bank: ${bankIds.size} Zusatzspieler bei ${teamIds.length} Teams`);
+  }
   const ergebnis: { saveId: string; schalter: Record<string, string | undefined>; saisons: Array<{ saison: string; kennzahlen: ReturnType<typeof kennzahlen> & { ertragNachAbstand?: Record<string, { n: number; mittel: number }> }; zeilen: Zeile[] }> } = {
     saveId,
     schalter: { OLY_ENTWICKLUNG: process.env.OLY_ENTWICKLUNG, OLY_TRAINING_JE_SPIELTAG_FAKTOR: process.env.OLY_TRAINING_JE_SPIELTAG_FAKTOR },
@@ -260,6 +316,8 @@ async function main() {
     const vor = get().gameState;
     const daten = leistungsDaten(vor);
     const vorSumme = startSnapshot(vor);
+    const tagesIndex = ppTagesIndex(vor);
+    const tagIds = vor.season.matchdayIds ?? [];
     const deckeVor = deckenSummen(vor);
     const potVor = potWerte(vor);
     const team = kaderIds(vor);
@@ -278,7 +336,7 @@ async function main() {
       if (!erg.applied) break;
       fertig = (get().gameState.playerProgressionEvents ?? []).some((e) => e.seasonId === sid && e.source === "organic_season_progression");
     }
-    if (!fertig) throw new Error("Saisonend-Progression nicht gelaufen");
+    if (!fertig) log("Hinweis: kein Progressions-Ereignis (Regel neu bucht am Saisonende keine Attribute mehr)");
     // Abnehmende Ertraege: Mittel der Aenderung je Attribut ueber die Saison nach Abstand zur Decke (Stand Saisonstart).
     const abstandsTabelle: Record<string, { n: number; summe: number }> = {};
     {
@@ -330,6 +388,25 @@ async function main() {
         deckeDelta: deckeVor[id] != null && deckeNach[id] != null ? r2(deckeNach[id]! - deckeVor[id]!) : null,
         evT: r2(herkunft.get(id)?.t ?? 0), evS: r2(herkunft.get(id)?.s ?? 0), evP: r2(herkunft.get(id)?.p ?? 0), evR: r2(herkunft.get(id)?.r ?? 0),
         potDelta: potVor[id] != null && potNach[id] != null ? r2(potNach[id]! - potVor[id]!) : null,
+        sumZ: r2(v?.training ?? 0), sumP: r2(v?.p ?? 0), sumPPlus: r2(v?.pPlus ?? 0), sumPMinus: r2(v?.pMinus ?? 0), sumA: r2(v?.a ?? 0),
+        bank: bankIds.has(id),
+        diligent: Boolean(vor.players.find((p) => p.id === id)?.traitsPositive?.some((t) => String(t).toLowerCase() === "diligent")),
+        ...(flag("tage")
+          ? (() => {
+              const akku = vor.players.find((p) => p.id === id)?.seasonTrainingAccumulator;
+              const jeTag = new Map((akku?.verlauf ?? []).map((e) => [e.m, e] as const));
+              return {
+                tagZ: tagIds.map((m) => Math.round(Object.values(jeTag.get(m)?.z ?? {}).reduce((a, b) => a + (b as number), 0) * 1000) / 1000),
+                tagA: tagIds.map((m) => Math.round(Object.values(jeTag.get(m)?.a ?? {}).reduce((a, b) => a + (b as number), 0) * 1000) / 1000),
+                tagVerletzt: tagIds.map((m) => jeTag.get(m)?.s === "v"),
+                tagAbstand: tagIds.map((m) => {
+                  const t = tagesIndex.tage.get(m);
+                  const z = t?.spieler.get(id);
+                  return z && t ? r2(z.pp - (t.median.get(z.liga) ?? 0)) : null;
+                }),
+              };
+            })()
+          : {}),
       });
     }
     const kz = { ...kennzahlen(zeilen), ertragNachAbstand: Object.fromEntries(Object.entries(abstandsTabelle).sort().map(([k, v]) => [k, { n: v.n, mittel: r2(v.summe / v.n) }])) };

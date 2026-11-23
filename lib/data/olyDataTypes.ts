@@ -364,6 +364,14 @@ export type TrainingsSpieltagEintrag = {
   i?: "leicht" | "mittel" | "hart";
   /** Gebuchter Zuwachs je Attribut (nur Werte ungleich 0), nach Decke. */
   z?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /**
+   * Entwicklung neu, Runde 2 (22.11.): Leistungsanteil dieses Spieltags je Attribut, MIT Vorzeichen (PP gegen den Liga-Median),
+   * und Abbau je Attribut (>= 0). Netto auf dem Attribut = z + p - a. Fehlen beide, ist der Eintrag aelter (nur Training).
+   */
+  p?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  a?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /** Ligafaktor, mit dem der Abbau `a` dieses Spieltags gebucht wurde (`ligaAbbauFaktor`); fehlt = 1. */
+  f?: number;
   /** Trainingslast dieses Spieltags (Fatigue-Anteil, nach Reha-Rabatt). */
   l?: number;
   /**

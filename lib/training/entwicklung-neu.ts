@@ -1,6 +1,11 @@
 /**
  * ENTWICKLUNG NEU (Chris, 22.11., docs/design/entwicklung-balance-22-11.md) -- reine Rechenbausteine.
  *
+ * RUNDE 2 (22.11.): ALLES JE SPIELTAG, keine Saisonend-Rechnung mehr. Je Spieltag und Attribut gilt
+ *   Delta = T (Training, Gewicht wT) + L (Leistung, Gewicht wL, mit Vorzeichen) - A (Abbau)
+ * gebucht und im Trainingsverlauf gezeigt (`z` = T, `p` = L, `a` = A). Chris: Training 60 %, Leistung 40 %; ein Spieler mit dem
+ * Merkmal Diligent 75 % / 25 %. Das Saisonende bucht keine Entwicklung mehr nach (nur die Potentialdrift).
+ *
  * Gilt nur, wenn der Spielstand die Saison mit `seasonState.entwicklungsRegel = "neu"` gestempelt hat
  * (`lib/resolve/entwicklung-regel.ts`); jeder Aufrufer fragt `entwicklungNeuFuer(gameState)`.
  *
@@ -9,60 +14,65 @@
  */
 
 export type EntwicklungsParameter = {
-  /** Leistungsfaktor auf den gebuchten Trainingszuwachs: unterstes / oberstes Ende (Chris: ca. 0,6 bis 1,4). */
-  faktorMin: number;
-  faktorMax: number;
-  /** Einsaetze (Disziplin-Auftritte einer Saison), ab denen der Leistungsfaktor voll zaehlt. */
-  einsatzVoll: number;
-  /** Mindestzahl Einsaetze, ab der ein Spieler in die Liga-Rangfolge der Leistung eingeht. */
-  einsatzMin: number;
-  /** Rangwert (0..1) fuer Spieler mit weniger als `einsatzMin` Einsaetzen. */
-  rangWenigEinsaetze: number;
-  /** Leistungskanal (Zuwachs aus gespielten Disziplinen) wird mit diesem Faktor skaliert. */
+  /** Gewichte Training / Leistung (Chris, 22.11.: 60 / 40) und fuer Spieler mit dem Merkmal Diligent (75 / 25). */
+  gewichtTraining: number;
+  gewichtLeistung: number;
+  gewichtTrainingDiligent: number;
+  gewichtLeistungDiligent: number;
+  /** Eichfaktor des Trainingsbudgets je Spieltag (gilt fuer Gewicht 0,6; bei anderem Gewicht proportional). */
+  trainingsSkala: number;
+  /** Eichfaktor der Leistung (gilt fuer Gewicht 0,4; bei anderem Gewicht proportional). */
   leistungsSkala: number;
+  /** Eichfaktor des Abbaus je Spieltag (Grundabbau + Marktwertdruck, durch die Saisonlaenge geteilt). */
+  abbauSkala: number;
   /** Grundabbau je Attribut und Saison (alt: 0,3). */
   abbauBasis: number;
-  /** Verfall (Summe ueber alle zwoelf Attribute) je Ausfalltag: wer verletzt fehlt, verliert zusaetzlich. */
-  verfallJeAusfalltag: number;
-  /** Fokus: wer sein Trainingsziel haelt, bekommt bis zu +fokusStaerke, wer es dauernd wechselt bis zu -fokusStaerke auf den Zuwachs. */
+  /** Faktor auf den Marktwertdruck des Abbaus: staerkere (teurere) Spieler bauen mehr ab -- gleicht, dass sie mehr Leistung buchen. */
+  abbauMarktwertSkala: number;
+  /** Leistung: PP-Abstand zum Liga-Median (derselben Liga, am selben Spieltag) pro Einheit, Obergrenze der Einheiten. */
+  ppEinheit: number;
+  zMax: number;
+  /** Leistungsformel: ueber dem Median z^gamma, darunter beta * |z|^betaExponent. */
+  gamma: number;
+  beta: number;
+  betaExponent: number;
+  /**
+   * Schwung (die "verstaerkende Kurve", je Spieltag statt am Saisonende): geht die Saison eines Spielers bisher in die Richtung
+   * der heutigen Leistung (Netto bisher > 0 und Leistung > 0, oder beides < 0), zaehlt diese Leistung mit
+   * 1 + schwungStaerke * min(schwungMax, (|Netto bisher| / schwungSumme)^schwungExponent). Daraus entstehen die wenigen starken
+   * Schuebe und Einbrueche; wer kaum Netto hat, wird nicht verstaerkt (die Masse bleibt kaum veraendert).
+   */
+  schwungStaerke: number;
+  schwungSumme: number;
+  schwungExponent: number;
+  schwungMax: number;
+  /** Fokus: wer sein Trainingsziel haelt, bekommt bis zu +fokusStaerke, wer es dauernd wechselt bis zu -fokusStaerke auf das Training. */
   fokusStaerke: number;
-  /** Abbau haengt an der Leistung: je Rangpunkt unter der Mitte (0,5) wachsen Abbau und Verfall um diesen Anteil. */
-  abbauLeistungsKopplung: number;
-  /** Entwicklungskurve: Rohsumme x -> sign(x) * kurveA * |x / kurveSigma| ^ kurveK, hoechstens +-kurveMax. */
-  kurveA: number;
-  kurveSigma: number;
-  kurveK: number;
-  kurveMax: number;
-  /** Schub-Deckel: ohne Leistung ueber dem Median und gehaltenes Ziel waechst ein Spieler hoechstens um diesen Betrag (< 8). */
-  schubOhneVerdienstMax: number;
-  /** Leistungsrang (0..1), ab dem der Deckel zu steigen beginnt; Fokus-Anteil und Mindesttage mit Ziel analog. */
-  schubRangMin: number;
-  schubFokusMin: number;
-  schubZielTageMin: number;
-  /** Breite der Rampe (Rang- und Fokus-Anteil), ueber die der Deckel von `schubOhneVerdienstMax` auf `kurveMax` steigt. */
-  schubRampe: number;
+  /** Ab so vielen Trainingstagen mit Ziel zaehlt der Fokus (davor neutral). */
+  fokusMinTage: number;
 };
 
 export const ENTWICKLUNGS_PARAMETER_STANDARD: EntwicklungsParameter = {
-  faktorMin: 0.6,
-  faktorMax: 1.4,
-  einsatzVoll: 10,
-  einsatzMin: 4,
-  rangWenigEinsaetze: 0.25,
-  leistungsSkala: 0.6,
-  abbauBasis: 0.51,
-  verfallJeAusfalltag: 0.25,
+  gewichtTraining: 0.6,
+  gewichtLeistung: 0.4,
+  gewichtTrainingDiligent: 0.75,
+  gewichtLeistungDiligent: 0.25,
+  trainingsSkala: 0.6,
+  leistungsSkala: 0.9,
+  abbauSkala: 1,
+  abbauBasis: 0.031,
+  abbauMarktwertSkala: 1.437,
+  ppEinheit: 3,
+  zMax: 3,
+  gamma: 1.35,
+  beta: 1.65,
+  betaExponent: 1,
+  schwungStaerke: 3,
+  schwungSumme: 3.8,
+  schwungExponent: 2.75,
+  schwungMax: 3,
   fokusStaerke: 0.5,
-  abbauLeistungsKopplung: 1.0,
-  kurveA: 2.5,
-  kurveSigma: 4,
-  kurveK: 2.6,
-  kurveMax: 18,
-  schubOhneVerdienstMax: 7.5,
-  schubRangMin: 0.5,
-  schubFokusMin: 0.6,
-  schubZielTageMin: 12,
-  schubRampe: 0.15,
+  fokusMinTage: 5,
 };
 
 let parameterCache: EntwicklungsParameter | null = null;
@@ -94,39 +104,37 @@ export function ertragsFaktor(abstandZurDecke: number | null | undefined): numbe
   return 0.05 + (0.95 * (abstandZurDecke - 1)) / 9;
 }
 
-/**
- * Wie viel vom gebuchten Trainingszuwachs ankommt: gut die Haelfte ohne Einsaetze (`faktorMin`), bei vollem Einsatz und
- * Spitzenleistung `faktorMax`. `rang` = Anteil der Liga-Spieler mit schwaecherer Leistung (0..1).
- */
-export function trainingsAnkommFaktor(einsaetze: number, rang: number, p: EntwicklungsParameter = entwicklungsParameter()): number {
-  const einsatzAnteil = Math.max(0, Math.min(1, einsaetze / p.einsatzVoll));
-  const r = Math.max(0, Math.min(1, rang));
-  return p.faktorMin + (p.faktorMax - p.faktorMin) * einsatzAnteil * r;
-}
-
-/** Verfall (Summe ueber zwoelf Attribute, >= 0) eines Spielers aus seinen Ausfalltagen (Verletzung: kein Training). */
-export function verfallSumme(ausfallTage: number, p: EntwicklungsParameter = entwicklungsParameter()): number {
-  return p.verfallJeAusfalltag * Math.max(0, ausfallTage);
-}
-
-/**
- * Entwicklungskurve: kleine Rohsummen werden gedaempft (die Masse bleibt "kaum veraendert"), grosse verstaerkt (wenige
- * Schuebe und Einbrueche). Das Vorzeichen bleibt, nur der Betrag aendert sich -- die Verteilung auf die Attribute ebenso.
- */
-export function entwicklungsKurve(rohSumme: number, p: EntwicklungsParameter = entwicklungsParameter(), maxPlus: number = p.kurveMax): number {
-  if (!Number.isFinite(rohSumme) || rohSumme === 0) return 0;
-  const betrag = Math.min(rohSumme > 0 ? maxPlus : p.kurveMax, p.kurveA * Math.pow(Math.abs(rohSumme) / p.kurveSigma, p.kurveK));
-  return Math.sign(rohSumme) * betrag;
-}
-
-/** Faktor, mit dem alle Attribut-Deltas eines Spielers multipliziert werden (>= 0). */
-export function entwicklungsKurvenSkala(rohSumme: number, p: EntwicklungsParameter = entwicklungsParameter(), maxPlus: number = p.kurveMax): number {
-  if (!Number.isFinite(rohSumme) || Math.abs(rohSumme) < 1e-6) return 1;
-  return entwicklungsKurve(rohSumme, p, maxPlus) / rohSumme;
-}
-
 /** Fokus-Faktor aus dem Anteil des meistgewaehlten Trainingsziels (0..1): 1 - s bei <= 0,4, 1 + s bei 1,0. */
 export function fokusFaktor(dominanz: number, p: EntwicklungsParameter = entwicklungsParameter()): number {
   const t = Math.max(0, Math.min(1, (dominanz - 0.4) / 0.6));
   return 1 - p.fokusStaerke + 2 * p.fokusStaerke * t;
+}
+
+/** Gewichte Training/Leistung; `diligent` = der Spieler hat das Merkmal Diligent (75 / 25 statt 60 / 40). */
+export function entwicklungsGewichte(diligent: boolean, p: EntwicklungsParameter = entwicklungsParameter()) {
+  return diligent
+    ? { training: p.gewichtTrainingDiligent, leistung: p.gewichtLeistungDiligent }
+    : { training: p.gewichtTraining, leistung: p.gewichtLeistung };
+}
+
+/** Faktor auf das Trainingsbudget eines Spieltags: Eichung x (Gewicht / 0,6) x Fokus. */
+export function trainingsBudgetFaktor(diligent: boolean, dominanz: number | null, p: EntwicklungsParameter = entwicklungsParameter()): number {
+  return p.trainingsSkala * (entwicklungsGewichte(diligent, p).training / p.gewichtTraining) * (dominanz == null ? 1 : fokusFaktor(dominanz, p));
+}
+
+/** Leistung eines Spieltags in Einheiten (mit Vorzeichen) aus dem PP-Abstand zum Liga-Median. */
+export function leistungsEinheit(ppAbstand: number, p: EntwicklungsParameter = entwicklungsParameter()): number {
+  const z = Math.max(-p.zMax, Math.min(p.zMax, ppAbstand / p.ppEinheit));
+  return z >= 0 ? Math.pow(z, p.gamma) : -p.beta * Math.pow(-z, p.betaExponent);
+}
+
+/** Schwung-Multiplikator: `nettoBisher` = bisherige Netto-Entwicklung der Saison (Summe ueber die Attribute), `leistung` = heutige Leistung. */
+export function schwungFaktor(nettoBisher: number, leistung: number, p: EntwicklungsParameter = entwicklungsParameter()): number {
+  if (leistung === 0 || nettoBisher === 0 || Math.sign(nettoBisher) !== Math.sign(leistung)) return 1;
+  return 1 + p.schwungStaerke * Math.min(p.schwungMax, Math.pow(Math.abs(nettoBisher) / p.schwungSumme, p.schwungExponent));
+}
+
+/** Faktor auf die Leistung eines Spieltags: Eichung x (Gewicht / 0,4). Der Schwung kommt je Spieltag dazu (`schwungFaktor`). */
+export function leistungsFaktor(diligent: boolean, p: EntwicklungsParameter = entwicklungsParameter()): number {
+  return p.leistungsSkala * (entwicklungsGewichte(diligent, p).leistung / p.gewichtLeistung);
 }
