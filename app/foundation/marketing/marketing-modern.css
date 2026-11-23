@@ -471,6 +471,7 @@
   align-items: center;
 }
 .ag-g { color: var(--bc-gold); }
+.fin-th.ag-cols { height: auto; min-height: 30px; padding-top: 4px; padding-bottom: 4px; line-height: 1.2; }
 .ag-zeile { text-align: left; width: 100%; }
 .ag-zeile.is-gew { background: rgba(240, 195, 90, 0.1); box-shadow: inset 3px 0 0 var(--bc-gold); }
 .ag-zeile.is-fest { box-shadow: inset 3px 0 0 var(--bc-gut, #62d394); }

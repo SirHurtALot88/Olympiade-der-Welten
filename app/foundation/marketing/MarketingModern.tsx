@@ -481,7 +481,7 @@ export default function MarketingModern({ gameState, teamId, startKontext = "fan
             <BcReiter aktiv={ansicht === "kader" && kontext === "fan"} onClick={() => { setAnsicht("kader"); setKontext("fan"); }} eyebrow="Fanprofil" titel="Fans" symbol={<BcIcon name="team" />} wert={vz(Math.round(u.profil.ton * 100) / 100)} wertNote="Ton" />
             <BcReiter aktiv={ansicht === "kader" && kontext === "spieler"} onClick={() => { setAnsicht("kader"); setKontext("spieler"); }} eyebrow="Kasse je Saison" titel="Marketing" symbol={<BcIcon name="karte" />} wert={z1(u.ansKasse)} wertNote="C" />
             <BcReiter aktiv={ansicht === "kader" && kontext === "verlauf"} onClick={() => { setAnsicht("kader"); setKontext("verlauf"); }} eyebrow="Farbe der Fans" titel="Verlauf" symbol={<BcIcon name="krone" />} wert={String(Math.max(1, (gueltigerMarketingStempel(gameState)?.verlauf?.[teamId]?.length ?? 1)))} wertNote="Saisons" />
-            <BcReiter aktiv={ansicht === "gesicht"} onClick={() => setAnsicht("gesicht")} eyebrow="Gesicht der Saison" titel="Aushängeschild" symbol={<BcIcon name="zauber" />} wert={gesicht ? gesicht.name.split(" ")[0]! : "—"} wertNote={werbeklauselAktiv(gameState) ? "" : "ab Saisonwechsel"} />
+            <BcReiter aktiv={ansicht === "gesicht"} onClick={() => setAnsicht("gesicht")} eyebrow="Aushängeschild" titel="Gesicht" symbol={<BcIcon name="zauber" />} wert={gesicht ? gesicht.name.split(" ")[0]! : "—"} wertNote={werbeklauselAktiv(gameState) ? "" : "ab Saisonwechsel"} />
           </>
         }
         rechts={
