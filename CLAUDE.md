@@ -307,6 +307,16 @@ Werbegeld je Spieler, dynamischer Team-Anteil und Teammarke in der Kasse (Posten
 Marktwert oder Sponsor. Regel im Spielstand (`seasonState.marketingRegel`, Abfrage nur `marketingAktiv(gameState)`), Rückweg `OLY_MARKETING=aus` / `aus-sofort`, nur
 Server. Eine Rechenstelle: `lib/marketing/marketing-team.ts`. Bau, Messung, Folgeaufträge: `docs/design/marketing-bau-22-11.md`.
 
+## Trainingsvorlieben (Chris, 23.11.)
+
+Jeder Spieler hat je Saison zwei **Lieblings-Disziplinen** und eine **ungeliebte**. Training mit einem Liebling wirkt **×1,30**, mit der
+ungeliebten **×0,50**; solange es das Trainingsziel ist, gibt es Moral **+3** bzw. **−6**. Damit der Liga-Schnitt neutral bleibt, gilt der
+Ausgleich **0,959** (aus den gemessenen Zielanteilen der KI). Die Vorlieben werden **jede Saison neu gewürfelt** aus Spieler-Id und Saison-Id
+und sind **unabhängig von der Eignung** (nur eine leichte Tendenz zur eigenen bzw. Gegenfarbe). Die Regel steht im Spielstand
+(`seasonState.trainingsVorlieben`, Abfrage nur über `trainingsVorliebenAktivFuer(gameState)`), nie in einer Prozess-Variable. Code:
+`lib/training/trainings-vorlieben.ts` (`leiteTrainingsVorliebenAb`, `vorliebeArt(player, disziplinId, saisonId)` mit `saisonId = gameState.season?.id ?? ""`),
+Schalter `lib/resolve/trainings-vorlieben.ts`. Anzeige: Reiter Kader der Training-Seite (Spalte Vorlieben) und PlanR2.
+
 ## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
 
 Wörtlich: „Wichtig: wenn du neue Dinge baust, IMMER einen Abgleich machen — Screenshot schauen und vergleichen mit dem
