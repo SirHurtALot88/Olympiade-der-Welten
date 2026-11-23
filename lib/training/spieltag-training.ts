@@ -283,7 +283,7 @@ export function berechneSpieltagsZuwachs(input: {
   // TRAININGSVORLIEBEN (22.11.): Lieblings-Disziplin x1,15, ungeliebte x0,80 auf dem Budget -- nur, wenn der Stempel der Saison "v1" sagt. Der Ausgleich
   // haelt das Ligamittel gleich; beide stecken im Budget, das Buchung, Vorschau, Heatmap und Transparenz gemeinsam rechnen.
   const vorlieben = trainingsVorliebenAktivFuer(input.gameState);
-  const vorliebeKind: VorliebeArt = vorlieben ? vorliebeArt(input.player, input.ziel.disziplinId) : 0;
+  const vorliebeKind: VorliebeArt = vorlieben ? vorliebeArt(input.player, input.ziel.disziplinId, input.gameState.season?.id ?? "") : 0;
   const vorliebeF = vorlieben ? vorliebeFaktor(vorliebeKind) : 1;
   const budgetFaktor = budgetEntwicklung * vorliebeF * (vorlieben ? TRAININGS_VORLIEBEN_AUSGLEICH : 1);
   const ergebnis = buildOrganicSeasonProgression({
@@ -533,7 +533,7 @@ export function bewerteTrainingsZiele(kontext: TrainingsZielKontext, player: Pla
     }
     // TRAININGSVORLIEBEN (22.11.): Lieblings-Disziplin zaehlt x1,15, die ungeliebte x0,80 -- dieselben Faktoren, die das Budget bekommt. Die Wahl
     // entscheidet weiter die Kaderluecke; die Vorliebe kippt sie nur bei knappen Abstaenden.
-    const vorliebeGewicht = vorlieben ? vorliebeFaktor(vorliebeArt(player, disziplinId)) : 1;
+    const vorliebeGewicht = vorlieben ? vorliebeFaktor(vorliebeArt(player, disziplinId, kontext.gameState.season?.id ?? "")) : 1;
     const punkte = (wichtigkeit * lueckeFaktor * schwelle * Math.max(0, besterWegFaktor) * vorliebeGewicht) / 20;
     ergebnis.push({ disziplinId, weg: besterWeg, punkte: rund(punkte, 4), kaderRang, slots, offeneAuftritte: offen, luecke: rund(luecke, 2), begruendung });
   }

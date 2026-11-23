@@ -7,7 +7,8 @@
  *   Ziel = Lieblings-Disziplin   Trainingsbudget x1,30 (Chris 23.11.), Moral +3, solange sie Ziel ist
  *   Ziel = ungeliebte Disziplin  Trainingsbudget x0,50 (Chris 23.11.),      Moral -6, solange sie Ziel ist
  *
- * FEST JE SPIELER, DETERMINISTISCH: nur aus `player.id` (und der Klassenfarbe, die sich nie aendert) abgeleitet, kein Zufall, kein Spielstandsfeld.
+ * FEST JE SPIELER UND SAISON, DETERMINISTISCH: aus `player.id`, der Saison-Id (Chris 23.11.: neue Vorlieben jede Saison) und der Klassenfarbe
+ * abgeleitet, kein Zufall, kein Spielstandsfeld.
  * Dasselbe Spiel, dieselben Vorlieben, fuer Mensch und KI gleich, ueber Saisons stabil. Weder Staerke noch Eignung gehen ein (die aendern sich mit
  * dem Training; sonst wuerden Vorlieben von Saison zu Saison springen).
  *
@@ -75,21 +76,26 @@ export function disziplinFarbe(
 
 const cache = new Map<string, TrainingsVorlieben>();
 
-/** Die Vorlieben eines Spielers. Rein; Ergebnis wird je (Id, Klassenfarbe) zwischengespeichert. */
+/**
+ * Die Vorlieben eines Spielers IN EINER SAISON. Rein; Ergebnis wird je (Id, Saison, Klassenfarbe) zwischengespeichert.
+ * Chris, 23.11.: die Vorlieben wechseln mindestens einmal je Saison -- die Saison-Id geht deshalb in den Wuerfel ein. Innerhalb einer Saison
+ * bleiben sie fest (Buchung, Vorschau, Heatmap und Moral rechnen alle mit derselben Saison-Id: gezeigt = gebucht).
+ */
 export function leiteTrainingsVorliebenAb(
   player: Pick<Player, "id" | "className">,
+  saisonId: string,
 ): TrainingsVorlieben {
   const klassenFarbe = getPlayerClassColor(player as Player);
-  const schluessel = `${player.id}|${klassenFarbe ?? "-"}`;
+  const schluessel = `${player.id}|${saisonId}|${klassenFarbe ?? "-"}`;
   const vorhanden = cache.get(schluessel);
   if (vorhanden) return vorhanden;
   const gegenFarbe = klassenFarbe ? (GEGENFARBE[klassenFarbe] ?? null) : null;
   const ids = [...officialDisciplineWeightOrder] as string[];
   const lieb = (d: string) =>
-    hash01(`${player.id}:lieb:${d}`) +
+    hash01(`${player.id}:${saisonId}:lieb:${d}`) +
     (klassenFarbe && disziplinFarbe(d) === klassenFarbe ? VORLIEBE_TENDENZ : 0);
   const unlieb = (d: string) =>
-    hash01(`${player.id}:unlieb:${d}`) +
+    hash01(`${player.id}:${saisonId}:unlieb:${d}`) +
     (gegenFarbe && disziplinFarbe(d) === gegenFarbe ? VORLIEBE_TENDENZ : 0);
   const sortiert = [...ids].sort(
     (a, b) => lieb(b) - lieb(a) || a.localeCompare(b),
@@ -108,9 +114,10 @@ export function leiteTrainingsVorliebenAb(
 export function vorliebeArt(
   player: Pick<Player, "id" | "className">,
   disziplinId: string | null | undefined,
+  saisonId: string,
 ): VorliebeArt {
   if (!disziplinId) return 0;
-  const v = leiteTrainingsVorliebenAb(player);
+  const v = leiteTrainingsVorliebenAb(player, saisonId);
   if (v.lieblinge.includes(disziplinId)) return 1;
   return v.ungeliebt === disziplinId ? -1 : 0;
 }

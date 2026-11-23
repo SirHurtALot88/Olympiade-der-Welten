@@ -1,8 +1,8 @@
 /**
  * TRAININGSVORLIEBEN-REGEL JE SAISON (22.11., docs/design/training-r2-22-11.md Abschnitt 3.5 und docs/design/training-r2-bau-22-11.md).
  *
- * Chris, 22.11.: Jeder Spieler hat zwei Lieblings-Disziplinen, auf die er Lust hat zu trainieren (Training dort x1,15, Moral +3), und eine
- * ungeliebte (x0,80, Moral -6) -- dasselbe Muster wie die Attribut-Affinitaet. Die Vorlieben selbst sind fest je Spieler
+ * Chris, 22./23.11.: Jeder Spieler hat zwei Lieblings-Disziplinen, auf die er Lust hat zu trainieren (Training dort x1,30, Moral +3), und eine
+ * ungeliebte (x0,50, Moral -6). Die Vorlieben selbst sind fest je Spieler und Saison und wechseln mit jeder neuen Saison
  * (`lib/training/trainings-vorlieben.ts`); hier steht nur, OB sie in einer Saison gelten.
  *
  * Die Regel haengt an der SAISON, nicht am Serverstart (Muster `entwicklung-regel.ts`): das Training wird je Spieltag gebucht, ein Umschalten

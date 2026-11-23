@@ -104,3 +104,10 @@ Lieblinge trainieren, liegen damit leicht über dem Ligamittel; das ist gewollt 
 
 Die Vorlieben hängen nicht an der Eignung: gewürfelt aus der Spieler-ID (FNV-Hash), nur mit leichter Tendenz +0,15 zur Klassenfarbe bzw. für
 die ungeliebte zur Gegenfarbe. Ein Spieler kann also eine Disziplin mögen, in der er schwach ist, und eine nicht mögen, in der er stark ist.
+
+## Nachtrag 23.11.: Vorlieben wechseln jede Saison
+
+Chris: „Werden die Vorlieben gewechselt? Würde das min. 1x pro Season machen.“ Die Saison-Id geht in den Würfel ein
+(`leiteTrainingsVorliebenAb(player, saisonId)`, `vorliebeArt(player, disziplinId, saisonId)`; Pflichtparameter, damit kein Rechenweg ohne
+Saison rechnet). Innerhalb einer Saison bleiben sie fest (Buchung, Vorschau, Heatmap, Moral, KI lesen dieselbe Saison-Id: gezeigt = gebucht),
+zum Saisonwechsel werden sie neu gewürfelt; Test: von 200 Spielern wechseln über 150 die Vorlieben.

@@ -73,7 +73,7 @@ export function vorliebenSicht(
   player: { id: string; className: string },
 ): VorliebenSicht {
   return vorliebenSichtFuerStufe(
-    leiteTrainingsVorliebenAb(player),
+    leiteTrainingsVorliebenAb(player, gameState.season?.id ?? ""),
     nebelStufeFuer(gameState, viewerTeamId, player.id),
   );
 }

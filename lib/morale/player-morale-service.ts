@@ -997,7 +997,7 @@ function computePlayerMorale(input: {
 
   // TRAININGSVORLIEBEN (22.11.): trainiert er auf eine Lieblings-Disziplin +3, auf die ungeliebte -6, solange sie sein Ziel ist (Grund, kein Abzug je Spieltag).
   if (trainingsVorliebenAktivFuer(gameState)) {
-    const art = vorliebeArt(player, aktuellesTrainingsZielId(player, gameState.season?.id ?? ""));
+    const art = vorliebeArt(player, aktuellesTrainingsZielId(player, gameState.season?.id ?? ""), gameState.season?.id ?? "");
     if (art !== 0) {
       const delta = vorliebeMoral(art);
       morale += delta;

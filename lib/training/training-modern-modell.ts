@@ -246,8 +246,8 @@ export function baueTrainingZeilen(input: {
         player && bestimmt && !verletzt
           ? (berechneSpieltagsZuwachs({ gameState, player, ziel: bestimmt.ziel, quelle: bestimmt.quelle, modus: row.mode })?.transparenz ?? null)
           : null,
-      vorlieben: vorliebenAktiv && player ? leiteTrainingsVorliebenAb(player) : null,
-      vorliebeAktuell: vorliebenAktiv && player && bestimmt ? vorliebeArt(player, bestimmt.ziel.disziplinId) : 0,
+      vorlieben: vorliebenAktiv && player ? leiteTrainingsVorliebenAb(player, gameState.season?.id ?? "") : null,
+      vorliebeAktuell: vorliebenAktiv && player && bestimmt ? vorliebeArt(player, bestimmt.ziel.disziplinId, gameState.season?.id ?? "") : 0,
       sp: player && bestimmt ? spBisSaisonende({ gameState, player, ziel: bestimmt.ziel, modus: row.mode }) : 0,
       spBisher: baueSaisonFortschritt(gameState, row.player.id)?.trainingSp ?? 0,
       moral: moralJeSpieler.get(row.player.id) ?? null,

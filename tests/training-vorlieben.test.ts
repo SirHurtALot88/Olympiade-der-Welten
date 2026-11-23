@@ -77,21 +77,33 @@ const neuesSpiel = () =>
 describe("Vorlieben: Ableitung je Spieler", () => {
   it("zwei Lieblinge und eine ungeliebte, verschieden, alles Matrix-Disziplinen", () => {
     for (const p of BASIS.players) {
-      const v = leiteTrainingsVorliebenAb(p);
+      const v = leiteTrainingsVorliebenAb(p, "season-1");
       expect(new Set([...v.lieblinge, v.ungeliebt]).size).toBe(3);
       for (const d of [...v.lieblinge, v.ungeliebt]) expect(officialDisciplineWeightOrder as readonly string[]).toContain(d);
     }
   });
 
+  it("wechselt mit der Saison (Chris 23.11.): andere Saison, fuer die meisten Spieler andere Vorlieben; dieselbe Saison, dieselben", () => {
+    let gewechselt = 0;
+    for (let i = 0; i < 200; i += 1) {
+      const p = { id: `test-spieler-${i}`, className: "Berserker" };
+      const s1 = leiteTrainingsVorliebenAb(p, "season-1");
+      expect(leiteTrainingsVorliebenAb(p, "season-1")).toEqual(s1);
+      const s2 = leiteTrainingsVorliebenAb(p, "season-2");
+      if (JSON.stringify(s1) !== JSON.stringify(s2)) gewechselt += 1;
+    }
+    expect(gewechselt).toBeGreaterThan(150);
+  });
+
   it("deterministisch aus der Spieler-ID: gleiches Ergebnis, auch wenn sich Werte und Eignungen aendern", () => {
-    const a = leiteTrainingsVorliebenAb(SPIELER);
+    const a = leiteTrainingsVorliebenAb(SPIELER, "season-1");
     const veraendert = {
       ...SPIELER,
       disciplineRatings: Object.fromEntries(Object.keys(SPIELER.disciplineRatings ?? {}).map((k) => [k, 1])),
       attributeSheetStats: { ...(SPIELER.attributeSheetStats ?? {}), power: 99 },
     } as Player;
-    expect(leiteTrainingsVorliebenAb(veraendert)).toEqual(a);
-    expect(leiteTrainingsVorliebenAb({ id: SPIELER.id, className: SPIELER.className })).toEqual(a);
+    expect(leiteTrainingsVorliebenAb(veraendert, "season-1")).toEqual(a);
+    expect(leiteTrainingsVorliebenAb({ id: SPIELER.id, className: SPIELER.className }, "season-1")).toEqual(a);
   });
 
   it("verteilt sich ueber alle Disziplinen und kippt mit der Klassenfarbe leicht (Tendenz, kein Zwang)", () => {
@@ -99,7 +111,7 @@ describe("Vorlieben: Ableitung je Spieler", () => {
     let imFarbton = 0;
     const n = 600;
     for (let i = 0; i < n; i += 1) {
-      const v = leiteTrainingsVorliebenAb({ id: `test-spieler-${i}`, className: "Berserker" });
+      const v = leiteTrainingsVorliebenAb({ id: `test-spieler-${i}`, className: "Berserker" }, "season-1");
       for (const d of v.lieblinge) {
         zaehler.set(d, (zaehler.get(d) ?? 0) + 1);
         if (bereichVonDisziplin(d) === "pow") imFarbton += 1;
@@ -118,10 +130,10 @@ describe("Vorlieben: Ableitung je Spieler", () => {
     expect(VORLIEBE_FAKTOR_UNGELIEBT).toBe(0.5);
     expect([vorliebeFaktor(1), vorliebeFaktor(-1), vorliebeFaktor(0)]).toEqual([1.3, 0.5, 1]);
     expect([vorliebeMoral(1), vorliebeMoral(-1), vorliebeMoral(0)]).toEqual([3, -6, 0]);
-    const v = leiteTrainingsVorliebenAb(SPIELER);
-    expect(vorliebeArt(SPIELER, v.lieblinge[0])).toBe(1);
-    expect(vorliebeArt(SPIELER, v.ungeliebt)).toBe(-1);
-    expect(vorliebeArt(SPIELER, null)).toBe(0);
+    const v = leiteTrainingsVorliebenAb(SPIELER, "season-1");
+    expect(vorliebeArt(SPIELER, v.lieblinge[0], "season-1")).toBe(1);
+    expect(vorliebeArt(SPIELER, v.ungeliebt, "season-1")).toBe(-1);
+    expect(vorliebeArt(SPIELER, null, "season-1")).toBe(0);
   });
 });
 
@@ -172,7 +184,7 @@ describe("Vorlieben: Wirkung auf das Trainingsbudget (eine Funktion fuer Buchung
   const ziel = (id: string) => ({ disziplinId: id, weg: 0 as const });
 
   it("Liebling x1,30, ungeliebt x0,50, neutral x1 gegenueber der Regel aus (mal Ausgleich)", () => {
-    const v = leiteTrainingsVorliebenAb(SPIELER);
+    const v = leiteTrainingsVorliebenAb(SPIELER, BASIS.season.id);
     const neutral = officialDisciplineWeightOrder.find((d) => !v.lieblinge.includes(d) && v.ungeliebt !== d)!;
     const aus = mitRegel(BASIS, "aus");
     const rechne = (gs: GameState, d: string) => berechneSpieltagsZuwachs({ gameState: gs, player: SPIELER, ziel: ziel(d), quelle: "manager" })!;
@@ -192,7 +204,7 @@ describe("Vorlieben: Wirkung auf das Trainingsbudget (eine Funktion fuer Buchung
   });
 
   it("Regel aus liefert exakt den Stand vor Runde 2 (Notbremse ebenso)", () => {
-    const v = leiteTrainingsVorliebenAb(SPIELER);
+    const v = leiteTrainingsVorliebenAb(SPIELER, BASIS.season.id);
     const aus = berechneSpieltagsZuwachs({ gameState: mitRegel(BASIS, "aus"), player: SPIELER, ziel: ziel(v.lieblinge[0]), quelle: "manager" })!;
     process.env.OLY_TRAINING_VORLIEBEN = "aus-sofort";
     const notbremse = berechneSpieltagsZuwachs({ gameState: BASIS, player: SPIELER, ziel: ziel(v.lieblinge[0]), quelle: "manager" })!;
@@ -204,7 +216,7 @@ describe("Vorlieben: Wirkung auf das Trainingsbudget (eine Funktion fuer Buchung
     const aus = mitRegel(BASIS, "aus");
     const kontextAn = baueTrainingsZielKontext(BASIS, "md-12");
     const kontextAus = baueTrainingsZielKontext(aus, "md-12");
-    const v = leiteTrainingsVorliebenAb(SPIELER);
+    const v = leiteTrainingsVorliebenAb(SPIELER, BASIS.season.id);
     const an = new Map(bewerteTrainingsZiele(kontextAn, SPIELER).map((b) => [b.disziplinId, b.punkte]));
     const ohne = new Map(bewerteTrainingsZiele(kontextAus, SPIELER).map((b) => [b.disziplinId, b.punkte]));
     expect(an.size).toBe(20);
@@ -249,7 +261,7 @@ describe("Heatmap: dieselbe Rechnung wie die Buchung", () => {
 
   it("alle Zellen tragen Bereich, Weg und Attribute; die Vorlieben-Zeilen entsprechen der Ableitung", () => {
     const heat = baueZielHeatmap({ gameState: BASIS, playerId: SPIELER.id })!;
-    const v = leiteTrainingsVorliebenAb(SPIELER);
+    const v = leiteTrainingsVorliebenAb(SPIELER, BASIS.season.id);
     expect(heat.vorliebenAktiv).toBe(true);
     for (const zeile of heat.zeilen) {
       expect(zeile.bereich).not.toBeNull();
@@ -323,7 +335,7 @@ describe("Vorlieben: Moral-Grund", () => {
   };
 
   it("Lieblingsdisziplin als Ziel: +3, ungeliebte: -6, sonst kein Grund; Regel aus: nie", () => {
-    const v = leiteTrainingsVorliebenAb(SPIELER);
+    const v = leiteTrainingsVorliebenAb(SPIELER, BASIS.season.id);
     const neutral = officialDisciplineWeightOrder.find((d) => !v.lieblinge.includes(d) && v.ungeliebt !== d)!;
     const grund = (a: ReturnType<typeof moralMit>, id: string) => a?.reasons.find((r) => r.reasonId === id) ?? null;
     expect(grund(moralMit(BASIS, v.lieblinge[0]), "training_favorite_discipline")?.valueDelta).toBe(3);

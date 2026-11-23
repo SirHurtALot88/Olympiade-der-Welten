@@ -317,7 +317,7 @@ export function baueZielHeatmap(input: {
       if (zelle) zellen.push(zelle);
     }
     const eignung = player.disciplineRatings?.[disziplinId];
-    const art = vorlieben ? vorliebeArt(player, disziplinId) : 0;
+    const art = vorlieben ? vorliebeArt(player, disziplinId, gameState.season?.id ?? "") : 0;
     zeilen.push({
       disziplinId,
       label: officialDisciplineWeightLabels[disziplinId],

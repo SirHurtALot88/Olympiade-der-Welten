@@ -1075,7 +1075,7 @@ function Vorschau({
             <h4>
               Trainingsvorlieben
               <span className="sp" />
-              <em>fest je Spieler</em>
+              <em>neu je Saison</em>
             </h4>
             <div className="vch">
               {zeile.vorlieben.lieblinge.map((id) => (
@@ -1486,7 +1486,7 @@ function FremdesTeamTafel({
       .map((p) => {
         const stufe: NebelStufe = nebelStufeFuer(gameState, viewerTeamId, p.id);
         const sicht = vorliebenSichtFuerStufe(
-          leiteTrainingsVorliebenAb(p),
+          leiteTrainingsVorliebenAb(p, gameState.season?.id ?? ""),
           stufe,
         );
         let beste: string | null = null;
@@ -1728,8 +1728,8 @@ function RegelInZahlen() {
         <div className="kasten">
           <h4>Wie gewürfelt wird</h4>
           <p className="vtx" style={{ margin: 0 }}>
-            Fest je Spieler aus seiner ID, <b>stark zufällig</b>; bleibt über
-            alle Saisons gleich, für Mensch und KI. Leichte Tendenz: Lieblinge
+            Je Spieler und Saison neu gewürfelt, <b>stark zufällig</b>; innerhalb
+            einer Saison fest, für Mensch und KI gleich. Leichte Tendenz: Lieblinge
             eher in der Klassenfarbe, die ungeliebte eher in der Gegenfarbe.
           </p>
         </div>

@@ -12,7 +12,7 @@ import {
 /** Sichtbarkeit der Trainingsvorlieben unter Scouting-Nebel (Chris, 18.11.): feste Stufen, nie nach Verdecktem sortieren. */
 
 const spieler = { id: "p-fremd", className: "Mage" };
-const vorlieben = leiteTrainingsVorliebenAb(spieler);
+const vorlieben = leiteTrainingsVorliebenAb(spieler, "season-1");
 
 function spiel(opts: { eigenerKader?: string[]; confidence?: number; nebelAus?: boolean } = {}): GameState {
   return {
