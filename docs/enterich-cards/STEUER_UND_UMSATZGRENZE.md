@@ -118,3 +118,18 @@ Bei Verlust des Kleinunternehmerstatus steckt in jedem Preis Umsatzsteuer (bei 1
 **Anlagen (Chris, November 2026):** Mintos 2.700 €, Robocash 146 €, Trade Republic 18.500 €, Twino 1.100 €, Viainvest 2.230 €, ING-Depot 1.650 €. Mintos-Rendite laut Chris etwa 9 bis 10 %. Der Dauersparplan in MSCI World läuft weiter als Notgroschen. Rahmenkredit-Kosten bei ING noch zu prüfen (der Kredite-Tab in der Excel-Datei ist veraltet). Der Puffer im Juli ist für die Psychologin (wird ab 2028 nicht mehr gezahlt) und eine Steuerrückzahlung 2027. In der EÜR stehen nur Nebenkosten, Grundsteuer, Strom, Gas, Wasser anteilig fürs Büro.
 
 **E-Rechnung (Hinweis für später):** Chris kauft teils von Händlern, teils von Privatpersonen und verkauft an Privatpersonen; E-Rechnungspflicht ist für ihn vermutlich nur beim Empfang relevant.
+
+## 8. Rechtsgrundlagen (Recherche 23.11.2026, keine Rechtsberatung)
+
+Gelesen: § 19 UStG auf gesetze-im-internet.de und zwei Ratgeber-Seiten zu DAC7. Das BMF-Schreiben zum Anwendungserlass (Abschnitt 19.2/19.3) war nicht abrufbar (HTTP 503) und ist **nicht geprüft**. Gerichtsurteile zu „PStTG-Meldung gegen EÜR“ wurden nicht gefunden.
+
+- **§ 19 Abs. 1 UStG:** steuerfrei (Kleinunternehmer), wenn der Gesamtumsatz im Vorjahr 25.000 € nicht überschritten hat und im laufenden Jahr 100.000 € nicht überschreitet.
+- **§ 19 Abs. 2 UStG:** Gesamtumsatz ist die **nach vereinnahmten Entgelten** berechnete Summe der steuerbaren Umsätze des Unternehmers (Zuflussprinzip). Umsätze mit Anlagevermögen bleiben außer Ansatz. Umsatzsteuer wird nicht hinzugerechnet.
+- Folge (aus dem Wortlaut abgeleitet): Überschreitung der 25.000 € im Jahr X wirkt für Jahr X+1 (Regelbesteuerung ab 1.1.), nicht rückwirkend. Überschreitung der 100.000 € wirkt sofort.
+- **Privatverkäufe** sind keine Umsätze eines Unternehmers und zählen deshalb nicht in den Gesamtumsatz (Schluss aus dem Wortlaut, nicht durch Quelle bestätigt). Wichtig ist, dass sie wirklich privat sind (eigene Gebrauchsgegenstände, nicht zum Weiterverkauf gekaufte Ware).
+- **Verzicht (§ 19 Abs. 3):** Der Verzicht auf die Kleinunternehmerregelung bindet mindestens fünf Jahre.
+- **PStTG/DAC7:** Meldung der Plattform bis 31. Januar an das BZSt, von dort als Kontrollmitteilung an das Finanzamt. Die Meldung setzt keine Steuer fest, sie ist Ausgangspunkt für einen Abgleich mit der Steuererklärung. Bei Abweichungen kommt in der Regel zuerst eine schriftliche Nachfrage. Keine gesetzliche Antwortfrist in den gelesenen Quellen genannt; die Frist steht im Schreiben des Finanzamts. Einspruch gegen einen Bescheid: ein Monat.
+- Mitwirkung: Tatsachen vollständig und wahrheitsgemäß offenlegen (Autoren nennen §§ 93, 393 AO). Praktisch Belege je Vorgang: Bestellnummer, Auszahlung, Erstattungsnachweis.
+- Gebühren, Stornos, Jahreswechsel-Auszahlungen erklären typischerweise den Unterschied zwischen eBay-Meldung („Einkünfte“ nach Gebühren) und EÜR (Umsatz brutto, Gebühren als Ausgabe).
+
+Quellen: [§ 19 UStG](https://www.gesetze-im-internet.de/ustg_1980/__19.html), [Hortmann Law zum DAC7-Abgleich](https://www.hortmannlaw.com/articles/dac7-steuerfahndung-datenabgleich-anwalt), [EÜR Einfach zu DAC7](https://eur-einfach.de/ratgeber/dac7-meldung-finanzamt.html). Die Ratgeber sind keine amtlichen Quellen.
