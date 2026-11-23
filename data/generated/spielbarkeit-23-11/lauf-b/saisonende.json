@@ -1,0 +1,37 @@
+{
+  "sid1": "season-1",
+  "sid2": "season-2",
+  "phase": "season_active",
+  "schritte": [
+    {
+      "schritt": "Saisonabrechnung buchen",
+      "status": 200,
+      "ok": true,
+      "info": ""
+    },
+    {
+      "schritt": "Verträge öffnen",
+      "status": 200,
+      "ok": true,
+      "info": "{\"blocker\":[],\"step\":\"season_end_management\"}"
+    },
+    {
+      "schritt": "Saisonwechsel prüfen (1)",
+      "status": 200,
+      "ok": true,
+      "info": "{\"blocker\":[\"vertragsentscheidung_offen:M-M:10\"],\"schritt\":{\"status\":\"ready\",\"blocker\":[\"vertragsentscheidung_offen:M-M:10\"]}}"
+    },
+    {
+      "schritt": "Saisonwechsel prüfen (2)",
+      "status": 200,
+      "ok": true,
+      "info": "{\"blocker\":[],\"schritt\":{\"status\":\"ready\",\"blocker\":[]}}"
+    },
+    {
+      "schritt": "Neue Saison starten",
+      "status": 200,
+      "ok": true,
+      "info": "[]"
+    }
+  ]
+}

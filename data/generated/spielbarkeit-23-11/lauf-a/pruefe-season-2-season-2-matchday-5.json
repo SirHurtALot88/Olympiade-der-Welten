@@ -1,0 +1,62 @@
+{
+  "saison": "season-2",
+  "phase": "season_active",
+  "md": "season-2-matchday-5",
+  "nichtEndlich": [],
+  "unter8": [],
+  "kaderSpanne": [
+    8,
+    14
+  ],
+  "kasse": {
+    "min": 9.3,
+    "max": 55.9,
+    "negativ": []
+  },
+  "mensch": {
+    "kasse": 34.4,
+    "kader": 9
+  },
+  "spieltagFinanzen": {
+    "zeilen": 128,
+    "spieltage": 4,
+    "teamsJeSpieltag": [
+      32
+    ],
+    "meine": [
+      {
+        "md": "season-2-matchday-3",
+        "gehalt": -3.2,
+        "sponsor": 0,
+        "geb": 0,
+        "rang": 0,
+        "mkt": 0.2,
+        "delta": -3
+      },
+      {
+        "md": "season-2-matchday-4",
+        "gehalt": -3.2,
+        "sponsor": 0,
+        "geb": 0,
+        "rang": 0,
+        "mkt": 0.3,
+        "delta": -2.9
+      }
+    ]
+  },
+  "kredite": {
+    "aktiv": 2,
+    "verzug": 0,
+    "rest": 48.89
+  },
+  "marketing": {
+    "teamsMitStand": 32,
+    "ansKasse": 6.01,
+    "max": 9.082690121498988
+  },
+  "entwicklungsRegel": {
+    "seasonId": "season-2",
+    "regel": "neu"
+  },
+  "verletzte": 335
+}

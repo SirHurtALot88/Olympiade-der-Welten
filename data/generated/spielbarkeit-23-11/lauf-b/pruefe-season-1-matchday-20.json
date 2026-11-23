@@ -1,0 +1,62 @@
+{
+  "saison": "season-1",
+  "phase": "season_completed",
+  "md": "matchday-20",
+  "nichtEndlich": [],
+  "unter8": [],
+  "kaderSpanne": [
+    8,
+    14
+  ],
+  "kasse": {
+    "min": 9,
+    "max": 60.9,
+    "negativ": []
+  },
+  "mensch": {
+    "kasse": 57.7,
+    "kader": 10
+  },
+  "spieltagFinanzen": {
+    "zeilen": 640,
+    "spieltage": 20,
+    "teamsJeSpieltag": [
+      32
+    ],
+    "meine": [
+      {
+        "md": "matchday-19",
+        "gehalt": -4.5,
+        "sponsor": 3.6,
+        "geb": 0,
+        "rang": 0.7,
+        "mkt": 0.2,
+        "delta": 0
+      },
+      {
+        "md": "matchday-20",
+        "gehalt": -4.4,
+        "sponsor": 3.7,
+        "geb": 0,
+        "rang": 0.7,
+        "mkt": 0.2,
+        "delta": 0.2
+      }
+    ]
+  },
+  "kredite": {
+    "aktiv": 0,
+    "verzug": 0,
+    "rest": 0
+  },
+  "marketing": {
+    "teamsMitStand": 32,
+    "ansKasse": 6.93,
+    "max": 13.278951153339825
+  },
+  "entwicklungsRegel": {
+    "seasonId": "season-1",
+    "regel": "neu"
+  },
+  "verletzte": 369
+}

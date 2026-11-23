@@ -208,6 +208,19 @@ async function draft() {
   const { browser, page, fehler } = await neueSeite();
   try {
     await page.goto(url(z), { waitUntil: "domcontentloaded", timeout: 180_000 });
+    // Seit 22.11.: erst die Wahl „Draft spielen / Selbst kaufen“ (Dialog beim ersten Oeffnen, sonst Hinweis auf der Startseite).
+    const dialogKnopf = page.getByTestId("draft-startwahl-dialog").getByRole("button", { name: /^Draft spielen/i }).first();
+    if (await dialogKnopf.waitFor({ state: "visible", timeout: 60_000 }).then(() => true).catch(() => false)) {
+      await foto(page, "00-wahl-dialog.png");
+      await dialogKnopf.click();
+      log("Wahl „Draft spielen“ im Dialog geklickt");
+      await page.waitForTimeout(3000);
+    }
+    const hinweis = page.getByTestId("draft-hinweis-spielen").first();
+    if (!(await page.getByTestId("liga-draft-seite").isVisible().catch(() => false)) && (await hinweis.isVisible().catch(() => false))) {
+      await hinweis.click();
+      log("Wahl „Draft spielen“ im Hinweis geklickt");
+    }
     await page.getByTestId("liga-draft-seite").waitFor({ state: "visible", timeout: 180_000 });
     await page.getByTestId("draft-zeile").first().waitFor({ state: "visible", timeout: 120_000 }).catch(() => undefined);
     await page.waitForTimeout(4000);
@@ -233,7 +246,8 @@ async function draft() {
     // Rest: Variante B (Auto-Draft, mein GM pickt an meinem Platz). Wirkt der Klick nicht (Fehler F2: Stand-Konflikt wird
     // still verschluckt, solange die KI weiterpickt), klickt ein Mensch erneut — gezaehlt.
     for (let klick = 1; klick <= 6; klick += 1) {
-      await page.getByTestId("draft-ueberspringen").click({ timeout: 60_000 });
+      if (gs(z.saveId).seasonState.ligaDraft?.status === "fertig") break;
+      await page.getByTestId("draft-ueberspringen").click({ timeout: 60_000 }).catch(() => log("Ueberspringen-Knopf nicht klickbar (Rechen-Overlay)"));
       await page.getByTestId("draft-skip-b").click({ timeout: 30_000 });
       await page.waitForTimeout(2500);
       const an = gs(z.saveId).seasonState.ligaDraft?.teams[z.teamId]?.autoPick === true;
