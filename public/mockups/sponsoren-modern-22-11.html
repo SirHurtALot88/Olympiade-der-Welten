@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sponsoren – Liga-Topf und Saisonfaktor (Mockup 22.11.)</title>
+<!--
+  SPONSOREN NEU, MOCKUP 22.11. Konzept: docs/design/sponsoren-rework-22-11.md.
+  Chris 22.11.: "kannst du die Sponsoren bzw. deren Finanzberechnung vllt noch mal reworken bzw. einen Mockup-Vorschlag machen ...
+  so dass manche Teams im + sind und manche im - und wir sowas wie den Season-Faktor haben, dass wenn alle Teams ihren aktuellen
+  Rang erreichen, wir bei 1 ungefaehr keine Aenderung in der GuV der Liga im Schnitt haben."
+  Gleiche Tokens, Schriften, Schiene, Hero-Kopf und Karten wie finanzen-modern-18-11.html und budget-gespraech-22-11.html.
+  Kein App-Code, kein PixelLab (0 Generationen): die drei Wappen stammen aus public/sprites/sponsoren/ (Icon-Probe 22.11.).
+  ECHT (Live-Abbild origin/live-save, Spielstand new-game-1795114260527-nzr0z9, Stand Spieltag 11 von 20, nur gelesen):
+        Teams, Liga, Tabellenplatz und Platzverlauf je Spieltag, Startrang des laufenden Sponsorvertrags (hier als Erwartungsrang
+        genutzt), Jahresgehalt, Kaderwert, Beliebtheit, Farb-Punkte je Team, Name und Seltenheit des laufenden Hauptsponsors,
+        heutige Sponsor-Hochrechnung und Vertragsanker, gebuchte Sponsor-Ereignisse.
+  GERECHNET (mit den Formeln des Vorschlags aus den echten Werten, nicht gebucht): Liga-Topf, Grundbetrag, Leistungsteil,
+        Farb-Partner, Ergebnis je Team.
+  BEISPIEL: die drei Angebote fuer Saison 2, Vertragsart und Farb-Wahl der Teams (nach der vorgeschlagenen KI-Regel), der
+        Sponsorentermin, das Ziel "Entwicklung", Vorab-Zusage.
+  URL: ?ansicht=vertrag|angebote|liga|rechnung &f=0.95|1|1.05 &liga=1|2 &art=fest|leistung|praemie &lz=1|2|3 &still=1
+-->
+<style>
+@font-face{font-family:"RaniraSeason";src:url("../fonts/ranira-bold-italic.otf") format("opentype");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:500;src:url("../fonts/barlow-condensed-latin-500-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:600;src:url("../fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");font-display:swap}
+@font-face{font-family:"Barlow Condensed";font-weight:700;src:url("../fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");font-display:swap}
+:root{
+  --grund:#06080c; --flaeche-1:#0c1017; --flaeche-2:#121824; --flaeche-3:#1a2231;
+  --linie:rgba(244,230,196,.13); --linie-2:rgba(244,230,196,.30);
+  --creme:#f4e6c4; --gold:#f0c35a; --tinte:#eef2f8; --leise:#9aa7ba; --stumm:#66738a;
+  --heim:#F2A03D; --gast:#45B0C9; --gut:#62d394; --warn:#ff6058; --acht:#f3b54a;
+  --pow:#e0637a; --spe:#4fc7b2; --men:#62a0f4; --soc:#ac8af2;
+  --haus:"RaniraSeason",Georgia,"Times New Roman",serif;
+  --zahl:"Barlow Condensed","Roboto Condensed","Arial Narrow","Helvetica Neue",Arial,sans-serif;
+  --r:.625rem; --r-s:.375rem;
+}
+html{font-size:clamp(11px,min(.8333vw,1.4815vh),30px)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#020305;color:var(--tinte);font-family:var(--zahl);-webkit-font-smoothing:antialiased}
+body{font-size:1rem}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-align:inherit}
+a{color:inherit;text-decoration:none}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+svg.i{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.t{font-variant-numeric:tabular-nums}
+.gk{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+img{display:block}
+.plus{color:var(--gut)} .minus{color:var(--warn)} .leise{color:var(--leise)} .gold{color:var(--gold)} .creme{color:var(--creme)}
+
+.demo{height:2.375rem;display:flex;align-items:center;gap:.5rem;padding:0 .875rem;background:#0d1016;border-bottom:1px solid #222a38;font-size:.875rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.demo b{color:var(--creme);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem;margin:0 .25rem 0 .5rem}
+.demo b:first-child{margin-left:0}
+.demo button{padding:.15rem .6rem;border:1px solid #2b3445;border-radius:999px;color:var(--tinte);font-weight:600}
+.demo button:hover{border-color:var(--gold)} .demo button[aria-pressed=true]{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.demo .welle{margin-left:auto;color:var(--gold);font-weight:600}
+body.still .demo{display:none}
+
+.app{display:grid;grid-template-columns:4rem minmax(0,1fr);height:calc(100vh - 2.375rem);background:var(--grund)}
+body.still .app{height:100vh}
+.rail{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.625rem 0;background:#080b11;border-right:1px solid var(--linie)}
+.rail .logo{width:2.5rem;height:2.5rem;border-radius:.56rem;overflow:hidden;border:1px solid var(--linie-2);margin-bottom:.625rem}
+.rail .logo img{width:100%;height:100%;object-fit:cover}
+.rail a{position:relative;width:2.75rem;height:2.75rem;border-radius:.56rem;display:grid;place-items:center;font-size:1.25rem;color:var(--stumm)}
+.rail a:hover{background:var(--flaeche-2);color:var(--tinte)}
+.rail a.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(240,195,90,.06));color:var(--gold)}
+.rail a.an::before{content:"";position:absolute;left:-.625rem;top:.56rem;bottom:.56rem;width:3px;border-radius:2px;background:var(--gold)}
+.rail .luecke{flex:1}
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+
+.hero{position:relative;flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;gap:1.375rem;padding:.875rem 1.25rem 0;border-bottom:1px solid var(--linie);overflow:hidden;isolation:isolate}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 140% at 30% 0%,rgba(240,195,90,.13),transparent 70%),linear-gradient(90deg,#0b0f16,#06080c 60%)}
+.hk{display:flex;align-items:center;gap:.875rem;padding-bottom:.875rem}
+.hk .crest{width:3.875rem;height:3.875rem;border-radius:.625rem;overflow:hidden;border:2px solid var(--heim);box-shadow:0 6px 18px rgba(0,0,0,.5);flex:none}
+.hk .crest img{width:100%;height:100%;object-fit:cover}
+.hk h1{margin:0;font:400 2.125rem/1 var(--haus);color:#fff;white-space:nowrap}
+.hk .sub{margin-top:.3rem;font-size:.94rem;color:var(--leise);font-weight:500;white-space:nowrap}
+.hk .sub b{color:var(--creme);font-weight:600}
+.tabs{display:flex;align-items:flex-end;gap:.5rem;min-width:0}
+.dtab{position:relative;flex:1 1 0;min-width:0;max-width:22rem;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:.7rem;padding:.7rem 1.4rem .75rem 1.1rem;
+  background:rgba(18,24,36,.72);border:1px solid var(--linie);border-bottom:0;clip-path:polygon(.875rem 0,100% 0,calc(100% - .875rem) 100%,0 100%);color:var(--leise)}
+.dtab:hover{background:rgba(26,34,49,.9)}
+.dtab.an{background:linear-gradient(180deg,rgba(240,195,90,.2),rgba(18,24,36,.92) 70%);color:var(--tinte)}
+.dtab.an::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--gold)}
+.dtab .nr{width:2.375rem;height:2.375rem;border-radius:.5rem;display:grid;place-items:center;font-size:1.3rem;background:rgba(0,0,0,.35);border:1px solid var(--linie);color:var(--creme)}
+.dtab.an .nr{color:var(--gold);border-color:rgba(240,195,90,.5)}
+.dtab em{display:block;font-style:normal;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dtab b{display:block;font:400 1.3rem/1.1 var(--haus);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hr{display:flex;align-items:center;gap:1rem;padding-bottom:.875rem}
+.fakt{display:grid;grid-template-columns:auto auto;column-gap:.7rem;align-items:center;padding:.4rem .8rem;border:1px solid rgba(240,195,90,.45);border-radius:.5rem;background:rgba(240,195,90,.07)}
+.fakt strong{grid-row:span 2;font-size:2.3rem;line-height:1;font-weight:700;color:var(--gold)}
+.fakt span{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap}
+.fakt i{font-style:normal;font-size:1rem;font-weight:600;color:var(--creme);white-space:nowrap}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;height:2.5rem;padding:0 1rem;border-radius:.45rem;border:1px solid var(--linie-2);background:var(--flaeche-2);font-weight:600;font-size:1.05rem;letter-spacing:.02em;white-space:nowrap}
+.btn:hover{background:var(--flaeche-3);border-color:var(--creme)}
+.btn.ja{background:var(--gold);border-color:var(--gold);color:#17120a} .btn.ja:hover{background:#ffd578}
+.btn.klein{height:2rem;padding:0 .7rem;font-size:.94rem}
+.marke{display:inline-flex;align-items:center;height:1.1rem;padding:0 .4rem;border-radius:3px;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:#0b0d12;background:var(--leise);flex:none;white-space:nowrap;text-transform:uppercase}
+.marke.gold{background:var(--gold)} .marke.gut{background:var(--gut)} .marke.acht{background:var(--acht)} .marke.rot{background:var(--warn);color:#fff}
+.marke.leer{background:none;border:1px solid var(--linie-2);color:var(--leise)}
+.marke.bsp{background:none;border:1px dashed var(--acht);color:var(--acht)}
+.marke.echt{background:none;border:1px solid rgba(98,211,148,.6);color:var(--gut)}
+.marke.r-gewöhnlich{background:#9aa7ba} .marke.r-magisch{background:#62a0f4} .marke.r-selten{background:#f0c35a} .marke.r-legendär{background:#f08a4a}
+.fb{display:inline-flex;align-items:center;justify-content:center;min-width:2.5rem;height:1.2rem;padding:0 .35rem;border-radius:3px;font-size:.8rem;font-weight:700;letter-spacing:.04em;color:#05070a;flex:none}
+.fb.pow{background:var(--pow)} .fb.spe{background:var(--spe)} .fb.men{background:var(--men)} .fb.soc{background:var(--soc)}
+.fb.aus{background:none;border:1px solid var(--linie);color:var(--stumm)}
+
+.work{flex:1;min-height:0;display:grid;gap:.75rem;padding:.75rem .875rem}
+.work.v-vertrag{grid-template-columns:24rem minmax(0,1fr) 25rem}
+.work.v-angebote{grid-template-columns:20rem minmax(0,1fr) 25rem}
+.work.v-liga{grid-template-columns:minmax(0,1fr)}
+.work.v-rechnung{grid-template-columns:29rem minmax(0,1fr) 21rem}
+.pan{min-height:0;min-width:0;display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie);border-radius:var(--r);overflow:hidden}
+.pk{flex:none;display:flex;align-items:center;gap:.5rem;padding:.55rem .75rem;border-bottom:1px solid var(--linie);min-height:2.875rem}
+.pk h2{margin:0;font:400 1.2rem/1 var(--haus);color:var(--creme);white-space:nowrap}
+.pk .sp{flex:1}
+.pk .hin{font-size:.85rem;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kb{flex:1;min-height:0;padding:.75rem;display:flex;flex-direction:column;gap:.7rem;overflow:hidden}
+.fuss{flex:none;display:flex;align-items:center;gap:.625rem;padding:.55rem .75rem;border-top:1px solid var(--linie);background:#0a0d13;font-size:.9rem;color:var(--leise)}
+.fuss .sp{flex:1}
+.spalte{display:flex;flex-direction:column;gap:.75rem;min-height:0;min-width:0}
+
+/* Vertragskarte */
+.vk{display:grid;grid-template-columns:5.5rem minmax(0,1fr);gap:.8rem;align-items:center}
+.wap{width:5.5rem;height:5.5rem;border-radius:.6rem;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#222c3f,#0c1017);border:1px solid var(--linie-2);overflow:hidden;flex:none}
+.wap img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+.wap span{font:400 2rem/1 var(--haus);color:var(--gold)}
+.wap.kl{width:1.9rem;height:1.9rem;border-radius:.3rem} .wap.kl span{font-size:.85rem}
+.vk h3{margin:0 0 .25rem;font:400 1.55rem/1.05 var(--haus);color:#fff}
+.vk p{margin:0;font-size:.92rem;color:var(--leise);line-height:1.3}
+.zl{display:flex;flex-direction:column}
+.z{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.6rem;align-items:baseline;padding:.34rem 0;border-bottom:1px solid var(--linie);font-size:1.02rem}
+.z:last-child{border-bottom:0}
+.z span{color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.z span small{color:var(--stumm);font-size:.82rem;margin-left:.3rem}
+.z b{font-weight:700;font-size:1.15rem;white-space:nowrap}
+.z.sum{border-top:1px solid var(--linie-2);border-bottom:0;margin-top:.15rem;padding-top:.5rem}
+.z.sum span{color:var(--creme);font-weight:600} .z.sum b{font-size:1.7rem;color:var(--gold)}
+.z.klein{font-size:.9rem;padding:.2rem 0} .z.klein b{font-size:.98rem;font-weight:600}
+.kachel{border:1px solid var(--linie);border-radius:var(--r-s);background:var(--flaeche-2);padding:.55rem .7rem}
+.kachel .gk{display:block;margin-bottom:.2rem}
+.kachel strong{display:block;font-size:1.9rem;line-height:1;font-weight:700}
+.kachel small{display:block;margin-top:.25rem;font-size:.85rem;color:var(--leise);line-height:1.25}
+.kacheln{display:grid;gap:.6rem}
+.hinweis{font-size:.9rem;line-height:1.35;color:var(--leise);border-left:3px solid var(--gold);padding:.3rem 0 .3rem .65rem}
+.hinweis b{color:var(--creme);font-weight:600}
+
+/* Diagramme */
+.dia{flex:1;min-height:0;position:relative}
+.dia svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.dia text{font-family:var(--zahl);fill:var(--leise);font-size:.82rem}
+.leg{display:flex;flex-wrap:wrap;gap:.35rem 1rem;font-size:.88rem;color:var(--leise)}
+.leg i{display:inline-block;width:.9rem;height:.5rem;border-radius:2px;margin-right:.35rem;vertical-align:.05em}
+
+/* Tabelle */
+.tw{flex:1;min-height:0;overflow:hidden}
+table{width:100%;height:100%;border-collapse:collapse;table-layout:fixed}
+th,td{padding:0 .5rem;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid var(--linie)}
+th{height:2.2rem;font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;color:var(--leise);font-weight:600;background:#0a0d13;cursor:pointer;user-select:none}
+th:hover{color:var(--creme)} th[aria-sort]{color:var(--gold)}
+th[aria-sort=ascending]::after{content:" ▲";font-size:.6rem} th[aria-sort=descending]::after{content:" ▼";font-size:.6rem}
+td{font-size:1.05rem;font-weight:600}
+td.l,th.l{text-align:left} td.m,th.m{text-align:center}
+tr.ich td{background:rgba(242,160,61,.1)} tr.ich td:first-child{box-shadow:inset 3px 0 0 var(--heim)}
+tbody tr:hover td{background:rgba(244,230,196,.05)}
+.tm{display:flex;align-items:center;gap:.5rem;min-width:0}
+.tm img{width:1.7rem;height:1.7rem;border-radius:.25rem;object-fit:cover;flex:none}
+.tm span{overflow:hidden;text-overflow:ellipsis}
+.tm span.h{font:400 1.08rem/1 var(--haus);color:#fff}
+.bal{position:relative;height:.9rem;background:rgba(244,230,196,.06);border-radius:2px}
+.bal::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--linie-2)}
+.bal i{position:absolute;top:0;bottom:0;border-radius:2px}
+
+/* Angebote */
+.ang{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}
+.ak{cursor:pointer;position:relative;display:flex;flex-direction:column;gap:.55rem;min-height:0;padding:.8rem;border:1px solid var(--linie);border-radius:var(--r);background:var(--flaeche-1);overflow:hidden;text-align:left}
+.ak:hover{border-color:var(--linie-2)}
+.ak.an{border-color:var(--gold);background:linear-gradient(180deg,rgba(240,195,90,.1),var(--flaeche-1) 45%)}
+.ak .kopf{display:grid;grid-template-columns:4.6rem minmax(0,1fr);gap:.7rem;align-items:center}
+.ak .wap{width:4.6rem;height:4.6rem}
+.ak h3{margin:.2rem 0 .15rem;font:400 1.35rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ak .art{font-size:1.15rem;font-weight:700;color:var(--gold);letter-spacing:.02em}
+.ak p{margin:0;font-size:.9rem;line-height:1.3;color:var(--leise)}
+.ak .dia{min-height:6rem}
+.mini{width:100%;border-collapse:collapse;height:auto}
+.mini th,.mini td{height:1.75rem;padding:0 .3rem;font-size:.95rem;border-bottom:1px solid var(--linie)}
+.mini th{background:none;cursor:default;font-size:.7rem}
+.mini tr.erw td{color:var(--gold)}
+.mini th:first-child{width:46%}
+.mini.zwei th:first-child{width:80%}
+.z span.fb{color:#05070a} .z span.fb.aus{color:var(--stumm)}
+.fl{display:block;font-size:.84rem;color:var(--stumm);margin:-.1rem 0 .15rem 2.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chips{display:flex;gap:.35rem;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:.3rem;height:1.9rem;padding:0 .65rem;border:1px solid var(--linie-2);border-radius:999px;font-weight:600;font-size:.95rem;background:var(--flaeche-2);white-space:nowrap}
+.chip:hover{border-color:var(--creme)}
+.chip[aria-pressed=true]{background:var(--gold);border-color:var(--gold);color:#17120a}
+.chip.f[aria-pressed=true].pow{background:var(--pow);border-color:var(--pow)} .chip.f[aria-pressed=true].spe{background:var(--spe);border-color:var(--spe)}
+.chip.f[aria-pressed=true].men{background:var(--men);border-color:var(--men)} .chip.f[aria-pressed=true].soc{background:var(--soc);border-color:var(--soc)}
+.stufe{display:flex;flex-direction:column;gap:.3rem}
+.schritt{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.5rem .6rem;border:1px solid var(--linie);border-radius:var(--r-s);background:var(--flaeche-2)}
+.schritt .n{width:2rem;height:2rem;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:1.1rem;background:rgba(240,195,90,.14);color:var(--gold);border:1px solid rgba(240,195,90,.4)}
+.schritt b{display:block;font-weight:600;font-size:1.02rem;color:var(--creme)}
+.schritt small{display:block;font-size:.85rem;color:var(--leise);line-height:1.25}
+.schritt strong{font-size:1.45rem;font-weight:700;white-space:nowrap}
+.formel{font-size:1rem;line-height:1.5;padding:.5rem .65rem;border:1px dashed var(--linie-2);border-radius:var(--r-s);color:var(--creme);background:rgba(0,0,0,.25)}
+.formel em{font-style:normal;color:var(--gold);font-weight:700}
+input[type=range]{width:100%;accent-color:var(--gold)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9H3z"/><path d="M9 20v-6h6v6"/></symbol>
+  <symbol id="i-post" viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 7l9 6 9-6"/></symbol>
+  <symbol id="i-liste" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-tab" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-team" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><circle cx="18" cy="9" r="2.5"/><path d="M17 14c3 0 5 2 5 5"/></symbol>
+  <symbol id="i-markt" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+  <symbol id="i-geld" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.6-1-1.7-1.5-3-1.5-1.7 0-3 .9-3 2.2 0 3 6 1.4 6 4.3 0 1.3-1.3 2.2-3 2.2-1.400 0-2.600-.6-3.200-1.600M12 6v2M12 16v2"/></symbol>
+  <symbol id="i-buero" viewBox="0 0 24 24"><path d="M4 21V5l8-2v18M12 9l8 2v10M2 21h20M7 8h2M7 12h2M7 16h2M15 14h2M15 17h2"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M3 12l4-4 5 3 5-3 4 4-9 8z"/><path d="M12 11v9"/></symbol>
+  <symbol id="i-vertrag" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h5"/></symbol>
+  <symbol id="i-waage" viewBox="0 0 24 24"><path d="M12 4v16M5 20h14M4 8h16M4 8l-2 6h6zM20 8l-2 6h6z"/></symbol>
+</svg>
+
+<div class="demo" id="demo"></div>
+<div class="app">
+  <nav class="rail" aria-label="Hauptnavigation">
+    <div class="logo"><img src="../team-logos/D-P.jpg" alt=""></div>
+    <a href="#" title="Start"><svg class="i"><use href="#i-home"/></svg></a>
+    <a href="#" title="Inbox"><svg class="i"><use href="#i-post"/></svg></a>
+    <a href="#" title="Einsatzliste"><svg class="i"><use href="#i-liste"/></svg></a>
+    <a href="#" title="Saisonstand"><svg class="i"><use href="#i-tab"/></svg></a>
+    <a href="#" title="Kader"><svg class="i"><use href="#i-team"/></svg></a>
+    <a href="#" title="Transfermarkt und Draft"><svg class="i"><use href="#i-markt"/></svg></a>
+    <span class="luecke"></span>
+    <a href="budget-gespraech-22-11.html" title="Office: Vorstand"><svg class="i"><use href="#i-buero"/></svg></a>
+    <a class="an" href="finanzen-modern-18-11.html" title="Finanzen und Sponsoren"><svg class="i"><use href="#i-geld"/></svg></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="hk" id="hk"></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Ansichten"></div>
+      <div class="hr" id="hr"></div>
+    </header>
+    <div class="work" id="work"></div>
+  </main>
+</div>
+
+<script>
+"use strict";
+/* Live-Abbild, Stand Spieltag 11 (nur gelesen). Felder: l Liga, r Platz, e Startrang des Vertrags, geh Jahresgehalt, ank Vertragsanker, ist Sponsor heute, fp Farb-Punkte POW/SPE/MEN/SOC, v Platzverlauf, ev Sponsor-Ereignisse */
+var TEAMS=[{"id":"L-R","n":"Last Ride","l":1,"r":1,"e":5,"pk":29,"bud":305,"ka":15.01,"sp":"Hellix Fahrzeuglicht","sid":"hella-fahrzeuglicht","br":"auto","rar":"selten","lz":3,"geh":80.7,"ank":94.1,"ist":86.8,"bo":5,"pop":4.04,"fin":3.01,"mw":290.0,"fp":[8,7,5,9],"v":[15,9,9,9,2,2,3,2,2,1,1],"ev":[],"m":0},{"id":"Z-H","n":"Zero Heroes","l":1,"r":2,"e":2,"pk":27,"bud":320,"ka":8.2,"sp":"Jagwar Land Roamer","sid":"jaguar-land-rover","br":"auto","rar":"gewöhnlich","lz":2,"geh":81.3,"ank":89.4,"ist":86.2,"bo":5,"pop":4.06,"fin":2,"mw":308.3,"fp":[6,5,6,10],"v":[3,1,1,1,1,1,1,1,1,2,2],"ev":[[2,"partner_conflict",-2],[6,"clause_trigger",-1.5]],"m":0},{"id":"S-S","n":"Silver Soldiers","l":1,"r":3,"e":10,"pk":26,"bud":280,"ka":26.9,"sp":"Fresstrog Tierbedarf","sid":"fressnapf-tierbedarf","br":"retail","rar":"gewöhnlich","lz":1,"geh":66,"ank":59.7,"ist":67.6,"bo":3,"pop":5.43,"fin":7.43,"mw":251.1,"fp":[10,10,4,2],"v":[4,6,6,6,4,4,6,6,4,5,3],"ev":[[2,"partner_conflict",-2]],"m":0},{"id":"G-G","n":"Golden Gladiators","l":1,"r":4,"e":4,"pk":25,"bud":310,"ka":33.7,"sp":"Miela Hausgeräte","sid":"miele-hausgeraete","br":"tech","rar":"legendär","lz":3,"geh":70.9,"ank":104.4,"ist":113,"bo":5,"pop":6.5,"fin":6.71,"mw":282.3,"fp":[9,2,5,9],"v":[1,2,2,2,5,8,4,4,5,3,4],"ev":[[6,"activation_bonus",6]],"m":0},{"id":"H-R","n":"Hell Raisers","l":1,"r":5,"e":9,"pk":24,"bud":285,"ka":11.3,"sp":"WRD Sportpartner","sid":"wdr-sport","br":"media","rar":"gewöhnlich","lz":1,"geh":78.2,"ank":63.3,"ist":60.9,"bo":5,"pop":6.9,"fin":2.1,"mw":273.7,"fp":[7,1,6,10],"v":[5,7,7,10,9,9,9,7,7,7,5],"ev":[[5,"clause_trigger",-1.5],[8,"clause_trigger",-1.5],[12,"activation_bonus",3]],"m":0},{"id":"C-S","n":"Cold Steel","l":1,"r":6,"e":3,"pk":24,"bud":315,"ka":33.74,"sp":"Rewo United","sid":"rewe-united","br":"retail","rar":"magisch","lz":1,"geh":76.5,"ank":97.8,"ist":94.9,"bo":5,"pop":6.88,"fin":8.32,"mw":281.3,"fp":[6,7,3,8],"v":[6,8,8,7,6,12,10,10,6,6,6],"ev":[],"m":0},{"id":"M-M","n":"Mayhem Mavericks","l":1,"r":7,"e":1,"pk":23,"bud":325,"ka":23.4,"sp":"Mahlke Motoren","sid":"mahle-motoren","br":"auto","rar":"magisch","lz":1,"geh":81.5,"ank":102.0,"ist":86.7,"bo":5,"pop":7.08,"fin":5.13,"mw":301.6,"fp":[6,6,6,5],"v":[7,3,3,3,3,3,2,3,3,4,7],"ev":[[8,"clause_trigger",-2],[10,"clause_trigger",-2],[12,"activation_bonus",4]],"m":0},{"id":"W-W","n":"Wicked Wizards","l":1,"r":8,"e":15,"pk":21,"bud":255,"ka":22.8,"sp":"Kreisler Motors","sid":"chrysler-motors","br":"auto","rar":"selten","lz":3,"geh":69.6,"ank":55.3,"ist":51.3,"bo":6,"pop":2.9,"fin":7.4,"mw":230.2,"fp":[7,2,8,4],"v":[8,12,11,14,15,15,13,16,12,10,8],"ev":[[12,"partner_conflict",-2]],"m":0},{"id":"P-S","n":"Project Suicide","l":1,"r":9,"e":6,"pk":21,"bud":300,"ka":18.5,"sp":"Konradin Elektronik","sid":"conrad-elektronik","br":"retail","rar":"magisch","lz":1,"geh":73.5,"ank":84.8,"ist":64.2,"bo":6,"pop":4.03,"fin":3.64,"mw":283.5,"fp":[8,0,6,7],"v":[2,4,4,4,10,5,7,8,9,11,9],"ev":[[3,"activation_bonus",4],[6,"partner_conflict",-2]],"m":0},{"id":"V-D","n":"Vicious & Delicious","l":1,"r":10,"e":16,"pk":20,"bud":250,"ka":13.4,"sp":"Pfennig Markt","sid":"penny-markt","br":"retail","rar":"gewöhnlich","lz":1,"geh":59.3,"ank":46.6,"ist":46.5,"bo":5,"pop":5.8,"fin":2.92,"mw":237.6,"fp":[0,8,6,6],"v":[9,13,12,11,13,6,11,9,10,8,10],"ev":[[4,"activation_bonus",3],[8,"partner_conflict",-2]],"m":0},{"id":"R-L","n":"Raging Lunatics","l":1,"r":11,"e":7,"pk":18,"bud":295,"ka":5.3,"sp":"Trumpfel Lasertechnik","sid":"trumpf-lasertechnik","br":"tech","rar":"selten","lz":3,"geh":75.3,"ank":84.1,"ist":67.3,"bo":5,"pop":4.94,"fin":1.72,"mw":285.2,"fp":[8,2,2,6],"v":[10,10,10,8,7,7,8,11,11,12,11],"ev":[[2,"partner_conflict",-2],[11,"clause_trigger",-2.5]],"m":0},{"id":"N-W","n":"Natures Wrath","l":1,"r":12,"e":13,"pk":18,"bud":265,"ka":16.1,"sp":"Deichmeier Schuhe","sid":"deichmann-schuhe","br":"retail","rar":"gewöhnlich","lz":2,"geh":70.5,"ank":50.2,"ist":53,"bo":3,"pop":6.14,"fin":4.14,"mw":248.4,"fp":[5,5,2,6],"v":[11,11,15,15,11,10,5,5,8,9,12],"ev":[[5,"clause_trigger",-1.5],[9,"partner_conflict",-2],[11,"activation_bonus",3]],"m":0},{"id":"N-N","n":"Nunchuck Ninjas","l":1,"r":13,"e":12,"pk":16,"bud":270,"ka":17.6,"sp":"BASK Chemie Partner","sid":"basf-chemie","br":"tech","rar":"gewöhnlich","lz":1,"geh":71.8,"ank":53.0,"ist":47.4,"bo":5,"pop":2.96,"fin":2.92,"mw":255.4,"fp":[1,8,7,0],"v":[16,16,16,16,16,11,14,12,13,13,13],"ev":[[9,"activation_bonus",3]],"m":0},{"id":"T-T","n":"Terrible Teachers","l":1,"r":14,"e":14,"pk":16,"bud":260,"ka":27.6,"sp":"Fischler Dübelwerke","sid":"fischer-duebelwerke","br":"retail","rar":"magisch","lz":1,"geh":64.7,"ank":54.1,"ist":51.6,"bo":0,"pop":5.77,"fin":8.85,"mw":230.4,"fp":[4,6,4,2],"v":[12,14,13,12,14,13,12,13,14,14,14],"ev":[[5,"partner_conflict",-2]],"m":0},{"id":"W-L","n":"Wrecking Legionnaires","l":1,"r":15,"e":8,"pk":14,"bud":290,"ka":36.45,"sp":"Teutonia Bank Partner","sid":"deutsche-bank","br":"finance","rar":"selten","lz":1,"geh":77.4,"ank":79.2,"ist":45.4,"bo":3,"pop":4.66,"fin":10,"mw":253.5,"fp":[7,1,2,4],"v":[13,5,5,5,12,16,15,14,15,15,15],"ev":[],"m":0},{"id":"B-P","n":"Black Panthers","l":1,"r":16,"e":11,"pk":14,"bud":275,"ka":24.22,"sp":"Porschen Holding","sid":"porsche-holding","br":"auto","rar":"selten","lz":1,"geh":66.8,"ank":66.3,"ist":56,"bo":5,"pop":7.88,"fin":6.41,"mw":250.8,"fp":[0,6,4,4],"v":[14,15,14,13,8,14,16,15,16,16,16],"ev":[],"m":0},{"id":"C-C","n":"Cash Creators","l":2,"r":1,"e":7,"pk":28,"bud":215,"ka":29.1,"sp":"Hannober Rück","sid":"hannover-rueck","br":"finance","rar":"magisch","lz":2,"geh":60.3,"ank":64.6,"ist":88.8,"bo":6,"pop":6.94,"fin":9.72,"mw":187.9,"fp":[6,6,6,10],"v":[1,4,1,1,1,2,2,1,1,1,1],"ev":[[3,"activation_bonus",4],[5,"partner_conflict",-2]],"m":0},{"id":"D-P","n":"Death Peaches","l":2,"r":2,"e":2,"pk":27,"bud":240,"ka":-1.2,"sp":"Evonix Materials","sid":"evonik-materials","br":"tech","rar":"selten","lz":1,"geh":70.4,"ank":82.2,"ist":84.4,"bo":1,"pop":8.3,"fin":3.05,"mw":236.2,"fp":[4,8,7,8],"v":[3,2,2,2,2,1,1,2,4,2,2],"ev":[[5,"clause_trigger",-2.5],[6,"clause_trigger",-2.5]],"m":1},{"id":"L-K","n":"Lost Kingdom","l":2,"r":3,"e":5,"pk":26,"bud":225,"ka":19.7,"sp":"Schäffner Antrieb","sid":"schaeffler-antrieb","br":"auto","rar":"legendär","lz":1,"geh":64.9,"ank":78.2,"ist":75.1,"bo":3,"pop":6.07,"fin":7.38,"mw":203.3,"fp":[9,7,3,7],"v":[4,5,5,7,3,7,3,6,5,6,3],"ev":[[2,"partner_conflict",-2]],"m":0},{"id":"A-A","n":"Armageddon Aftermath","l":2,"r":4,"e":15,"pk":26,"bud":175,"ka":6.3,"sp":"Sennhauser Audio","sid":"sennheiser-audio","br":"media","rar":"magisch","lz":1,"geh":49.3,"ank":54.7,"ist":56.4,"bo":5,"pop":2.84,"fin":1.23,"mw":166.8,"fp":[5,8,7,6],"v":[5,11,3,5,5,3,4,3,3,3,4],"ev":[[9,"clause_trigger",-2]],"m":0},{"id":"U-A","n":"Undercover Agents","l":2,"r":5,"e":12,"pk":26,"bud":190,"ka":11.98,"sp":"Generic Motors","sid":"general-motors","br":"auto","rar":"selten","lz":1,"geh":50.8,"ank":58.0,"ist":66.4,"bo":1,"pop":4,"fin":4.25,"mw":178.0,"fp":[7,9,3,7],"v":[15,13,12,12,6,8,7,4,2,4,5],"ev":[],"m":0},{"id":"R-C","n":"Royal Court","l":2,"r":6,"e":6,"pk":26,"bud":220,"ka":20.25,"sp":"Webasco Comfort","sid":"webasto-comfort","br":"auto","rar":"magisch","lz":1,"geh":59.7,"ank":67.4,"ist":75.2,"bo":5,"pop":7.42,"fin":6.8,"mw":199.8,"fp":[8,4,4,10],"v":[6,6,6,8,4,4,5,5,6,5,6],"ev":[],"m":0},{"id":"M-S","n":"Mortal Sin","l":2,"r":7,"e":1,"pk":23,"bud":245,"ka":22.3,"sp":"Tumm Werkstatt","sid":"toom-werkstadt","br":"retail","rar":"selten","lz":1,"geh":63.3,"ank":83.2,"ist":59.7,"bo":6,"pop":8.29,"fin":6.79,"mw":222.7,"fp":[1,5,7,10],"v":[7,7,7,11,13,10,10,9,8,7,7],"ev":[],"m":0},{"id":"V-W","n":"Vigilante Wranglers","l":2,"r":8,"e":14,"pk":21,"bud":180,"ka":10.08,"sp":"Hornberg & Co","sid":"hornbach-co","br":"retail","rar":"gewöhnlich","lz":3,"geh":43.7,"ank":48.3,"ist":44,"bo":1,"pop":7.23,"fin":3.11,"mw":169.9,"fp":[6,2,9,4],"v":[8,8,8,3,7,5,6,7,7,8,8],"ev":[],"m":0},{"id":"B-B","n":"Blazing Beasts","l":2,"r":9,"e":13,"pk":18,"bud":185,"ka":10.9,"sp":"Kuxa Automation","sid":"kuka-automation","br":"tech","rar":"selten","lz":1,"geh":55.5,"ank":57.2,"ist":49.4,"bo":5,"pop":5.96,"fin":3.68,"mw":174.1,"fp":[6,4,6,2],"v":[16,16,13,9,8,6,8,8,10,10,9],"ev":[],"m":0},{"id":"V-V","n":"Vigorous Vikings","l":2,"r":10,"e":3,"pk":18,"bud":235,"ka":16.4,"sp":"Toyato Way Mobility","sid":"toyota-way","br":"auto","rar":"gewöhnlich","lz":2,"geh":67,"ank":68.0,"ist":44.4,"bo":2,"pop":4.76,"fin":3,"mw":221.6,"fp":[10,6,0,2],"v":[9,9,9,4,9,11,14,14,11,11,10],"ev":[[9,"activation_bonus",3]],"m":0},{"id":"D-L","n":"Dire Legion","l":2,"r":11,"e":11,"pk":18,"bud":195,"ka":15.6,"sp":"Hilto Befestigung","sid":"hilti-befestigung","br":"tech","rar":"magisch","lz":2,"geh":52.6,"ank":56.4,"ist":47.9,"bo":3,"pop":3.82,"fin":4.94,"mw":177.4,"fp":[0,1,8,9],"v":[10,12,11,14,15,14,13,11,13,12,11],"ev":[[4,"clause_trigger",-2]],"m":0},{"id":"S-C","n":"Stronghold Crusaders","l":2,"r":12,"e":9,"pk":17,"bud":205,"ka":17.43,"sp":"Leiko Kamera","sid":"leica-kamera","br":"media","rar":"gewöhnlich","lz":1,"geh":52,"ank":53.4,"ist":42.7,"bo":5,"pop":6.53,"fin":5.59,"mw":187.6,"fp":[10,1,4,2],"v":[11,10,14,13,12,12,11,12,12,13,12],"ev":[],"m":0},{"id":"R-R","n":"Riptide Rivers","l":2,"r":13,"e":16,"pk":17,"bud":170,"ka":15.6,"sp":"Montblanko Writing","sid":"montblanc-writing","br":"retail","rar":"magisch","lz":1,"geh":42.3,"ank":55.6,"ist":47.6,"bo":3,"pop":7.04,"fin":7.34,"mw":152.4,"fp":[4,7,2,4],"v":[2,1,10,10,10,13,12,10,9,9,13],"ev":[[3,"clause_trigger",-2]],"m":0},{"id":"T-C","n":"The Chantry","l":2,"r":14,"e":8,"pk":16,"bud":210,"ka":16.5,"sp":"Dr. Oedeker Gastronomie","sid":"dr-oetker","br":"food","rar":"gewöhnlich","lz":3,"geh":54.9,"ank":55.3,"ist":41.4,"bo":6,"pop":6.92,"fin":7.06,"mw":190.0,"fp":[6,1,5,4],"v":[12,14,15,15,16,16,15,15,15,14,14],"ev":[[2,"partner_conflict",-2],[7,"clause_trigger",-1.5]],"m":0},{"id":"T-G","n":"The Giants","l":2,"r":15,"e":4,"pk":15,"bud":230,"ka":8,"sp":"Fiato Automobili","sid":"fiat-automobili","br":"auto","rar":"gewöhnlich","lz":3,"geh":58.4,"ank":65.5,"ist":41.2,"bo":6,"pop":3.24,"fin":2.64,"mw":220.0,"fp":[10,0,4,1],"v":[13,3,4,6,11,9,9,13,14,15,15],"ev":[[10,"partner_conflict",-2]],"m":0},{"id":"P-C","n":"Pirate Crew","l":2,"r":16,"e":10,"pk":14,"bud":200,"ka":21.8,"sp":"Hermos Paket","sid":"hermes-paket","br":"logistics","rar":"magisch","lz":3,"geh":53,"ank":58.0,"ist":47,"bo":3,"pop":7.28,"fin":9.35,"mw":176.2,"fp":[0,7,1,6],"v":[14,15,16,16,14,15,16,16,16,16,16],"ev":[[4,"partner_conflict",-2]],"m":0}];
+
+/* ---------- Stellschrauben des Vorschlags (Startwerte, Konzept Abschnitt 4) ---------- */
+var P={
+  plan:4.5,                 // Planwert der uebrigen Einnahmen je Team (heute: Vorstandsziele)
+  richtwert:62,             // Richtwert Saison 1, C je Team
+  band:.15,                 // Topf hoechstens 15 % vom Vorjahr bzw. Richtwert weg
+  ligaAnteil:{1:1.11,2:.89},// Niveau des Grundbetrags je Liga
+  steig:{1:1.2,2:1.0},      // C je Erwartungsrang
+  praemie:{1:3.0,2:2.5},    // C je Platz ueber oder unter Erwartung
+  s1Satz:.5,                // Saison 1: halber Leistungssatz
+  markt:.8,                 // C je Beliebtheitspunkt
+  farbTopf:{1:12,2:9},      // C je Farbe und Liga
+  farbAnteile:[.40,.25,.15,.10,.05,.05],
+  wert:{"gewöhnlich":.97,"magisch":1,"selten":1.02,"legendär":1.04},
+  hebel:{fest:.5,leistung:1,praemie:1.5},
+  ziel:{fest:0,leistung:4,praemie:8},
+  spieltage:20, gespielt:11
+};
+var FARBEN=["pow","spe","men","soc"], FNAME={pow:"Power",spe:"Speed",men:"Mental",soc:"Social"};
+var ARTNAME={fest:"Festvertrag",leistung:"Leistungsvertrag",praemie:"Prämienvertrag"};
+var ICH="D-P";
+var q=new URLSearchParams(location.search);
+var Z={ansicht:q.get("ansicht")||"vertrag",f:parseFloat(q.get("f")||"1")||1,liga:parseInt(q.get("liga")||"2",10)===1?1:2,
+       art:q.get("art")||"leistung",lz:parseInt(q.get("lz")||"2",10)||2,farben:null,sort:{k:"sumNeu",d:-1},ang:1};
+if(q.get("still")==="1")document.body.classList.add("still");
+
+/* ---------- Hilfen ---------- */
+function el(id){return document.getElementById(id)}
+function zahl(v,n){return (Math.round(v*Math.pow(10,n==null?1:n))/Math.pow(10,n==null?1:n)).toLocaleString("de-DE",{minimumFractionDigits:n==null?1:n,maximumFractionDigits:n==null?1:n})}
+function vz(v,n){var s=zahl(Math.abs(v),n);return (v>0.049?"+":v<-0.049?"−":"±")+s}
+function kl(v){return v>0.049?"plus":v<-0.049?"minus":"leise"}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function mittel(a){return a.length?a.reduce(function(s,v){return s+v},0)/a.length:0}
+function summe(a){return a.reduce(function(s,v){return s+v},0)}
+function team(id){return TEAMS.filter(function(t){return t.id===id})[0]}
+function liga(l){return TEAMS.filter(function(t){return t.l===l})}
+var WAPPEN={"red-stag-energy":1,"rainforest-commerce":1,"alphasearch-global":1};
+function wappen(sid,name,klein){
+  var k=klein?" kl":"";
+  if(WAPPEN[sid])return '<span class="wap'+k+'"><img src="../sprites/sponsoren/'+sid+'.png" alt=""></span>';
+  var ini=name.split(/\s+/).slice(0,2).map(function(w){return w.charAt(0)}).join("").toUpperCase();
+  return '<span class="wap'+k+'" title="Wappen folgt, bis dahin Monogramm"><span>'+esc(ini)+'</span></span>';
+}
+function mass(box){var r=box.getBoundingClientRect(),k=parseFloat(getComputedStyle(document.documentElement).fontSize)/16;return {W:Math.max(200,Math.round(r.width)),H:Math.max(60,Math.round(r.height)),k:k}}
+function artVon(t){return t.id===ICH?Z.art:(t.e>=11?"praemie":t.e<=4?"fest":"leistung")}
+
+/* ---------- Die Rechnung (identisch zu Konzept Abschnitt 4) ---------- */
+function rechne(F){
+  var n=TEAMS.length, kosten=summe(TEAMS.map(function(t){return t.geh})), plan=P.plan*n;
+  var kIst=kosten-plan, ref=P.richtwert*n;
+  var k=Math.min(Math.max(kIst,ref*(1-P.band)),ref*(1+P.band));
+  var topf=F*k, farbSumme=4*(P.farbTopf[1]+P.farbTopf[2]);
+  var haupt=topf-farbSumme, jeTeam=haupt/n;
+  var norm=(P.ligaAnteil[1]+P.ligaAnteil[2])/2;
+  var res={kosten:kosten,plan:plan,kIst:kIst,k:k,topf:topf,farbSumme:farbSumme,haupt:haupt,zeilen:{}};
+  [1,2].forEach(function(l){
+    var ts=liga(l), popM=mittel(ts.map(function(t){return t.pop}));
+    function rohGrund(t){return jeTeam*P.ligaAnteil[l]/norm+F*P.steig[l]*(8.5-t.e)+P.markt*(t.pop-popM)}
+    var wSkala=summe(ts.map(rohGrund))/summe(ts.map(function(t){return rohGrund(t)*(P.wert[t.rar]||1)}));
+    // Farb-Wahl: die zwei Farben mit dem besten Ligarang in den Farb-Punkten (KI-Regel); D-P nach Auswahl
+    var rangIn={};
+    FARBEN.forEach(function(f,i){var o=ts.slice().sort(function(a,b){return b.fp[i]-a.fp[i]||a.r-b.r});o.forEach(function(t,j){(rangIn[t.id]=rangIn[t.id]||{})[f]=j+1})});
+    var wahl={};
+    ts.forEach(function(t){var ki=FARBEN.slice().sort(function(a,b){return rangIn[t.id][a]-rangIn[t.id][b]}).slice(0,2);if(t.id===ICH&&!Z.farben)Z.farben=ki.slice();wahl[t.id]=t.id===ICH?Z.farben.slice():ki});
+    var liste={};
+    var farb={};ts.forEach(function(t){farb[t.id]={}});
+    FARBEN.forEach(function(f,i){
+      var unt=ts.filter(function(t){return wahl[t.id].indexOf(f)>=0}).sort(function(a,b){return b.fp[i]-a.fp[i]||a.r-b.r});
+      var ant=P.farbAnteile.slice(0,unt.length), s=summe(ant)||1;
+      unt.forEach(function(t,j){farb[t.id][f]={platz:j+1,von:unt.length,c:j<ant.length?F*P.farbTopf[l]*ant[j]/s:0}});
+      liste[f]=unt.slice(0,3).map(function(t){return t.id+" "+t.fp[i]});
+    });
+    var roh=ts.map(function(t){var h=P.hebel[artVon(t)];return F*P.s1Satz*P.praemie[l]*h*(t.e-t.r)});
+    var ausgleich=-mittel(roh);
+    ts.forEach(function(t,i){
+      var grund=rohGrund(t)*(P.wert[t.rar]||1)*wSkala;
+      var leist=roh[i]+ausgleich, fc=summe(FARBEN.map(function(f){return farb[t.id][f]?farb[t.id][f].c:0}));
+      var uebrig=t.bo, sumNeu=grund+leist+fc;
+      res.zeilen[t.id]={t:t,art:artVon(t),grund:grund,roh:rohGrund(t),wSkala:wSkala,basis:jeTeam*P.ligaAnteil[l]/norm,popM:popM,leist:leist,leistRoh:roh[i],ausgleich:ausgleich,liste:liste,farb:farb[t.id],farbC:fc,wahl:wahl[t.id],rangIn:rangIn[t.id],
+        sumNeu:sumNeu,heute:t.ist,ergNeu:sumNeu+uebrig-t.geh,ergHeute:t.ist+uebrig-t.geh+summe(t.ev.map(function(e){return e[2]})),
+        erwNeu:grund+fc+uebrig-t.geh,erwHeute:t.ank+uebrig-t.geh};
+    });
+  });
+  return res;
+}
+
+/* ---------- Kopf ---------- */
+function kopf(R){
+  var d=R.zeilen[ICH], t=d.t;
+  el("hk").innerHTML='<div class="crest"><img src="../team-logos/'+ICH+'.jpg" alt=""></div><div><h1>Sponsoren</h1>'+
+    '<div class="sub"><b>'+esc(t.n)+'</b> · Liga '+t.l+' · Spieltag '+P.gespielt+' von '+P.spieltage+' · Platz <b>'+t.r+'</b> · Erwartung <b>'+t.e+'</b></div></div>';
+  var tabs=[["vertrag","i-vertrag","Laufender Vertrag",esc(t.sp)],["angebote","i-hand","Angebote für Saison 2","Verhandlung"],["liga","i-tab","Wer bekommt was","Liga-Vergleich"],["rechnung","i-waage","So wird gerechnet","Saisonfaktor"]];
+  el("tabs").innerHTML=tabs.map(function(x){return '<button class="dtab'+(Z.ansicht===x[0]?" an":"")+'" role="tab" aria-selected="'+(Z.ansicht===x[0])+'" data-ansicht="'+x[0]+'"><span class="nr"><svg class="i"><use href="#'+x[1]+'"/></svg></span><span><em>'+x[2]+'</em><b>'+x[3]+'</b></span></button>'}).join("");
+  var lage=Math.abs(Z.f-1)<.005?"Liga im Gleichgewicht":Z.f>1?"Liga im Plus":"Liga im Minus";
+  el("hr").innerHTML='<div class="fakt" title="Eine Zahl im Spielstand. Bei 1,00 deckt der Liga-Topf genau die Kosten der Liga."><strong class="t">'+zahl(Z.f,2)+'</strong><span>Saisonfaktor</span><i>'+lage+'</i></div>';
+}
+function demo(){
+  function b(lab,k,v,an){return '<button data-k="'+k+'" data-v="'+v+'" aria-pressed="'+an+'">'+lab+'</button>'}
+  el("demo").innerHTML='<b>Mockup</b><b>Ansicht</b>'+[["vertrag","Vertrag"],["angebote","Angebote"],["liga","Liga"],["rechnung","Rechnung"]].map(function(x){return b(x[1],"ansicht",x[0],Z.ansicht===x[0])}).join("")+
+    '<b>Saisonfaktor</b>'+[.95,1,1.05].map(function(f){return b(zahl(f,2),"f",f,Math.abs(Z.f-f)<.004)}).join("")+
+    '<b>Liga</b>'+b("1","liga",1,Z.liga===1)+b("2","liga",2,Z.liga===2)+
+    '<span class="welle">Sponsoren neu · Live-Daten Death Peaches, Spieltag 11 · Beträge gerechnet, nicht gebucht</span>';
+}
+
+/* ---------- Ansicht 1: Laufender Vertrag ---------- */
+function ansVertrag(R){
+  var d=R.zeilen[ICH], t=d.t, l=t.l, p=Z.f*P.s1Satz*P.praemie[l]*P.hebel[d.art];
+  var ziel=P.ziel[d.art], zielErf=.62, zielC=ziel*(2*zielErf-1);
+  var saison=d.sumNeu+zielC, jeTag=d.grund/P.spieltage;
+  var ev=summe(t.ev.map(function(e){return e[2]}));
+  var links='<section class="pan"><div class="pk"><h2>Hauptsponsor</h2><span class="sp"></span><span class="marke echt">Marke echt</span><span class="marke r-'+t.rar+'">'+t.rar+'</span></div><div class="kb">'+
+    '<div class="vk">'+wappen(t.sid,t.sp)+'<div><h3>'+esc(t.sp)+'</h3><p>'+ARTNAME[d.art]+' · Laufzeit '+t.lz+' Saison'+(t.lz>1?"en":"")+'<br>Erwartungsrang <b class="creme">'+t.e+'</b> von 16 · Beliebtheit <b class="creme">'+zahl(t.pop)+'</b></p></div></div>'+
+    '<div class="zl">'+
+    '<div class="z"><span>Grundbetrag <small>'+zahl(jeTag,2)+' C je Spieltag</small></span><b class="t">'+zahl(d.grund)+' C</b></div>'+
+    '<div class="z"><span>Leistungsteil <small>'+zahl(p,2)+' C je Platz, Stand Platz '+t.r+'</small></span><b class="t '+kl(d.leistRoh)+'">'+vz(d.leistRoh)+' C</b></div>'+
+    '<div class="z klein"><span title="Hält die Summe der Leistungsteile der Liga bei 0, auch wenn Teams verschiedene Vertragsarten haben.">Liga-Ausgleich <small>für alle 16 Teams gleich</small></span><b class="t '+kl(d.ausgleich)+'">'+vz(d.ausgleich)+' C</b></div>'+
+    '<div class="z"><span>Farb-Partner <small>'+d.wahl.map(function(f){return FNAME[f]}).join(" und ")+'</small></span><b class="t plus">'+vz(d.farbC)+' C</b></div>'+
+    '<div class="z"><span>Ziel „Entwicklung“ <small>Einsatz ±'+zahl(ziel,0)+' C, erfüllt zu 62 %</small> <span class="marke bsp">Beispiel</span></span><b class="t '+kl(zielC)+'">'+vz(zielC)+' C</b></div>'+
+    '<div class="z sum"><span>Hochrechnung Saison</span><b class="t">'+zahl(saison)+' C</b></div>'+
+    '<div class="z klein"><span>Heutiges System, selber Tabellenplatz <span class="marke echt">echt</span></span><b class="t leise">'+zahl(t.ist)+' C</b></div>'+
+    '<div class="z klein"><span>Jahresgehalt des Kaders <span class="marke echt">echt</span></span><b class="t">−'+zahl(t.geh)+' C</b></div>'+
+    '<div class="z klein"><span>Ergebnis der Saison (mit Vorstandszielen '+vz(t.bo)+')</span><b class="t '+kl(saison+t.bo-t.geh)+'">'+vz(saison+t.bo-t.geh)+' C</b></div>'+
+    '</div>'+
+    '<table class="mini"><thead><tr><th class="l">Endet die Saison auf</th><th>Leistung</th><th>Sponsor</th><th>Ergebnis</th></tr></thead><tbody>'+[1,2,4,8].map(function(k){var le=p*(t.e-k),sp=d.grund+le+d.ausgleich+d.farbC+zielC;
+      return '<tr class="'+(k===t.e?"erw":"")+'"><td class="l">Platz '+k+(k===t.e?" · Erwartung":"")+'</td><td class="t '+kl(le)+'">'+vz(le)+'</td><td class="t">'+zahl(sp)+'</td><td class="t '+kl(sp+t.bo-t.geh)+'">'+vz(sp+t.bo-t.geh)+'</td></tr>'}).join("")+'</tbody></table>'+
+    '<div class="hinweis"><b>Warum weniger als heute?</b> Heute bekommt Startrang 2 in Liga 2 den zweitgrößten Vertrag der Liga, egal was der Kader kostet. Neu deckt der Grundbetrag die übliche Kostenlast für Erwartungsrang '+t.e+'. Dein Kader ist der teuerste der Liga 2 ('+zahl(t.geh)+' C, Liga-Mittel '+zahl(mittel(liga(2).map(function(x){return x.geh})))+' C): den Unterschied musst du erspielen.</div>'+
+    '</div></section>';
+  // Verlauf
+  var mitte='<section class="pan"><div class="pk"><h2>Leistungsteil gegen die Erwartung</h2><span class="sp"></span><span class="marke echt">Platzverlauf echt</span><span class="hin">Abschlag je Spieltag = 80 % von Satz × (Erwartung − Platz) ÷ 20</span></div><div class="kb">'+
+    '<div class="dia" id="diaVerlauf"></div>'+
+    '<div class="leg"><span><i style="background:var(--heim)"></i>Tabellenplatz Death Peaches</span><span><i style="background:var(--gold)"></i>Erwartungsrang '+t.e+'</span><span><i style="background:var(--gut)"></i>Abschlag im Plus</span><span><i style="background:var(--warn)"></i>Abschlag im Minus</span><span><i style="background:var(--stumm)"></i>offen: Spieltag 12 bis 20</span></div>'+
+    '</div><div class="fuss"><span>Am Saisonende: Schlussausgleich auf den Endrang. Summe über alle 16 Teams der Liga ist immer 0.</span></div></section>';
+  // rechts
+  var farb=FARBEN.map(function(f,i){var w=d.farb[f];
+    return '<div class="z"><span><span class="fb '+(w?f:"aus")+'">'+f.toUpperCase()+'</span> '+FNAME[f]+' <small>'+t.fp[i]+' Punkte · Liga-Rang '+d.rangIn[f]+(w?' · Platz '+w.platz+' von '+w.von+' Partnern':' · nicht unterschrieben')+'</small></span><b class="t '+(w&&w.c>0?"plus":"leise")+'">'+(w?vz(w.c)+" C":"—")+'</b></div>'+
+      '<span class="fl">vorn unter den Partnern: '+d.liste[f].map(function(x,j){return (j+1)+". "+x}).join(" · ")+'</span>'}).join("");
+  var EVN={partner_conflict:"Partner-Reibung",clause_trigger:"Klausel verfehlt",activation_bonus:"Aktionsbonus"};
+  var evZ=t.ev.length?t.ev.map(function(e){return '<div class="z klein"><span>Spieltag '+e[0]+' · '+(EVN[e[1]]||e[1])+' <small>heute: Würfel, 12 % je Spieltag</small></span><b class="t '+kl(e[2])+'">'+vz(e[2])+' C</b></div>'}).join(""):'<div class="z klein"><span>Kein Würfel-Ereignis in dieser Saison</span><b class="leise">—</b></div>';
+  var rechts='<div class="spalte">'+
+    '<section class="pan" style="flex:1.45"><div class="pk"><h2>Farb-Partner</h2><span class="sp"></span><span class="marke echt">Farb-Punkte echt</span></div><div class="kb"><div class="zl">'+farb+'</div>'+
+    '<div class="hinweis">Je Farbe ein Topf von '+zahl(P.farbTopf[l],0)+' C in Liga '+l+'. Verteilt wird nur unter den Teams, die diese Farbe unterschrieben haben: 40 / 25 / 15 / 10 / 5 / 5 %. Jedes Team wählt zwei Farben.</div></div></section>'+
+    '<section class="pan" style="flex:1"><div class="pk"><h2>Ereignisse</h2><span class="sp"></span><span class="hin">neu: Entscheidung statt Würfel</span></div><div class="kb"><div class="zl">'+evZ+
+    '<div class="z"><span>Sponsorentermin vor Spieltag 12 <span class="marke bsp">Beispiel</span></span><b class="t plus">+1,5 C</b></div></div>'+
+    '<div class="hinweis">'+esc(t.sp)+' lädt zum Werksbesuch. Sagst du zu, fehlt ein Spieler deiner Wahl im Abschlusstraining: Form −1 am nächsten Spieltag. Höchstens zwei Termine je Saison.</div>'+
+    '<div style="display:flex;gap:.5rem"><button class="btn klein ja">Zusagen</button><button class="btn klein">Absagen</button><button class="btn klein">An die KI geben</button></div>'+
+    '</div></section></div>';
+  el("work").innerHTML=links+mitte+rechts;
+  zeichneVerlauf(t,p);
+}
+function zeichneVerlauf(t,p){
+  var box=el("diaVerlauf"),m=mass(box),W=m.W,H=m.H,k=m.k,l=64*k,r=14*k,o=30*k,u=Math.max(150*k,H*.3),N=P.spieltage,pw=(W-l-r)/N,ph=H-o-u;
+  var tief=Math.min(16,Math.max(Math.max.apply(null,t.v),t.e)+3);
+  function x(i){return l+pw*(i+.5)} function y(rg){return o+ph*(rg-1)/(tief-1)}
+  var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Platzverlauf und Abschläge je Spieltag">';
+  for(var g=1;g<=tief;g++){if(tief>9&&g!==1&&g%4!==0)continue;s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+y(g)+'" y2="'+y(g)+'" stroke="rgba(244,230,196,.09)"/><text x="'+(l-8*k)+'" y="'+(y(g)+4*k)+'" text-anchor="end">Platz '+g+'</text>'}
+  s+='<rect x="'+(x(P.gespielt-1)+pw/2)+'" y="'+(o-14*k)+'" width="'+(W-r-x(P.gespielt-1)-pw/2)+'" height="'+(H-o-12*k)+'" fill="rgba(102,115,138,.08)"/>';
+  s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+y(t.e)+'" y2="'+y(t.e)+'" stroke="#f0c35a" stroke-width="'+2*k+'" stroke-dasharray="7 5"/><text x="'+(W-r-4*k)+'" y="'+(y(t.e)-7*k)+'" text-anchor="end" fill="#f0c35a">Erwartung '+t.e+'</text>';
+  s+='<polyline points="'+t.v.map(function(v,i){return x(i)+","+y(v)}).join(" ")+'" fill="none" stroke="#F2A03D" stroke-width="'+3*k+'"/>';
+  t.v.forEach(function(v,i){s+='<circle cx="'+x(i)+'" cy="'+y(v)+'" r="'+5*k+'" fill="#F2A03D"/><text x="'+x(i)+'" y="'+(y(v)-10*k)+'" text-anchor="middle" fill="#eef2f8">'+v+'</text>'});
+  var hoch=(u-64*k)/2,b0=H-26*k-hoch-6*k,ab=t.v.map(function(v){return .8*p*(t.e-v)/N}),mx=Math.max.apply(null,ab.map(Math.abs).concat([.8*p*2/N])),kum=0;
+  s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+b0+'" y2="'+b0+'" stroke="rgba(244,230,196,.3)"/><text x="'+(l-8*k)+'" y="'+(b0+4*k)+'" text-anchor="end">Abschlag</text>';
+  for(var i=0;i<N;i++){
+    s+='<text x="'+x(i)+'" y="'+(H-6*k)+'" text-anchor="middle">'+(i+1)+'</text>';
+    if(i<ab.length){var a=ab[i];kum+=a;var h=Math.max(2*k,Math.abs(a)/mx*hoch*.8);
+      s+='<rect x="'+(x(i)-pw*.3)+'" y="'+(a>=0?b0-h:b0)+'" width="'+pw*.6+'" height="'+h+'" rx="2" fill="'+(a>.0001?"#62d394":a<-.0001?"#ff6058":"#66738a")+'"><title>Spieltag '+(i+1)+': Platz '+t.v[i]+', Abschlag '+vz(a,2)+' C</title></rect>';
+      if(Math.abs(a)>.0001)s+='<text x="'+x(i)+'" y="'+(a>=0?b0-h-5*k:b0+h+14*k)+'" text-anchor="middle" fill="'+(a>0?"#62d394":"#ff6058")+'">'+vz(a,2)+'</text>';
+    } else s+='<rect x="'+(x(i)-pw*.3)+'" y="'+(b0-2*k)+'" width="'+pw*.6+'" height="'+4*k+'" rx="2" fill="#333d50"/>';
+  }
+  s+='<text x="'+(l+4*k)+'" y="'+(b0-hoch*.8-10*k)+'" fill="#f4e6c4">Abschläge bisher '+vz(kum,2)+' C · offen bis zum Schlussausgleich '+vz(p*(t.e-t.r)-kum,2)+' C · Satz '+zahl(p,2)+' C je Platz</text>';
+  box.innerHTML=s+'</svg>';
+}
+
+/* ---------- Ansicht 2: Angebote und Verhandlung (Beispiel Saison 2) ---------- */
+var ANGEBOTE=[
+  {sid:"rainforest-commerce",n:"Rainforest Commerce",br:"Handel",rar:"magisch",art:"fest",txt:"Planbar. Jeder Platz zählt nur halb, nach oben wie nach unten. Kein Ziel."},
+  {sid:"alphasearch-global",n:"Alphasearch Global",br:"Technik",rar:"selten",art:"leistung",txt:"Der Standard. Voller Leistungssatz, ein Ziel mit kleinem Einsatz."},
+  {sid:"red-stag-energy",n:"Red Stag Energy",br:"Sport",rar:"legendär",art:"praemie",txt:"Wette auf dich selbst. Jeder Platz zählt anderthalbfach, das Ziel doppelt."}
+];
+function angebotWerte(R,a){
+  var d=R.zeilen[ICH],t=d.t,l=t.l,h=P.hebel[a.art];
+  var grund=d.roh*(P.wert[a.rar]||1)*d.wSkala;
+  var satz=Z.f*P.praemie[l]*h;      // Saison 2: voller Satz
+  var treue=Z.lz>=2?1:0, treue3=Z.lz>=3?2:0;
+  return {grund:grund,satz:satz,ziel:P.ziel[a.art],treue:treue,treue3:treue3,e:t.e};
+}
+function ansAngebote(R){
+  var d=R.zeilen[ICH],t=d.t;
+  var links='<section class="pan"><div class="pk"><h2>Deine Ausgangslage</h2><span class="sp"></span><span class="marke echt">echt</span></div><div class="kb">'+
+    '<div class="kacheln" style="grid-template-columns:1fr 1fr">'+
+    '<div class="kachel"><span class="gk">Erwartungsrang</span><strong class="t gold">'+t.e+'<small style="display:inline;font-size:1rem"> von 16</small></strong><small>Vorstand: Kaderstärke und Vorjahr</small></div>'+
+    '<div class="kachel"><span class="gk">Beliebtheit</span><strong class="t">'+zahl(t.pop)+'</strong><small>Liga-Mittel '+zahl(mittel(liga(t.l).map(function(x){return x.pop})))+' · je Punkt 0,8 C</small></div>'+
+    '<div class="kachel"><span class="gk">Liga-Topf</span><strong class="t">'+zahl(R.topf,0)+' C</strong><small>Kosten der Liga × Faktor '+zahl(Z.f,2)+'</small></div>'+
+    '<div class="kachel"><span class="gk">Vorab-Zusage</span><strong class="t">'+zahl(d.grund*.9,0)+' C</strong><small>mindestens 90 % des Grundbetrags, vor der Kaufphase <span class="marke bsp">Beispiel</span></small></div></div>'+
+    '<div class="hinweis"><b>Drei Angebote, drei Vertragsarten.</b> Alle zahlen bei Erwartungsrang fast dasselbe. Sie unterscheiden sich darin, wie stark jeder Tabellenplatz zählt.</div>'+
+    '<table class="mini"><thead><tr><th class="l">Prestige der Marke</th><th>Grundbetrag</th><th>Leih-Kurs</th></tr></thead><tbody>'+[["gewöhnlich","−3 %","1,4"],["magisch","±0","1,9"],["selten","+2 %","2,4"],["legendär","+4 %","3,0"]].map(function(x){return '<tr><td class="l"><span class="marke r-'+x[0]+'">'+x[0]+'</span></td><td class="t">'+x[1]+'</td><td class="t">'+x[2]+'</td></tr>'}).join("")+'</tbody></table>'+
+    '<small class="leise">Prestige ist kein Los mehr: es hebt den Grundbetrag nur leicht und in der Liga-Summe gar nicht. Der Leih-Kurs gilt für eine Gebäude-Leihe wie heute. Welche Marken anklopfen, hängt an Beliebtheit und den letzten Platzierungen.</small>'+
+    '<div class="hinweis" style="border-color:var(--gast)"><b>Vorstand:</b> „Mit Erwartungsrang '+t.e+' können wir kaum noch überraschen. Ein Prämienvertrag lohnt sich für Außenseiter, nicht für uns.“ <span class="marke bsp">Beispiel</span></div>'+
+    '</div></section>';
+  var karten='<div class="spalte"><div class="ang">'+ANGEBOTE.map(function(a,i){var w=angebotWerte(R,a);
+    return '<div role="button" tabindex="0" class="ak'+(Z.ang===i?" an":"")+'" data-ang="'+i+'"><div class="kopf">'+wappen(a.sid,a.n)+'<div><span class="marke r-'+a.rar+'">'+a.rar+'</span> <span class="marke bsp">Beispiel</span><h3>'+esc(a.n)+'</h3><span class="art">'+ARTNAME[a.art]+'</span></div></div>'+
+    '<p>'+a.txt+'</p><div class="zl">'+
+    '<div class="z"><span>Grundbetrag je Saison</span><b class="t">'+zahl(w.grund)+' C</b></div>'+
+    '<div class="z"><span>je Platz über oder unter Erwartung</span><b class="t">±'+zahl(w.satz,2)+' C</b></div>'+
+    '<div class="z"><span>Zieleinsatz</span><b class="t">'+(w.ziel?"±"+zahl(w.ziel,0)+" C":"—")+'</b></div>'+
+    '</div><table class="mini"><thead><tr><th class="l">Endrang</th><th>Leistung</th><th>Hauptsponsor</th></tr></thead><tbody>'+[1,2,4,8,12,16].map(function(k){var le=w.satz*(w.e-k);
+      return '<tr class="'+(k===w.e?"erw":"")+'"><td class="l">Platz '+k+(k===w.e?" · Erwartung":"")+'</td><td class="t '+kl(le)+'">'+vz(le)+'</td><td class="t">'+zahl(w.grund+le)+' C</td></tr>'}).join("")+'</tbody></table>'+
+    '<div class="dia" data-kurve="'+i+'"></div></div>'}).join("")+'</div></div>';
+  var a=ANGEBOTE[Z.ang], w=angebotWerte(R,a), zw=R.zeilen[ICH];
+  var rechts='<section class="pan"><div class="pk"><h2>Verhandlung</h2><span class="sp"></span><span class="hin">'+esc(a.n)+'</span></div><div class="kb">'+
+    '<div class="stufe"><span class="gk">Laufzeit</span><div class="chips">'+[1,2,3].map(function(n){return '<button class="chip" data-lz="'+n+'" aria-pressed="'+(Z.lz===n)+'">'+n+' Saison'+(n>1?"en":"")+'</button>'}).join("")+'</div>'+
+    '<small class="leise">Vertragsart und Marke sind für die Laufzeit fest. Treuebonus +1 C im zweiten, +2 C im dritten Jahr. Der Erwartungsrang wird jede Saison neu gesetzt.</small></div>'+
+    '<div class="stufe"><span class="gk">Farb-Partner: zwei aus vier</span><div class="chips">'+FARBEN.map(function(f){return '<button class="chip f '+f+'" data-farbe="'+f+'" aria-pressed="'+(Z.farben.indexOf(f)>=0)+'">'+f.toUpperCase()+' · Liga-Rang '+zw.rangIn[f]+'</button>'}).join("")+'</div>'+
+    '<small class="leise">Liga-Rang nach Farb-Punkten dieser Saison <span class="marke echt">echt</span>. Geld gibt es nur in den zwei unterschriebenen Farben.</small></div>'+
+    '<div class="stufe"><span class="gk">Ziel gegen die eigene Ausgangslage</span><div class="chips">'+["Entwicklung","Kaderpflege","Ausbau","Solidität"].map(function(z,i){return '<button class="chip" aria-pressed="'+(i===0)+'">'+z+'</button>'}).join("")+'</div>'+
+    '<small class="leise">Auszahlung = Einsatz × (2 × Erfüllung − 1). Im Mittel 0, wie die Achsen heute.</small></div>'+
+    '<div class="kachel"><span class="gk">Nachfordern, einmal je Angebot <span class="marke bsp">Beispiel</span></span><small>Chance 46 % aus Beliebtheit 8,3 und Vorstandsvertrauen 5,7. Gelingt es, zählt das Ziel nach oben voll und nach unten halb. Scheitert es, zieht '+esc(a.n)+' zurück und es bleiben zwei Angebote.</small></div>'+
+    '<div class="zl" style="margin-top:auto">'+
+    '<div class="z"><span>Grundbetrag</span><b class="t">'+zahl(w.grund)+' C</b></div>'+
+    '<div class="z"><span>Farb-Partner <small>Stand heute</small></span><b class="t plus">'+vz(zw.farbC)+' C</b></div>'+
+    '<div class="z"><span>Treuebonus über die Laufzeit</span><b class="t">'+(Z.lz===1?"—":"+"+zahl(Z.lz===2?1:3,0)+" C")+'</b></div>'+
+    '<div class="z sum"><span>Bei Erwartungsrang, Saison 2</span><b class="t">'+zahl(w.grund+zw.farbC)+' C</b></div></div>'+
+    '</div><div class="fuss"><button class="btn klein" title="Einmal je Angebot. Chance nach Beliebtheit und Vorstandsvertrauen. Scheitert es, zieht die Marke zurück.">Nachfordern</button><span class="sp"></span><button class="btn klein">KI wählen lassen</button><button class="btn ja">Unterschreiben</button></div></section>';
+  el("work").innerHTML=links+karten+rechts;
+  ANGEBOTE.forEach(function(a,i){var w=angebotWerte(R,a), box=document.querySelector('[data-kurve="'+i+'"]'), m=mass(box), W=m.W, H=m.H, k=m.k;
+    var l=8*k,r=8*k,o=22*k,u=22*k; var vals=[];for(var j=1;j<=16;j++)vals.push(w.grund+w.satz*(w.e-j));
+    var all=[];ANGEBOTE.forEach(function(b){var x=angebotWerte(R,b);all.push(x.grund+x.satz*(x.e-1),x.grund+x.satz*(x.e-16))});
+    var mn=Math.min.apply(null,all),mx=Math.max.apply(null,all);
+    function X(j){return l+(W-l-r)*(j-1)/15} function Y(v){return o+(H-o-u)*(1-(v-mn)/(mx-mn||1))}
+    var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Auszahlung nach Endrang">';
+    s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(w.grund)+'" y2="'+Y(w.grund)+'" stroke="rgba(244,230,196,.25)" stroke-dasharray="4 4"/>';
+    s+='<polyline fill="none" stroke="#f0c35a" stroke-width="'+2.5*k+'" points="'+vals.map(function(v,j){return X(j+1)+","+Y(v)}).join(" ")+'"/>';
+    s+='<circle cx="'+X(w.e)+'" cy="'+Y(w.grund)+'" r="'+5*k+'" fill="#F2A03D"/>';
+    s+='<text x="'+l+'" y="'+(H-5*k)+'">Platz 1</text><text x="'+(W-r)+'" y="'+(H-5*k)+'" text-anchor="end">Platz 16</text><text x="'+(X(w.e)+10*k)+'" y="'+(Y(w.grund)-8*k)+'" fill="#F2A03D">Erwartung · '+zahl(w.grund,0)+' C</text><text x="'+(W-r-16*k)+'" y="'+(Y(vals[15])+3*k)+'" text-anchor="end">'+zahl(vals[15],0)+' C</text>';
+    box.innerHTML=s+'</svg>';
+  });
+}
+
+/* ---------- Ansicht 3: Liga-Vergleich ---------- */
+var SPALTEN=[["rg","#",3,"m"],["n","Team",15,"l"],["sp","Hauptsponsor",17,"l"],["art","Vertragsart",9,"l"],["e","Erwartung",6,"m"],["r","Platz",5,"m"],
+  ["grund","Grundbetrag",7,""],["leist","Leistung",7,""],["farbC","Farb-Partner",9,""],["sumNeu","Summe neu",7,""],["heute","heute",6,""],["geh","Gehalt",6,""],["ergNeu","Ergebnis neu",8,""],["bal","",10,"m"],["ergHeute","Ergebnis heute",8,""]];
+function ansLiga(R){
+  var zs=liga(Z.liga).map(function(t){return R.zeilen[t.id]});
+  // Rang 1 = hoechste Summe
+  zs.slice().sort(function(a,b){return b.sumNeu-a.sumNeu}).forEach(function(z,i){z.rg=i+1});
+  function wert(z,k){return k==="n"?z.t.n:k==="sp"?z.t.sp:k==="e"?z.t.e:k==="r"?z.t.r:k==="geh"?z.t.geh:k==="art"?ARTNAME[z.art]:k==="bal"?z.ergNeu:z[k]}
+  var k=Z.sort.k,dd=Z.sort.d;
+  zs.sort(function(a,b){var x=wert(a,k),y=wert(b,k);return (typeof x==="string"?x.localeCompare(y,"de"):x-y)*dd});
+  var mx=Math.max.apply(null,zs.map(function(z){return Math.max(Math.abs(z.ergNeu),Math.abs(z.ergHeute))}));
+  var kopfz=SPALTEN.map(function(s){var as=Z.sort.k===s[0]?' aria-sort="'+(Z.sort.d>0?"ascending":"descending")+'"':"";return '<th class="'+s[3]+'" style="width:'+s[2]+'%" data-sort="'+s[0]+'"'+as+'>'+s[1]+'</th>'}).join("");
+  var rows=zs.map(function(z){var t=z.t, w=Math.min(50,Math.abs(z.ergNeu)/mx*50);
+    return '<tr class="'+(t.id===ICH?"ich":"")+'"><td class="m t">'+z.rg+'</td><td class="l"><span class="tm"><img src="../team-logos/'+t.id+'.jpg" alt=""><span class="h">'+esc(t.n)+'</span></span></td>'+
+    '<td class="l"><span class="tm">'+wappen(t.sid,t.sp,true)+'<span>'+esc(t.sp)+'</span><span class="marke r-'+t.rar+'">'+t.rar.slice(0,3)+'</span></span></td>'+
+    '<td class="l leise">'+ARTNAME[z.art].replace("vertrag","")+'</td><td class="m t gold">'+t.e+'</td><td class="m t">'+t.r+'</td>'+
+    '<td class="t">'+zahl(z.grund)+'</td><td class="t '+kl(z.leist)+'">'+vz(z.leist)+'</td>'+
+    '<td class="t"><span class="tm" style="justify-content:flex-end">'+z.wahl.map(function(f){return '<span class="fb '+f+'">'+f.toUpperCase()+'</span>'}).join("")+'<span class="'+(z.farbC>0?"plus":"leise")+'" style="min-width:2.6rem;text-align:right">'+zahl(z.farbC)+'</span></span></td>'+
+    '<td class="t gold">'+zahl(z.sumNeu)+'</td><td class="t leise">'+zahl(z.heute)+'</td><td class="t">'+zahl(t.geh)+'</td>'+
+    '<td class="t '+kl(z.ergNeu)+'">'+vz(z.ergNeu)+'</td><td><div class="bal"><i style="background:'+(z.ergNeu>=0?"var(--gut)":"var(--warn)")+';'+(z.ergNeu>=0?"left:50%":"right:50%")+';width:'+w+'%"></i></div></td>'+
+    '<td class="t '+kl(z.ergHeute)+'">'+vz(z.ergHeute)+'</td></tr>'}).join("");
+  var neu=zs.map(function(z){return z.ergNeu}), alt=zs.map(function(z){return z.ergHeute});
+  var sn=zs.map(function(z){return z.sumNeu}), sa=zs.map(function(z){return z.heute});
+  el("work").innerHTML='<section class="pan"><div class="pk"><h2>Liga '+Z.liga+': wer bekommt was</h2><span class="marke echt">Teams, Plätze, Gehälter, Marken echt</span><span class="marke bsp">Vertragsart und Farb-Wahl nach KI-Regel</span><span class="sp"></span>'+
+    '<span class="hin">Rang 1 = höchste Summe · alle Spalten sortierbar · Beträge in C je Saison, Hochrechnung mit dem Tabellenstand von Spieltag 11</span></div>'+
+    '<div class="tw"><table><thead><tr>'+kopfz+'</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div class="fuss"><span>Ergebnis neu: Mittel <b class="'+kl(mittel(neu))+'">'+vz(mittel(neu))+' C</b> · im Plus <b class="creme">'+neu.filter(function(v){return v>=0}).length+' von 16</b></span>'+
+    '<span>Ergebnis heute: Mittel <b class="'+kl(mittel(alt))+'">'+vz(mittel(alt))+' C</b> · im Plus <b class="creme">'+alt.filter(function(v){return v>=0}).length+' von 16</b></span><span class="sp"></span>'+
+    '<span>Größter zu kleinstem Vertrag: neu <b class="creme">'+zahl(Math.max.apply(null,sn)/Math.min.apply(null,sn),2)+'</b> · heute <b class="creme">'+zahl(Math.max.apply(null,sa)/Math.min.apply(null,sa),2)+'</b></span></div></section>';
+}
+
+/* ---------- Ansicht 4: So rechnet der Saisonfaktor ---------- */
+function ansRechnung(R){
+  var n=TEAMS.length, zs=TEAMS.map(function(t){return R.zeilen[t.id]});
+  var neu=zs.map(function(z){return z.erwNeu}), alt=zs.map(function(z){return z.erwHeute});
+  function grad(werte,l){var ts=zs.filter(function(z){return z.t.l===l});var o=ts.filter(function(z){return z.t.e<=4}),u=ts.filter(function(z){return z.t.e>=13});
+    return mittel(o.map(function(z){return z[werte]}))-mittel(u.map(function(z){return z[werte]}))}
+  var links='<section class="pan"><div class="pk"><h2>So rechnet der Saisonfaktor</h2><span class="sp"></span><span class="marke echt">Live-Zahlen</span></div><div class="kb">'+
+    '<div class="schritt"><span class="n">1</span><span><b>Was kostet die Liga?</b><small>Jahresgehälter aller 32 Kader am Stichtag, dazu Unterhalt und Zinsen</small></span><strong class="t">'+zahl(R.kosten,0)+' C</strong></div>'+
+    '<div class="schritt"><span class="n">2</span><span><b>Was kommt ohnehin herein?</b><small>Planwert der übrigen Einnahmen: heute Vorstandsziele, später Karten, Marketing, Medaillen</small></span><strong class="t">−'+zahl(R.plan,0)+' C</strong></div>'+
+    '<div class="schritt"><span class="n">3</span><span><b>Liga-Topf = Rest × Saisonfaktor</b><small>'+zahl(R.k,0)+' C × '+zahl(Z.f,2)+' · der Topf darf je Saison höchstens 15 % wandern</small></span><strong class="t gold">'+zahl(R.topf,0)+' C</strong></div>'+
+    '<div class="schritt"><span class="n">4</span><span><b>Verteilen: Grundbetrag, Leistung, Farbe</b><small>Grundbetrag nach Erwartungsrang und Beliebtheit · Leistung: Summe je Liga 0 · Farb-Partner '+zahl(R.farbSumme,0)+' C</small></span><strong class="t">'+zahl(R.topf/n)+' <small style="display:inline;font-size:.9rem;color:var(--leise)">je Team</small></strong></div>'+
+    '<div class="formel">Auszahlung = <em>Grundbetrag</em>(Erwartungsrang, Beliebtheit) + <em>Satz</em> × Hebel × (Erwartungsrang − Endrang) − Liga-Ausgleich + <em>Farb-Partner</em> + Ziel</div>'+
+    (function(){var d=R.zeilen[ICH],t=d.t;return '<table class="mini zwei"><thead><tr><th class="l">Beispiel Death Peaches: Grundbetrag</th><th></th></tr></thead><tbody>'+
+      '<tr><td class="l">Anteil am Topf, Liga 2 (0,89 von 1,00)</td><td class="t">'+zahl(d.basis)+'</td></tr>'+
+      '<tr><td class="l">Erwartungsrang '+t.e+': (8,5 − '+t.e+') × '+zahl(P.steig[t.l])+' C</td><td class="t plus">'+vz(Z.f*P.steig[t.l]*(8.5-t.e))+'</td></tr>'+
+      '<tr><td class="l">Beliebtheit '+zahl(t.pop)+' gegen Liga-Mittel '+zahl(d.popM)+'</td><td class="t '+kl(t.pop-d.popM)+'">'+vz(P.markt*(t.pop-d.popM))+'</td></tr>'+
+      '<tr><td class="l">Prestige '+t.rar+', in der Liga-Summe neutral</td><td class="t '+kl(d.grund-d.roh)+'">'+vz(d.grund-d.roh)+'</td></tr>'+
+      '<tr class="erw"><td class="l">Grundbetrag</td><td class="t">'+zahl(d.grund)+' C</td></tr></tbody></table>'})()+
+    '<div class="stufe"><span class="gk">Saisonfaktor verschieben: '+zahl(Z.f,2)+'</span><input type="range" min="0.9" max="1.1" step="0.01" value="'+Z.f+'" id="regler" aria-label="Saisonfaktor">'+
+    '<small class="leise">Jedes Hundertstel bewegt die Liga um '+zahl(R.k/100,0)+' C, das sind '+zahl(R.k/100/n,2)+' C je Team. Vorschlag: Grundwert 1,00 im Spielstand, Konjunktur je Saison nur noch 0,95 bis 1,05 (heute 0,82 bis 1,24).</small></div>'+
+    '<div class="hinweis" style="margin-top:auto"><b>Empfehlung ab Saison 2:</b> eine Zeile mehr im Topf, der Kader-Ersatz (10 % des Kaderwerts). Gemessen zahlt die Liga je Saison rund 20 C je Team netto an den Markt. Ohne diese Zeile steht die Betriebsrechnung bei 0, aber die Kassen laufen leer. Frage 1 im Konzept.</div>'+
+    '</div></section>';
+  var mitte='<section class="pan"><div class="pk"><h2>Wenn alle genau ihren Erwartungsrang erreichen</h2><span class="sp"></span><span class="hin">Ergebnis je Team in C, sortiert nach Erwartungsrang · links Liga 1, rechts Liga 2</span></div><div class="kb">'+
+    '<div class="dia" id="diaErw"></div>'+
+    '<div class="leg"><span><i style="background:var(--stumm)"></i>heute: Vertragsanker minus Gehalt <span class="marke echt">echt</span></span><span><i style="background:var(--gut)"></i>neu im Plus</span><span><i style="background:var(--warn)"></i>neu im Minus</span><span><i style="background:var(--heim)"></i>Death Peaches</span></div>'+
+    '</div><div class="fuss"><span>Heute hängt das Ergebnis am Startrang: wer oben erwartet wird, verdient schon ohne Überraschung. Neu hängt es an der Gehaltspolitik: wer für seinen Erwartungsrang teuer ist, liegt im Minus.</span></div></section>';
+  var rechts='<div class="spalte"><section class="pan" style="flex:1"><div class="pk"><h2>Liga-Bilanz</h2><span class="sp"></span><span class="hin">alle auf Erwartungsrang</span></div><div class="kb">'+
+    '<div class="kachel"><span class="gk">Liga-Mittel neu</span><strong class="t '+kl(mittel(neu))+'">'+vz(mittel(neu))+' C</strong><small>heute '+vz(mittel(alt))+' C je Team (Faktor 0,94 im Live-Spielstand)</small></div>'+
+    '<div class="kachel"><span class="gk">Teams im Plus · im Minus</span><strong class="t">'+neu.filter(function(v){return v>=0}).length+' · '+neu.filter(function(v){return v<0}).length+'</strong><small>heute '+alt.filter(function(v){return v>=0}).length+' · '+alt.filter(function(v){return v<0}).length+'</small></div>'+
+    '<div class="kachel"><span class="gk">Gefälle oben gegen unten, Liga 1</span><strong class="t">'+vz(grad("erwNeu",1))+' C</strong><small>Erwartungsrang 1 bis 4 gegen 13 bis 16 · heute '+vz(grad("erwHeute",1))+' C</small></div>'+
+    '<div class="kachel"><span class="gk">Gefälle oben gegen unten, Liga 2</span><strong class="t">'+vz(grad("erwNeu",2))+' C</strong><small>heute '+vz(grad("erwHeute",2))+' C</small></div>'+
+    '<div class="kachel"><span class="gk">Größter zu kleinstem Vertrag</span><strong class="t">'+zahl(Math.max.apply(null,zs.map(function(z){return z.sumNeu}))/Math.min.apply(null,zs.map(function(z){return z.sumNeu})),2)+'</strong><small>heute '+zahl(Math.max.apply(null,TEAMS.map(function(t){return t.ist}))/Math.min.apply(null,TEAMS.map(function(t){return t.ist})),2)+' · beim Tabellenstand von Spieltag 11</small></div>'+
+    '<div class="kachel"><span class="gk">Sponsorgeld Liga 1 zu Liga 2</span><strong class="t">'+zahl(mittel(liga(1).map(function(t){return R.zeilen[t.id].sumNeu}))/mittel(liga(2).map(function(t){return R.zeilen[t.id].sumNeu})),2)+'</strong><small>heute '+zahl(mittel(liga(1).map(function(t){return t.ist}))/mittel(liga(2).map(function(t){return t.ist})),2)+' · Gehälter '+zahl(mittel(liga(1).map(function(t){return t.geh}))/mittel(liga(2).map(function(t){return t.geh})),2)+'</small></div>'+
+    '</div></section></div>';
+  el("work").innerHTML=links+mitte+rechts;
+  // Diagramm
+  var ord=liga(1).slice().sort(function(a,b){return a.e-b.e}).concat(liga(2).slice().sort(function(a,b){return a.e-b.e}));
+  var box=el("diaErw"),m=mass(box),W=m.W,H=m.H,k=m.k,l=46*k,r=10*k,o=30*k,u=50*k,luecke=26*k,bw=(W-l-r-luecke)/32;
+  var all=ord.map(function(t){return R.zeilen[t.id].erwNeu}).concat(ord.map(function(t){return R.zeilen[t.id].erwHeute}));
+  var mx=Math.ceil(Math.max(Math.max.apply(null,all),10)/10)*10, mn=Math.floor(Math.min(Math.min.apply(null,all),-10)/10)*10;
+  function Y(v){return o+(H-o-u)*(1-(v-mn)/(mx-mn))}
+  var s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Ergebnis je Team bei Erwartungsrang, heute und neu">';
+  for(var g=mn;g<=mx;g+=10){s+='<line x1="'+l+'" x2="'+(W-r)+'" y1="'+Y(g)+'" y2="'+Y(g)+'" stroke="rgba(244,230,196,'+(g===0?.45:.08)+')"/><text x="'+(l-6*k)+'" y="'+(Y(g)+4*k)+'" text-anchor="end">'+(g>0?"+":"")+g+'</text>'}
+  ord.forEach(function(t,i){var z=R.zeilen[t.id], x=l+i*bw+(i>=16?luecke:0);
+    var a=z.erwHeute,b=z.erwNeu;
+    s+='<rect x="'+(x+bw*.12)+'" y="'+Math.min(Y(a),Y(0))+'" width="'+bw*.34+'" height="'+Math.max(1.5,Math.abs(Y(a)-Y(0)))+'" fill="#66738a"><title>'+esc(t.n)+' heute '+vz(a)+' C</title></rect>';
+    s+='<rect x="'+(x+bw*.5)+'" y="'+Math.min(Y(b),Y(0))+'" width="'+bw*.38+'" height="'+Math.max(1.5,Math.abs(Y(b)-Y(0)))+'" fill="'+(t.id===ICH?"#F2A03D":b>=0?"#62d394":"#ff6058")+'"><title>'+esc(t.n)+' neu '+vz(b)+' C</title></rect>';
+    s+='<text x="'+(x+bw*.5)+'" y="'+(H-u+18*k)+'" text-anchor="middle"'+(t.id===ICH?' fill="#F2A03D"':'')+'>'+t.id+'</text><text x="'+(x+bw*.5)+'" y="'+(H-u+36*k)+'" text-anchor="middle" fill="#66738a">'+t.e+'</text>';
+  });
+  s+='<text x="'+(l+8*bw)+'" y="'+18*k+'" text-anchor="middle" fill="#f4e6c4">Liga 1</text><text x="'+(l+24*bw+luecke)+'" y="'+18*k+'" text-anchor="middle" fill="#f4e6c4">Liga 2</text>';
+  s+='<text x="'+(l-6*k)+'" y="'+(H-u+36*k)+'" text-anchor="end" fill="#66738a">Erw.</text>';
+  box.innerHTML=s+'</svg>';
+  el("regler").addEventListener("input",function(e){Z.f=parseFloat(e.target.value);zeichne(true)});
+}
+
+/* ---------- Steuerung ---------- */
+function zeichne(reglerBleibt){
+  var R=rechne(Z.f);
+  demo();kopf(R);
+  var w=el("work");w.className="work v-"+Z.ansicht;
+  var fok=reglerBleibt&&document.activeElement&&document.activeElement.id==="regler";
+  if(Z.ansicht==="angebote")ansAngebote(R);else if(Z.ansicht==="liga")ansLiga(R);else if(Z.ansicht==="rechnung")ansRechnung(R);else ansVertrag(R);
+  if(fok)el("regler").focus();
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-k]");
+  if(b){var k=b.dataset.k,v=b.dataset.v;Z[k]=(k==="f"?parseFloat(v):k==="liga"?parseInt(v,10):v);zeichne();return}
+  b=e.target.closest("[data-ansicht]");if(b){Z.ansicht=b.dataset.ansicht;zeichne();return}
+  b=e.target.closest("[data-sort]");if(b){var s=b.dataset.sort;if(Z.sort.k===s)Z.sort.d=-Z.sort.d;else Z.sort={k:s,d:(s==="n"||s==="sp"||s==="art"||s==="rg"||s==="e"||s==="r")?1:-1};zeichne();return}
+  b=e.target.closest("[data-ang]");if(b){Z.ang=parseInt(b.dataset.ang,10);Z.art=ANGEBOTE[Z.ang].art;zeichne();return}
+  b=e.target.closest("[data-lz]");if(b){Z.lz=parseInt(b.dataset.lz,10);zeichne();return}
+  b=e.target.closest("[data-farbe]");if(b){var f=b.dataset.farbe,i=Z.farben.indexOf(f);if(i>=0){if(Z.farben.length>1)Z.farben.splice(i,1)}else{Z.farben.push(f);if(Z.farben.length>2)Z.farben.shift()}zeichne();return}
+});
+(function(){var i=["fest","leistung","praemie"].indexOf(Z.art);if(i>=0)Z.ang=i;else Z.art="leistung"})();
+zeichne();
+var rz=null;window.addEventListener("resize",function(){clearTimeout(rz);rz=setTimeout(function(){zeichne()},120)});
+</script>
+</body>
+</html>
