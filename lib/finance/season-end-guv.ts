@@ -43,6 +43,7 @@
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { apronKonjunkturKurzhinweis } from "@/lib/finance/apron-konjunktur-hinweis";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
+import { kreditSaisonZerlegung, ratenSicht } from "@/lib/finance/kredit-raten";
 import { FACILITY_CATALOG, getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
 import {
   calculateFacilitySeasonUpkeep,
@@ -460,6 +461,8 @@ export type TeamLoanShareRow = {
   outstanding: number;
   /** Verbleibende Saisons bis zur letzten Rate. */
   remainingSeasons: number;
+  /** Raten-Saison: die Rate je Spieltag (sonst fehlt das Feld). */
+  rateJeSpieltag?: number;
 };
 
 /**
@@ -473,8 +476,10 @@ export function computeTeamLoanShareRows(gameState: GameState, teamId: string): 
   return (gameState.seasonState.loans ?? [])
     .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
     .map((loan) => {
-      const installment = round1(loan.installmentPerSeason ?? 0);
-      const interest = round1(loan.principalOutstanding * loan.interestRatePerSeason);
+      // RATEN JE SPIELTAG (22.11.): in einer Raten-Saison Saisonsumme der Spieltagsraten (gebucht plus offen), sonst wie bisher.
+      const z = kreditSaisonZerlegung(gameState, loan);
+      const installment = z.jeSpieltag ? round1(z.rate) : round1(loan.installmentPerSeason ?? 0);
+      const interest = z.jeSpieltag ? round1(z.zins) : round1(loan.principalOutstanding * loan.interestRatePerSeason);
       return {
         loanId: loan.loanId,
         lenderName:
@@ -486,6 +491,7 @@ export function computeTeamLoanShareRows(gameState: GameState, teamId: string): 
         principal: Math.max(0, round1(installment - interest)),
         outstanding: round1(loan.principalOutstanding),
         remainingSeasons: loan.seasonsRemaining,
+        ...(z.jeSpieltag ? { rateJeSpieltag: ratenSicht(gameState, loan)?.rateJeSpieltag } : {}),
       };
     })
     .sort((left, right) => right.installment - left.installment);

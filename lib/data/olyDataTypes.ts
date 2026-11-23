@@ -1992,7 +1992,22 @@ export type SpieltagFinanzBuchung = {
    * zu 1/N je Spieltag, immer >= 0 und in `cashDelta` enthalten. Fehlt in Zeilen ohne Marketing (dann 0).
    */
   marketing?: number;
-  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number; marketing?: number };
+  /**
+   * KREDITRATEN JE SPIELTAG (22.11., lib/finance/kredit-raten.ts, Stempel `seasonState.kreditRegel`): Zins und Tilgung der laufenden
+   * Kredite dieses Teams (beide <= 0, in `cashDelta` enthalten) und der Rueckfluss aus Team-Krediten an den Geber (>= 0, ebenfalls in
+   * `cashDelta`). In der GuV zaehlt nur der Zins. `kredit` haelt die Aufteilung je Kredit. Fehlt in Zeilen ohne Kreditraten.
+   */
+  kreditZins?: number;
+  kreditTilgung?: number;
+  kreditEingang?: number;
+  kredit?: SpieltagKreditPosten[];
+  rest: {
+    gehalt: number;
+    sponsorBasis: number;
+    gebaeudeEinnahme: number;
+    gebaeudeUnterhalt: number;
+    marketing?: number;
+  };
   createdAt: string;
 };
 
@@ -2101,6 +2116,18 @@ export type LoanRecord = {
   originatedSeasonId: string;
   status: "active" | "paid" | "defaulted";
   missedPayments: number;
+  /**
+   * RATEN JE SPIELTAG (22.11., lib/finance/kredit-raten.ts, Stempel `seasonState.kreditRegel`): Anzahl der Spieltage je Saison, auf die
+   * sich die Rate verteilt (der Nenner). Gesetzt = der Kredit wird je Spieltag getilgt; fehlt = Rate am Saisonende (alter Weg).
+   * `installmentPerSeason` bleibt die Jahressumme (`rateJeSpieltag x ratenJeSaison`), `seasonsRemaining` ist `ceil(ratenOffen / ratenJeSaison)`.
+   */
+  ratenJeSaison?: number;
+  /** Noch offene Raten (Laufzeit x Spieltage am Anfang, je gebuchtem Spieltag eine weniger). */
+  ratenOffen?: number;
+  /** Die gleichbleibende Rate je Spieltag (Annuitaet mit Zins je Saison / `ratenJeSaison`). */
+  rateJeSpieltag?: number;
+  /** Rundungsrest der Raten (Zins und Tilgung, je unter 0,05), der in die naechste Rate geht; Kasse und Restschuld bleiben so auf Dauer deckungsgleich. */
+  ratenRest?: { zins: number; tilgung: number };
 };
 
 export type LoanApplyLogRecord = {
@@ -2120,6 +2147,15 @@ export type LoanApplyLogRecord = {
    * derselben Saison NICHT als "bereits gelaufen" markieren.
    */
   kind?: "settlement" | "early_payoff";
+};
+
+/** Ein Kredit-Posten einer Spieltagsbuchung (Zahlen positiv): was der Kredit an diesem Spieltag an Zins und Tilgung gezahlt hat. */
+export type SpieltagKreditPosten = {
+  loanId: string;
+  zins: number;
+  tilgung: number;
+  /** Nur bei Zahlungsausfall: der nicht gezahlte Teil der Rate (kapitalisiert, samt 5 % Strafzins). */
+  ausfall?: number;
 };
 
 /**
@@ -4295,6 +4331,12 @@ export type SeasonState = {
     /** Spiegel der Notbremse `OLY_MARKETING=aus-sofort`, vom Server beim naechsten Buchen gesetzt: ab dann buchen/wirken keine neuen Anteile, Gebuchtes bleibt. */
     notbremse?: boolean;
   } | null;
+  /**
+   * KREDIT-REGEL DIESER SAISON (22.11., lib/finance/kredit-raten.ts): "raten" = Zins und Tilgung der Kredite werden je Spieltag
+   * gebucht (Ledger `spieltagFinanzen`); "saisonende" = wie bisher eine Jahresrate am Saisonende. Gesetzt beim Anlegen eines Spiels
+   * und beim Saisonwechsel, nie mitten in der Saison. Ein bestehender Spielstand bekommt fuer die laufende Saison "saisonende".
+   */
+  kreditRegel?: { seasonId: string; regel: "raten" | "saisonende" } | null;
   /**
    * MARKETING-STAND JE TEAM (22.11., lib/marketing/marketing-team.ts): das eingefrorene Rechenergebnis der Saison. Nur der Server schreibt
    * ihn (`bucheSpieltagFinanzen`: erster Spieltag der Saison, neu bei geaendertem Kader-Hash). Seite, GuV-Prognose, Moral-Zuschlag und

@@ -427,24 +427,23 @@ describe("originateLoan", () => {
     );
   });
 
-  it("Season 1 = keine Kredite: refuses regardless of capacity, no mutation", () => {
+  it("Saison 1 ist frei (Finanzkonzept f.6, 22.11.): ein Kredit wird aufgenommen, solange der Rahmen reicht", () => {
     const gameState = { ...gameStateWithCapacity(), season: { ...gameStateWithCapacity().season, id: "season-1" } };
     const result = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 10, termSeasons: 3 }, { execute: true });
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe("season_one_no_loans");
-    expect(result.loan).toBeNull();
-    expect(result.gameState).toBe(gameState);
-    expect(result.gameState.seasonState.loans ?? []).toHaveLength(0);
-    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(50);
+    expect(result.ok).toBe(true);
+    expect(result.loan).not.toBeNull();
+    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(60);
+    const ueberRahmen = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 9999, termSeasons: 3 }, { execute: true });
+    expect(ueberRahmen.reason).toBe("over_capacity");
   });
 
   describe("emergency option (Notkredit)", () => {
-    it("bypasses the Season 1 lock when emergency:true, blocked otherwise", () => {
+    it("bypasses the capacity limit when emergency:true, blocked otherwise", () => {
       const gameState = { ...gameStateWithCapacity(), season: { ...gameStateWithCapacity().season, id: "season-1" } };
 
-      const blocked = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 10, termSeasons: 3 }, { execute: true });
+      const blocked = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 9999, termSeasons: 3 }, { execute: true });
       expect(blocked.ok).toBe(false);
-      expect(blocked.reason).toBe("season_one_no_loans");
+      expect(blocked.reason).toBe("over_capacity");
 
       const emergency = originateLoan(
         gameState,
