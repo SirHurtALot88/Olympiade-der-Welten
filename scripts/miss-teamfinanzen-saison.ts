@@ -130,6 +130,7 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
 
 type TeamSnap = {
   teamId: string;
+  arena?: unknown;
   liga: string | null;
   rank: number | null;
   cash: number;
@@ -255,6 +256,18 @@ function snap(gs: GameState): Record<string, TeamSnap> {
       sponsorAnker: (() => { const a = getSponsorV3Terms(getTeamSponsorContract(gs, t.teamId))?.anchor; return typeof a === "number" ? r2(a) : null; })(),
       hatSponsor: getTeamSponsorContract(gs, t.teamId) != null,
       staerke: staerke.jeTeam[t.teamId] ?? 0,
+      // ARENA und MEDAILLEN (22.11.): Plaetze, Fans, Ausbau der Saison und Medaillen-Geld, fuer `scripts/auswerte-arena-tickets-medaillen.ts`.
+      arena: (() => {
+        const a = gs.seasonState.arena?.[t.teamId];
+        const v = gs.seasonState.medaillenVergabe;
+        return a ? {
+          plaetze: a.plaetze, fanbasis: Math.round(a.fanbasis), stimmung: r2(a.stimmung),
+          ausbau: r2(a.ausbau.filter((z) => z.seasonId === gs.season.id).reduce((x, z) => x + z.kosten, 0)),
+          dauer: a.dauerkarten?.geld ?? 0,
+          auslastung: a.heimspiele.length ? r2(a.heimspiele.reduce((x, h) => x + (h.auslastung.steh + h.auslastung.sitz) / 2, 0) / a.heimspiele.length) : null,
+          medaillen: v && v.seasonId === gs.season.id ? (v.geldJeTeam[t.teamId] ?? null) : null,
+        } : null;
+      })(),
     };
   }
   return out;

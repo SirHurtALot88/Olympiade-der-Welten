@@ -1,4 +1,6 @@
 // Zyklus mit marketing-team (das den Moral-Dienst fuer `moralOhneWerbung` liest) ist gewollt: beide nutzen die Funktionen erst zur Laufzeit.
+import { medaillenAktiv } from "@/lib/medaillen/medaillen-regel";
+import { medaillenMoralZuschlag } from "@/lib/medaillen/medaillen-modell";
 import { marketingMoralZuschlag } from "@/lib/marketing/marketing-team";
 import { marketingAktiv } from "@/lib/marketing/marketing-regel";
 import type {
@@ -1108,6 +1110,15 @@ function computePlayerMorale(input: {
     if (zuschlag !== 0) {
       morale = roundValue(clamp(morale + zuschlag, 0, 100));
       addReason(reasons, "marketing_werbevertraege", "Werbeverträge", zuschlag, "marketing");
+    }
+  }
+  // MEDAILLEN (22.11., docs/design/finanzen-posten-22-11.md g.1): wer Medaillen mit Ehrgeiz-/Ruhm-Trait geholt hat, geht gestaerkt in die naechste
+  // Zeit (hoechstens +10). Nur Spieler mit solchem Trait tragen einen Eintrag; die Zeile traegt genau diese Punkte (gezeigt = gebucht).
+  if (medaillenAktiv(gameState)) {
+    const medaille = medaillenMoralZuschlag(gameState, player.id);
+    if (medaille && medaille.punkte > 0) {
+      morale = roundValue(clamp(morale + medaille.punkte, 0, 100));
+      addReason(reasons, "medaillen", medaille.text, medaille.punkte, "medaillen");
     }
   }
   const visibleMood = getVisibleMood(morale);

@@ -301,6 +301,13 @@ Schalter ist der Stempel `seasonState.wertungsSkalen.ppTagesanker` (neues Spiel 
 ab dem nächsten Saisonwechsel, gebuchte Spieltage bleiben), jeder Rechenweg fragt `ppTagesankerFuer(gameState, matchdayId)`.
 Rückweg `OLY_PP_TAGESANKER=aus` (neue Saisons), Notbremse `=aus-sofort`. Doku: `docs/design/pp-tagesanker-live-22-11.md`.
 
+## Arena-Einnahmen und Medaillen (Chris, 22.11.)
+
+Platzarten Steh/Sitz/Loge (Grundarena 4.000), Tageskasse je Heimspiel, Dauerkarten (Rabatt 25 %), Ausbau von Hand (Steh +1.000, Sitz +1.000, Loge +100;
+Obergrenzen 15.000 / 10.000 / 1.200) aus dem Investitionstopf, harte Vorstands-Freigabe, KI nach denselben Regeln. Disziplin-Medaillen und Farb-Meister am Saisonende,
+bezahlt aus dem Rangprämien-Topf. Regeln im Spielstand (`seasonState.arenaRegel`, `medaillenRegel`; Abfrage nur `arenaAktiv` / `medaillenAktiv`), Rückweg `OLY_ARENA=aus` /
+`OLY_MEDAILLEN=aus` (`aus-sofort` = Notbremse), nur Server. Bau, Messung, Abbildung des alten Gebäudes: `docs/design/arena-tickets-medaillen-22-11.md`.
+
 ## Marketing (Chris, 22.11.)
 
 Werbegeld je Spieler, dynamischer Team-Anteil und Teammarke in der Kasse (Posten "Marketing"), Spieler-Anteil hebt die Moral; wirkt nie auf Wertung,

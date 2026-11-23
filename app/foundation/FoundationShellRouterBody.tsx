@@ -496,6 +496,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   originateLoanForActiveTeam,
   vorstandBudgetAktion,
   ausruestungAktion,
+  arenaAktion,
   kannVerwaltenAktivesTeam,
   repayLoanEarlyForActiveTeam,
   persistenceError,
@@ -2905,6 +2906,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               saveId={activeSaveId}
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
               onVorstandAktion={vorstandBudgetAktion}
+              onArenaAktion={arenaAktion}
               onOpenOffice={() => navigateHomeTab("office")}
               kannVerwalten={kannVerwaltenAktivesTeam}
               onKreditAufnehmen={originateLoanForActiveTeam}

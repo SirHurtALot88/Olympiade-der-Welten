@@ -1,3 +1,5 @@
+import { rangPraemieFaktor } from "@/lib/medaillen/medaillen-regel";
+import { bucheMedaillen } from "@/lib/medaillen/medaillen-modell";
 import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
@@ -79,7 +81,12 @@ function buildSponsorV3SeasonEndRows(
   const goalFraction = goalComponent && terms.goalSize > 0
     ? Math.max(0, Math.min(1, evaluateSpecialComponentStage(gameState, contract.teamId, goalComponent).fraction))
     : 0;
-  const parts = sponsorV3SettlementParts({ terms, finalRank: currentRank, goalFraction });
+  // MEDAILLEN (22.11.): Disziplin-Medaillen und Farb-Meister werden aus dem Rangpraemien-Topf bezahlt: jede Rangpraemie sinkt um den
+  // Topf-Abzug der Saison (`rangPraemieFaktor`, 1 ohne Medaillen-Regel). Die Zeile "Tabellenplatz" traegt schon den gekuerzten Betrag.
+  const rangFaktor = rangPraemieFaktor(gameState);
+  const parts = sponsorV3SettlementParts({ terms, finalRank: currentRank, goalFraction }).map((part) =>
+    part.key === "rank" && rangFaktor !== 1 ? { ...part, cashDelta: roundCash(part.cashDelta * rangFaktor) } : part,
+  );
   return parts.map((part) => ({
     teamId: contract.teamId,
     teamName: team?.name ?? contract.teamId,
@@ -142,7 +149,8 @@ export function sponsorRangAbschlag(gameState: GameState, teamId: string, rang: 
   if (!contract || !(spieltage > 0)) return { praemie: 0, abschlag: 0 };
   const terms = getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract);
   const teil = sponsorV3SettlementParts({ terms, finalRank: rang, goalFraction: 0 }).find((part) => part.key === "rank");
-  const praemie = teil?.cashDelta ?? 0;
+  // MEDAILLEN (22.11.): die Rangpraemie ist um den Topf-Abzug gekuerzt, der Abschlag je Spieltag auch.
+  const praemie = roundCash((teil?.cashDelta ?? 0) * rangPraemieFaktor(gameState));
   return { praemie, abschlag: roundCash((RANG_ABSCHLAG_QUOTE * praemie) / spieltage) };
 }
 
@@ -325,7 +333,15 @@ export function applySponsorSettlement(input: {
     },
   };
 
-  return { gameState: nextGameState, preview, applied: payoutLogs.length > 0 };
+  // MEDAILLEN (22.11.): Disziplin-Medaillen und Farb-Meister werden im selben Atemzug gebucht wie die Rangpraemien, aus denen sie bezahlt
+  // werden (`rangPraemieFaktor`). Idempotent und ohne gueltige Regel ein No-op; ein Fehler bei der Wertung darf die Sponsor-Abrechnung nie kippen.
+  let mitMedaillen = nextGameState;
+  try {
+    mitMedaillen = bucheMedaillen(nextGameState, { saveId: input.saveId });
+  } catch {
+    mitMedaillen = nextGameState;
+  }
+  return { gameState: mitMedaillen, preview, applied: payoutLogs.length > 0 || mitMedaillen !== nextGameState };
 }
 
 /**

@@ -230,6 +230,8 @@ export type TeamWriteAction =
   | "vorstand_budget_update"
   /** Ausruestung (Phase 1a, 22.11.): Truhe oeffnen, Fund waehlen, Teil zerlegen. */
   | "ausruestung_update"
+  /** Arena (22.11.): Ausbau von Hand und Dauerkarten-Wahl. */
+  | "arena_update"
   /** Postfach: Gelesen-Markierung je Manager (21.11.). */
   | "inbox_gelesen"
   | "player_generator_commit"

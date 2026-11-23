@@ -1,3 +1,5 @@
+import { stempleArenaBeimAnlegen } from "@/lib/arena/arena-regel";
+import { stempleMedaillenBeimAnlegen } from "@/lib/medaillen/medaillen-regel";
 import { stempleMarketingBeimAnlegen } from "@/lib/marketing/marketing-regel";
 import { stempleKreditRegelBeimAnlegen } from "@/lib/finance/kredit-raten";
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
@@ -671,6 +673,10 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     // (Rueckweg: OLY_FINANZEN_JE_SPIELTAG=aus).
     stempleWirtschaftsRegelnBeimAnlegen(
     // MARKETING (22.11.): Werbegeld, Team-Anteil, Teammarke und Moral-Zuschlag ab Saison 1 (Rueckweg: OLY_MARKETING=aus).
+    // ARENA und MEDAILLEN (22.11.): Platzarten, Tickets, Dauerkarten, Ausbau von Hand und Disziplin-Medaillen ab Saison 1
+    // (Rueckwege: OLY_ARENA=aus, OLY_MEDAILLEN=aus).
+    stempleArenaBeimAnlegen(
+    stempleMedaillenBeimAnlegen(
     // KREDITRATEN JE SPIELTAG (22.11.): Zins und Tilgung der Kredite je Spieltag ab Saison 1 (Rueckweg: OLY_KREDIT_RATEN=aus).
     stempleKreditRegelBeimAnlegen(
     stempleMarketingBeimAnlegen(
@@ -679,6 +685,8 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
           stempleTrainingsVorliebenBeimAnlegen(stempleEntwicklungsRegelBeimAnlegen(stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers))))),
         ),
       ),
+    ),
+    ),
     ),
     ),
     ),

@@ -1,3 +1,7 @@
+import { arenaRegelFuerNeueSaison } from "@/lib/arena/arena-regel";
+import { arenaStaendeFuerSaisonwechsel } from "@/lib/arena/arena-stand";
+import { medaillenRegelFuerNeueSaison } from "@/lib/medaillen/medaillen-regel";
+import { moralFuerSaisonwechsel } from "@/lib/medaillen/medaillen-modell";
 import { baueLeistungsErwartung } from "@/lib/training/entwicklung-tag";
 import { marketingStempelFuerSaisonwechsel } from "@/lib/marketing/marketing-team";
 import { kreditRegelFuerNeueSaison, kreditSaisonwechsel } from "@/lib/finance/kredit-raten";
@@ -697,6 +701,13 @@ function buildNextSeasonGameState(
     marketingRegel: marketingStempelFuerSaisonwechsel(save.gameState, save.gameState.season.id, nextSeasonId),
     marketingAushaengeschild: null,
     marketingStand: null,
+    // ARENA-REGEL (22.11., lib/arena/arena-regel.ts): gilt ab der FOLGENDEN Saison; ein bestehender Spielstand stellt hier von "Arena Upgrade"
+    // auf Platzarten um (Stempel `umstieg`, Abbildung in der Doku). Plaetze, Fanbasis und Stimmung ruecken nach (Rueckweg OLY_ARENA=aus).
+    arenaRegel: arenaRegelFuerNeueSaison(nextSeasonId, save.gameState.seasonState.arenaRegel),
+    arena: arenaStaendeFuerSaisonwechsel(save.gameState, nextSeasonId),
+    // MEDAILLEN-REGEL (22.11., lib/medaillen/medaillen-regel.ts): Medaillen und Farb-Meister am Saisonende, aus dem Rangpraemien-Topf; der
+    // Moral-Zuschlag der abgelaufenen Vergabe wirkt in der neuen Saison weiter. Rueckweg OLY_MEDAILLEN=aus.
+    medaillenRegel: medaillenRegelFuerNeueSaison(nextSeasonId, moralFuerSaisonwechsel(save.gameState)),
     // KREDIT-REGEL (22.11., lib/finance/kredit-raten.ts): gilt ab der FOLGENDEN Saison; ein Kredit, der bisher am Saisonende zahlte,
     // wird beim ersten Spieltag auf Spieltagsraten umgerechnet. Rueckweg OLY_KREDIT_RATEN=aus.
     kreditRegel: kreditRegelFuerNeueSaison(nextSeasonId),

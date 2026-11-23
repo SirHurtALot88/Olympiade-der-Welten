@@ -1,3 +1,4 @@
+import { arenaAktiv } from "@/lib/arena/arena-regel";
 import { createHash, randomUUID } from "node:crypto";
 
 import type { GameState, TeamFacilityCollection } from "@/lib/data/olyDataTypes";
@@ -244,6 +245,8 @@ export function previewFacilityUpgrade(
   if (facilityId === "specialist_wing" && action === "upgrade" && currentLevel > 0 && variant && variant !== existingVariant) {
     blockingReasons.push("specialist_wing_variant_switch_not_supported");
   }
+  // ARENA (22.11.): mit den Platzarten ersetzt der Ausbau von Hand (Finanzen, Reiter Arena) das Gebaeude "Arena Upgrade".
+  if (facilityId === "arena_upgrade" && action === "upgrade" && arenaAktiv(gameState)) blockingReasons.push("arena_ersetzt_durch_platzarten");
   if (cashAfter != null && cashAfter < 0) blockingReasons.push("insufficient_cash");
   // Finanzkonzept V2: Gebaeude zahlen aus dem Investitionstopf des Vorstands (hart, Mensch und KI gleich).
   if (action === "upgrade" && team && facility && upgradeCost != null && upgradeCost > 0) {

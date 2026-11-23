@@ -40,6 +40,7 @@
  * Buchung und beide Oberflächen wirklich dieselbe Rechnung lesen können.
  */
 
+import { arenaUnterhaltDerSaison, ohneAltesArenaGebaeude } from "@/lib/arena/arena-gebaeude";
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { apronKonjunkturKurzhinweis } from "@/lib/finance/apron-konjunktur-hinweis";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
@@ -84,6 +85,8 @@ export const SEASON_GUV_POSTEN_KEYS = [
   "sponsorereignisse",
   "gebaeude_einnahme",
   "marketing",
+  "tickets",
+  "medaillen",
   "apron",
   "boardziele",
   "gehaelter",
@@ -144,6 +147,10 @@ export type SeasonGuvParts = {
    * Der Spieler-Anteil steht nie hier, er hebt nur die Moral. Ohne gueltige Marketing-Regel 0.
    */
   marketingCash?: number | null;
+  /** TICKETS (22.11.): Tageskasse der Heimspiele (gebucht plus Erwartung der offenen) und Dauerkarten-Geld. Ohne Arena-Regel 0. */
+  ticketsCash?: number | null;
+  /** MEDAILLEN (22.11.): Disziplin-Medaillen und Farb-Meister, gebucht am Saisonende (vorher 0). */
+  medaillenCash?: number | null;
   /** Tatsächlich bezahlter Gebäude-Unterhalt (Season-End-Semantik), als positive Zahl. */
   facilityUpkeep?: number | null;
   /** Apron-Netto beim aktuellen Rang hochgerechnet: `ausgleich − abgabe`. Negativ = Abgabe. */
@@ -215,6 +222,8 @@ const POSTEN_LABEL: Record<SeasonGuvPostenKey, string> = {
   sponsorereignisse: "Sponsor-Ereignisse",
   gebaeude_einnahme: "Gebäude-Einnahme",
   marketing: "Marketing",
+  tickets: "Ticket-Einnahmen",
+  medaillen: "Medaillen",
   apron: "Apron",
   boardziele: "Vorstandsziele",
   gehaelter: "Gehälter",
@@ -254,6 +263,20 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
       amount: round2(num(parts.marketingCash)),
       counted: true,
       note: "Teammarke und Team-Anteile am Werbegeld",
+    },
+    {
+      key: "tickets",
+      label: POSTEN_LABEL.tickets,
+      amount: round2(num(parts.ticketsCash)),
+      counted: true,
+      note: "Tageskasse der Heimspiele und Dauerkarten",
+    },
+    {
+      key: "medaillen",
+      label: POSTEN_LABEL.medaillen,
+      amount: round2(num(parts.medaillenCash)),
+      counted: true,
+      note: "Disziplin-Medaillen und Farb-Meister (aus dem Rangprämien-Topf)",
     },
     {
       key: "apron",
@@ -408,7 +431,8 @@ export function computeFacilitySeasonCash(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   cashBefore: number | null,
 ): FacilitySeasonCash {
-  const teamFacilities = getTeamFacilityState(gameState, teamId);
+  // ARENA (22.11.): mit der Arena-Regel zahlt "Arena Upgrade" nichts; der Unterhalt der Ausbau-Schritte steht als eigene Zeile.
+  const teamFacilities = ohneAltesArenaGebaeude(gameState, getTeamFacilityState(gameState, teamId));
   const seasonId = gameState.season.id;
   const arenaPopularityFactor = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
 
@@ -431,6 +455,12 @@ export function computeFacilitySeasonCash(
     if (row.upkeep <= 0 || row.alreadyPaid) continue;
     upkeepRows.push({ label: row.label, upkeep: round2(row.upkeep) });
     paidUpkeepTotalRaw += row.upkeep;
+  }
+
+  const arenaUnterhalt = arenaUnterhaltDerSaison(gameState, teamId);
+  if (arenaUnterhalt > 0) {
+    upkeepRows.push({ label: "Arena (Ausbau-Schritte)", upkeep: round2(arenaUnterhalt) });
+    paidUpkeepTotalRaw += arenaUnterhalt;
   }
 
   // Rundung wie im Original (`roundValue`, 2 Nachkommastellen). Vorher stand hier `round1`; am

@@ -29,6 +29,11 @@ export type KontoauszugArt =
   | "gebaeude_einnahme_spieltag"
   | "gebaeude_unterhalt_spieltag"
   | "marketing_spieltag"
+  | "tickets_spieltag"
+  | "dauerkarten"
+  | "arena_ausbau"
+  | "medaillen"
+  | "farb_meister"
   | "kredit_zins_spieltag"
   | "kredit_tilgung_spieltag"
   | "kredit_eingang_spieltag"
@@ -143,10 +148,36 @@ export function buildKontoauszuege(gameState: GameState, seasonId?: string | nul
     if ((b.marketing ?? 0) !== 0) {
       add(b.teamId, { ...basis, art: "marketing_spieltag", text: `Marketing Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.marketing ?? 0 });
     }
+    // ARENA (22.11.): Tageskasse des Heimspiels und Dauerkarten-Standard (Spieltag 1), je eine Zeile.
+    if ((b.tickets ?? 0) !== 0) {
+      add(b.teamId, { ...basis, art: "tickets_spieltag", text: `Ticket-Einnahmen Heimspiel Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.tickets ?? 0 });
+    }
+    if ((b.dauerkarten ?? 0) !== 0) {
+      add(b.teamId, { ...basis, art: "dauerkarten", text: "Dauerkarten (Standard, vor Spieltag 1 nicht gewählt)", betrag: b.dauerkarten ?? 0 });
+    }
     // KREDITRATEN JE SPIELTAG (22.11.): Zins und Tilgung des Kreditnehmers, Rueckfluss beim Geber eines Team-Kredits.
     add(b.teamId, { ...basis, art: "kredit_zins_spieltag", text: `Kreditzins Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.kreditZins ?? 0 });
     add(b.teamId, { ...basis, art: "kredit_tilgung_spieltag", text: `Kredittilgung Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.kreditTilgung ?? 0 });
     add(b.teamId, { ...basis, art: "kredit_eingang_spieltag", text: `Kreditrückfluss Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.kreditEingang ?? 0 });
+  }
+
+  // 2c) ARENA (22.11.): Dauerkarten, die der Manager vor Spieltag 1 gewaehlt hat (sofort gutgeschrieben), und Ausbau-Schritte (aus dem Investitionstopf).
+  for (const [teamId, stand] of Object.entries(gameState.seasonState.arena ?? {})) {
+    if (stand.dauerkarten?.sofort && stand.dauerkarten.geld !== 0) {
+      add(teamId, { seasonId: stand.dauerkarten.seasonId, matchdayId: null, phase: "kaufphase", art: "dauerkarten", quelle: "arena", text: `Dauerkarten ${stand.dauerkarten.stufe} (Rabatt 25 %)`, betrag: stand.dauerkarten.geld, zeit: stand.dauerkarten.zeit ?? null });
+    }
+    for (const a of stand.ausbau ?? []) {
+      add(teamId, { seasonId: a.seasonId, matchdayId: null, phase: a.matchdayIndex <= 0 ? "kaufphase" : "saison", art: "arena_ausbau", quelle: "arena", text: `Arena-Ausbau ${a.bereich === "steh" ? "Stehplätze" : a.bereich === "sitz" ? "Sitzplätze" : "Logen"} ×${a.schritte}`, betrag: -a.kosten, zeit: a.zeit ?? null });
+    }
+  }
+
+  // 2d) MEDAILLEN (22.11.): Disziplin-Medaillen und Farb-Meister der abgelaufenen Saison, am Saisonende gebucht.
+  const vergabe = gameState.seasonState.medaillenVergabe;
+  if (vergabe) {
+    for (const [teamId, g] of Object.entries(vergabe.geldJeTeam)) {
+      if (g.medaillen !== 0) add(teamId, { seasonId: vergabe.seasonId, matchdayId: null, phase: "saisonende", art: "medaillen", quelle: "medaillenVergabe", text: "Disziplin-Medaillen", betrag: g.medaillen, zeit: vergabe.gebuchtAm });
+      if (g.farbe !== 0) add(teamId, { seasonId: vergabe.seasonId, matchdayId: null, phase: "saisonende", art: "farb_meister", quelle: "medaillenVergabe", text: "Farb-Meister", betrag: g.farbe, zeit: vergabe.gebuchtAm });
+    }
   }
 
   // 3) Apron.
