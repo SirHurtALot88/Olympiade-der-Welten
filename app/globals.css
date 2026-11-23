@@ -52341,7 +52341,7 @@ button.foundation-team-portrait-card {
 }
 
 .is-new-look .nl-facility-plan-leer {
-  color: var(--nl-mut-2);
+  color: var(--nl-mut);
 }
 
 .is-new-look .nl-facility-plan-ziel {
@@ -52353,7 +52353,7 @@ button.foundation-team-portrait-card {
   padding: 2px 8px;
   font: inherit;
   font-size: 0.85em;
-  color: var(--nl-mut-2);
+  color: var(--nl-mut);
   background: transparent;
   border: 1px solid var(--nl-line);
   border-radius: var(--nl-r-sm);
@@ -52385,7 +52385,7 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-facility-plan-summe {
   margin-left: auto;
-  color: var(--nl-mut-2);
+  color: var(--nl-mut);
 }
 
 .is-new-look .nl-facility-plan-summe b {
