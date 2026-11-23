@@ -1,3 +1,4 @@
+import { ankerNachSaison, fanGruendeSaisonende, fanGruendeSpieltag, fanPrognoseFaktor, sternFans, sternGewicht, startStadionPlaetze, startStadionSchritte, wendeFanGruendeAn } from "@/lib/arena/fan-modell";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
@@ -12,7 +13,6 @@ import {
   ausbauVorschau,
   bauKosten,
   dauerkartenGeld,
-  fanbasisNachHeimspiel,
   kiDauerkartenStufe,
   leiterZeile,
   maxSchritte,
@@ -95,10 +95,51 @@ describe("Arena: Nachfrage, Kasse, Dauerkarten", () => {
     expect(kiDauerkartenStufe(0.75, true)).toBe("viel");
   });
 
-  it("Fanbasis waechst bei vollem Haus, sinkt bei leerem und endet am Fan-Maximum", () => {
-    expect(fanbasisNachHeimspiel(5000, 0.95, GRUND_PLAETZE)).toBeCloseTo(5100, 5);
-    expect(fanbasisNachHeimspiel(5000, 0.5, GRUND_PLAETZE)).toBeCloseTo(4950, 5);
-    expect(fanbasisNachHeimspiel(5990, 1, GRUND_PLAETZE)).toBeLessThanOrEqual(6000);
+  it("Fan-Modell: die Fanbasis haengt nicht am Stadion, ein leeres Haus senkt sie nicht", () => {
+    const e = { fanbasis: 8000, anker: 8000, deltaPunkte: 2 as number | null, erwartetePunkte: 2, serie: 0 };
+    const klein = fanGruendeSpieltag(e).reduce((x, g) => x + g.delta, 0);
+    expect(klein).toBeCloseTo(0, 5);
+    expect(fanGruendeSpieltag({ ...e, deltaPunkte: 4 }).reduce((x, g) => x + g.delta, 0)).toBeGreaterThan(0);
+    expect(fanGruendeSpieltag({ ...e, deltaPunkte: 0 }).reduce((x, g) => x + g.delta, 0)).toBeLessThan(0);
+    expect(fanGruendeSpieltag({ ...e, serie: 3 }).some((g) => g.id === "serie" && g.delta > 0)).toBe(true);
+    expect(fanGruendeSpieltag({ ...e, serie: -4 }).some((g) => g.id === "serie" && g.delta < 0)).toBe(true);
+  });
+
+  it("Fan-Modell: Kauf eines Stars bringt Fans, Verkauf kostet sie, Schwache zaehlen kaum", () => {
+    const star = sternGewicht(85, 95);
+    expect(star).toBeGreaterThan(0.4);
+    expect(sternFans(star, true)).toBeGreaterThan(400);
+    expect(sternFans(star, false)).toBe(-sternFans(star, true));
+    expect(sternGewicht(30, 50)).toBe(0);
+  });
+
+  it("Fan-Modell: Saison-Schranke -15 % bis +30 %, Anker folgt langsam, Saisonende nach Platz", () => {
+    const hoch = wendeFanGruendeAn(10000, 10000, [{ id: "x", label: "x", delta: 9000 }]);
+    expect(hoch.fanbasis).toBeCloseTo(13000, 3);
+    expect(hoch.gekappt).toBe(true);
+    expect(hoch.gruende[0]!.delta).toBeCloseTo(3000, 3);
+    expect(wendeFanGruendeAn(10000, 10000, [{ id: "x", label: "x", delta: -9000 }]).fanbasis).toBeCloseTo(8500, 3);
+    expect(ankerNachSaison(10000, 12000)).toBeCloseTo(10800, 3);
+    const meister = fanGruendeSaisonende({ fanbasis: 10000, rangAnteil: 1, erwartungAnteil: 0.8, titel: true, aufgestiegen: false, abgestiegen: false });
+    const letzter = fanGruendeSaisonende({ fanbasis: 10000, rangAnteil: 0, erwartungAnteil: 0.2, titel: false, aufgestiegen: false, abgestiegen: true });
+    expect(meister.reduce((x, g) => x + g.delta, 0)).toBeGreaterThan(1500);
+    expect(letzter.reduce((x, g) => x + g.delta, 0)).toBeLessThan(-1500);
+  });
+
+  it("Start-Stadion: 4.000 bis 7.000 Plaetze, das Budget allein macht es nicht gross", () => {
+    expect(startStadionSchritte(0, false, 0)).toBe(0);
+    expect(startStadionSchritte(1, true, 1)).toBe(3);
+    expect(startStadionSchritte(0, false, 1)).toBe(0);
+    expect(startStadionSchritte(0.2, true, 1)).toBeLessThan(startStadionSchritte(0.9, true, 0.2) + 1);
+    const p = startStadionPlaetze(GRUND_PLAETZE, 3);
+    expect(p.steh + p.sitz + p.loge).toBe(7000);
+    expect(startStadionPlaetze(GRUND_PLAETZE, 0)).toEqual(GRUND_PLAETZE);
+  });
+
+  it("Fan-Prognose der KI: Trend der Saison hochgerechnet, gedaempft und begrenzt", () => {
+    expect(fanPrognoseFaktor({ fanbasis: 11000, saisonStart: 10000, spieltage: 10, trendVorsaison: 0 })).toBeCloseTo(1 + 0.7 * 0.2, 5);
+    expect(fanPrognoseFaktor({ fanbasis: 10000, saisonStart: 10000, spieltage: 2, trendVorsaison: 0.1 })).toBeCloseTo(1.07, 5);
+    expect(fanPrognoseFaktor({ fanbasis: 5000, saisonStart: 10000, spieltage: 10, trendVorsaison: 0 })).toBeCloseTo(0.85, 5);
   });
 
   it("Stimmung: Sieg hebt, Niederlage senkt, Heimspiel x 1,5, Rueckzug zur Mitte", () => {

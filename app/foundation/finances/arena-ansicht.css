@@ -6,7 +6,10 @@
 .arena-hoch { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .arena-hoch b { font-family: var(--bc-zahl); font-size: clamp(28px, 2vw, 44px); line-height: 1; color: var(--bc-creme); }
 .arena-hoch span { color: var(--bc-leise); font-size: 13px; }
-.arena-hoch b.plus { color: var(--bc-gut); }
+.arena-hoch b.plus, .arena-kopf .plus { color: var(--bc-gut); }
+.arena-kopf .minus { color: var(--bc-warn); }
+.arena-fanlinie { width: 46%; height: 24px; }
+.arena-fanlinie polyline { stroke: var(--bc-gut); }
 .arena-bereich { display: grid; grid-template-columns: 10px minmax(70px, 1fr) 56px minmax(80px, 2fr) 44px auto; align-items: center; gap: 8px; padding: 3px 0; }
 .arena-punkt { width: 9px; height: 9px; border-radius: 2px; background: var(--bc-gast); }
 .arena-punkt.is-sitz { background: #6d8cf0; }
