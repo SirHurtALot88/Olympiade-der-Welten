@@ -117,24 +117,35 @@ Laufzeit `scripts/miss-spieltagsbuchung-dauer.ts` (`bucheSpieltagFinanzen` für 
 
 Schere reich/arm: die Zahlen der Nachbesserung 1 hängen an der Formel, nicht am Cache; die Vorschau rechnet dieselbe Formel mit denselben Eingaben (Saison 1 identisch). Eine Saison-2-Neumessung steht aus (nur der Farb-Meister der eigenen Liga ändert dort etwas, nicht neu gemessen).
 
-## Abgleich Mockup – App (Aufnahmen `docs/design/marketing-bau-22-11/`, Team D-P, Live-Abbild-Kopie)
+## Abgleich Mockup – App (Aufnahmen `docs/design/marketing-bau-22-11/`, Team D-P, Live-Abbild-Kopie, nach dem main-Merge und den Review-Fixes)
 
-Bilder: `app-marketing-{fan,spieler,verlauf}-{1920x1080,2560x1440,1710x1112}.png`, `app-transfermarkt-marketability-1920x1080.png`, `app-finanzen-guv-1920x1080.png`.
-Kein Seitenscroll in allen Marketing-Aufnahmen, keine JS-Fehler.
+Bildpaare „links Mockup, rechts App“ (`vergleich-<ansicht>-<größe>.png`, erzeugt mit `scripts/vergleich-marketing-bilder.mjs`):
+Fan, Spieler, Verlauf je 1920x1080, 2560x1440 und 1710x1112; Finanzen-GuV und Transfermarkt-Marketability je 1920x1080 und 2560x1440. Die App-Aufnahmen (`app-*.png`) kommen aus
+`scripts/screenshot-marketing-bau.ts`. Seitenscroll in allen Marketing- und GuV-Aufnahmen 0, keine JS-Fehler. Der Spielstand der Aufnahme hat noch keinen Marketing-Stand, die Seite zeigt deshalb
+sichtbar „Vorschau“ im Kopf. Das Mockup kennt nur die Ansichten Fan/Spieler/Verlauf; für GuV und Transfermarkt gibt es kein Marketing-Mockup, verglichen wird mit
+`finanzen-modern-18-11.html` und `transfermarkt-modern-18-11.html` (dort kommt nur eine Zeile bzw. Spalte dazu).
 
-| Mockup-Feature | Stand |
+| Mockup-Merkmal | Stand |
 |---|---|
-| Hero mit Kennzahl-Reitern, Aushängeschild rechts | drin |
-| Drei Karten (Wohin das Geld geht, Aushängeschild, Team-Anteil dynamisch) | drin |
-| Tabelle nur eigener Kader: Reichweite-Stapel, Passung mit vier Beiträgen, Team-Anteil-Balken mit zwei Gründen, ans Team / an ihn, Summe, sortierbar | drin |
-| Reiter Fanprofil, Spieler (drei Fragen), Verlauf | drin |
-| Umschalter zwischen zwei Teams, Phone-Schalter | entfällt (nur Mockup-Steuerung) |
-| Spalte Marketability im Transfermarkt mit Nebel | drin (Spalte „Mkt“) |
+| Kopf mit Wappen, Dachzeile, Titel „Marketing“, Untertitel mit Fanprofil, ans Team, an die Spieler | drin (Dachzeile trägt zusätzlich „Vorschau“ ohne Stand) |
+| Kennzahl-Reiter Fans / Marketing / Verlauf mit großer Zahl, Aushängeschild rechts | drin |
+| Tabelle „Dein Kader: wer wirbt, und warum?“, nur eigener Kader | drin |
+| Spalten Reichweite-Stapel (Leistung, Ausstrahlung, Typ), Passung mit vier Beiträgen, Marketability, Werbegeld, Team-Anteil-Balken mit Gründen, ans Team, an ihn, Summenzeile | drin |
+| Aushängeschild-Markierung „GESICHT“, Verletzt-Marke | drin |
+| Karten „Wohin das Werbegeld geht“, „Team-Anteil: dynamisch“, „Aushängeschild“ | angepasst: Karte Aushängeschild zeigt Reichweite und Anteil als Text, kein „Schub durch Aktionen“ (Aktionen sind Folgeauftrag) |
+| Rechte Spalte, Reiter Fanprofil (Ton-Skala, mag/meidet, Farbe der Fans) | drin |
+| Reiter Spieler (drei Fragen: warum fällt er auf, warum passt er, wie viel bekommt das Team) | drin |
+| Reiter Verlauf (Fanfarbe je Saison mit Grund, Schritt je Teamerfolg, Regel) | angepasst: zeigt nur die Saisons des echten Spielstands (hier nur der Start), das Mockup hat vier Beispielsaisons samt Prognose; Zeilen „Kader heute / Erfolg heute“ und „Neu gemocht seit Saison“ fehlen (Folgeauftrag 5) |
+| Fußzeile mit Legende und Hinweis „Fremde Spieler: Marketability im Transfermarkt“ | drin (Hinweis und Einheit C je Saison) |
+| Mockup-Steuerung (Teamumschalter H-R / G-G, Phone-Schalter, Vorschlag-Banner) | entfällt (nur Mockup) |
+| Zahlen im Mockup (Beispielwerte für Moral, Vertrag, Klausel) | angepasst: die App rechnet mit echten Spielstandwerten |
 | Tabelle ohne inneres Scrollen | angepasst: ab etwa acht Spielern scrollt die Tabelle innen, die Summenzeile bleibt unten |
-| „neue Vorliebe“ im Fanprofil (Klasse wächst nach zwei Saisons Aushängeschild) | fehlt (Folgeauftrag) |
-| Aushängeschild wählen, Werbeklausel verhandeln | fehlt (Folgeauftrag) |
+| Spalte Marketability im Transfermarkt mit Nebel | drin (Spalte „Mkt“, Stufe nach Scouting; Kompaktliste und voller Pfad) |
+| Posten „Marketing“ in der GuV (Teammarke + Team-Anteile) | drin |
+| Icon in der Schiene | drin (Lautsprecher-Symbol, neu) |
+| „neue Vorliebe“ im Fanprofil, Aushängeschild wählen, Werbeklausel verhandeln | fehlt (Folgeaufträge 1, 2, 5) |
 
-Nebenbefund: die Transfermarkt-Seite meldet 36 px Seitenscroll (y) bei 1920x1080; nicht untersucht, vermutlich nicht aus diesem Bau.
+Nebenbefund: die Transfermarkt-Seite meldet 36 px Seitenscroll (y) bei 1920x1080 und 2560x1440; nicht Teil dieses Baus, nicht untersucht.
 
 ## Folgeaufträge
 

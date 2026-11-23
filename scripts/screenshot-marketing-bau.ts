@@ -136,8 +136,10 @@ async function main() {
       await aufnehmen("marketing", b, h, `app-marketing-spieler-${n}.png`, zeile);
       await aufnehmen("marketing", b, h, `app-marketing-verlauf-${n}.png`, reiter("Verlauf"));
     }
-    await aufnehmen("marketV2", 1920, 1080, "app-transfermarkt-marketability-1920x1080.png", nichts);
-    await aufnehmen("finances", 1920, 1080, "app-finanzen-guv-1920x1080.png", reiter("GuV"));
+    for (const [b, h, n] of [[1920, 1080, "1920x1080"], [2560, 1440, "2560x1440"]] as Array<[number, number, string]>) {
+      await aufnehmen("marketV2", b, h, `app-transfermarkt-marketability-${n}.png`, nichts);
+      await aufnehmen("finances", b, h, `app-finanzen-guv-${n}.png`, reiter("GuV"));
+    }
   } finally {
     await browser?.close().catch(() => undefined);
     try {
