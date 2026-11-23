@@ -190,6 +190,81 @@ export function buildRawDisciplineScoresByPlayerId(
   return scoresByPlayerId;
 }
 
+/**
+ * Liga-Rangkontext fuer EINZELNE Ueberschreibungen (Saisonwechsel-Tempo, 23.11.).
+ *
+ * `buildLeagueDisciplineRatingsWithAttributeOverrides(liga, {spieler: attrs})` rankt die GANZE Liga je Disziplin neu,
+ * obwohl sich nur ein Spieler aendert — je Aufruf O(Liga x 20 x log). Der Kontext sortiert die Roh-Punktzahlen der
+ * Liga je Disziplin einmal; der Rang eines ueberschriebenen Spielers ist dann 1 + (Liga-Spieler mit strikt hoeherer
+ * Punktzahl, ohne den eigenen alten Eintrag) — exakt dieselbe Wettbewerbsrang-Regel wie `buildCompetitionRanks`.
+ */
+export type LeagueRankContext = {
+  leagueIds: Set<string>;
+  ownScoresByPlayerId: Map<string, Partial<Record<OfficialDisciplineWeightId, number>>>;
+  sortedDescendingByDiscipline: Map<OfficialDisciplineWeightId, number[]>;
+};
+
+export function buildLeagueRankContext(players: Player[]): LeagueRankContext | null {
+  const leagueIds = new Set<string>();
+  const ownScoresByPlayerId = new Map<string, Partial<Record<OfficialDisciplineWeightId, number>>>();
+  const sortedDescendingByDiscipline = new Map<OfficialDisciplineWeightId, number[]>();
+  for (const disciplineId of officialDisciplineWeightOrder) sortedDescendingByDiscipline.set(disciplineId, []);
+  for (const player of players) {
+    // Doppelte Ids kennt das Vergleichsverfahren nicht (letzte gewinnt) -- dann lieber den alten Weg nehmen.
+    if (leagueIds.has(player.id)) return null;
+    leagueIds.add(player.id);
+    const attributes = readPlayerAttributes(player);
+    if (!attributes) continue;
+    const scores: Partial<Record<OfficialDisciplineWeightId, number>> = {};
+    for (const disciplineId of officialDisciplineWeightOrder) {
+      const score = calculateRawDisciplineScore(attributes, disciplineId);
+      if (score != null && Number.isFinite(score)) {
+        scores[disciplineId] = score;
+        sortedDescendingByDiscipline.get(disciplineId)!.push(score);
+      }
+    }
+    ownScoresByPlayerId.set(player.id, scores);
+  }
+  for (const list of sortedDescendingByDiscipline.values()) list.sort((left, right) => right - left);
+  return { leagueIds, ownScoresByPlayerId, sortedDescendingByDiscipline };
+}
+
+function countStrictlyGreaterSorted(sortedDescending: number[], value: number) {
+  let low = 0;
+  let high = sortedDescending.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (sortedDescending[mid]! > value) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+/** Gleiches Ergebnis wie `buildLeagueDisciplineRatingsWithAttributeOverrides(liga, {[id]: attrs}).get(id)`; undefined = Spieler nicht in der Liga. */
+export function buildLeagueDisciplineRatingsForOverride(
+  context: LeagueRankContext,
+  playerId: string,
+  attributes: PlayerGeneratorAttributes,
+  table: RankToDisciplineStatRow[] = rankToDisciplineStatTable,
+): Record<string, number> | undefined {
+  if (!context.leagueIds.has(playerId)) return undefined;
+  const own = context.ownScoresByPlayerId.get(playerId);
+  const ratings: Record<string, number> = {};
+  let any = false;
+  for (const disciplineId of officialDisciplineWeightOrder) {
+    const score = calculateRawDisciplineScore(attributes, disciplineId);
+    if (score == null || !Number.isFinite(score)) continue;
+    let greater = countStrictlyGreaterSorted(context.sortedDescendingByDiscipline.get(disciplineId)!, score);
+    const ownScore = own?.[disciplineId];
+    if (ownScore != null && ownScore > score) greater -= 1;
+    const stat = mapRankToDisciplineStat(greater + 1, table);
+    if (stat == null) continue;
+    ratings[disciplineId] = roundValue(stat, 2);
+    any = true;
+  }
+  return any ? ratings : undefined;
+}
+
 /** Rebuild displayed discipline stats for all players via league rank → stat table. */
 export function buildLeagueDisciplineRatingsForPlayers(
   players: Player[],

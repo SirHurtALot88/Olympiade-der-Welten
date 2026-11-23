@@ -47,7 +47,12 @@ import {
   type SeasonEndProgressionDisciplineDelta,
   type SeasonEndProgressionEconomyAudit,
 } from "@/lib/training/season-end-progression-preview";
-import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
+import {
+  buildLeagueDisciplineRatingsForOverride,
+  buildLeagueDisciplineRatingsWithAttributeOverrides,
+  buildLeagueRankContext,
+  type LeagueRankContext,
+} from "@/lib/player-formulas/discipline-rating-engine";
 
 export type SeasonEndXpSpendPreviewPlayer = {
   playerId: string;
@@ -239,6 +244,14 @@ function buildRosterLeaguePlayers(gameState: GameState): Player[] {
     rosterPlayers.push(player);
   }
   return rosterPlayers;
+}
+
+const leagueRankContextCache = new WeakMap<Player[], LeagueRankContext | null>();
+function getLeagueRankContext(leaguePlayers: Player[]): LeagueRankContext | null {
+  if (leagueRankContextCache.has(leaguePlayers)) return leagueRankContextCache.get(leaguePlayers) ?? null;
+  const context = buildLeagueRankContext(leaguePlayers);
+  leagueRankContextCache.set(leaguePlayers, context);
+  return context;
 }
 
 function getEconomyPreviewContext(gameState: GameState): EconomyPreviewContext {
@@ -684,16 +697,18 @@ function buildPreviewPlayer(input: {
   const leaguePlayers = input.fastDisciplineLeague
     ? input.economyContext.rosterLeaguePlayers
     : input.save.gameState.players;
-  const previewDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-    player: input.player,
-    attributesAfter,
-    leaguePlayers,
-  });
-  const baselineDisciplineRatings = buildPreviewDisciplineRatingsFromAttributes({
-    player: input.player,
-    attributesAfter: attributesBefore,
-    leaguePlayers,
-  });
+  // Saisonwechsel-Tempo (23.11.): im Schnellweg rankt jeder Spieler die Roster-Liga zweimal komplett neu (20 Disziplinen x
+  // Sortierung). Ein einmal je Liga gebauter Rangkontext liefert dasselbe Ergebnis per Binaersuche (bit-gleich).
+  const rankContext = input.fastDisciplineLeague ? getLeagueRankContext(leaguePlayers) : null;
+  const ratingsFor = (attributes: PlayerGeneratorAttributes | null) => {
+    if (!attributes) return input.player.disciplineRatings ?? {};
+    if (rankContext) {
+      return buildLeagueDisciplineRatingsForOverride(rankContext, input.player.id, attributes) ?? input.player.disciplineRatings ?? {};
+    }
+    return buildPreviewDisciplineRatingsFromAttributes({ player: input.player, attributesAfter: attributes, leaguePlayers });
+  };
+  const previewDisciplineRatings = ratingsFor(attributesAfter);
+  const baselineDisciplineRatings = ratingsFor(attributesBefore);
   const disciplineDeltas = buildSeasonEndDisciplineDeltas({
     disciplines: input.save.gameState.disciplines,
     lastSeasonDisciplineValues: baselineDisciplineRatings,
