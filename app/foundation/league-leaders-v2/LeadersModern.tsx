@@ -10,7 +10,6 @@
  */
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
-import LeagueLeadersNewLook from "@/app/foundation/league-leaders-v2/LeagueLeadersNewLook";
 import type { LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
 import { getClassIconSrc } from "@/app/foundation/classVisuals";
 import { getDisciplineIconSrc } from "@/app/foundation/DisciplineIcon";
@@ -19,6 +18,7 @@ import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild
 import {
   baueLeadersModell,
   baueMedaillen,
+  baueSpieltagsMvps,
   baueSpielerZeilen,
   baueTeamZeilen,
   LEADERS_ACHSEN,
@@ -48,6 +48,8 @@ export type LeadersSpieltage = {
 export type LeadersModernProps = LeagueLeadersClientProps & {
   ownTeamId: string | null;
   spieltage: LeadersSpieltage | null;
+  /** Springt in die Historie, Reiter „Rekorde & Legenden“. */
+  onOpenRekorde?: () => void;
 };
 
 const FARBE: Record<LeadersAchse, string> = { pow: "var(--ld-pow)", spe: "var(--ld-spe)", men: "var(--ld-men)", soc: "var(--ld-soc)" };
@@ -119,7 +121,6 @@ export default function LeadersModern(props: LeadersModernProps) {
   const [soS, setSoS] = useState<Sort>({ k: "pp", d: -1 });
   const [soT, setSoT] = useState<Sort>({ k: "pkt", d: -1 });
   const [soM, setSoM] = useState<Sort>({ k: "med", d: -1 });
-  const [historie, setHistorie] = useState(false);
 
   const ownTeamId = useMemo(() => ownProp ?? gameState?.teams.find((t) => t.humanControlled)?.teamId ?? null, [ownProp, gameState]);
 
@@ -145,17 +146,8 @@ export default function LeadersModern(props: LeadersModernProps) {
   const alleSpieler = useMemo(() => (m ? baueSpielerZeilen(m, zeit) : []), [m, zeit]);
   const alleTeams = useMemo(() => (m ? baueTeamZeilen(m, zeit, alleSpieler) : []), [m, zeit, alleSpieler]);
   const medaillen = useMemo(() => (m ? baueMedaillen(m) : null), [m]);
+  const spieltagsMvps = useMemo(() => (m ? baueSpieltagsMvps(m) : []), [m]);
 
-  if (historie && gameState) {
-    return (
-      <div data-testid="leaders-historie">
-        <button type="button" className="ld-btn" style={{ margin: "0 0 8px" }} onClick={() => setHistorie(false)}>
-          ← Zurück zu Leaders
-        </button>
-        <LeagueLeadersNewLook {...props} nurMehrsaison />
-      </div>
-    );
-  }
   if (!m || !medaillen) return <div className="bc ld" data-testid="leaders-modern" />;
 
   const gespielt = medaillen.gespielt;
@@ -219,7 +211,7 @@ export default function LeadersModern(props: LeadersModernProps) {
               <button type="button" aria-pressed={aktiveLiga === "alle"} onClick={() => setLiga("alle")}>Beide</button>
             </div>
           ) : null}
-          <button type="button" className="ld-btn" data-testid="leaders-zu-historie" data-tip="Rekorde, Legenden, All-Time und Erfolge über mehrere Saisons" onClick={() => setHistorie(true)}>
+          <button type="button" className="ld-btn" data-testid="leaders-zu-historie" data-tip="Rekorde, Legenden, All-Time und Erfolge über mehrere Saisons (Historie)" onClick={() => props.onOpenRekorde?.()}>
             Rekorde &amp; Legenden <BcIcon name="rechts" />
           </button>
         </div>
@@ -291,6 +283,23 @@ export default function LeadersModern(props: LeadersModernProps) {
             </div>
           ))}
         </div>
+        {spieltagsMvps.length ? (
+          <div className="ld-mvps" data-testid="leaders-mvp-spieltag" aria-label="MVP je Spieltag">
+            <span className="ld-mvpk">MVP je Spieltag</span>
+            {[...spieltagsMvps].reverse().map((x) => {
+              const dn = m.disziplinen.find((d) => d.id === x.disziplinId)?.name ?? x.disziplinId;
+              return (
+                <button type="button" key={x.spieltag} className={`ld-mvp${zeit === x.spieltag ? " an" : ""}${x.spieler.teamId === ownTeamId ? " wir" : ""}`} data-tip={`Bester Einzelwert von Spieltag ${x.spieltag} über beide Ligen: ${z1(x.pp)} PP in ${dn}`} onClick={() => onOpenPlayer?.(x.spieler.id)}>
+                  <i>{x.spieltag}</i>
+                  <Dz id={x.disziplinId} name={dn} />
+                  <b>{x.spieler.name}</b>
+                  <small>{teamVon.get(x.spieler.teamId)?.kuerzel ?? "–"}</small>
+                  <em className="t">{z1(x.pp)}</em>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="ld-tl ld-sl">
           <div className="ld-th">
             <Kopf k="pp" so={soS} onSo={onSo} cls="m tipll" tip={`Rang nach PP in ${ligaName}, klein unter allen Spielern`}>#</Kopf>

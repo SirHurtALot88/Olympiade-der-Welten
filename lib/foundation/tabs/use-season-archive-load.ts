@@ -41,6 +41,7 @@ export function shouldLoadSeasonArchiveForView(
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "leagueLeaders" ||
+    activeView === "recordsLegends" ||
     activeView === "allTimeTable" ||
     // Finanzen: Cash-Abgleich/Verlauf lesen das Saisonarchiv (Saisonstart-Cash der Vorsaison).
     activeView === "finances" ||

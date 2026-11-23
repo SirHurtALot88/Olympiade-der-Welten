@@ -87,6 +87,7 @@ export type FoundationView =
   | "diszis"
   | "leagueLeaders"
   | "allTimeTable"
+  | "recordsLegends"
   | "prize"
   | "market"
   | "marketV2"

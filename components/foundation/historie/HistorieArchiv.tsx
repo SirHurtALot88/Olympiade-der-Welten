@@ -25,7 +25,7 @@ export type HistorieHostBasis = {
   ownTeamId: string | null;
   onOpenTeam: (teamId: string) => void;
   /** Wechselt den Reiter der Historie (und waehlt optional eine Saison/ein Fenster). */
-  onWechsel: (reiter: "archiv" | "transfers" | "ewig", seasonId?: string, teamId?: string) => void;
+  onWechsel: (reiter: "archiv" | "transfers" | "ewig" | "rekorde", seasonId?: string, teamId?: string) => void;
   onOpenSaisonstand: () => void;
 };
 

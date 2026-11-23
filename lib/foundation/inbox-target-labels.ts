@@ -40,6 +40,7 @@ const EXTRA_VIEW_LABELS: Record<string, string> = {
   // Die Historie ist EIN Schienenpunkt (`seasonArchive`) mit drei Reitern; die Ziele der Reiter heissen weiter so.
   historyV2: "Historie",
   allTimeTable: "Ewige Tabelle",
+  recordsLegends: "Rekorde & Legenden",
 };
 
 /**

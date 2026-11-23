@@ -29,6 +29,7 @@ export const FOUNDATION_VIEW_IDS = [
   "diszis",
   "leagueLeaders",
   "allTimeTable",
+  "recordsLegends",
   "prize",
   "market",
   "marketV2",
@@ -115,6 +116,9 @@ export function normalizeFoundationViewParam(view: string | null | undefined): F
   }
   if (view === "home-v2" || view === "homev2" || view === "home") {
     return "homeV2";
+  }
+  if (view === "rekorde" || view === "rekorde-legenden" || view === "records-legends") {
+    return "recordsLegends";
   }
   if (view === "ewige-tabelle" || view === "all-time-table" || view === "alltime") {
     return "allTimeTable";

@@ -291,6 +291,29 @@ export function baueSpielerZeilen(m: LeadersModell, zeit: LeadersZeit): SpielerZ
   return [...jeSpieler.values()];
 }
 
+/* ---------------------------------------------------------------------------------------------- MVP je Spieltag */
+
+export type SpieltagsMvp = { spieltag: number; spieler: LeadersSpieler; pp: number; disziplinId: string };
+
+/**
+ * Ein MVP je gebuchtem Spieltag: die beste einzelne PP-Buchung des Tages über beide Ligen und alle Disziplinen
+ * (Chris, 23.11.: „ein MVP je Spieltag“). Gleichstand: der Name entscheidet, damit die Wahl stabil bleibt.
+ */
+export function baueSpieltagsMvps(m: LeadersModell): SpieltagsMvp[] {
+  const spielerVon = new Map(m.spieler.map((s) => [s.id, s] as const));
+  const bester = new Map<number, SpieltagsMvp>();
+  for (const b of m.buchungen) {
+    if (b.spieltag <= 0) continue;
+    const sp = spielerVon.get(b.playerId);
+    if (!sp) continue;
+    const alt = bester.get(b.spieltag);
+    if (!alt || b.pp > alt.pp || (b.pp === alt.pp && sp.name.localeCompare(alt.spieler.name, "de") < 0)) {
+      bester.set(b.spieltag, { spieltag: b.spieltag, spieler: sp, pp: b.pp, disziplinId: b.disziplinId });
+    }
+  }
+  return [...bester.values()].sort((a, b) => a.spieltag - b.spieltag);
+}
+
 /* ---------------------------------------------------------------------------------------------- Teams */
 
 export type TeamZeile = {
