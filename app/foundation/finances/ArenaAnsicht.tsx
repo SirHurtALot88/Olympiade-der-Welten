@@ -228,8 +228,8 @@ export default function ArenaAnsicht({ gameState, teamId, onAktion, kannSchreibe
             {fanLetzte ? (
               <div className="fin-txt"><b>{fanLetzte.tag === 0 ? "Saisonwechsel" : `Spieltag ${fanLetzte.tag}`} ({vz(fanLetzte.delta)}):</b> {gruendeText(fanLetzte.gruende.map((g) => ({ ...g })), 4)}</div>
             ) : null}
-            <div className="fin-txt"><b>Diese Saison ({vz(fanSaisonDelta)}):</b> {gruendeText(stand.fanBilanz)}</div>
-            {stand.fanBilanzVorsaison ? <div className="fin-txt"><b>Vorsaison:</b> {gruendeText(stand.fanBilanzVorsaison)}</div> : null}
+            <div className="fin-txt"><b>Diese Saison ({vz(fanSaisonDelta)}):</b> {gruendeText(stand.fanBilanz, 3)}</div>
+            {stand.fanBilanzVorsaison ? <div className="fin-txt"><b>Vorsaison:</b> {gruendeText(stand.fanBilanzVorsaison, 3)}</div> : null}
             <div className="fin-rek"><span>Tageskasse bisher</span><b className="bc-t plus">{C(stand.heimspiele.reduce((s, h) => s + h.tickets, 0))}</b></div>
             <div className="fin-rek"><span>Heimspiele gespielt</span><b className="bc-t">{stand.heimspiele.length} von {heim}</b></div>
             {letztes ? (
@@ -238,7 +238,6 @@ export default function ArenaAnsicht({ gameState, teamId, onAktion, kannSchreibe
             ) : (
               <div className="fin-txt">Noch kein Heimspiel gebucht. Die Nachfrage folgt der Fanbasis, der Stimmung und dem Anlass des Spiels (Derby, Spitzenspiel, Unwetter …).</div>
             )}
-            <div className="fin-txt">Ausverkauft: der Überhang hebt die Tageskarten bis +25 % (Logen bis +50 %). Dauerkarten bleiben beim festen Preis.</div>
           </div>
         </section>
 

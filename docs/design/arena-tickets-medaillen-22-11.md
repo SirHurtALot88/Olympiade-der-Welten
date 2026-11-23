@@ -152,3 +152,90 @@ Stichprobe über mehrere Disziplinen entfällt: die Seite ist teamweit, nicht je
 | Ticketpreis-Stufen, Merch, Verletzungs-Versicherung, Trainingslager, Kredite | nicht Teil dieses Baus |
 
 Offen nach der Aufnahme: der Rabatt-Hinweis der Dauerkarten ist nach den Aufnahmen von einer leeren Marke auf Klartext umgestellt worden und nicht neu aufgenommen.
+
+
+## Fan-Modell organisch (Chris 23.11.)
+
+Chris: „12k Plätze war geplant, 12 % Einnahmen ca. Und Fans sollen organisch wachsen oder auch mal weniger werden nach Leistung des Teams, Kauf und Verkauf von Stars — die Anzahl Fans hängt nicht an der Stadiongröße! Starke Teams vielleicht schon etwas größere Stadien, aber ungern 1:1 nach Budget.“
+
+### Regeln (Code: `lib/arena/fan-modell.ts`, Buchung `lib/arena/arena-stand.ts`)
+
+- **Fanbasis hängt nicht am Stadion.** Fan-Maximum (1,5 × Plätze) und das Wachstum nach Auslastung sind entfernt. Das Stadion begrenzt nur die verkauften Tickets; die Nachfrage bleibt Fanbasis × (0,45 + 0,90 × Stimmung / 100).
+- **Je Spieltag (kleine Schritte, alle Teams, Heim und Auswärts):** Tabellenpunkte gegen die Erwartung aus der Kaderstärke (Rang der besten sechs nach Rating, 1,3 bis 2,7 erwartete Punkte), Punkte über/unter dem Schnitt von 2, Serien ab drei (± 0,4 %), Rückzug zum Anker (1,1 % der Lücke je Spieltag).
+- **Stars:** der Kader von heute wird mit dem gemerkten verglichen (derselbe Weg für Kauf, Verkauf und Vertragsende, Mensch und KI). Stern-Gewicht = ((Marketability − 30) / 70)² × (0,5 + 0,5 × Leistungsperzentil), Wirkung ± Gewicht × 1.200 Fans (Spitzenspieler etwa ± 500). Weniger als 0,05 zählt nicht.
+- **Saisonende (größerer Schritt):** Tabellenplatz (± 14 %), Platz gegen Erwartung (± 12 %), Titel oder Farb-Meister (+ 8 %), Aufstieg (+ 8 %), Abstieg (− 8 %). Der Anker folgt der Fanbasis zu 40 %.
+- **Schranke:** je Saison höchstens − 15 % bis + 30 % des Saisonstarts (gezeigt = gebucht, die Gründe werden anteilig gekappt).
+- **Start (neues Spiel):** 6.500 × (½ Beliebtheits-KPI + ½ Matrix-Beliebtheit `popularity` × 0,12 + 0,45). Bestehender Spielstand: Umstieg wie bisher (halbes Haus × Beliebtheit).
+- **Start-Stadion:** Grundarena 4.000 für alle plus 0 bis 3 Schritte à 1.000 (Steh, Sitz, Steh) aus der Mischung 60 % Matrix-Beliebtheit (auf 0..1), 25 % Liga 1, nur 15 % Budget (Rang). Spannweite 4.000 bis 7.000. Starke Teams starten etwas größer, müssen aber weiter bauen; reich allein macht das Stadion nicht größer.
+- **KI:** prognostiziert den Fan-Trend (`fanPrognoseFaktor`: Änderung der Saison hochgerechnet, vor Spieltag 5 die der Vorsaison, × 0,7, begrenzt) statt der Auslastung; Überhang, Bewertung und Kosten wie für den Menschen (`bauArenaAus`).
+- **Anzeige:** Seite „Arena & Fans“ zeigt Fanbasis und Trend der Saison, die Fanlinie je Spieltag und die Gründe (letzte Änderung, Saison, Vorsaison), z. B. „+ 44 Siege und Punkte, + 13 Ergebnisse über Erwartung“, „− 451 Verkauf Kelektros“.
+- Regel-Stempel unverändert (`seasonState.arenaRegel`, Rückweg `OLY_ARENA`); neue Felder am Arena-Stand sind optional (Alt-Stände legen sie beim ersten Buchen an: Anker = Fanbasis, Kader ohne Wirkung).
+
+### Start-Stadion und Start-Fanbasis je Team (Messlauf-Anlage, `scripts/auswerte-arena-start-stadion.ts`)
+
+| Team | Liga | Beliebtheit (Matrix) | Budget | Start-Plätze | Start-Fanbasis |
+|---|---|---:|---:|---:|---:|
+| M-M | liga1 | 7.08 | 325 | 7000 | 8286 |
+| M-S | liga2 | 8.29 | 245 | 6000 | 8758 |
+| D-P | liga2 | 8.3 | 240 | 6000 | 8710 |
+| R-C | liga2 | 7.42 | 220 | 6000 | 8157 |
+| C-S | liga1 | 6.88 | 315 | 6000 | 8103 |
+| B-P | liga1 | 7.88 | 275 | 6000 | 8074 |
+| C-C | liga2 | 6.94 | 215 | 6000 | 7917 |
+| G-G | liga1 | 6.5 | 310 | 6000 | 7903 |
+| P-C | liga2 | 7.28 | 200 | 6000 | 7892 |
+| T-C | liga2 | 6.92 | 210 | 6000 | 7857 |
+| H-R | liga1 | 6.9 | 285 | 6000 | 7797 |
+| N-W | liga1 | 6.14 | 265 | 6000 | 7291 |
+| S-S | liga1 | 5.43 | 280 | 6000 | 7171 |
+| R-L | liga1 | 4.94 | 295 | 6000 | 7137 |
+| T-T | liga1 | 5.77 | 260 | 6000 | 7094 |
+| Z-H | liga1 | 4.06 | 320 | 6000 | 7056 |
+| V-D | liga1 | 5.8 | 250 | 6000 | 7001 |
+| W-L | liga1 | 4.66 | 290 | 6000 | 6975 |
+| L-R | liga1 | 4.04 | 305 | 6000 | 6891 |
+| P-S | liga1 | 4.03 | 300 | 6000 | 6737 |
+| L-K | liga2 | 6.07 | 225 | 5000 | 7683 |
+| V-W | liga2 | 7.23 | 180 | 5000 | 7663 |
+| S-C | liga2 | 6.53 | 205 | 5000 | 7652 |
+| R-R | liga2 | 7.04 | 170 | 5000 | 7484 |
+| V-V | liga2 | 4.76 | 235 | 5000 | 7276 |
+| B-B | liga2 | 5.96 | 185 | 5000 | 7221 |
+| T-G | liga2 | 3.24 | 230 | 5000 | 6631 |
+| U-A | liga2 | 4 | 190 | 5000 | 6508 |
+| D-L | liga2 | 3.82 | 195 | 5000 | 6491 |
+| N-N | liga1 | 2.96 | 270 | 5000 | 6103 |
+| W-W | liga1 | 2.9 | 255 | 5000 | 5922 |
+| A-A | liga2 | 2.84 | 175 | 4000 | 5899 |
+
+### Messung (32 KI-Teams von Anfang an, 3 Saisons, `scripts/auswerte-arena-ki-saisons.ts`)
+
+Drei Läufe: **F2** mit den Konstanten vor dem letzten Feinschliff (Ergebnisschritte 0,35 %, Platz 12 %), **F3** und **F4** mit den endgültigen (zwei Saaten). Lauf 1 (Start 5.000, Nachfrage 0,30 + 0,85) brach in Saison 2 ab (Speicherdruck); nach Saison 1 stand die Spitze bei 6.200 bis 6.900 Fans und 6.250 Plätzen: Anlass für Start 6.500 und Nachfrage 0,45 + 0,90.
+
+| Saison | Lauf | Plätze Ø L1 | Plätze Top-4 L1 | Top-4 L1 Fans | Ticket-Anteil Top-4 / alle | Teams GuV ≥ 0 | GuV-Abstand reich 8 − arm 8 | Kasse < 0 |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | F2 | 7.813 | 10.250 | 8.633 | 8 % / 8 % | 27 | 14,1 | 0 |
+| 1 | F3 | 8.188 | 9.250 | 8.602 | 7 % / 8 % | 28 | 12,7 | 0 |
+| 1 | F4 | 7.375 | 8.750 | 8.049 | 8 % / 8 % | 27 | 10,0 | 0 |
+| 2 | F2 | 8.563 | 11.250 | 10.197 | 9 % / 8 % | 31 | 2,5 | 0 |
+| 2 | F3 | 8.000 | 10.500 | 9.679 | 10 % / 7 % | 31 | 0,1 | 0 |
+| 2 | F4 | 8.625 | 11.750 | 10.221 | 10 % / 8 % | 30 | 0,9 | 1 |
+| 3 | F2 | 10.000 | 10.250 | 11.691 | 11 % / 9 % | 32 | 9,0 | 0 |
+| 3 | F3 | 8.875 | 11.250 | 11.094 | 8 % / 8 % | 32 | 12,1 | 0 |
+| 3 | F4 | 9.563 | 13.250 | 12.097 | 9 % / 8 % | 31 | 9,3 | 0 |
+
+Endgültige Konstanten (F3, F4), Saison 3: Top-4 Liga 1 im Mittel **12.250 Plätze** (Ziel um 12.000, Spanne 10–14k: erreicht), Fans 11.100 bis 12.100, Liga-1-Schnitt 8.900 bis 9.600 Plätze (niedriger als die Spitze). Teams mit Kasse < 0: höchstens eins (Saison 2, F4). GuV-Abstand 9 bis 12 in Saison 3, 0,1 bis 2,5 in Saison 2: im Rahmen der Tabelle aus #1719 (− 9,5 bis 17,6). Die Fanbasis wächst und schrumpft (Spanne nach Saison 3: 4.200 bis 12.800; die Liga-Schere zwischen Spitze und Ende öffnet sich), Plätze folgen den Fans.
+
+### Abweichungen und offene Entscheidung
+
+- **Ticket-Anteil der Spitze erreicht das Ziel 12 % (10–14 %) nicht:** 8 bis 11 % nach Saison 3 (Mittel F3/F4 8,5 %), Liga-Schnitt 8 %. Bei den festen Preisen aus g.2 bringen 12.000 Plätze rund 13 C je Saison gegen 140 C Gesamteinnahmen; 12 % wären erst bei etwa 17.000 Plätzen oder rund 30 % höheren Preisen erreicht. Die Preise (`PREIS_JE_1000`) sind Teil des freigegebenen Konzepts und hier **nicht** geändert. **Entscheidung für Chris/PM:** Ticketpreise × 1,3 (eine Konstante); das verkürzt auch die Amortisation und lässt die KI mehr bauen, müsste neu gemessen werden.
+- Erwartung aus der Kaderstärke (Rang der besten sechs nach Rating), nicht `computeTeamExpectation` des Vorstands (braucht die schweren Snapshot-Zeilen je Spieltag).
+- Medaillen zählen nicht eigens in den Fans; „Titel oder Farb-Meister“ (aus `teamErfolgAusSnapshot`) schon. Kein Stimmungs-Malus bei sehr leerem Stadion.
+- Start-Fanbasis: Matrix-Beliebtheit zur Hälfte beigemischt (Chris: „Beliebtheit/Tradition aus der Matrix“), Basis 6.500 statt 5.000.
+- Stern-Gewichte werden zu Saisonbeginn aufgefrischt, sonst gilt das Gewicht beim Zugang (Verkauf kostet, was der Spieler beim Kauf oder zum Saisonstart wert war).
+- Zwei Saaten gleichzeitig gelaufen; F2 ist die Saat mit den Konstanten vor dem Feinschliff.
+
+### Prüfungen und Aufnahmen
+
+- `npx tsc -p tsconfig.check.json --noEmit` sauber; `tests/arena-tickets-medaillen.test.ts` (26, davon fünf neue für das Fan-Modell).
+- Aufnahmen: `docs/design/arena-tickets-medaillen-22-11/app-arena-leer-1920x1080.png` und `-2560x1440.png` (Messlauf-Spielstand F3, Saison 3 nach Spieltag 20, Seitenscroll 0, keine JS-Fehler); die Karte „Fans & Heimspiele“ zeigt Fanlinie und Gründe, die abgeschnittene Zeile „Ausverkauft“ ist entfallen.
