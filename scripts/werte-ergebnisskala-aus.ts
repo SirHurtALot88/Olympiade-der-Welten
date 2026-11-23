@@ -204,6 +204,11 @@ function ankerAus(margen: number[], leistungen: number[], margeQuelle?: "marge" 
 // 1:0, Platzpunkte) -> Leistungsabstand der Seiten statt Marge.
 const MIN_STUFEN = 3;
 const RELATIV_AB = 0.5;
+// 23.11.: Die Wahl marge/relativ haengt am Variationskoeffizienten und kippt zwischen zwei Stichproben (Spurt und
+// Wettessen sprangen bei der Neuziehung von relativ auf marge, Hockey von marge auf relativ). Die Summe der
+// Seiten waechst dort mit der Feldgroesse (Spurt: 21 bei 3, 55 bei 5, 90 bei 6), eine absolute Marge ist nicht
+// vergleichbar. Deshalb fest: Climbing/Spurt/Wettessen immer relativ (Entscheidung 18.11.), Hockey immer nativ (22.11.).
+const FESTE_QUELLE: Record<string, "marge" | "relativ"> = { climbing: "relativ", spurt: "relativ", wettessen: "relativ", hockey: "marge" };
 
 if (schreibe) {
   const kalib: Record<string, Record<string, unknown>> = {};
@@ -218,7 +223,7 @@ if (schreibe) {
       const summen = dd.map((x) => (x.heim.seiten ? Math.abs(x.heim.seiten[0]) + Math.abs(x.heim.seiten[1]) : NaN)).filter(Number.isFinite);
       const mittelSumme = summen.reduce((a, b) => a + b, 0) / Math.max(1, summen.length);
       const vk = summen.length > 1 && mittelSumme > 0 ? Math.sqrt(summen.reduce((a, b) => a + (b - mittelSumme) ** 2, 0) / summen.length) / mittelSumme : 0;
-      const quelle = stufen < MIN_STUFEN ? "leistung" : vk > RELATIV_AB && summen.length === dd.length ? "relativ" : "marge";
+      const quelle = stufen < MIN_STUFEN ? "leistung" : FESTE_QUELLE[d] ?? (vk > RELATIV_AB && summen.length === dd.length ? "relativ" : "marge");
       const siegMarge = (x: Duell) =>
         margeFuerAnker(
           { margeQuelle: quelle },

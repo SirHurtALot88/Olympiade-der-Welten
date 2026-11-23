@@ -102,7 +102,7 @@ Breaking, Hockey rho (Feldspieler-Validität).
 **Wertung**
 - PP-Skala C2: mehrere Spieler glatt auf 5,0 an 18–21 von 40 Tagen; Tagesanker-Prototyp (`origin/claude/pp-analyse-21-11`)
   — Freigabe Chris offen. Anker für TDM-Gefecht, Breaking (neu), Bahn nachziehen.
-- Ergebnisskala E1: Median-Abstand je Disziplin 2–9 statt ~3 (Climbing 40 % 10:0) — Anker nachziehen.
+- Ergebnisskala E1: Median-Abstand je Disziplin 2–9 statt ~3 (Climbing 40 % 10:0) — **erledigt 23.11.** (Anker neu gezogen, Median 2,5–4, 10:0 ≤ 9 %; Reste: Spurt Feld 6, Gewichtheben, `docs/design/ergebnisskala-18-11.md` 23.11.).
 - Hockey rho 0,68 (Ausnahme) — Feldspieler-Validität.
 
 **Mechanik (Entscheidungen Chris offen/teils gefallen)**
