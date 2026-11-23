@@ -579,7 +579,7 @@ Geprüft: lädt ohne JS-Fehler, kein Seitenscroll und kein Überlauf bei 1920×1
 
 ---
 
-## 12. Offene Fragen an Chris
+## 12. Offene Fragen an Chris (beantwortet 23.11., siehe Abschnitt 13)
 
 1. **Was heißt Gleichgewicht?** (a) Die reine Betriebsrechnung ist bei Faktor 1 im Mittel 0. Dann fehlen der Liga ab
    Saison 2 die rund 20 C je Team, die sie heute netto am Transfermarkt ausgibt; die Kassen laufen in zwei bis drei Saisons
@@ -593,3 +593,27 @@ Geprüft: lädt ohne JS-Fehler, kein Seitenscroll und kein Überlauf bei 1920×1
 3. **Seltenheit nur noch Prestige?** Am 22.11. wolltest du, dass ein legendärer Sponsor mehr wert sein kann. Der Vorschlag
    lässt davon −3 bis +4 % übrig und legt den Rest in das Wappen und den Leih-Kurs, weil die Seltenheit heute gewürfelt ist
    und in Liga 1 bis zu 8 C je Saison verschiebt. Soll es dabei bleiben oder wieder ±11 % sein?
+
+## 13. Entscheidungen (Chris, 23.11.)
+
+1. **Gleichgewicht = Variante (b), Kader-Ersatz an (κ = 1).** Chris wörtlich: „genug Sponsoreinnahmen, dass mit allen
+   anderen Einnahmen und Ausgaben ungefähr die Liga gleich im Wert bleibt“. Gemeint ist der **Wert der Liga**, also Kassen
+   plus Kaderwert zusammen, nicht die reine Betriebsrechnung. Bei Saisonfaktor 1 und allen Teams auf ihrem Erwartungsrang
+   bleibt dieser Wert im Mittel stehen. Abnahme im Bau: über mindestens drei Saisons mit 32 KI-Teams, Liga-Wert (Σ Kasse +
+   Σ Kaderwert) je Saison bei Faktor 1 innerhalb von ±3 % des Vorjahres.
+2. **Neue Einnahmen verdrängen den Sponsor-Topf.** Karten, Marketing und Medaillen werden vom Topf abgezogen, damit die
+   Liga bei Faktor 1 bei 0 bleibt („passt für mich“).
+3. **Die gewürfelte Seltenheit entfällt als Geldregler und als Stufe.** Chris: „sonst mach bei den Sponsoren eine andere
+   Art Variation mit rein, die nicht so random ist wie die Stufen selbst, auf die kann man ja dann eigentlich verzichten“.
+   Entscheidung des PM:
+   - **Keine Seltenheitsstufen mehr** (gewöhnlich bis legendär) auf neuen Angeboten; der Wertfaktor 0,89 bis 1,11 und der
+     Vorschlag „−3 bis +4 % Prestige“ fallen weg. Das Wappen bleibt, es gehört zur Marke, nicht zu einer Stufe.
+   - **Stattdessen „Passung“, vom Team selbst beeinflussbar:** je Angebot ein Faktor 0,95 bis 1,05 auf den Grundbetrag aus
+     zwei Größen, die das Team kennt und steuern kann:
+     - **Beliebtheit des Kaders** (Marketing-Wert der eigenen Spieler gegen das Liga-Mittel), Gewicht 2/3,
+     - **Treue zur Marke** (Saisons, die das Team schon mit dieser Dachmarke gespielt hat, 0 bis 3), Gewicht 1/3.
+     Der Faktor wird über die Liga auf Mittel 1,00 normiert, ist also topfneutral. Kein Würfel: dasselbe Team bekommt
+     bei derselben Lage dieselbe Passung. Die Angebotskarte zeigt sie als Zeile „Passung +3 % (Beliebtheit hoch, 2 Saisons
+     Treue)“.
+   - **Leih-Kurs einer Gebäude-Leihe** folgt der Passung statt der Seltenheit.
+   - Laufende Verträge behalten ihre Stufe bis zum Vertragsende (Regel-Stempel, ab dem nächsten Saisonwechsel).
