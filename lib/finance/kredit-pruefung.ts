@@ -5,9 +5,9 @@
  *                 Sponsorvertrag) gibt es keine Bezugsgroesse, dann greift die Grenze nicht.
  *   Sparauflage   In der Stufe "Sparauflage" des Vorstands (Freigabe unter 60 %) gibt es keinen freiwilligen Kredit.
  *
- * EINE Funktion fuer Seite (Sperre am Knopf, Balken) und Server (Route `POST /api/finance/loan/originate`): was die Seite sperrt, lehnt der
- * Server ab. Der Notkredit (`emergency`) umgeht beide Sperren, weil er unfreiwillig ist. Die KI hat in `ai-loan-decision-service` ihre eigene,
- * strengere Grenze (10 % der Planeinnahmen) und bleibt damit unter dieser Obergrenze.
+ * EINE Funktion fuer Seite (Sperre am Knopf, Balken), Server (Route `POST /api/finance/loan/originate`) UND KI (`resolveAiLoanDecision` fragt sie
+ * vor jedem `shouldBorrow: true`): was die Seite sperrt, lehnt der Server ab, und die KI leiht nie darueber. Eine gemeinsame Grenze von 20 %
+ * fuer Mensch und KI. Nur der Notkredit der Bank (`emergency`) umgeht beide Sperren, weil er unfreiwillig ist.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamAnnualLoanInstallment } from "@/lib/finance/loan-service";
@@ -15,6 +15,7 @@ import { erwarteterSponsorFuerPlanung } from "@/lib/finance/sponsor-erwartung";
 import { resolveVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 
 export const SCHULDENDIENST_OBERGRENZE = 0.2;
+/** Nur Anzeige: ab 10 % faerbt die Seite den Schuldendienst-Balken als Warnung. KEINE zweite Grenze -- gesperrt wird erst ueber 20 %, fuer Mensch und KI. */
 export const SCHULDENDIENST_KI_GRENZE = 0.1;
 
 export type KreditSperreGrund = "schuldendienst_obergrenze" | "vorstand_sparauflage";

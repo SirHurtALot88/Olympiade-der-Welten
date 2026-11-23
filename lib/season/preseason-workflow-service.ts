@@ -1,5 +1,5 @@
 import { marketingStempelFuerSaisonwechsel } from "@/lib/marketing/marketing-team";
-import { kreditRegelFuerNeueSaison } from "@/lib/finance/kredit-raten";
+import { kreditRegelFuerNeueSaison, kreditSaisonwechsel } from "@/lib/finance/kredit-raten";
 import { createHash, randomUUID } from "node:crypto";
 
 import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
@@ -689,6 +689,15 @@ function buildNextSeasonGameState(
     // KREDIT-REGEL (22.11., lib/finance/kredit-raten.ts): gilt ab der FOLGENDEN Saison; ein Kredit, der bisher am Saisonende zahlte,
     // wird beim ersten Spieltag auf Spieltagsraten umgerechnet. Rueckweg OLY_KREDIT_RATEN=aus.
     kreditRegel: kreditRegelFuerNeueSaison(nextSeasonId),
+    // Zaehler verpasster Raten je Saison zurueck; Raten-Kredite auf die Spieltagszahl der neuen Saison neu verrentet (nur in einer Raten-Saison).
+    ...(save.gameState.seasonState.loans?.length
+      ? {
+          loans: kreditSaisonwechsel(
+            save.gameState.seasonState.loans,
+            kreditRegelFuerNeueSaison(nextSeasonId).regel === "raten" && finanzenJeSpieltagFuerNeueSaison(nextSeasonId) ? matchdayIds.length : null,
+          ),
+        }
+      : {}),
     // AUSRUESTUNGS-REGEL (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste der neuen Saison, ab Saisonbeginn nach dem
     // Schalter OLY_AUSRUESTUNG (Phase 1a: nur Besitz). Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel.
     ausruestungRegel: ausruestungRegelFuerNeueSaison(save.gameState, nextSeasonId),

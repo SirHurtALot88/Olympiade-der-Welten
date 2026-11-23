@@ -137,3 +137,29 @@ Planeinnahmen, Sparauflage) in `lib/finance/kredit-pruefung.ts`: dieselbe Funkti
 
 Bilder (Mockup | App): `vergleich-1920x1080.png` (Spieltag 12, Fenster zu), `vergleich-2560x1440.png`, `vergleich-1710x1112.png` (Vorsaison, Aufnehmen und Ablösen aktiv),
 `vergleich-leer-1920x1080.png` (kein Kredit); dazu `app-kredite-register-1920x1080.png`. Kein Seitenscroll, keine Überlappung bei 1920, 2560 und 1710.
+
+### 9a. Review-Fixes zu PR #1717 (22.11.) und die Verzugsregel
+
+**Verzug (PM-Entscheidung, verbindlich; ersetzt „geplatzt“).** Ein Kredit „in Verzug“ (Status `defaulted`) wird **weiter eingezogen**:
+
+- An jedem Spieltag mit positiver Kasse zahlt das Team die Rate oder so viel, wie da ist, Zins zuerst. Kein Strafzins über die 5 % auf den Fehlbetrag hinaus.
+- Bei Team-Krediten geht der Rückfluss weiter an den Geber (eigene Ledger-Zeile, `kreditEingang`), der Geber verliert nichts dauerhaft.
+- Solange der Kredit in Verzug ist: Neukreditsperre (`isDefaultedDebtBorrowBlocked`) und **−1 Vorstandsvertrauen je Saison in Verzug** (einmal, beim ersten Einzug oder beim ersten Ausfall der Saison, nicht je Spieltag).
+- „In Verzug“ gilt ab 5 verpassten Raten **innerhalb einer Saison** (ein Viertel der Spieltage). `missedPayments` zählt je Saison und je Regel und wird beim Saisonwechsel zurückgesetzt (`kreditSaisonwechsel`). Im alten Saisonende-Weg gibt es nur eine Rate je Saison, dort gilt die eine verpasste Jahresrate als Verzug.
+- Ist die Restschuld getilgt, endet der Verzug (Status `paid`). Der Status selbst bleibt über den Saisonwechsel stehen, bis getilgt ist.
+- Am Laufzeitende gibt es keine Ballonzahlung: Nach einem Ausfall wird die Rate über die Restlaufzeit neu verrentet (`rateFuerRestraten`); war es die letzte Rate, kommt eine Saison Laufzeit dazu (Saisonende-Weg: Mindestlaufzeit 2, Jahresrate neu). Kein NaN, keine Endlosschleife.
+- `ratenSicht` liefert für Kredite in Verzug nicht mehr `null`; GuV, Schuldendienst und Verpflichtungen zählen sie als laufend (`kreditLaeuft`).
+
+| Befund | Änderung |
+|---|---|
+| W1 doppelt gezählte Tilgung | neue Restschuld = Restschuld − gezahlte Tilgung + ungezahlter Zins + 5 % Fehlbetrag, in `bucheKreditRaten` und in `buildSettlementRows`/`applyLoanSettlement` (`capitalizedShortfall` = ungezahlter Zins + Strafzins). Beispiel 100 C, 3 Saisons, n=10, Kasse im Minus: 102,19 statt 104,7. |
+| W2 Verzug | siehe oben |
+| W3 KI | `resolveAiLoanDecision` ruft vor jedem `shouldBorrow: true` `pruefeKreditAufnahme` mit der echten Rate aus `kreditKonditionen`; die Ausnahme „längste Laufzeit trotz Überschreitung“ ist weg, der Liquiditätszweig geht ebenfalls durch Obergrenze und Sparauflage, nur der Notkredit der Bank ist ausgenommen. Eine gemeinsame Grenze von 20 %; die 10 % sind nur noch die Warnfarbe der Seite. |
+| M1 gezeigt = gebucht | `kreditSaisonZerlegung`, `computeEarlyPayoff(loan, gameState)` und `kreditZeile` rechnen ohne Raten-Saison mit `alsJahresrateKredit`, wie die Saisonende-Abrechnung. |
+| M2 Rechner = Route | die Vorschau prüft mit `sim.loan.installmentPerSeason` (wie die Route); „bis Saisonende“ ohne Raten-Saison ist die Jahresrate. |
+| M3 Mehrspieler | `originateLoan` prüft wie `buildLoanOffers`: ein manuell geführter Geber verleiht nur sein freigegebenes `lendingBudget` minus Verliehenes, sonst `lender_budget_not_released`. |
+| K1 | `direkterEingang` bucht `kreditEingang` und `cashDelta` auf die schon stehende Zeile des Gebers (Kasse = Summe der Buchungen). |
+| K2 | `kreditSaisonwechsel` im Saisonwechsel: Zähler zurück, Raten-Kredit bei geänderter Spieltagszahl neu verrentet. |
+| K5 | Baseline-Eintrag der gelöschten Datei entfernt, Kommentar im Router aktualisiert. |
+
+Tests: `tests/kredit-review-fixes-22-11.test.ts` (alle Befunde), angepasst `tests/loan-service.test.ts` (Verzug wird eingezogen, Schwelle 1 im Saisonende-Weg) und `tests/ai-loan-decision-service.test.ts` (Sperre mit echter Rate).

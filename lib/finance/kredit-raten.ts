@@ -19,9 +19,13 @@
  * Kredit, der schon je Spieltag lief, wird dabei in die Jahresrate zurueckgerechnet. Die Umrechnung eines alten Kredits in Raten
  * (`alsRatenKredit`) ist rein und deterministisch, damit Anzeige und Buchung dieselbe Rate sehen (gezeigt = gebucht).
  *
- * ZAHLUNGSAUSFALL je Spieltag: wie am Saisonende wird bezahlt, was da ist (Zins zuerst); der Rest wird samt 5 % Strafzins auf die
- * Restschuld geschlagen, der Vorstand verliert EINMAL je Kredit und Saison einen Vertrauenspunkt, und nach einem Viertel der Saison
- * verpasster Raten (bei 20 Spieltagen: 5) gilt der Kredit als geplatzt.
+ * ZAHLUNGSAUSFALL je Spieltag: wie am Saisonende wird bezahlt, was da ist (Zins zuerst). Auf die Restschuld kommt NUR, was nicht gezahlt
+ * wurde: ungezahlter Zins, dazu 5 % Strafzins auf den Fehlbetrag (die ungezahlte Tilgung steckt schon in der Restschuld und zaehlt
+ * nicht doppelt). Danach wird die Rate ueber die Restlaufzeit neu verrentet; am Laufzeitende gibt es keine Ballonzahlung, sondern eine
+ * weitere Saison Laufzeit. Nach einem Viertel der Saison verpasster Raten (bei 20 Spieltagen: 5) gilt der Kredit IN VERZUG (Status
+ * `defaulted`): er wird WEITER eingezogen (an jedem Spieltag mit positiver Kasse die Rate oder so viel, wie da ist), der Geber eines
+ * Team-Kredits bekommt den Rueckfluss weiter, es gibt keine Neukredite, und der Vorstand nimmt je Saison in Verzug einen Vertrauenspunkt.
+ * `missedPayments` zaehlt je Saison; `kreditSaisonwechsel` setzt ihn zurueck. Ist die Restschuld getilgt, endet der Verzug.
  *
  * DIESE DATEI IST CLIENT-SICHER (kein node:fs, keine Dienste) und importiert `loan-service` nicht (der importiert sie).
  */
@@ -123,6 +127,15 @@ export function rateJeSpieltagFuer(principal: number, zinsJeSaison: number, n: n
   return r4(i === 0 ? kapital / raten : (kapital * i) / (1 - Math.pow(1 + i, -raten)));
 }
 
+/** Annuitaet einer Restschuld ueber `raten` Raten (nach einem Zahlungsausfall neu verrentet): nie NaN, mindestens eine Rate. */
+export function rateFuerRestraten(kapital: number, zinsJeSaison: number, n: number, raten: number): number {
+  const k = Math.max(0, kapital);
+  const m = Math.max(1, Math.round(raten));
+  if (k === 0 || !(n > 0)) return 0;
+  const i = zinsJeSaison / n;
+  return r4(i === 0 ? k / m : (k * i) / (1 - Math.pow(1 + i, -m)));
+}
+
 /** Jahres-Annuitaet im alten Weg (eine Rate je Saison), fuer die Rueckrechnung eines Kredits in die Jahresrate. */
 function jahresRate(principal: number, zinsJeSaison: number, saisons: number): number {
   const s = Math.max(1, Math.round(saisons));
@@ -146,6 +159,11 @@ export function ratenSchritt(restschuld: number, zinsJeSaison: number, n: number
   const zahlung = ratenOffen <= 1 ? restschuld + zins : Math.min(rate, restschuld + zins);
   const tilgung = Math.max(0, zahlung - zins);
   return { zins, tilgung, zahlung, rest: Math.max(0, restschuld - tilgung) };
+}
+
+/** Ein Kredit, der noch eingezogen wird: aktiv oder in Verzug (`defaulted`). */
+export function kreditLaeuft(loan: Pick<LoanRecord, "status">): boolean {
+  return loan.status === "active" || loan.status === "defaulted";
 }
 
 export function istRatenKredit(loan: Pick<LoanRecord, "ratenJeSaison" | "ratenOffen" | "rateJeSpieltag">): boolean {
@@ -189,10 +207,25 @@ export function alsJahresrateKredit(loan: LoanRecord): LoanRecord {
  * dabei umgerechnet, ein Raten-Kredit bleibt). In einer Saison ohne Raten `null` -- dann bucht die Saisonende-Abrechnung.
  */
 export function ratenSicht(gameState: GameState, loan: LoanRecord): LoanRecord | null {
-  if (loan.status !== "active") return null;
+  // Ein Kredit in Verzug (`defaulted`) wird weiter eingezogen; nur ein getilgter Kredit steht still.
+  if (loan.status === "paid") return null;
   const n = ratenJeSaisonFuer(gameState);
   if (n == null) return null;
   return alsRatenKredit(loan, n);
+}
+
+/**
+ * SAISONWECHSEL (K2 und W2): setzt den Zaehler verpasster Raten zurueck (er gilt je Saison) und rechnet jeden Raten-Kredit neu auf die
+ * Spieltagszahl `n` der neuen Saison, wenn sie sich geaendert hat (`ratenJeSaison !== n`): gleiche Restschuld, gleiche Restlaufzeit in
+ * Saisons, Rate neu verrentet. `n` = `null`: kein Umrechnen (neue Saison ohne Raten). Rein; paid-Kredite bleiben, wie sie sind.
+ */
+export function kreditSaisonwechsel(loans: readonly LoanRecord[], n: number | null): LoanRecord[] {
+  return loans.map((loan) => {
+    if (loan.status === "paid") return loan;
+    const zurueck: LoanRecord = loan.missedPayments ? { ...loan, missedPayments: 0 } : loan;
+    if (n != null && n > 0 && istRatenKredit(zurueck) && zurueck.ratenJeSaison !== n) return alsRatenKredit(alsJahresrateKredit(zurueck), n);
+    return zurueck;
+  });
 }
 
 // --- Ledger lesen -----------------------------------------------------------------------------------------------------------------
@@ -250,8 +283,10 @@ export function kreditSaisonZerlegung(gameState: GameState, loan: LoanRecord): K
   const sicht = ratenSicht(gameState, loan);
   if (!sicht) {
     // Wie bisher gerundet (`Number(x.toFixed(1))`), damit der alte Weg bit-gleich bleibt.
-    const zins = Number((loan.principalOutstanding * loan.interestRatePerSeason).toFixed(1));
-    const rate = Number((loan.installmentPerSeason ?? 0).toFixed(1));
+    // GEZEIGT = GEBUCHT: die Saisonende-Abrechnung bucht die zur Jahresrate zurueckgerechnete Rate (`alsJahresrateKredit`), nicht die Spieltagssumme.
+    const jahr = alsJahresrateKredit(loan);
+    const zins = Number((jahr.principalOutstanding * jahr.interestRatePerSeason).toFixed(1));
+    const rate = Number((jahr.installmentPerSeason ?? 0).toFixed(1));
     return { rate, zins, tilgung: Number((rate - zins).toFixed(1)), jeSpieltag: false, gebuchteRaten: 0 };
   }
   const n = sicht.ratenJeSaison ?? 1;
@@ -275,7 +310,7 @@ export function kreditSaisonZerlegung(gameState: GameState, loan: LoanRecord): K
 export function kreditBeendeteKredite(gameState: GameState, teamId: string): { zins: number; tilgung: number } {
   if (!kreditRatenAktiv(gameState)) return { zins: 0, tilgung: 0 };
   const aktiv = new Set(
-    (gameState.seasonState.loans ?? []).filter((l) => l.borrowerTeamId === teamId && l.status === "active").map((l) => l.loanId),
+    (gameState.seasonState.loans ?? []).filter((l) => l.borrowerTeamId === teamId && kreditLaeuft(l)).map((l) => l.loanId),
   );
   const ids = new Set<string>();
   for (const zeile of zeilenDerSaison(gameState, teamId)) for (const p of zeile.kredit ?? []) if (!aktiv.has(p.loanId)) ids.add(p.loanId);
@@ -301,7 +336,7 @@ export function kreditZinsBeendeterKredite(gameState: GameState, teamId: string)
 export function kreditSaisonTilgungRaten(gameState: GameState, teamId: string): number {
   if (!kreditRatenAktiv(gameState)) return 0;
   const laufend = (gameState.seasonState.loans ?? [])
-    .filter((l) => l.borrowerTeamId === teamId && l.status === "active")
+    .filter((l) => l.borrowerTeamId === teamId && kreditLaeuft(l))
     .reduce((summe, l) => summe + kreditSaisonZerlegung(gameState, l).tilgung, 0);
   return r1(laufend + kreditBeendeteKredite(gameState, teamId).tilgung);
 }
@@ -448,6 +483,7 @@ export function bucheKreditRaten(
     const tilgCash = r1(rohTilgung);
     const rate0 = r1(zinsCash + tilgCash);
     const frei = Math.max(0, kasse.get(sicht.borrowerTeamId) ?? 0);
+    const gebucht = kreditSaisonGebucht(gameState, loan.loanId, loan.borrowerTeamId);
 
     let gezahltZins = zinsCash;
     let gezahltTilgung = tilgCash;
@@ -458,37 +494,43 @@ export function bucheKreditRaten(
     let missed = sicht.missedPayments;
     let status: LoanRecord["status"] = sicht.status;
     let ratenOffenNeu = offen - 1;
+    let neueRate = rate;
+    // Ein Kredit, der schon in Verzug in die Saison geht, kostet den Vorstands-Vertrauenspunkt dieser Saison beim ersten Einzug.
+    let vertrauenAbzug = sicht.status === "defaulted" && gebucht.raten === 0;
 
     if (frei + 0.0001 < rate0) {
-      // Zahlungsausfall: bezahlt wird, was da ist (Zins zuerst), der Rest kommt samt Strafzins auf die Restschuld.
+      // Zahlungsausfall: bezahlt wird, was da ist (Zins zuerst). Auf die Restschuld kommt nur, was NICHT gezahlt wurde: der ungezahlte
+      // Zins plus 5 % auf den Fehlbetrag; die ungezahlte Tilgung steckt schon in `principalOutstanding` und zaehlt nicht doppelt.
       const bezahlt = Math.floor(frei * 10) / 10;
       gezahltZins = Math.min(zinsCash, bezahlt);
       gezahltTilgung = Math.max(0, bezahlt - gezahltZins);
       const fehl = r1(rate0 - bezahlt);
       ausfall = r1(fehl * (1 + KREDIT_STRAFZINS));
-      neueRestschuld = r4(Math.max(0, sicht.principalOutstanding - gezahltTilgung + ausfall));
-      // Nach dem letzten Ratentermin bleibt eine Rate, die den kapitalisierten Rest loest.
-      if (ratenOffenNeu <= 0) ratenOffenNeu = 1;
+      neueRestschuld = r4(Math.max(0, sicht.principalOutstanding - gezahltTilgung + (zinsCash - gezahltZins) + KREDIT_STRAFZINS * fehl));
+      // Die Rate wird ueber die Restlaufzeit neu verrentet; am Laufzeitende gibt es keine Ballonzahlung, sondern eine weitere Saison.
+      if (ratenOffenNeu <= 0) ratenOffenNeu = n;
+      neueRate = rateFuerRestraten(neueRestschuld, sicht.interestRatePerSeason, n, ratenOffenNeu);
       neueRestZins = 0;
       neueRestTilg = 0;
       missed += 1;
       if (missed >= schwelle) status = "defaulted";
-      // Der Vorstand merkt es EINMAL je Kredit und Saison.
-      if (kreditSaisonGebucht(gameState, loan.loanId, loan.borrowerTeamId).ausfall === 0) {
-        const aktuell = boardConfidence[sicht.borrowerTeamId];
-        const wert = Math.min(10, Math.max(1, r1((aktuell?.value ?? 5) - 1)));
-        boardConfidence[sicht.borrowerTeamId] = {
-          teamId: sicht.borrowerTeamId,
-          value: wert,
-          pressure: Math.min(10, Math.max(1, r1(11 - wert))),
-          warnings: aktuell?.warnings ?? [],
-        };
-        vertrauenGeaendert = true;
-      }
+      // Der Vorstand merkt es EINMAL je Kredit und Saison (auch wenn der Kredit schon in Verzug war und den Punkt beim Einzug gezahlt hat).
+      if (sicht.status !== "defaulted" && gebucht.ausfall === 0) vertrauenAbzug = true;
     } else if (ratenOffenNeu <= 0 || neueRestschuld <= 0.00005) {
       neueRestschuld = 0;
       status = "paid";
       ratenOffenNeu = 0;
+    }
+    if (vertrauenAbzug && status !== "paid") {
+      const aktuell = boardConfidence[sicht.borrowerTeamId];
+      const wert = Math.min(10, Math.max(1, r1((aktuell?.value ?? 5) - 1)));
+      boardConfidence[sicht.borrowerTeamId] = {
+        teamId: sicht.borrowerTeamId,
+        value: wert,
+        pressure: Math.min(10, Math.max(1, r1(11 - wert))),
+        warnings: aktuell?.warnings ?? [],
+      };
+      vertrauenGeaendert = true;
     }
 
     const zahlung = r1(gezahltZins + gezahltTilgung);
@@ -513,6 +555,7 @@ export function bucheKreditRaten(
     const fortgeschrieben: LoanRecord = {
       ...sicht,
       principalOutstanding: neueRestschuld,
+      ...(neueRate !== rate ? { rateJeSpieltag: neueRate, installmentPerSeason: r1(neueRate * n) } : {}),
       ratenOffen: ratenOffenNeu,
       seasonsRemaining: Math.max(0, Math.ceil(ratenOffenNeu / n)),
       missedPayments: missed,

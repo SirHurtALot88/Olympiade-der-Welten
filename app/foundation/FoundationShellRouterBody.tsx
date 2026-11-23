@@ -1816,7 +1816,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
           {activeView === "homeV2" ? (() => {
           // Kredit-Kern (Fog of War): nur für das aktive Manager-Team, nie für
-          // ein fremdes Team, siehe `use-credits-view-model.ts`.
+          // ein fremdes Team; die Kredite-Seite liest dieselben Kerne (`lib/finance/kredite-seite-modell.ts`).
           const homeLoanInstallment = activeManagerTeamId
             ? getTeamAnnualLoanInstallment(gameState, activeManagerTeamId)
             : null;

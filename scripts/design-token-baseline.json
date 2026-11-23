@@ -12,7 +12,6 @@
     "app/foundation/PlayerGeneratorPanelNewLook.tsx:1547:LOCALE",
     "app/foundation/PlayerHeroNewLook.tsx:120:HEX",
     "app/foundation/cockpit-v2/FoundationCockpitPanel.tsx:983:LOCALE",
-    "app/foundation/credits/FoundationCreditsNewLook.tsx:848:HEX",
     "app/foundation/debug/FoundationDebugGameStatePanel.tsx:150:LOCALE",
     "app/foundation/facilities-v2/FacilitiesV2NewLook.tsx:267:EUR",
     "app/foundation/facilities-v2/facility-ui-shared.tsx:38:LOCALE",

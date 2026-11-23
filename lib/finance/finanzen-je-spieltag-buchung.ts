@@ -141,6 +141,16 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
     };
   });
 
+  // K1: ein Geber, dessen Zeile fuer diesen Spieltag schon steht, bekommt den Rueckfluss als Posten auf GENAU dieser Zeile (Kasse = Summe der
+  // Buchungen). Ohne Zeile dieses Spieltags (kann nur ein Geber ausserhalb der Liga sein) bleibt es bei der Kasse, es gibt nichts zu buchen.
+  const ledgerNeu = kreditBuchung.direkterEingang.size === 0
+    ? ledger
+    : ledger.map((zeile) => {
+        const eingang = zeile.seasonId === seasonId && zeile.matchdayId === matchdayId ? kreditBuchung.direkterEingang.get(zeile.teamId) : undefined;
+        if (!eingang) return zeile;
+        return { ...zeile, kreditEingang: runde1((zeile.kreditEingang ?? 0) + eingang), cashDelta: runde1(zeile.cashDelta + eingang) };
+      });
+
   return {
     ...gameState,
     teams: gameState.teams.map((team) => {
@@ -150,7 +160,7 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
     }),
     seasonState: {
       ...gameState.seasonState,
-      spieltagFinanzen: [...ledger, ...mitKredit],
+      spieltagFinanzen: [...ledgerNeu, ...mitKredit],
       ...(kreditBuchung.loans ? { loans: kreditBuchung.loans } : {}),
       ...(kreditBuchung.boardConfidence ? { boardConfidence: kreditBuchung.boardConfidence } : {}),
     },

@@ -9,7 +9,7 @@
  * 22.11.), die Kasse fremder Teams bleibt verborgen: sie steht in keiner Zeile dieses Modells.
  */
 import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
-import { alsRatenKredit, istRatenKredit, kreditPlan, kreditRatenAktiv, type KreditPlan } from "@/lib/finance/kredit-raten";
+import { alsJahresrateKredit, alsRatenKredit, istRatenKredit, kreditPlan, kreditRatenAktiv, type KreditPlan } from "@/lib/finance/kredit-raten";
 import { KREDIT_SPERRE_TEXT, pruefeKreditAufnahme, SCHULDENDIENST_KI_GRENZE, SCHULDENDIENST_OBERGRENZE, type KreditSperreGrund } from "@/lib/finance/kredit-pruefung";
 import {
   berechneKreditRahmen,
@@ -163,8 +163,10 @@ function kreditZeile(gameState: GameState, loan: LoanRecord, n: number): KreditZ
   // Restlaufzeit und Plan immer in Spieltagsraten (ohne Raten-Saison als Vorschau "ab dem naechsten Saisonwechsel").
   const raten = alsRatenKredit(loan, n);
   const jeSpieltag = kreditRatenAktiv(gameState);
+  // Gezeigt = gebucht (M1): ohne Raten-Saison bucht das Saisonende die zur Jahresrate zurueckgerechnete Rate.
+  const jahresrate = alsJahresrateKredit(loan).installmentPerSeason ?? 0;
   const laufend = loan.status === "active";
-  const quote = laufend ? computeEarlyPayoff(loan) : { payoff: 0, feePortion: 0, foregoneInterest: 0, principalPortion: 0 };
+  const quote = laufend ? computeEarlyPayoff(loan, gameState) : { payoff: 0, feePortion: 0, foregoneInterest: 0, principalPortion: 0 };
   const gesamt = loan.termSeasons * n;
   const offen = laufend ? (raten.ratenOffen ?? 0) : 0;
   return {
@@ -181,8 +183,8 @@ function kreditZeile(gameState: GameState, loan: LoanRecord, n: number): KreditZ
     ratenGesamt: gesamt,
     ratenGezahlt: Math.max(0, gesamt - offen),
     // Gezeigt = gebucht: in einer Raten-Saison die Spieltagsrate, sonst bis zum naechsten Saisonwechsel die Jahresrate am Saisonende.
-    rateJeSpieltag: jeSpieltag ? (raten.rateJeSpieltag ?? 0) : r2((loan.installmentPerSeason ?? 0) / n),
-    rateJeSaison: jeSpieltag ? r1((raten.rateJeSpieltag ?? 0) * n) : r1(loan.installmentPerSeason ?? 0),
+    rateJeSpieltag: jeSpieltag ? (raten.rateJeSpieltag ?? 0) : r2(jahresrate / n),
+    rateJeSaison: jeSpieltag ? r1((raten.rateJeSpieltag ?? 0) * n) : r1(jahresrate),
     abloese: r1(quote.payoff),
     abloeseGebuehr: r1(quote.feePortion),
     abloeseSpart: r1(Math.max(0, quote.foregoneInterest - quote.feePortion)),
@@ -285,7 +287,7 @@ export function baueKreditSeitenModell(gameState: GameState, teamId: string): Kr
       restschuld: r1(l.principalOutstanding),
       zins: l.interestRatePerSeason,
       ratenOffen: laufend ? (raten.ratenOffen ?? 0) : 0,
-      rateJeSaison: kreditRatenAktiv(gameState) ? r1((raten.rateJeSpieltag ?? 0) * nEff) : r1(l.installmentPerSeason ?? 0),
+      rateJeSaison: kreditRatenAktiv(gameState) ? r1((raten.rateJeSpieltag ?? 0) * nEff) : r1(alsJahresrateKredit(l).installmentPerSeason ?? 0),
       status: l.status,
       eigene: l.borrowerTeamId === teamId || l.lenderTeamId === teamId,
     };
@@ -428,7 +430,9 @@ export function baueKreditVorschau(
 
   const nach = sim.gameState;
   const neuRaten = alsRatenKredit(sim.loan, n);
-  const jahresrateNeu = r1((neuRaten.rateJeSpieltag ?? 0) * n);
+  // M2: dieselbe Zahl wie die Route `POST /api/finance/loan/originate` (sie prueft `loan.installmentPerSeason`): in einer Raten-Saison Rate x Spieltage,
+  // sonst die Jahresrate des Saisonende-Wegs. Der Rechner und der Knopf urteilen so genau wie der Server.
+  const jahresrateNeu = r1(sim.loan.installmentPerSeason);
   const pruefung = pruefeKreditAufnahme(gameState, teamId, jahresrateNeu);
   const standAlt = berechneVorstandBudgetStand(gameState, teamId);
   const standNeu = berechneVorstandBudgetStand(nach, teamId);
@@ -447,7 +451,8 @@ export function baueKreditVorschau(
     rate: neuRaten.rateJeSpieltag ?? 0,
     start: leer.ersteRateSpieltag,
   });
-  const ratenSaison = plan.saisons[0] ? r1(plan.saisons[0].zins + plan.saisons[0].tilgung) : 0;
+  // "Bis Saisonende": in einer Raten-Saison die Raten der noch offenen Spieltage, ohne Raten-Saison die EINE Jahresrate am Saisonende.
+  const ratenSaison = kreditRatenAktiv(gameState) ? (plan.saisons[0] ? r1(plan.saisons[0].zins + plan.saisons[0].tilgung) : 0) : jahresrateNeu;
   const gesamtZinsen = r1(plan.zinsenGesamt);
   const wirkung: WirkungsZeile[] = [
     { schluessel: "kasse", alt: r1(team.cash), neu: r1(team.cash + betrag), aenderung: r1(betrag), gut: true },
