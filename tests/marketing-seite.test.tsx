@@ -113,7 +113,7 @@ describe("Marketing ist als Ansicht erreichbar", () => {
     expect(team.items.some((i) => i.id === "marketing" && i.label === "Marketing")).toBe(true);
     const router = readFileSync("app/foundation/FoundationShellRouterBody.tsx", "utf8");
     expect(router).toContain('activeView === "marketing"');
-    expect(router).toContain("<FoundationMarketingHost gameState={gameState} teamId={activeManagerTeamId} />");
+    expect(router).toContain("<FoundationMarketingHost gameState={gameState} teamId={activeManagerTeamId} onAktion={marketingAktion} kannSchreiben={kannVerwaltenAktivesTeam} />");
     const typen = readFileSync("lib/foundation/tabs/foundation-page-types.ts", "utf8");
     expect(typen).toMatch(/\| "marketing"/);
   });

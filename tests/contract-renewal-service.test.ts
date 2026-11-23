@@ -468,6 +468,66 @@ describe("contract renewal service", () => {
     expect(ki.teams[0]!.cash).toBe(300);
   });
 
+
+  describe("Werbeklausel (23.11.): Gehalt je Stufe, Ablehnung, Stempel", () => {
+    const erneuere = (traits: { positive?: string[]; negative?: string[] }, marketingKlausel: -1 | 0 | 1 | null, stempel: boolean) => {
+      const team = createTeam({ teamId: "H-H", shortCode: "H-H", humanControlled: true, cash: 300 });
+      const player = createPlayer("p1", { rating: 88, traitsPositive: traits.positive ?? [], traitsNegative: traits.negative ?? [] });
+      const gameState = createGameState({
+        teams: [team],
+        players: [player],
+        rosters: [createRosterEntry("p1", { teamId: team.teamId, contractLength: 0, contractStatus: "renewal_pending", salary: 6 })],
+      });
+      if (stempel) {
+        gameState.seasonState.marketingRegel = { seasonId: "season-2", regel: "an", version: "klausel-v2" };
+        gameState.seasonState.finanzenJeSpieltag = { seasonId: "season-2", version: "v1" } as never;
+      }
+      const save = createSave(gameState);
+      const persistence = createPersistenceMock();
+      const preview = previewContractRenewalAction({ save, teamId: team.teamId, playerId: "p1", action: "renew", contractLength: 3, offeredSalary: 9.5, marketingKlausel });
+      applyContractRenewalAction({
+        save, teamId: team.teamId, playerId: "p1", action: "renew", contractLength: 3, offeredSalary: 9.5, marketingKlausel,
+        confirmToken: preview.confirmToken, persistence, source: "manual_contract_renewal",
+      });
+      const geschrieben = vi.mocked(persistence.saveSingleplayerState).mock.calls[0]?.[1]?.rosters[0];
+      return { preview, entry: geschrieben };
+    };
+
+    it("Spieler behaelt mehr: Gehalt -2,5 %, Klausel am Vertrag; Team bekommt mehr: +2,5 %; Vorschau zeigt dasselbe Gehalt wie die Buchung", () => {
+      const minus = erneuere({}, -1, true);
+      expect(minus.entry?.salary).toBe(9.26);
+      expect(minus.entry?.marketingKlausel).toBe(-1);
+      expect(minus.preview.klausel?.gehalt).toBe(9.26);
+      const plus = erneuere({}, 1, true);
+      expect(plus.entry?.salary).toBe(9.74);
+      expect(plus.entry?.marketingKlausel).toBe(1);
+      expect(plus.preview.klausel?.zeilen.map((z) => z.gehalt)).toEqual([9.26, 9.5, 9.74]);
+      const standard = erneuere({}, 0, true);
+      expect(standard.entry?.salary).toBe(9.5);
+      expect(standard.entry?.marketingKlausel).toBe(0);
+    });
+
+    it("Loyal nimmt Team bekommt mehr ohne Gehaltsaufschlag; Egomaniac und Diva lehnen ab und blocken den Abschluss", () => {
+      expect(erneuere({ positive: ["Loyal"] }, 1, true).entry?.salary).toBe(9.5);
+      for (const trait of ["Egomaniac", "Diva"]) {
+        const r = erneuere({ negative: [trait] }, 1, true);
+        expect(r.preview.blockingReasons).toContain("werbeklausel_vom_spieler_abgelehnt");
+        expect(r.preview.ok).toBe(false);
+        expect(r.entry).toBeUndefined();
+        const zeilen = r.preview.klausel!.zeilen;
+        expect(zeilen[2]!.erlaubt).toBe(false);
+        expect(zeilen[0]!.erlaubt).toBe(true);
+      }
+    });
+
+    it("ohne Stempel klausel-v2 (alter Spielstand, Rueckweg): Klausel und Gehaltsfaktor wirken nicht", () => {
+      const r = erneuere({}, -1, false);
+      expect(r.entry?.salary).toBe(9.5);
+      expect(r.entry?.marketingKlausel).toBeUndefined();
+      expect(r.preview.klausel).toBeNull();
+    });
+  });
+
   it("Unterschriftspfad Vertragsaktion (Mensch wie KI): schreibt das angebotene Jahresgehalt fest", () => {
     const team = createTeam({ teamId: "H-H", shortCode: "H-H", humanControlled: true, cash: 300 });
     const player = createPlayer("p1", { rating: 88 });
