@@ -244,3 +244,20 @@ describe("Zustandsabschlag im Marktwert", () => {
     expect(marketValueOf(q, 1)).toBeCloseTo(10);
   });
 });
+
+describe("marketValueOf mit Ø EK (doppelt)", () => {
+  const q = { priceFrom: null, priceTrend: 10, priceAvg30: 10, priceAvg7: 10, priceAvg1: 10, available: 5, fetchedAt: new Date("2026-10-12"), matchQuality: "eindeutig" } as never;
+  it("Ø EK zaehlt doppelt und ersetzt den einfachen letzten EK", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q, 1, 8, 1, 4)).toBeCloseTo((40 + 4 * 2) / 6);
+  });
+  it("ohne Ø EK zaehlt der letzte EK einfach wie bisher", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q, 1, 8, 1, null)).toBeCloseTo((40 + 8) / 5);
+    expect(marketValueOf(q, 1, 8, 1, 0)).toBeCloseTo((40 + 8) / 5);
+  });
+  it("Zustandsfaktor und Pack wirken nur auf die Cardmarket-Preise, nicht auf den Ø EK", async () => {
+    const { marketValueOf } = await import("./marketComparison");
+    expect(marketValueOf(q, 3, null, 0.5, 6)).toBeCloseTo((10 * 3 * 0.5 * 4 + 6 * 2) / 6);
+  });
+});

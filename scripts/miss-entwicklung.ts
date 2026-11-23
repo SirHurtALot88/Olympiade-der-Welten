@@ -350,6 +350,12 @@ async function main() {
       start = startSnapshot(get().gameState);
       if (START_JSON) fs.writeFileSync(START_JSON, JSON.stringify(start));
     }
+    const vorliebenArg = arg("vorlieben", "");
+    if (vorliebenArg === "an" || vorliebenArg === "aus") {
+      // Messhebel (Training Runde 2): Stempel der Trainingsvorlieben fuer diese Saison setzen (Regel an gegen aus, ueber alle Saisons des Laufs).
+      const gs0 = get().gameState;
+      persistence.saveSingleplayerState(saveId, { ...gs0, seasonState: { ...gs0.seasonState, trainingsVorlieben: { seasonId: sid, regel: vorliebenArg === "an" ? "v1" : "aus" } } });
+    }
     let prognoseBeginn: ReturnType<typeof prognoseZuBeginn> | null = null;
     try {
       prognoseBeginn = prognoseZuBeginn(get().gameState);
@@ -480,7 +486,31 @@ async function main() {
           : {}),
       });
     }
-    const kz = { ...kennzahlen(zeilen), ertragNachAbstand: Object.fromEntries(Object.entries(abstandsTabelle).sort().map(([k, v]) => [k, { n: v.n, mittel: r2(v.summe / v.n) }])) };
+    // Trainingsvorlieben (Runde 2): Anteil der Trainingstage mit Ziel = Lieblings- bzw. ungeliebte Disziplin (Verlaufsfeld v) und Moral-Mittel der Kaderspieler vor dem Abschluss.
+    const vorliebenKz = (() => {
+      let tage = 0, lieb = 0, unlieb = 0;
+      for (const p of vor.players) {
+        if (!team.has(p.id)) continue;
+        const akku = p.seasonTrainingAccumulator;
+        if (!akku || akku.seasonId !== sid) continue;
+        for (const e of akku.verlauf ?? []) {
+          if (e.s !== "t" || !e.d) continue;
+          tage += 1;
+          if (e.v === 1) lieb += 1;
+          else if (e.v === -1) unlieb += 1;
+        }
+      }
+      const moral = (vor.playerMoraleState ?? []).filter((m) => team.has(m.playerId)).map((m) => m.morale);
+      return {
+        trainingstageMitZiel: tage,
+        lieblingAnteilPct: tage ? r2((lieb / tage) * 100) : 0,
+        ungeliebtAnteilPct: tage ? r2((unlieb / tage) * 100) : 0,
+        moralMittel: moral.length ? r2(moral.reduce((a, b) => a + b, 0) / moral.length) : null,
+        moralN: moral.length,
+        vorliebenStempel: vor.seasonState?.trainingsVorlieben?.regel ?? null,
+      };
+    })();
+    const kz = { ...kennzahlen(zeilen), vorlieben: vorliebenKz, ertragNachAbstand: Object.fromEntries(Object.entries(abstandsTabelle).sort().map(([k, v]) => [k, { n: v.n, mittel: r2(v.summe / v.n) }])) };
     ergebnis.saisons.push({ saison: sid, kennzahlen: kz, prognoseBeginn, zeilen } as (typeof ergebnis.saisons)[number]);
     schreibe();
     log(`${sid}: ${JSON.stringify(kz)}`);

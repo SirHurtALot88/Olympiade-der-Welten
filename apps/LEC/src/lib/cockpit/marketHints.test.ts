@@ -39,7 +39,8 @@ describe("marketHints", () => {
     const min = (0.45 + hk) / (1 - (0.11 + 0.09) * 1.19 - 0.25);
     const opt = (0.45 + hk) / (1 - (0.11 + 0.1) * 1.19 - 0.33);
     // letzter EK = Marktwert, damit er den Mittelwert nicht verschiebt (der EK zaehlt als weiterer Wert mit)
-    const cheap = { ...article("1", 8, 4, 6), currentEk: market }; // deutlich unter der Spanne
+    // Ø EK aus den Verkaeufen zaehlt doppelt (Chris, 23.11.): auch er liegt beim Marktwert, damit der Mittelwert unveraendert bleibt
+    const cheap = { ...article("1", 8, 4, 6), currentEk: market, windows: { "90": win(6, 48, 6 * market), "365": win(6, 48, 6 * market) } }; // deutlich unter der Spanne
     const ok = { ...article("2", Math.round((min + opt) / 2 * 100) / 100, 1), currentEk: market };
     const dear = { ...article("3", 40, 2), currentEk: market };
     const noQuote = article("4", 9, 1);

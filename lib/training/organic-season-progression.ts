@@ -248,8 +248,8 @@ const HIGH_POTENTIAL_GAP_TRAINING_GROWTH_FLOOR = 0.35;
 /** Star-gap thresholds (same scale as getPotentialGapXpFactor's tiers). */
 const HIGH_POTENTIAL_GAP_STARS_THRESHOLD = 1.5;
 const MID_POTENTIAL_GAP_STARS_THRESHOLD = 0.75;
-const SIGNATURE_ORGANIC_GROWTH_MULTIPLIER = 1.15;
-const WEAK_ORGANIC_GROWTH_MULTIPLIER = 0.8;
+export const SIGNATURE_ORGANIC_GROWTH_MULTIPLIER = 1.15;
+export const WEAK_ORGANIC_GROWTH_MULTIPLIER = 0.8;
 /**
  * Spillover-Nebenstat-Hilfe: Ein Teil des Trainingsbudgets, den die Fokus-Attribute der
  * gewählten Klasse wegen Attribut-Decke/Potenzialraum NICHT aufnehmen konnten, wird zu diesem

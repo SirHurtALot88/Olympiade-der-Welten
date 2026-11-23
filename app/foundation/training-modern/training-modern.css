@@ -10,7 +10,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  height: max(660px, calc(100dvh - 152px - max(0px, (100vw - 1700px) * 0.04)));
+  height: max(660px, calc(100dvh - 158px - max(0px, (100vw - 1700px) * 0.04)));
   border: 1px solid var(--bc-linie);
   border-radius: var(--bc-r);
   overflow: hidden;
@@ -293,14 +293,21 @@
   border: 1px solid var(--bc-linie);
   border-radius: var(--bc-r);
   overflow: hidden;
-  background: #3a352c url("/sprites/kulissen/gewichtheben/sandsack.jpg") center top / cover;
+  background: #3a352c url("/sprites/kulissen/gewichtheben/sandsack.jpg") center
+    top / cover;
   image-rendering: pixelated;
 }
 .te-halle::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(6, 8, 12, 0.55) 0, transparent 26%, transparent 66%, rgba(6, 8, 12, 0.6) 100%);
+  background: linear-gradient(
+    180deg,
+    rgba(6, 8, 12, 0.55) 0,
+    transparent 26%,
+    transparent 66%,
+    rgba(6, 8, 12, 0.6) 100%
+  );
   pointer-events: none;
 }
 .te-halle__kopf {
@@ -801,14 +808,14 @@
   margin-top: auto;
   padding-top: 6px;
 }
-.te-plan-rechts .te-blick__fuss {
-  padding: 10px 12px;
-}
 
 /* ---------- Spieler-Ansicht ---------- */
 .te-spieler {
   display: grid;
-  grid-template-columns: clamp(250px, 15vw, 400px) minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: clamp(250px, 15vw, 400px) minmax(0, 1.15fr) minmax(
+      0,
+      1fr
+    );
   gap: 12px;
 }
 .te-sp-links {
@@ -823,7 +830,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: #3a352c url("/sprites/kulissen/gewichtheben/sandsack.jpg") center top / cover;
+  background: #3a352c url("/sprites/kulissen/gewichtheben/sandsack.jpg") center
+    top / cover;
   image-rendering: pixelated;
   overflow: hidden;
 }
@@ -880,200 +888,9 @@
   background: var(--bc-stumm);
 }
 
-/* ---------- Plan-Editor ---------- */
-.te-plan {
-  display: grid;
-  grid-template-columns: clamp(220px, 14vw, 380px) minmax(0, 1fr) clamp(300px, 18.5vw, 500px);
-  gap: 12px;
-}
-.te-plan-liste {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-}
-.te-pl {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 7px 12px;
-  background: none;
-  border: 0;
-  border-bottom: 1px solid rgba(244, 230, 196, 0.07);
-  border-left: 3px solid transparent;
-  color: var(--bc-tinte);
-  text-align: left;
-  cursor: pointer;
-}
-.te-pl.is-an {
-  background: rgba(240, 195, 90, 0.1);
-  border-left-color: var(--bc-gold);
-}
-.te-pl strong {
-  display: block;
-  font: italic 700 1.2em/1.1 var(--bc-haus);
-  color: var(--bc-creme);
-}
-.te-pl small {
-  display: block;
-  color: var(--bc-stumm);
-  font-size: var(--te-klein);
-}
-.te-pl__punkt {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--bc-gold);
-}
-.te-pl__modus {
-  padding: 1px 7px;
-  border: 1px solid var(--bc-linie-2);
-  border-radius: 3px;
-  font-size: var(--te-klein);
-}
-.te-plan-mitte {
-  overflow-y: auto;
-}
-.te-plan-schritt {
-  padding: 8px 14px 4px;
-}
-.te-plan-schritt h3 {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0 0 6px;
-  font: italic 700 clamp(18px, 1.15vw, 30px) / 1.1 var(--bc-haus);
-  color: var(--bc-creme);
-}
-.te-plan-schritt h3 b {
-  display: inline-grid;
-  place-items: center;
-  width: 1.3em;
-  height: 1.3em;
-  border-radius: 50%;
-  background: var(--bc-gold);
-  color: #17120a;
-  font: 700 0.8em var(--bc-zahl);
-}
-.te-plan-schritt h3 small {
-  font: 500 var(--te-klein) var(--bc-zahl);
-  color: var(--bc-stumm);
-}
-.te-dk-raster {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 6px;
-}
-.te-dk {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  min-height: clamp(64px, 5vw, 120px);
-  padding: 5px 8px 6px;
-  background: var(--bc-flaeche-2);
-  border: 1px solid var(--bc-linie);
-  border-radius: 6px;
-  color: var(--bc-tinte);
-  text-align: left;
-  cursor: pointer;
-}
-.te-dk b {
-  font: italic 700 1.05em var(--bc-haus);
-  color: var(--bc-creme);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.te-dk__oben {
-  display: flex;
-  justify-content: space-between;
-  font-size: var(--te-klein);
-  color: var(--bc-gold);
-}
-.te-dk__oben small {
-  color: var(--bc-stumm);
-  white-space: nowrap;
-}
-.te-dk.is-zu {
-  opacity: 0.55;
-}
-.te-dk.is-an {
-  border-color: var(--bc-gold);
-  background: rgba(240, 195, 90, 0.14);
-}
-.te-wege,
-.te-modi {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-.te-weg,
-.te-modus {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 9px 12px 10px;
-  background: var(--bc-flaeche-2);
-  border: 1px solid var(--bc-linie);
-  border-radius: 8px;
-  color: var(--bc-tinte);
-  text-align: left;
-  cursor: pointer;
-}
-.te-weg.is-an,
-.te-modus.is-an {
-  border-color: var(--bc-gold);
-  background: rgba(240, 195, 90, 0.1);
-}
-.te-weg:disabled,
-.te-modus:disabled,
-.te-dk:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.te-weg__kopf,
-.te-modus__kopf {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.te-weg__kopf small,
-.te-modus small {
-  color: var(--bc-stumm);
-  font-size: var(--te-klein);
-}
-.te-weg__fuss {
-  margin-top: auto;
-  color: var(--bc-leise);
-  font-size: var(--te-klein);
-}
-.te-weg__fuss em {
-  font-style: normal;
-  color: var(--bc-acht);
-}
-.te-modus__kopf .te-art {
-  margin-left: auto;
-}
-.te-vorschau,
-.te-offen {
-  padding: 10px 14px;
-}
-.te-offen {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  border-top: 1px solid var(--bc-linie);
-}
-.te-plan-rechts {
-  min-height: 0;
-}
-
 @media (max-width: 1500px) {
   .te-radar__raster {
     grid-template-columns: repeat(10, minmax(0, 1fr));
-  }
-  .te-dk-raster {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 
@@ -1101,22 +918,6 @@
   font-size: var(--te-klein);
   letter-spacing: 0;
   text-transform: none;
-}
-
-.te-pl > span:not(.te-med) {
-  flex: 1;
-  min-width: 0;
-}
-.te-pl > .te-med {
-  flex: none;
-}
-.te-plan-rechts .te-btn {
-  white-space: nowrap;
-  font-size: var(--te-klein);
-  letter-spacing: 0.05em;
-}
-.te-plan-rechts .te-btn.is-gold {
-  flex: 1.6;
 }
 
 .te-klasse {
@@ -1202,12 +1003,6 @@
 .te-kennzahlen > div.is-wunsch {
   border-top-color: var(--bc-acht);
 }
-.te-pl > span.te-wunsch--klein:not(.te-med) {
-  flex: none;
-  padding: 0 5px;
-  font-size: var(--te-klein);
-  white-space: nowrap;
-}
 .te-art--wunsch {
   border-color: var(--bc-acht);
   background: rgba(240, 195, 90, 0.14);
@@ -1235,17 +1030,6 @@
   width: 1.2em;
   height: 1.2em;
   margin-top: 1px;
-}
-.te-wunschleiste {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--bc-linie);
-}
-.te-wunschleiste small {
-  color: var(--bc-stumm);
-  font-size: var(--te-klein);
 }
 .te-btn.te-btn--klein {
   flex: none;
@@ -1349,10 +1133,6 @@
   font-size: var(--te-klein);
   margin-left: 2px;
 }
-.te-weg__bremse {
-  color: var(--bc-warn);
-  font-style: normal;
-}
 .te-moralzahl {
   white-space: nowrap;
 }
@@ -1454,48 +1234,13 @@
   line-height: 1.35;
 }
 
-/* ---------- Belastungs-Verlauf je Intensität (22.11.) ---------- */
-.te-belverlauf {
-  display: block;
-  margin: 2px 0 1px;
-}
-.te-belverlauf svg {
-  display: block;
-  width: 100%;
-  height: 40px;
-  background: rgba(244, 230, 196, 0.04);
-  border-radius: 6px;
-}
-.te-belverlauf__schwelle {
-  stroke: var(--bc-stumm);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-  vector-effect: non-scaling-stroke;
-}
-.te-belverlauf__jetzt {
-  fill: var(--bc-tinte);
-}
-.te-belverlauf__aus {
-  fill: none;
-  stroke: var(--bc-stumm);
-  stroke-width: 1.2;
-}
-.te-belverlauf__zeile {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--bc-stumm);
-  font-size: var(--te-klein);
-}
-.te-belastung-hinweis {
-  margin: 2px 0 6px;
-}
 .te-ziel-marke {
   color: var(--bc-gold);
 }
-.te-top5 {
-  border-top: 1px solid var(--bc-linie);
-}
-.te-top5 .te-kv > b small {
-  color: var(--bc-stumm);
+
+/* Schmale Fenster (MacBook 1710): der Platzhalter-Reiter „Liga kommt“ weicht den Kennzahlen, damit nichts überlappt. */
+@media (max-width: 1800px) {
+  .te-reiter button:disabled {
+    display: none;
+  }
 }

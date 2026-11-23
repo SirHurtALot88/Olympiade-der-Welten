@@ -21,6 +21,7 @@ import { startbudgetStaffelFuerNeuesSpiel } from "@/lib/resolve/startbudget-staf
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
 import { stempleFormkartenRegelBeimAnlegen } from "@/lib/resolve/formkarten-regel";
 import { stempleEntwicklungsRegelBeimAnlegen } from "@/lib/resolve/entwicklung-regel";
+import { stempleTrainingsVorliebenBeimAnlegen } from "@/lib/resolve/trainings-vorlieben";
 import { stempleBelastungsRegelBeimAnlegen } from "@/lib/fatigue/belastung-regel-stempel";
 import { stempleFinanzenJeSpieltagBeimAnlegen } from "@/lib/finance/finanzen-je-spieltag";
 import {
@@ -681,7 +682,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     stempleMarketingBeimAnlegen(
       stempleFinanzenJeSpieltagBeimAnlegen(
         stempleBelastungsRegelBeimAnlegen(
-          stempleEntwicklungsRegelBeimAnlegen(stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)))),
+          stempleTrainingsVorliebenBeimAnlegen(stempleEntwicklungsRegelBeimAnlegen(stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers))))),
         ),
       ),
     ),
