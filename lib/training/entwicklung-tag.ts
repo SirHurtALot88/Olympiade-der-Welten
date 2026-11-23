@@ -187,6 +187,7 @@ export function ligaAbbauFaktor(gameState: GameState, ohneSpieltag?: string | nu
   if (gemerkt && gemerkt.seasonId === gameState.season.id) return gemerkt.wert;
   let zuwachs = 0;
   let abbauBasis = 0;
+  let abbauGebucht = 0;
   let negativ = 0;
   const tage = new Set<string>();
   for (const player of gameState.players) {
@@ -202,10 +203,21 @@ export function ligaAbbauFaktor(gameState: GameState, ohneSpieltag?: string | nu
       }
       let a = 0;
       for (const w of Object.values(e.a ?? {})) a += w ?? 0;
+      abbauGebucht += a;
       abbauBasis += a / (e.f && e.f > 0 ? e.f : 1);
     }
   }
-  const wert = tage.size < 3 || abbauBasis <= 0 ? 1 : Math.max(0.6, Math.min(1.6, (zuwachs - negativ) / abbauBasis));
+  let wert = 1;
+  if (tage.size >= 3 && abbauBasis > 0) {
+    // Gleichgewicht der bisherigen Saison (Zuwaechse - negative Leistung) / Abbau ohne Faktor; auf die ganze Saison hochgerechnet muss die
+    // Summe des gebuchten Abbaus dieses Gleichgewicht treffen. Was die bisherigen Spieltage ueber oder unter dem Gleichgewicht lagen,
+    // holen die uebrigen Spieltage nach (fruehe Spieltage tragen anders als spaete, deshalb nicht nur das Verhaeltnis bis jetzt).
+    const gleichgewicht = (zuwachs - negativ) / abbauBasis;
+    const gesamtTage = Math.max(tage.size + 1, gameState.season.totalMatchdays ?? gameState.season.matchdayIds?.length ?? 20);
+    const basisGesamt = (abbauBasis * gesamtTage) / tage.size;
+    const rest = basisGesamt - abbauBasis;
+    wert = Math.max(0.6, Math.min(1.6, rest > 0 ? (gleichgewicht * basisGesamt - abbauGebucht) / rest : gleichgewicht));
+  }
   jeSpieltag.set(merk, { seasonId: gameState.season.id, wert });
   return wert;
 }

@@ -197,11 +197,11 @@ describe("Ligafaktor auf den Abbau (Thermostat fuer das Liga-Mittel)", () => {
       ],
     }) as unknown as GameState;
 
-  it("bis zum dritten Spieltag 1; danach (Zuwaechse - negative Leistung) / Abbau ohne Faktor, begrenzt auf 0,6 bis 1,6", () => {
+  it("bis zum dritten Spieltag 1; danach so, dass der Abbau der ganzen Saison das Gleichgewicht (Zuwaechse - negative Leistung) trifft, begrenzt auf 0,6 bis 1,6", () => {
     expect(ligaAbbauFaktor(liga(2, 1, 1))).toBe(1);
     expect(ligaAbbauFaktor(liga(5, 1, 1))).toBeCloseTo(1, 8);
-    expect(ligaAbbauFaktor(liga(5, 1.2, 1))).toBeCloseTo(1.2, 8);
-    expect(ligaAbbauFaktor(liga(5, 1, 1, undefined, -0.2))).toBeCloseTo(0.8, 8);
+    expect(ligaAbbauFaktor(liga(5, 1.2, 1))).toBeCloseTo(19 / 15, 8);
+    expect(ligaAbbauFaktor(liga(5, 1, 1, undefined, -0.2))).toBeCloseTo(11 / 15, 8);
     expect(ligaAbbauFaktor(liga(5, 9, 1))).toBe(1.6);
     expect(ligaAbbauFaktor(liga(5, 0.1, 1))).toBe(0.6);
   });

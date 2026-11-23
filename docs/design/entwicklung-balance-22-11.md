@@ -11,7 +11,10 @@ Auftrag von Chris, 22.11., wörtlich:
 - „Nicht jeder Spieler nähert sich zwangsweise dem Peak, weil es immer schwerer wird, je stärker ein Spieler wird.“
 - „Das Liga-Mittel soll weiterhin −1 bis +1 sein!“
 
-Stand: Regel **„neu“** gebaut, geeicht und über fünf Saisons gemessen (Tabelle 1). Gilt per Spielstand-Stempel (`seasonState.entwicklungsRegel`),
+**Stand 22.11. (Runde 2, Review von PR #1696): Training, Leistung und Abbau werden je Spieltag gebucht (60/40, Diligent 75/25), das Saisonende nimmt nichts
+zurück — siehe Abschnitt 8. Die Abschnitte 3 bis 5 beschreiben die Runde 1 (Saisonend-Rechnung) und gelten nur noch als Vorgeschichte.**
+
+Stand Runde 1: Regel **„neu“** gebaut, geeicht und über fünf Saisons gemessen (Tabelle 1). Gilt per Spielstand-Stempel (`seasonState.entwicklungsRegel`),
 Rückweg `OLY_ENTWICKLUNG=alt`. Wertungs-Fingerabdruck unverändert (`GESAMT fe1dc086d68d`, Entwicklung ist keine Arena-Wertung).
 
 ## 1. Abnahme und Schwellen
@@ -52,7 +55,7 @@ Dazu zwei Eigenheiten des Bestands:
   weiter +12 bis +13): `breakout` erzwingt +2, `regression_risk` erzwingt −2, die Mehrheit der Liga hat einen Aufwärts-Ausblick.
   Die Drift ist also nicht neutral, sondern ein zweiter Inflationskanal.
 
-## 3. Was die Regel „neu“ tut
+## 3. Was die Regel „neu“ tat (Runde 1, ersetzt durch Abschnitt 8)
 
 Alles in `lib/training/organic-season-progression.ts` (Saisonend-Rechnung `buildOrganicSeasonProgression`, nur mit Stempel „neu“
 und nur dort, nie im Tageszuwachs), Bausteine in `lib/training/entwicklung-neu.ts`.
@@ -88,7 +91,7 @@ und nur dort, nie im Tageszuwachs), Bausteine in `lib/training/entwicklung-neu.t
 Nicht gebaut (Chris: „optional, erst die Kernabnahme“): Auslöser für die Drift (Spielzeit, Verletzung, ungenutztes Attribut). Die
 Messung zeigt, dass jeder Spieler spielt; ein Spielzeit-Auslöser hätte heute nichts zu unterscheiden.
 
-## 4. Stellschrauben (`ENTWICKLUNGS_PARAMETER_STANDARD`)
+## 4. Stellschrauben der Runde 1 (ersetzt, aktuelle Werte in 8.6)
 
 | Schraube | Wert | Wirkung |
 |---|---:|---|
@@ -106,7 +109,7 @@ Messung zeigt, dass jeder Spieler spielt; ein Spielzeit-Auslöser hätte heute n
 Faustregel: Liga-Mittel zu hoch → `abbauBasis` hoch; zu viele Stark-Besser/Schlechter → `kurveA` oder `kurveK` runter; zu wenige →
 rauf. `OLY_ENT_PARAMS` (JSON) überschreibt einzelne Werte **nur für Messläufe** (`scripts/miss-entwicklung.ts`), im Spiel nie gesetzt.
 
-## 5. Messung
+## 5. Messung der Runde 1 (Zahlen überholt, Werkzeug und Verfahren gelten weiter)
 
 Werkzeug: `scripts/miss-entwicklung.ts` (Wegwerf-SQLite, **32 KI-Teams von Anfang an**, Liga-Draft der Pick-Engine, echte
 Arena-Spieltage, danach Saisonabschluss + Saisonende-Kette + nächste Saison). Je Saison werden die Kennzahlen und alle Zeilen
@@ -179,7 +182,7 @@ die Ursache: ohne PP über dem Median und gehaltenes Ziel kommt niemand über +8
 - **Unverändert:** Matrix (gesperrt), Wertungs-Fingerabdruck (`GESAMT fe1dc086d68d`), Verletzte trainieren nicht, Training wirkt je
   Spieltag (nur die Kurve der Erträge ist stetig geworden).
 
-## 7. Offen
+## 7. Offen (Stand Runde 1, ersetzt durch 8.7)
 
 - Die Zahlen sind an einer Liga (KI-Teams, Pick-Engine-Draft) geeicht; ein Spielstand mit menschlichen Teams (Bank, anderes Training)
   verschiebt Leistungsrang und Fokus. Die Anteile stark/kaum sind weich (±2 Punkte je Saison durch Stichprobe von ~300 Spielern),
@@ -190,3 +193,172 @@ die Ursache: ohne PP über dem Median und gehaltenes Ziel kommt niemand über +8
   sofortiges Saisonende ergäbe, nicht die Hochrechnung.
 - Auslöser für die Potentialdrift (Spielzeit, Verletzung, ungenutztes Attribut): bewusst nicht gebaut (s. o.).
 - Kein Alterungsmodell (bleibt: Laufbahnen enden über sinkendes Potential und den Abschied, nicht über Jahre).
+
+## 8. Runde 2: je Spieltag, 60/40 (22.11., Review von PR #1696)
+
+Anlass: das unabhängige Review fand zwei Muss-Funde und fünf Sollte-Funde zur Runde 1 (Abschnitte 3 bis 5). Chris dazu, wörtlich: „trainingsleistung soll
+60% ausmachen und spielperformance 40% so dass auch schwächere die noch nicht so gute performance ingame bringen besser durch training aufsteigen — darauf
+könnte auch sowas wie diligent wirken dass die spieler sich mehr auf training als ingame performance konzentrieren und die quote da 75% durch training ist
+dafür nur 25% durch ingame performance“. **Die Saisonend-Rechnung der Runde 1 (Leistungsrang-Faktor auf das gebuchte Training, Verfall, Entwicklungskurve,
+Schub-Deckel) ist ersetzt**; die Abschnitte 3 bis 5 beschreiben sie nur noch als Vorgeschichte (ihre Zahlen gelten nicht mehr). Es bleibt bei: Stempel
+`entwicklungsRegel`, Rückweg `OLY_ENTWICKLUNG=alt` (bit-gleich), Potentialdrift mittelwertneutral, Matrix nur gelesen, Wertungs-Fingerabdruck
+`GESAMT fe1dc086d68d`.
+
+### 8.1 Die Regel: ein Delta je Spieltag und Attribut
+
+    Delta = T (Training) + L (Leistung, mit Vorzeichen) − A (Abbau)
+
+Alles wird je Spieltag **gebucht und im Trainingsverlauf gezeigt** (`z` = T, `p` = L mit Vorzeichen, `a` = A, `f` = Ligafaktor des Abbaus; Netto auf dem Attribut =
+z + p − a, drei Stellen, gezeigt = gebucht). Das Saisonende bucht keine Entwicklung mehr nach und nimmt nichts zurück; es bleibt die Potentialdrift (und, wie
+immer, die Decken-Klemme, wenn die Drift eine Decke unter einen Wert senkt).
+
+| Teil | Quelle | Regel |
+|---|---|---|
+| **T** | bestehende Tages-Setpoints (`TRAINING_SETPOINTS_JE_SPIELTAG`) | Budget × Ertragskurve zur Decke (stetig) × **Fokusfaktor** (0,5 bis 1,5 nach dem Anteil des meistgewählten Ziels, erst ab fünf Trainingstagen) × Gewicht Training × Eichung `trainingsSkala` |
+| **L** | PP des Spielers an diesem Spieltag gegen den **Median derselben Liga** (nur wer antrat) | Einheit = PP-Abstand / `ppEinheit` (3), darüber `z^1,35`, darunter `−1,65·|z|`, auf drei Einheiten begrenzt; verteilt nach dem Matrixgewicht der gespielten Disziplin(en) (nach PP-Anteil), positiver Teil mal Ertragskurve. **Ohne Einsatz L = 0, keine Zusatzstrafe.** × Gewicht Leistung × Eichung × **Schwung** |
+| **A** | Grundabbau (0,031 je Attribut und Saison) + Marktwertdruck × 1,437, durch die Saisonlänge geteilt, mal die Decken-Dämpfung, mal der **Ligafaktor** | **Verletzte: kein T, kein L und auch kein A** — keine Mehrfachstrafe mehr |
+| Gewichte | 60 % Training / 40 % Leistung; **Trait Diligent 75 % / 25 %** (`traitsPositive`, Name „Diligent“) | Training × (Gewicht/0,6), Leistung × (Gewicht/0,4): bei 60/40 der Zuwächse bleibt die Summe gleich, nur der Anteil verschiebt sich |
+| **Schwung** | je Spieltag statt Kurve am Saisonende | geht die Saison bisher in die Richtung der heutigen Leistung (Netto bisher und L gleiches Vorzeichen), zählt L mit `1 + 3 · min(3, (|Netto bisher| / 3,8)^2,75)`; wer kaum Netto hat, wird kaum verstärkt. Daraus entstehen die wenigen starken Schübe und Einbrüche, die Masse bleibt kaum verändert |
+| **Ligafaktor** | `ligaAbbauFaktor`, ligaweit, trifft alle Teams gleich | stellt den Abbau je Spieltag so, dass die Abbau-Summe der ganzen Saison die Zuwächse der Liga (Training + positive Leistung − negative Leistung) trifft: Gleichgewicht der bisherigen Spieltage, hochgerechnet auf die Saison, der Rest wird nachgeholt; 0,6 bis 1,6, bis zum dritten Spieltag 1. Er steht im Verlauf (`f`), Vorschau und Prognose rechnen mit demselben |
+
+Dateien: `lib/training/entwicklung-neu.ts` (Parameter, Formeln), `lib/training/entwicklung-tag.ts` (PP-Index, Leistung, Ligafaktor, Zusammenführung mit Decke und
+Boden), `lib/training/matchday-training-accumulator.ts` (Buchung, Rückbau bei Neubuchung, Abschluss nach halbem Spieltag), `lib/training/spieltag-training.ts`
+(`berechneSpieltagsZuwachs` liefert T und A, Vorschau = Buchung), `lib/training/organic-season-progression.ts` (Prognose/Saisonende).
+Halber Spieltag (Arena-Teilbuchung): T und A stehen seit D1 fest (`o`), die Leistung des ganzen Spieltags kommt mit dem Abschluss-Commit dazu.
+
+### 8.2 Prognosen und Saisonende (M1, S5)
+
+`buildOrganicSeasonProgression` (Trainingsseite, Spielerprofil, Bestenliste, Saisonende-Apply) rechnet mit Stempel „neu“ nur noch den **noch nicht gebuchten
+Rest** mit derselben Formel: Training aus dem Budget der offenen Spieltage, Abbau × offene Spieltage × Ligafaktor, Leistung = bisheriger Schnitt der gebuchten
+Spieltage (ohne Einsätze: 0, also der Liga-Median). Zu Saisonbeginn ist das die ganze Saison, am Saisonende nichts. Die frühere Saisonend-Strafe (Rang 0,25 ohne
+Einsätze, voller Abbau, verstärkende Kurve, bis −18) kommt in keiner Prognose mehr vor.
+
+- **Prognose zu Saisonbeginn** (383 Kaderspieler, frisch angelegter Spielstand, Prognose-Aufruf wie die Trainingsseite): Mittel −0,5, p5 −4,6, Median −0,5, p95 +2,6,
+  kleinster Wert −9,1, größter +6,1 (Runde 1: bis −18). Beispiele: Jasper Kane Training +1,1 / Abbau −10,2 = −9,1 (sehr teurer Spieler an der Decke),
+  Gravemind Atoll +2,8 / −3,3 = −0,5, Colonys Sting +8,1 / −2,5 = +6,1. Die Prognose kennt noch keine Leistung (L = 0), deshalb liegt die Spanne eng um das Mittel.
+- **Rückweg `OLY_TRAINING_JE_SPIELTAG=aus`:** nichts wird je Spieltag gebucht; das Saisonende rechnet **dieselbe Formel in einem Rutsch** (Training aus dem alten
+  Saisonbudget, umgerechnet auf den Satz je Spieltag, Abbau für die ganze Saison, Leistung aus den echten PP jedes Spieltags gegen den Liga-Median, Fokus
+  neutral, weil kein Ziel je Tag aufgezeichnet wird). Die Prognose zu Saisonbeginn ist in beiden Betriebsarten gleich (Test). **Nicht gemessen** am vollen Spiel
+  (nur Einheitentest); der Rutsch kennt den Schwung und den Ligafaktor nicht.
+- `buildPlayerSeasonTrainingForecast` (Trainingshistorie) summiert mit „neu“ genau die Verlaufseinträge (Training, Leistung, Abbau), ohne je Spieler einen
+  abgeschnittenen Spielstand zu bauen.
+
+### 8.3 PP-Index (S3, S4)
+
+`ppTagesIndex(gameState)` baut **einmal je Ergebnisbestand** (`WeakMap` am `seasonState`) aus dem Punktebuch die PP je Spieler und Spieltag und den **Median je
+Liga** (`leagueByTeamId`, ohne Split eine Liga „all“). Der Rang gilt damit je Liga, nicht ligaübergreifend („Reiche werden reicher“ durch eine Liga-1-Skala fällt
+weg: Liga 2 misst sich an Liga 2). Der alte Leistungsrang-Index je Spieler-`truncatedGameState` (688 → 1213 ms für zehn Spieler) ist entfernt.
+
+### 8.4 Eichung und Messung
+
+Werkzeug unverändert `scripts/miss-entwicklung.ts` (32 KI-Teams von Anfang an, derselbe Ausgangsstand für alle Läufe), neu `--tage` (je Spieler und Spieltag
+Training, Abbau und PP-Abstand im Ergebnis — damit lässt sich die Eichung offline durchspielen), `--bank K --bank-teams N` (N Teams bekommen K Zusatzspieler aus
+den Freien, nach Stärke knapp unter dem eigenen Kader). Vorgehen: Lauf mit Zwischenwerten, danach die Parameter an den je Tag gespeicherten Rohdaten offline
+gesucht (Ziel: Mittel −1..+1, 5–8 % ≥ +8, 5–8 % ≤ −8, 50–60 % kaum, 60 % Trainingsanteil, Korrelation Startstärke↔Netto ≤ 0,15), im vollen Lauf bestätigt.
+
+Was die Läufe gelehrt haben (Tabelle 5):
+
+1. Die Leistung korreliert mit der Startstärke (0,51), der Marktwertdruck im Abbau mit 0,94 gleicht das aus: deshalb ist der Abbau vom flachen Grundabbau
+   (0,51 → 0,031) zum Marktwertdruck (× 1,437) verschoben.
+2. Rein linear bleibt die Verteilung eine Glocke (kaum 54 %, aber nur 2 % ≥ +8). Die Ränder entstehen erst durch den Schwung.
+3. Die Korrelation Start↔Netto stieg ohne Gegenmaßnahme über die Saisons (0,05 → 0,23 → 0,38: die Liga sortiert sich, Starke bleiben vorn): stärkerer Marktwertdruck
+   im Abbau (Zeile „B“).
+4. Das Liga-Mittel lief ohne Regler über die Saisons weg (+0,08 → −1,0 → −2,1: die Ertragskurve schließt sich zur Decke, die positiven Teile schrumpfen, der
+   negative Teil der Leistung wird vom Schwung voll verstärkt, der Abbau bleibt): der **Ligafaktor** (Zeile „C“).
+
+**Tabelle 5: Eichung** (Regel neu, Saison 1 bzw. Saisons 1–3, Trainingsanteil = Training / (Training + positive Leistung))
+
+| Lauf | Saison | Mittel | stark besser % | stark schlechter % | kaum % | Trainingsanteil % | Korr. Start↔Netto |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Probe 1: Skalen 1/1/1, flacher Abbau 0,51, kein Schwung | 1 | +2,16 | 16,3 | 2,2 | 32,5 | 56,7 | +0,27 |
+| Probe 2: Training 0,6, Leistung 0,5, Marktwert 2,5, kein Schwung | 1 | −1,89 | 1,2 | 2,1 | 34,8 | 59,1 | −0,38 |
+| A: Schwung (2,64), Marktwert 0,96 | 1 / 2 / 3 | −0,11 / −0,12 / −0,72 | 6,5 / 10,4 / 5,7 | 4,6 / 8,8 / 8,7 | 51,4 / 47,1 / 52,3 | 61 / 52 / 61 | +0,05 / +0,23 / +0,38 |
+| B: Marktwert 1,44, Schwung 3,3 | 1 / 2 / 3 | +0,08 / −1,00 / −2,06 | 8,2 / 9,5 / 4,7 | 5,3 / 11,8 / 12,8 | 49,1 / 43,3 / 51,5 | 60 / 53 / 66 | −0,11 / +0,16 / +0,12 |
+| **C (Endstand): + Ligafaktor, Schwung 3** | siehe Tabelle 6 | | | | | | |
+
+**Tabelle 6: Endstand über drei Saisons** (32 KI-Teams, je Saison etwa 300 Spieler; Wiederholung mit derselben Saat ergibt bit-gleiche Werte)
+
+| Saison | Spieler | Liga-Mittel | Median | stark besser % | stark schlechter % | kaum % | Trainingsanteil % | Korr. Start↔Netto | PP über Median bei stark Besseren % |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 321 | -0.53 | -0.7 | 6.5 | 5.9 | 48.9 | 63.3 | -0.21 | 86 (n 21) |
+| 2 | 308 | -0.80 | -0.5 | 5.8 | 9.1 | 46.1 | 56.5 | +0.01 | 94 (n 18) |
+| 3 | 299 | -0.57 | -0.3 | 6.0 | 8.0 | 54.5 | 61.7 | +0.10 | 89 (n 18) |
+| Mittel | | -0.63 | | 6.1 | 7.7 | 49.8 | 60.5 | -0.03 | |
+
+Soll gegen Ist: Liga-Mittel in allen drei Saisons zwischen −0,8 und −0,5 (Soll −1..+1, leichter Abwärtszug, Stellschraube `abbauBasis`); stark besser 5,8–6,5 % (Soll
+5–8); stark schlechter 5,9–9,1 % (Soll 5–8, Saison 2 drüber); kaum verändert 46–55 % (Soll 50–60, Saison 1 und 2 knapp darunter); Trainingsanteil im Mittel 60,5 %;
+Korrelation Start↔Netto −0,21 / +0,01 / +0,10 (Soll ≤ 0,15, nicht steigend: erfüllt).
+
+**Tabelle 7: Gruppen, Saison 1 des Endstands** (Netto = Summe der zwölf Attribute; Training Z, Leistung P, Abbau A je Saison)
+
+| Gruppe | Spieler | Netto Mittel | Training Z | Leistung P | Abbau A | ≥ +8 / ≤ −8 % | Einsätze |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| alle | 321 | -0.53 | 3.76 | -0.54 | 3.65 | 6.5 / 5.9 | 13.4 |
+| Einsätze ≤ 8 (Bank) | 8 | +0.79 | 4.63 | -1.08 | 2.76 | 0.0 / 0.0 | 7.8 |
+| Einsätze 9–14 | 188 | +0.53 | 3.93 | -0.55 | 2.74 | 8.0 / 3.7 | 11.8 |
+| Einsätze ≥ 15 | 125 | -2.21 | 3.45 | -0.48 | 5.08 | 4.8 / 9.6 | 16.1 |
+| verletzt (≥ 1 Ausfalltag) | 75 | -1.62 | 3.77 | -0.74 | 4.53 | 6.7 / 8.0 | 14.7 |
+| nie verletzt | 246 | -0.20 | 3.75 | -0.47 | 3.39 | 6.5 / 5.3 | 13.0 |
+| Diligent | 45 | +3.07 | 5.75 | +0.73 | 3.34 | 17.8 / 2.2 | 13.3 |
+| nicht Diligent | 276 | -1.12 | 3.43 | -0.74 | 3.70 | 4.7 / 6.5 | 13.4 |
+| Start unteres Drittel | 107 | +1.16 | 3.72 | -0.04 | 2.45 | 8.4 / 0.9 | 11.9 |
+| Start mittleres Drittel | 107 | -0.96 | 3.98 | -1.95 | 2.88 | 5.6 / 10.3 | 12.4 |
+| Start oberes Drittel | 107 | -1.79 | 3.57 | +0.38 | 5.63 | 5.6 / 6.5 | 15.9 |
+
+**Tabelle 8: Bank** (eigener Lauf, 8 Teams mit je drei Zusatzspielern, Saison 1, 338 Spieler; dort Liga-Mittel −0,64)
+
+| Gruppe | Spieler | Netto Mittel | Training Z | Leistung P | Abbau A | ≥ +8 / ≤ −8 % | Einsätze |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Bank-Messfall: 18 Zusatzspieler bei 8 Teams | 18 | +0,91 | 3,48 | ±0,00 | 2,51 | 5,6 / 0,0 | 10,5 |
+| übrige Kader dieses Laufs | 320 | −0,73 | 3,77 | −0,96 | 3,46 | 5,6 / 8,8 | 12,8 |
+| Einsätze ≤ 8 in diesem Lauf | 31 | +2,84 | 4,93 | +0,49 | 2,53 | 12,9 / 0,0 | 7,0 |
+
+Zu lesen:
+
+- **Bank:** wer kaum eingesetzt wird, fällt nicht zurück. Die Zusatzspieler (im Mittel 10,5 Einsätze) liegen bei +0,9, die mit höchstens 8 Einsätzen bei +2,8 (Training
+  4,9 gegen Abbau 2,5, Leistung ±0). Training hält sie, wie vorgegeben „ohne Einsatz, aber mit gehaltenem Training: nicht zurückfallen“.
+- **Verletzte:** −1,6 gegen −0,2 der nie Verletzten. Der Unterschied ist zum Teil Auswahl (Verletzte spielen mehr, sind teurer: Abbau 4,5 gegen 3,4) und zum Teil
+  die verlorenen Trainingstage; eine Zusatzstrafe gibt es nicht (Test: kein T, L, A an Ausfalltagen).
+- **Stärke:** unteres Drittel +1,2, oberes −1,8. Chris: „schwächere ... besser durch training aufsteigen“ — das trifft ein; die Tendenz zur Mitte ist etwas stärker als
+  nötig. Hebel: `abbauMarktwertSkala`.
+- **Diligent:** +3,1 gegen −1,1 (Training 5,8 gegen 3,4). Das 75/25-Gewicht ist summenneutral; der Vorsprung kommt aus dem schon bestehenden Trait-Budget
+  und daraus, dass die KI für Diligent den Modus „hart“ wählt (`HART_BIAS_TRAITS`). Siehe Offen.
+- **Verdient:** 86–94 % der Stark-Besseren haben PP je Einsatz über dem Median (Tabelle 6); ihr Trainingsanteil an den Zuwächsen liegt bei rund 40 %, sie gewinnen über die
+  Leistung, der Liga-Anteil bei 60 %.
+
+### 8.5 Die Review-Funde und wie sie behoben sind
+
+| Fund | Behebung |
+|---|---|
+| **M1** Prognosen zu Saisonbeginn bis −18 | Prognose = Rest-Rechnung mit der Je-Spieltag-Formel (8.2); zu Saisonbeginn Mittel −0,5, kleinster Wert −9,1 |
+| **M2** Saisonende nimmt gebuchtes Training zurück (Herkunft „Training“ im Mittel −2,3) | Das Saisonende bucht keine Entwicklung mehr nach: im Messlauf sind Training, Nebenwirkung, Leistung und Abbau im Saisonend-Ereignis alle 0 (kein Eintrag mehr). Die Attribute behalten die drei Nachkommastellen der Buchung (früher Rundung auf eine Stelle am Saisonende) |
+| **S1** Mehrfachstrafe bei Verletzung | Verletzte: kein T, kein L, kein A; kein Verfall, keine Rang-Strafe, keine Kurve (Test) |
+| **S2** Bank ungemessen | `--bank`, Tabelle 8 |
+| **S3** Rang ligaübergreifend | Median je Liga am selben Spieltag (8.3) |
+| **S4** Rang-Index je Spieler neu gebaut | ein Index je Ergebnisbestand (8.3); die Historie baut keinen abgeschnittenen Spielstand mehr |
+| **S5** Rückweg ließ Leistungsfaktor wirkungslos | der Rutsch rechnet dieselbe Formel am Saisonende (8.2) |
+
+### 8.6 Stellschrauben (`ENTWICKLUNGS_PARAMETER_STANDARD`, Runde 2)
+
+| Schraube | Wert | Wirkung |
+|---|---:|---|
+| `gewichtTraining` / `gewichtLeistung` | 0,6 / 0,4 | Chris: 60 % Training, 40 % Leistung |
+| `gewichtTrainingDiligent` / `gewichtLeistungDiligent` | 0,75 / 0,25 | Trait Diligent |
+| `trainingsSkala` / `leistungsSkala` | 0,6 / 0,9 | Eichung der Teile (Verhältnis der Zuwächse 60 : 40) |
+| `abbauBasis` / `abbauMarktwertSkala` | 0,031 / 1,437 | Grundabbau (Liga-Mittel: ±0,01 ≈ ∓0,1) und Stärke-Neutralität |
+| `ppEinheit`, `zMax`, `gamma`, `beta`, `betaExponent` | 3, 3, 1,35, 1,65, 1 | Form der Leistung |
+| `schwungStaerke`, `schwungSumme`, `schwungExponent`, `schwungMax` | 3, 3,8, 2,75, 3 | Ränder der Verteilung (die „verstärkende Kurve“, je Spieltag) |
+| `fokusStaerke`, `fokusMinTage` | 0,5, 5 | Fokusfaktor auf das Training |
+
+Faustregel: Liga-Mittel zu hoch/niedrig → `abbauBasis`; zu wenige/zu viele Ränder → `schwungStaerke`; Starke gewinnen/verlieren zu viel → `abbauMarktwertSkala`.
+`OLY_ENT_PARAMS` (JSON) überschreibt Werte nur für Messläufe.
+
+### 8.7 Offen
+
+- **Diligent** gewinnt im Mittel +3 (Training 5,8 gegen 3,4). Das Gewicht 75/25 ist summenneutral, aber der Trait gibt schon +10 % Trainingsbudget und die KI wählt für
+  Diligent den Modus „hart“. Entscheidung für Chris: Modus-Neigung bei Diligent lassen (der Trait ist dann stark) oder entfernen.
+- Die Eichung stammt aus einer reinen KI-Liga (Kader von 9 bis 14). Mit Menschen (andere Aufstellungen, später Ausrüstung) nachmessen; Liga-Mittel −0,5 bis −0,8 ist
+  der untere Rand, `abbauBasis` leicht senken, wenn es weiter absinkt.
+- Der Rückweg `OLY_TRAINING_JE_SPIELTAG=aus` ist nur im Einheitentest geprüft, nicht über Saisons gemessen.
+- Verdient (Runde-1-Maß „PP über Median **und** Ziel gehalten“) liegt nur bei etwa 50 %, weil das Ziel nur als Faktor 0,5–1,5 auf das Training eingeht, nicht als Bedingung.
+- Die Decken-Summe je Spieler und Saison steigt im Messlauf um etwa +4 (Drift +0,5 bis +0,8, der Rest sind Decken, die ein Attribut über der Decke anhebt); nicht Teil dieser Änderung, nicht neu bewertet.
