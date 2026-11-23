@@ -376,6 +376,8 @@ export type TrainingsSpieltagEintrag = {
    * entsteht beim Saisonwechsel die Leistungs-Erwartung fuer die Folgesaison (`Player.leistungsErwartung`).
    */
   y?: Record<string, number>;
+  /** Trainingsvorlieben (22.11.): das Ziel dieses Spieltags war eine Lieblings-Disziplin (1) oder die ungeliebte (-1); fehlt = neutral oder Regel aus. */
+  v?: 1 | -1;
   /** PP-Fingerabdruck dieses Spieltags beim Buchen (`ppHashFuerTag`): weicht er beim erneuten Buchen ab, wird L neu gerechnet. */
   h?: string;
   /** Ligafaktor, mit dem der Abbau `a` dieses Spieltags gebucht wurde (`ligaAbbauFaktor`); fehlt = 1. */
@@ -4342,6 +4344,11 @@ export type SeasonState = {
    * Verfall, mittelwertneutrale Potentialdrift) oder "alt". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel.
    */
   entwicklungsRegel?: { seasonId: string; regel: "alt" | "neu" } | null;
+  /**
+   * TRAININGSVORLIEBEN DIESER SAISON (22.11., lib/resolve/trainings-vorlieben.ts): "v1" = zwei Lieblings-Disziplinen (Training x1,15, Moral +3) und eine
+   * ungeliebte (x0,80, Moral -6) je Spieler gelten; "aus" = nichts davon. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison.
+   */
+  trainingsVorlieben?: { seasonId: string; regel: "aus" | "v1" } | null;
   /**
    * MARKETING-REGEL DIESER SAISON (22.11., lib/marketing/marketing-regel.ts): "an" = Werbegeld, Team-Anteil, Teammarke und Moral-Zuschlag
    * gelten; "aus" = nichts davon. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison. Dazu die Fanfarbe

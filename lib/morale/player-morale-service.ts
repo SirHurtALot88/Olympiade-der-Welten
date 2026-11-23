@@ -26,6 +26,8 @@ import {
 } from "@/lib/morale/morale-konstanten";
 import { buildPlayerDemands, selectTeamCaptain } from "@/lib/morale/player-demands-service";
 import { evaluateTrainingModeDemandDelta } from "@/lib/training/training-mode-demand-service";
+import { trainingsVorliebenAktivFuer } from "@/lib/resolve/trainings-vorlieben";
+import { aktuellesTrainingsZielId, vorliebeArt, vorliebeMoral } from "@/lib/training/trainings-vorlieben";
 import { LEAGUE_SIZE, TEAM_COUNT_TOTAL, getLeagueOf, getLeagueTeamIds, isLeagueSplitActive } from "@/lib/season/league-split";
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 
@@ -991,6 +993,22 @@ function computePlayerMorale(input: {
     const delta = hasTrait(player, "ambitious") ? -2 : 2;
     morale += delta;
     addReason(reasons, "light_training_load", "Leichtere Trainingslast", delta, "training");
+  }
+
+  // TRAININGSVORLIEBEN (22.11.): trainiert er auf eine Lieblings-Disziplin +3, auf die ungeliebte -6, solange sie sein Ziel ist (Grund, kein Abzug je Spieltag).
+  if (trainingsVorliebenAktivFuer(gameState)) {
+    const art = vorliebeArt(player, aktuellesTrainingsZielId(player, gameState.season?.id ?? ""));
+    if (art !== 0) {
+      const delta = vorliebeMoral(art);
+      morale += delta;
+      addReason(
+        reasons,
+        art > 0 ? "training_favorite_discipline" : "training_disliked_discipline",
+        art > 0 ? "Trainiert seine Lieblingsdisziplin" : "Trainiert, was er nicht mag",
+        delta,
+        "training",
+      );
+    }
   }
 
   const traits = getTraits(player);

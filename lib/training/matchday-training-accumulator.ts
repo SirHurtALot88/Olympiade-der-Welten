@@ -286,6 +286,7 @@ export function accumulateMatchdayTrainingProgress(input: {
             : {}),
           i: mode,
           l: roundValue(fatigueShare, 3),
+          ...(zuwachs && zuwachs.vorliebe.art !== 0 ? { v: zuwachs.vorliebe.art as 1 | -1 } : {}),
         };
         if (entwicklungNeu && zuwachs && attributeSheetStats) {
           const einheiten = new Map<string, number>();
