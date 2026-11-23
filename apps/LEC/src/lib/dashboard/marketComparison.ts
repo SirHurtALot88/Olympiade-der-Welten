@@ -40,14 +40,17 @@ export interface LatestQuote {
 
 /**
  * Marktwert des ARTIKELS aus dem Datensatz: Cardmarket-Preise gelten je Karte, der VK je Artikel
- * (3er-Pack = 3 Karten). Mittelwert aus Trend, Ø 1, Ø 7, Ø 30 Tage, dem guenstigsten Angebot ("ab", immer, doppelt gewichtet) und, wenn bekannt, deinem letzten EK (Chris, 11.11.:
+ * (3er-Pack = 3 Karten). Mittelwert aus Trend, Ø 1, Ø 7, Ø 30 Tage, dem guenstigsten Angebot ("ab", immer, doppelt gewichtet) und, wenn bekannt, deinem Ø EK (doppelt, Chris 23.11.) bzw. sonst dem letzten EK (Chris, 11.11.:
  * ein einzelner Wert, vor allem der 1-Tage-Schnitt, schwankt zu stark); fehlen Werte, zaehlen die vorhandenen.
  * Null bei mehrdeutiger Seltenheit (dann gibt es nur `marketRangeOf`) oder ohne Preis.
  */
 /** "ab" zaehlt doppelt (Chris, 13.11.): es spiegelt den aktuellen Stand besser als die traegen Schnitte, vor allem bei fallendem Preis. */
 export const FROM_WEIGHT = 2;
 
-export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: number | null, factor = 1): number | null {
+/** Der durchschnittliche Einkaufspreis (Ø EK aus den Verkaeufen) zaehlt doppelt im Marktwert (Chris, 23.11.), wo er vorhanden ist. */
+export const AVG_EK_WEIGHT = 2;
+
+export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: number | null, factor = 1, avgEk?: number | null): number | null {
   if (quote.matchQuality === "mehrdeutig") return null;
   const pack = Math.max(1, packQty);
   const cardParts = [quote.priceTrend, quote.priceAvg1, quote.priceAvg7, quote.priceAvg30].filter((v): v is number => v != null && v > 0);
@@ -58,7 +61,9 @@ export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: numb
   // Je Artikel (Karte x Pack-Menge); der letzte EK steht schon je Artikel und federt Ausreisser ab (Chris, 11.11.).
   // Zustandsabschlag (EX/GD/LP/PL/Poor) nur auf die Cardmarket-Preise: sie gelten fuer NM, der letzte EK ist ein echter Betrag.
   const parts = cardParts.map((v) => v * pack * factor);
-  if (lastEk != null && lastEk > 0) parts.push(lastEk);
+  // Ø EK vorhanden: er zaehlt doppelt und ersetzt den einfachen letzten EK; sonst der letzte EK einfach wie bisher.
+  if (avgEk != null && avgEk > 0) for (let i = 0; i < AVG_EK_WEIGHT; i++) parts.push(avgEk);
+  else if (lastEk != null && lastEk > 0) parts.push(lastEk);
   return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
 
@@ -169,7 +174,7 @@ export function buildMarketComparisonRow(
   // Cardmarket-Preise gelten je Karte, der VK je Artikel (3er-Pack = 3 Karten).
   const condition = conditionOf(a.nameRaw);
   const condFactor = conditionFactor(a.nameRaw);
-  const marketValue = marketValueOf(quote, pack, a.currentEk, condFactor);
+  const marketValue = marketValueOf(quote, pack, a.currentEk, condFactor, realizedEk > 0 ? realizedEk : null);
   const marketRange = marketRangeOf(quote, pack, condFactor);
 
   const rangeFor = (marketPerUnit: number): MarketTargetRange =>

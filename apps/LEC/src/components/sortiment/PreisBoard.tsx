@@ -399,6 +399,6 @@ export function PreisBoard({ rows, dupGroups, sortKey, reversed, onSort, imageVe
 function marketTitle(m: NonNullable<SortimentRow["market"]>): string {
   if (m.range) return `${m.range.variants} Varianten im Set, die Seltenheit lässt sich nicht eindeutig zuordnen — Spanne statt Einzelwert`;
   if (m.how === "seltenheit") return "Mittelwert (Cardmarket-Trend, Ø 1/7/30 Tage, letzter EK) der Variante mit der Seltenheit aus deinem Titel";
-  if (m.how === "einzige_variante") return "Mittelwert aus Cardmarket und letztem EK (die Karte hat im Set nur eine Variante)";
-  return "Mittelwert aus Cardmarket-Trend, Ø 1/7/30 Tage und letztem EK";
+  if (m.how === "einzige_variante") return "Mittelwert aus Cardmarket und deinem Ø EK (die Karte hat im Set nur eine Variante)";
+  return "Mittelwert aus Cardmarket-Trend, Ø 1/7/30 Tage, ab und deinem Ø EK (doppelt)";
 }
