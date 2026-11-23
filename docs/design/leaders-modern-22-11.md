@@ -148,3 +148,19 @@ Die alten Ligaleader-Karten (PPS, Achsen, MVS, OVR, Training, Most Improved) sin
 | MVP-Zähler | angepasst: Zahl der MVP-Kandidaten-Markierungen der Wertung (`isMvpCandidate`), im Tooltip benannt |
 | „Rekorde & Legenden“ | neu (Knopf im Kopf, siehe oben) |
 | Nebel | entfällt, alles öffentlich |
+
+### Nachbesserung 22.11. (Bereichsfarben, Kopf, Abgleich)
+
+| Punkt | Änderung |
+|---|---|
+| Doppelter Titel | Das Regieband der Shell nennt „Leaders“, der Hero trägt jetzt wie der Saisonstand das Team als Titel und „Leaders · Saison/Spieltag · Liga“ als Dachzeile |
+| Reiter bei 1710 px | Eyebrows kürzer („Punkte · PP“, „Stand heute“), unter 1800 px engere Reiter ohne Symbolfeld: Titel und Zahl stehen ungekürzt |
+| Disziplin-Karten | laufen spaltenweise je Bereich (POW, SPE, MEN, SOC); jede Karte mit 4 px Kante, Oberkante, Tönung, Bereichs-Kürzel und Icon-Chip in Bereichsfarbe; gilt für Spieler, Teams, Medaillen und die Tagesbesten |
+| Filter-Chips | POW/SPE/MEN/SOC in Bereichsfarbe mit Tönung und Unterstrich, aktiv voll gefüllt |
+| Tabellen | Bereichsspalten POW/SPE/MEN/SOC (Spieler und Teams) mit getönten Köpfen und Zellen |
+
+Abgleich: Bildpaare `leaders-modern-22-11/vergleich-<ansicht>-<größe>.png` (links Mockup, rechts App; Live-Abbild, Team D-P; kein Seitenscroll).
+Bewusst anders als das Mockup: der Hero-Titel (Team statt „Leaders“, siehe oben), die Shell um die Seite (Schiene, Regieband), die Kartenreihenfolge (Mockup zeilenweise gemischt, App spaltenweise je Bereich, damit die Bereiche getrennt lesbar sind).
+Drin / angepasst / fehlt: alle Mockup-Merkmale bleiben drin, angepasst sind die genannten Punkte, es fehlt nichts.
+
+Bildstand: Bildpaare für Spieler (1920x1080, 2560x1440, 1710x1112), Teams (1920x1080), Medaillen (1920x1080, 2560x1440) und Spieltag (1920x1080). Die Aufnahmen der älteren Fassung, die nicht neu gemacht wurden (Teams 2560/1710, Spieltag 2560/1710, Medaillen 1710), sind entfernt, damit kein Bild den alten Stand zeigt.

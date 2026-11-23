@@ -87,10 +87,10 @@ function Por({ s }: { s: LeadersSpieler }) {
   return s.portraitSrc ? <img className="po" src={s.portraitSrc} alt="" loading="lazy" /> : <span className="po">{s.initials}</span>;
 }
 type Sort = { k: string; d: 1 | -1 };
-function Kopf({ k, so, onSo, cls, tip, children }: { k: string; so: Sort; onSo: (k: string) => void; cls?: string; tip?: string; children: ReactNode }) {
+function Kopf({ k, so, onSo, cls, tip, kc, children }: { k: string; so: Sort; onSo: (k: string) => void; cls?: string; tip?: string; kc?: string; children: ReactNode }) {
   const an = so.k === k;
   return (
-    <button type="button" className={`${cls ?? ""}${an ? " so" : ""}`} data-tip={tip} onClick={() => onSo(k)}>
+    <button type="button" className={`${cls ?? ""}${an ? " so" : ""}`} style={kc ? ({ "--kc": kc } as CSSProperties) : undefined} data-tip={tip} onClick={() => onSo(k)}>
       {children}
       <span className="pf">{an && so.d > 0 ? "▲" : "▼"}</span>
     </button>
@@ -175,18 +175,23 @@ export default function LeadersModern(props: LeadersModernProps) {
       className="ld-hero"
       wappen={eigenesTeam?.logoSrc ?? null}
       wappenAlt={eigenesTeam?.name ?? ""}
-      titel="Leaders"
+      dachzeile={
+        <>
+          Leaders · {zeitName} · {ligaName}
+        </>
+      }
+      titel={eigenesTeam?.name ?? "Leaders"}
       kulisseUrl={kulisse}
       untertitel={
         <>
-          <b>{zeitName}</b> · {ligaName} · nach Spieltag {m.gebuchteSpieltage} von {m.spieltageGesamt}
+          nach Spieltag <b>{m.gebuchteSpieltage}</b> von {m.spieltageGesamt}
         </>
       }
       mitte={
         <>
           <BcReiter aktiv={sicht === "spieler"} onClick={() => setSicht("spieler")} eyebrow="PP-Bestenliste" titel="Spieler" symbol={<BcIcon name="team" />} wert={topSp ? z1(topSp.pp) : "–"} wertNote={topSp?.spieler.name ?? ""} />
-          <BcReiter aktiv={sicht === "teams"} onClick={() => setSicht("teams")} eyebrow="Punkte und Team-PP" titel="Teams" symbol={<BcIcon name="team" />} wert={fuehrer ? fuehrer.punkte : "–"} wertNote={fuehrer ? `${fuehrer.team.kuerzel} führt${eigeneLiga ? ` Liga ${eigeneLiga}` : ""}` : ""} />
-          <BcReiter aktiv={sicht === "medaillen"} onClick={() => { setSicht("medaillen"); setZeit(0); }} eyebrow="Gold · Silber · Bronze" titel="Medaillen" symbol={<BcIcon name="krone" />} wert={eigMed ? eigMed.gold + eigMed.silber + eigMed.bronze : "–"} wertNote={eigMed && eigenesTeam ? `${eigMed.gold} Gold für ${eigenesTeam.kuerzel}` : ""} />
+          <BcReiter aktiv={sicht === "teams"} onClick={() => setSicht("teams")} eyebrow="Punkte · PP" titel="Teams" symbol={<BcIcon name="team" />} wert={fuehrer ? fuehrer.punkte : "–"} wertNote={fuehrer ? `${fuehrer.team.kuerzel} führt${eigeneLiga ? ` Liga ${eigeneLiga}` : ""}` : ""} />
+          <BcReiter aktiv={sicht === "medaillen"} onClick={() => { setSicht("medaillen"); setZeit(0); }} eyebrow="Stand heute" titel="Medaillen" symbol={<BcIcon name="krone" />} wert={eigMed ? eigMed.gold + eigMed.silber + eigMed.bronze : "–"} wertNote={eigMed && eigenesTeam ? `${eigMed.gold} Gold für ${eigenesTeam.kuerzel}` : ""} />
         </>
       }
       rechts={
@@ -228,11 +233,16 @@ export default function LeadersModern(props: LeadersModernProps) {
       <div className="kk">
         <Dz id={id} name={d?.name ?? id} />
         <b>{d?.name ?? id}</b>
+        {bereichTag(id)}
         <small>{rechts}</small>
       </div>
     );
   };
   const kartenStil = (achse: LeadersAchse) => ({ "--kc": FARBE[achse] }) as CSSProperties;
+  const bereichTag = (id: string) => {
+    const a = m.disziplinen.find((x) => x.id === id)?.achse;
+    return a ? <i className="ld-ab">{LEADERS_ACHSEN_LABEL[a]}</i> : null;
+  };
 
   /* ---------------- Spieler ---------------- */
   const spielerLinks = () => {
@@ -257,7 +267,7 @@ export default function LeadersModern(props: LeadersModernProps) {
           <div className="ld-seg" role="group" aria-label="Bereich">
             <button type="button" aria-pressed={!ber} onClick={() => { setBer(null); setSoS({ k: "pp", d: -1 }); }}>Alle PP</button>
             {LEADERS_ACHSEN.map((a) => (
-              <button key={a} type="button" aria-pressed={ber === a} style={ber === a ? { background: FARBE[a], color: "#0b0d12" } : { color: FARBE[a] }} onClick={() => { setBer(a); setSoS({ k: "pp", d: -1 }); }}>{LEADERS_ACHSEN_LABEL[a]}</button>
+              <button key={a} type="button" className="ld-bb" aria-pressed={ber === a} style={{ "--kc": FARBE[a] } as CSSProperties} onClick={() => { setBer(a); setSoS({ k: "pp", d: -1 }); }}>{LEADERS_ACHSEN_LABEL[a]}</button>
             ))}
           </div>
         </div>
@@ -291,7 +301,7 @@ export default function LeadersModern(props: LeadersModernProps) {
             <Kopf k="e" so={soS} onSo={onSo} cls="r" tip="Einsätze">Eins.</Kopf>
             <Kopf k="ppe" so={soS} onSo={onSo} cls="r" tip="PP je Einsatz. Skala: der Tagesbeste einer Disziplin liegt um 5.">Ø</Kopf>
             {LEADERS_ACHSEN.map((a, i) => (
-              <Kopf key={a} k={`a${i}`} so={soS} onSo={onSo} cls="r"><span style={{ color: FARBE[a] }}>{LEADERS_ACHSEN_LABEL[a]}</span></Kopf>
+              <Kopf key={a} k={`a${i}`} so={soS} onSo={onSo} cls="r ld-ah" kc={FARBE[a]}><span>{LEADERS_ACHSEN_LABEL[a]}</span></Kopf>
             ))}
             <Kopf k="mvp" so={soS} onSo={onSo} cls="r" tip="Spieler des Spieltags (MVP-Kandidat der Wertung)">MVP</Kopf>
             <Kopf k="t10" so={soS} onSo={onSo} cls="r tipl" tip="So oft unter den zehn Besten einer Disziplin">Top 10</Kopf>
@@ -310,7 +320,7 @@ export default function LeadersModern(props: LeadersModernProps) {
                 <span className="r t leise">{z.einsaetze}</span>
                 <span className="r t">{z.einsaetze ? z1(z.pp / z.einsaetze) : "–"}</span>
                 {z.pa.map((p, i) => (
-                  <span key={i} className={`r t${p ? "" : " null"}`} style={ber === LEADERS_ACHSEN[i] ? { fontWeight: 700, color: FARBE[ber] } : undefined}>{p ? z1(p) : "–"}</span>
+                  <span key={i} className={`r t ld-aw${p ? "" : " null"}`} style={{ "--kc": FARBE[LEADERS_ACHSEN[i]!], ...(ber === LEADERS_ACHSEN[i] ? { fontWeight: 700 } : {}) } as CSSProperties}>{p ? z1(p) : "–"}</span>
                 ))}
                 <span className={`r t${z.mvp ? " gold" : " null"}`}><b>{z.mvp || "–"}</b></span>
                 <span className={`r t${z.top10 ? "" : " null"}`}>{z.top10 || "–"}</span>
@@ -439,7 +449,7 @@ export default function LeadersModern(props: LeadersModernProps) {
             <Kopf k="best" so={soT} onSo={onSo}>Bester Spieler</Kopf>
             <Kopf k="med" so={soT} onSo={onSo} cls="r" tip="Stand heute, vergeben am Saisonende">Medaillen</Kopf>
             {LEADERS_ACHSEN.map((a, i) => (
-              <Kopf key={a} k={`a${i}`} so={soT} onSo={onSo} cls={`r${i > 1 ? " tipl" : ""}`} tip={`Tabellenpunkte in ${LEADERS_ACHSEN_LABEL[a]}`}><span style={{ color: FARBE[a] }}>{LEADERS_ACHSEN_LABEL[a]}</span></Kopf>
+              <Kopf key={a} k={`a${i}`} so={soT} onSo={onSo} cls={`r ld-ah${i > 1 ? " tipl" : ""}`} kc={FARBE[a]} tip={`Tabellenpunkte in ${LEADERS_ACHSEN_LABEL[a]}`}><span>{LEADERS_ACHSEN_LABEL[a]}</span></Kopf>
             ))}
           </div>
           {liste.map((z) => (
@@ -453,7 +463,7 @@ export default function LeadersModern(props: LeadersModernProps) {
               <span className="r t">{z1(z.ppJeEinsatz)}</span>
               <span className="ld-sz">{z.best ? <><Por s={z.best.spieler} /><b>{z.best.spieler.name}</b><span className="t leise" style={{ marginLeft: "auto" }}>{z1(z.best.pp)}</span></> : "–"}</span>
               {medZ(z.team.teamId)}
-              {z.pa.map((p, i) => <span key={i} className={`r t${p ? "" : " null"}`}>{p}</span>)}
+              {z.pa.map((p, i) => <span key={i} className={`r t ld-aw${p ? "" : " null"}`} style={{ "--kc": FARBE[LEADERS_ACHSEN[i]!] } as CSSProperties}>{p}</span>)}
             </div>
           ))}
         </div>
