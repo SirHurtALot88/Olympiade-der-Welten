@@ -106,11 +106,19 @@ export const ENTWICKLUNGS_TEMPO_NEU2 = 3.5;
 
 export const ENTWICKLUNGS_PARAMETER_NEU2: EntwicklungsParameter = {
   ...ENTWICKLUNGS_PARAMETER_STANDARD,
-  trainingsSkala: ENTWICKLUNGS_PARAMETER_STANDARD.trainingsSkala * ENTWICKLUNGS_TEMPO_NEU2,
+  // Training wiegt staerker als im reinen Tempo (x1,25): Training soll sich spuerbar auswirken (Chris, 23.11.); das Verhaeltnis 60 / 40 der Gewichte bleibt.
+  trainingsSkala: ENTWICKLUNGS_PARAMETER_STANDARD.trainingsSkala * ENTWICKLUNGS_TEMPO_NEU2 * 1.25,
   leistungsSkala: ENTWICKLUNGS_PARAMETER_STANDARD.leistungsSkala * ENTWICKLUNGS_TEMPO_NEU2,
   abbauSkala: ENTWICKLUNGS_PARAMETER_STANDARD.abbauSkala * ENTWICKLUNGS_TEMPO_NEU2,
-  negativSaisonGrenze: ENTWICKLUNGS_PARAMETER_STANDARD.negativSaisonGrenze * ENTWICKLUNGS_TEMPO_NEU2,
+  // Teure Spieler geben weniger ab als im Stand 22.11. (Messung 23.11.: sonst bilden sie den halben negativen Rand allein durch den Abbau).
+  abbauMarktwertSkala: 1.0,
   schwungSumme: ENTWICKLUNGS_PARAMETER_STANDARD.schwungSumme * ENTWICKLUNGS_TEMPO_NEU2,
+  // Schwung: die positiven Raender kuerzer (sonst zieht ein einzelner Ausreisser die Mitte der Liga ab), der negative Rand tiefer (Ueberlastete,
+  // Verletzte, Schwache sollen spuerbar absacken: Chris 23.11. ca. 10 % deutlich schlechter).
+  schwungStaerke: 2.6,
+  schwungMax: 2,
+  schwungMaxNegativ: 0.9,
+  negativSaisonGrenze: 40,
 };
 
 let parameterCache: EntwicklungsParameter | null = null;

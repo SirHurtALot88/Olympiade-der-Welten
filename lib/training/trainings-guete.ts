@@ -44,7 +44,7 @@ export const GUETE_PARAMETER_STANDARD: GueteParameter = {
   belastungLimit: -0.3,
   belastungHartFaktor: 1.5,
   belastungAbbauAnteil: 0.6,
-  entfaltung: 0.3,
+  entfaltung: 0.4,
   guteMin: 0.35,
   guteMax: 1.9,
   ausgleich: 1,
