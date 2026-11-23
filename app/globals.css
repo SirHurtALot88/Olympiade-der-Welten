@@ -11315,135 +11315,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   color: var(--heat-danger-text);
 }
 
-.ranks-table {
-  min-width: 1240px;
-  width: max-content;
-  table-layout: fixed;
-}
-
-.ranks-leader-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.ranks-leader-card {
-  display: grid;
-  gap: 5px;
-  min-height: 92px;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.055);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.ranks-leader-card span {
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 0.72rem;
-  font-weight: 950;
-  text-transform: uppercase;
-}
-
-.ranks-leader-card strong {
-  min-width: 0;
-  overflow: hidden;
-  color: #f4f7ff;
-  font-size: 1.02rem;
-  line-height: 1.08;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ranks-leader-card small {
-  color: rgba(255, 255, 255, 0.66);
-  font-weight: 850;
-}
-
-.ranks-leader-card.is-total {
-  border-color: rgba(210, 222, 242, 0.28);
-  background: linear-gradient(135deg, rgba(91, 111, 145, 0.22), rgba(255, 255, 255, 0.04));
-}
-
-.ranks-leader-card.is-pow {
-  border-color: rgba(224, 96, 91, 0.38);
-  background: linear-gradient(135deg, rgba(181, 75, 70, 0.25), rgba(255, 255, 255, 0.04));
-}
-
-.ranks-leader-card.is-spe {
-  border-color: rgba(120, 205, 139, 0.34);
-  background: linear-gradient(135deg, rgba(92, 148, 76, 0.25), rgba(255, 255, 255, 0.04));
-}
-
-.ranks-leader-card.is-men {
-  border-color: rgba(118, 161, 235, 0.36);
-  background: linear-gradient(135deg, rgba(76, 119, 197, 0.26), rgba(255, 255, 255, 0.04));
-}
-
-.ranks-leader-card.is-soc {
-  border-color: rgba(225, 178, 82, 0.38);
-  background: linear-gradient(135deg, rgba(225, 164, 47, 0.24), rgba(255, 255, 255, 0.04));
-}
-
-.ranks-panel-header {
-  align-items: flex-start;
-  gap: 16px;
-}
-
-.ranks-panel-heading {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-
-.ranks-season-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-}
-
-/* Live-Draft-Fortschritt beim „KI-Teams picken": zeigt X/Y Teams + Mini-Balken,
-   damit man den Draft oben mitverfolgen kann (Fortschritt zählt team-granular hoch). */
-.ranks-draft-progress {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ranks-draft-progress-count {
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.ranks-draft-progress-bar {
-  position: relative;
-  display: inline-block;
-  width: 96px;
-  height: 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--nl-accent) 22%, transparent);
-  overflow: hidden;
-}
-
-.ranks-draft-progress-bar > span {
-  position: absolute;
-  inset: 0 auto 0 0;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--nl-accent);
-  transition: width 0.3s ease;
-}
-
-.ranks-season-select {
-  min-width: 180px;
-}
-
-.ranks-season-source {
-  font-size: 12px;
-}
-
 .ranks-rank-cell {
   display: inline-flex;
   align-items: baseline;
@@ -11470,15 +11341,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .ranks-rank-delta.is-declined {
   color: #f87171;
-}
-
-.ranks-table tbody td.ranks-metric-cell .ranks-rank-delta.is-improved {
-  color: #bbf7d0;
-}
-
-.ranks-table tbody td.ranks-metric-cell .ranks-rank-delta.is-declined {
-  /* W1-Befund 4: #fecaca lag auf grünen Heat-Zellen unter 4,5:1 (10px!). */
-  color: #fee2e2;
 }
 
 .league-leaders-panel {
@@ -11644,169 +11506,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   background: linear-gradient(135deg, rgba(58, 148, 126, 0.24), rgba(255, 255, 255, 0.04));
 }
 
-.ranks-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  padding: 8px 6px;
-  font-size: 0.72rem;
-  letter-spacing: 0.015em;
-  white-space: nowrap;
-}
-
-.ranks-table .ranks-sticky-team {
-  position: sticky;
-  left: 0;
-  z-index: 4;
-  min-width: 150px;
-  max-width: 210px;
-  background: rgba(43, 43, 43, 0.995);
-  box-shadow: 1px 0 0 rgba(255, 255, 255, 0.08), 10px 0 14px rgba(0, 0, 0, 0.18);
-}
-
-.ranks-table thead .ranks-sticky-team {
-  z-index: 6;
-}
-
-.ranks-table .ranks-head-metric {
-  background: rgba(49, 56, 66, 0.98) !important;
-}
-
-.ranks-table .ranks-head-metric-total {
-  background: linear-gradient(180deg, rgba(77, 87, 102, 0.98), rgba(45, 52, 64, 0.98)) !important;
-}
-
-/* W1-Befund 3 (Farbkollision): Die Achsenfarbe lebt NUR noch im Gruppenband
-   über den Spalten (.ranks-group-row) — die Aggregat-Köpfe POW/SPE/MEN/SOC
-   sind neutral, damit „rot im Kopf" nie mehr mit „rot = schlechter Rang" in
-   den Zellen konkurriert. */
-.ranks-table .ranks-head-metric-pow,
-.ranks-table .ranks-head-metric-spe,
-.ranks-table .ranks-head-metric-men,
-.ranks-table .ranks-head-metric-soc {
-  background: rgba(49, 56, 66, 0.98) !important;
-}
-
-.ranks-table .ranks-summary-block-start {
-  border-left: 2px solid rgba(230, 239, 255, 0.32);
-}
-
-.ranks-table .ranks-summary-block-end {
-  border-right: 2px solid rgba(230, 239, 255, 0.38);
-}
-
-.ranks-table tbody td.ranks-metric-cell {
-  box-shadow:
-    inset 1px 0 0 rgba(255, 255, 255, 0.08),
-    inset -1px 0 0 rgba(255, 255, 255, 0.055);
-}
-
-.ranks-table tbody td.ranks-metric-cell-total.rank-muted {
-  background: rgba(64, 72, 86, 0.72) !important;
-}
-
-/* W1-Befund 3: keine Achsen-Tönung mehr in den Zellen — Zellenfarbe heißt
-   ausschließlich „Rang". Die Aggregat-rank-muted-Zellen erben das neutrale
-   .rank-muted; nur die TOT-Spalte behält ihren (neutralen) Summenton oben. */
-
-.ranks-table .ranks-head-discipline {
-  text-align: center;
-  border-left: 1px solid rgba(255, 255, 255, 0.16);
-  border-right: 1px solid rgba(0, 0, 0, 0.14);
-}
-
-.ranks-table .ranks-discipline-group-start {
-  border-left-color: rgba(232, 238, 248, 0.32) !important;
-  border-left-width: 2px !important;
-  border-left-style: solid !important;
-}
-
-/* W1-Befund 3: Disziplin-Köpfe neutral — die Achse steht im Gruppenband. */
-.ranks-table .ranks-head-discipline-power,
-.ranks-table .ranks-head-discipline-speed,
-.ranks-table .ranks-head-discipline-mental,
-.ranks-table .ranks-head-discipline-social {
-  background: rgba(38, 44, 54, 0.98) !important;
-}
-
-.ranks-table tbody td {
-  height: 34px;
-  padding: 5px 4px;
-  text-align: center;
-  font-size: 0.82rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.ranks-table .resizable-header-cell {
-  justify-content: center;
-}
-
-.ranks-table .sortable-header {
-  justify-content: center;
-  gap: 4px;
-  overflow: hidden;
-  text-align: center;
-}
-
-.ranks-table .sortable-help-dot {
-  display: none;
-}
-
-.ranks-table .sortable-arrow {
-  flex: 0 0 auto;
-  margin-left: 1px;
-  font-size: 0.72em;
-}
-
-.ranks-table .column-resizer {
-  width: 5px;
-  margin-right: -3px;
-}
-
-.ranks-table .column-resizer::after {
-  inset: 7px 2px;
-}
-
-.ranks-table tbody td.ranks-discipline-cell {
-  box-shadow:
-    inset 1px 0 0 rgba(255, 255, 255, 0.08),
-    inset -1px 0 0 rgba(0, 0, 0, 0.12);
-}
-
-.ranks-table tbody td.ranks-discipline-cell-power {
-  border-left: 1px solid rgba(232, 238, 248, 0.08);
-  border-right: 1px solid rgba(0, 0, 0, 0.14);
-}
-
-.ranks-table tbody td.ranks-discipline-cell-speed {
-  border-left: 1px solid rgba(232, 238, 248, 0.08);
-  border-right: 1px solid rgba(0, 0, 0, 0.14);
-}
-
-.ranks-table tbody td.ranks-discipline-cell-mental {
-  border-left: 1px solid rgba(232, 238, 248, 0.08);
-  border-right: 1px solid rgba(0, 0, 0, 0.14);
-}
-
-.ranks-table tbody td.ranks-discipline-cell-social {
-  border-left: 1px solid rgba(232, 238, 248, 0.08);
-  border-right: 1px solid rgba(0, 0, 0, 0.14);
-}
-
-/* W1-Befund 3: die Achsen-Tönungen der rank-muted-Disziplinzellen sind
-   entfallen — dort erbt jetzt das neutrale .rank-muted (Zellenfarbe = Rang,
-   sonst nichts). */
-
-.ranks-table tbody .ranks-sticky-team {
-  text-align: left;
-  overflow: hidden;
-  padding-left: 10px;
-  padding-right: 8px;
-  font-size: 0.82rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* --- Ranks-Matrix Modernisierung (Chrome only — Heat-Farbformatierung der
    Rang-Zellen bleibt unangetastet: getRankHeatClass/.rank-* werden NICHT
    überschrieben). Ziel: modernerer Rahmen + sichtbare Klickbarkeit der
@@ -11817,65 +11516,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   box-shadow: 0 18px 42px -30px rgba(0, 0, 0, 0.7);
   overflow-x: auto;
   overflow-y: hidden;
-}
-
-/* Kopfzeile: ruhigere, dichtere Typo für die Sticky-Kopfzeile. */
-.ranks-table thead th {
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-/* Team-Zeilen sind anklickbar → Teamprofil. Cursor + Hover-Feedback machen
-   das sichtbar, ohne die farbcodierten Rang-Zellen umzufärben. */
-.ranks-table tbody tr.ranks-row-clickable {
-  cursor: pointer;
-  transition: box-shadow 0.14s ease;
-}
-
-.ranks-table tbody tr.ranks-row-clickable:hover td {
-  box-shadow: inset 0 1px 0 rgba(120, 170, 255, 0.28), inset 0 -1px 0 rgba(120, 170, 255, 0.28);
-}
-
-.ranks-table tbody tr.ranks-row-clickable:hover .ranks-sticky-team {
-  background: color-mix(in srgb, var(--nl-accent, #5aa0ff) 20%, rgba(43, 43, 43, 0.995)) !important;
-  box-shadow: inset 3px 0 0 var(--nl-accent, #5aa0ff), 1px 0 0 rgba(255, 255, 255, 0.08),
-    10px 0 14px rgba(0, 0, 0, 0.18);
-}
-
-.ranks-table tbody tr.ranks-row-clickable:focus-visible {
-  outline: 2px solid var(--nl-accent, #5aa0ff);
-  outline-offset: -2px;
-}
-
-/* Klickbarkeit wird — wie auf den anderen Seiten — allein über Hover kenntlich
-   gemacht (cursor:pointer, Akzent-Rand + aufgehellte Team-Spalte oben), kein
-   dauerhaftes „Profil"-Label. Der Team-Name bekommt bei Hover Akzentfarbe. */
-.ranks-table tbody tr.ranks-row-clickable:hover .ranks-sticky-team {
-  /* F1-Regel: Teamfarbe als TEXT immer über --nl-accent-text (lesbar angehoben). */
-  color: var(--nl-accent-text, #7fb0ff);
-  font-weight: 700;
-}
-
-/* ---------------------------------------------------------------------------
-   Rivalen-Hervorhebung (additiv): Die Rivalen des aktiven Teams bekommen in den
-   Ranglisten (Ranks-Matrix + Saisonstand) einen roten Kantenakzent + einen
-   "⚔ Rivale"-Chip. Bewusst REIN ADDITIV — die Heat-Farbformatierung der
-   Ranks-Matrix (getRankHeatClass/.rank-*) und das Farbschema des Saisonstands
-   bleiben unangetastet; es kommt nur eine Kante/ein Ring + der Chip hinzu.
-   --------------------------------------------------------------------------- */
-
-/* Ranks-Matrix: roter Kantenakzent an der Sticky-Team-Spalte — verändert KEINE
-   Zell-Hintergründe (nur eine box-shadow-Kante). */
-.is-new-look .ranks-table tbody tr.is-rival .ranks-sticky-team {
-  box-shadow: inset 3px 0 0 var(--nl-risk);
-}
-
-/* Team-Name + Chip nebeneinander in der Sticky-Team-Zelle. */
-.is-new-look .ranks-team-name-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
 }
 
 /* Wiederverwendbarer "⚔ Rivale"-Chip (Ranks + Saisonstand + später Disziplin-Szenen). */
@@ -18749,7 +18389,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 .foundation-home-owner-card,
 .foundation-home-player-card,
 .teams-spotlight-card,
-.ranks-leader-card,
 .transfer-decision-card,
 .transfer-market-empty-card,
 .transfer-wishlist-card,
@@ -18784,7 +18423,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 .foundation-home-card:hover,
 .foundation-home-owner-card:hover,
 .foundation-home-player-card:hover,
-.ranks-leader-card:hover,
 .transfer-decision-card:hover,
 .transfer-wishlist-card:hover,
 .transfer-ai-candidate-card:hover,
@@ -19439,8 +19077,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   .foundation-home-play-card:hover,
   .transfer-wishlist-card:hover,
   .transfer-decision-card:hover,
-  .teams-spotlight-card:hover,
-  .ranks-leader-card:hover {
+  .teams-spotlight-card:hover{
     transform: none !important;
   }
 }
@@ -22861,7 +22498,6 @@ button.selected-roster-pps-axis-sortable:focus-visible {
   .foundation-shell .foundation-home-today-strip,
   .foundation-shell .foundation-home-owner-grid,
   .foundation-shell .teams-spotlight-grid,
-  .foundation-shell .ranks-leader-grid,
   .foundation-shell .transfer-decision-board {
     grid-template-columns: minmax(0, 1fr);
     width: 100%;
@@ -22985,8 +22621,7 @@ button.selected-roster-pps-axis-sortable:focus-visible {
 
 .foundation-shell .metric-card,
 .foundation-shell .transfer-decision-card,
-.foundation-shell .teams-spotlight-card,
-.foundation-shell .ranks-leader-card {
+.foundation-shell .teams-spotlight-card{
   overflow-wrap: anywhere;
 }
 
@@ -44111,12 +43746,6 @@ button.foundation-team-portrait-card {
   color: var(--nl-ink);
 }
 
-.is-new-look .nl-ranks-hint {
-  margin: 0 0 var(--nl-s3);
-  font-size: 12px;
-  color: var(--nl-mut);
-}
-
 /* Leaderboard-Balkendiagramm für die aktive Metrik (Gesamt/POW/SPE/MEN/SOC),
    demselben Grammatik-Muster wie der Prize-Forecast folgend. */
 .is-new-look .nl-ranks-metric-chart-scroll {
@@ -44129,11 +43758,6 @@ button.foundation-team-portrait-card {
   width: 100%;
   min-width: 480px;
   height: auto;
-}
-
-/* Liga-Überblick (Ø / Spannweite / eigenes Team / Abstand zu #1) über dem Board. */
-.is-new-look .nl-ranks-statrow {
-  margin: 0 0 var(--nl-s3);
 }
 
 .is-new-look .nl-ranks-filterbar {
@@ -44169,206 +43793,20 @@ button.foundation-team-portrait-card {
   box-shadow: inset 0 0 0 1px var(--nl-tone, var(--nl-accent));
 }
 
-.is-new-look .nl-ranks-board {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s2);
-}
-
-.is-new-look .nl-ranks-row {
-  display: grid;
-  grid-template-columns: 44px minmax(180px, 1.2fr) minmax(220px, 1.4fr) auto;
-  align-items: center;
-  gap: var(--nl-s3);
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--nl-line);
-  border-left: 3px solid var(--team-tag-border, var(--nl-line-2));
-  border-radius: var(--nl-r-md);
-  background: var(--nl-panel);
-  color: var(--nl-ink);
-  box-shadow: var(--nl-e1);
-  text-align: left;
-  cursor: pointer;
-  transition: background-color var(--nl-t-fast) var(--nl-ease);
-}
-
 /* Laptop/1024: engere Spaltenminima, damit die Ranking-Zeile in die
    Content-Spalte passt statt die Seite seitlich zu schieben. Summaryrow teilt
    dasselbe Raster; die Scroll-Container werden auf die Elternbreite geklemmt,
    damit ihr overflow-x tatsächlich greift (Flex-Column-Cross-Axis). */
 @media (max-width: 1080px) {
-  .is-new-look .nl-ranks-row,
-  .is-new-look .nl-ranks-summaryrow {
-    grid-template-columns: 44px minmax(104px, 1.2fr) minmax(150px, 1.4fr) auto;
-    gap: var(--nl-s2);
-  }
 }
 
-.is-new-look .nl-ranks-board-scroll,
+
 .is-new-look .nl-ranks-metric-chart-scroll {
   min-width: 0;
   max-width: 100%;
 }
 
-.is-new-look .nl-ranks-row:hover,
-.is-new-look .nl-ranks-row:focus-visible {
-  background: var(--nl-panel-2);
-}
-
-.is-new-look .nl-ranks-row:focus-visible {
-  outline: 2px solid var(--nl-accent);
-  outline-offset: -2px;
-}
-
-.is-new-look .nl-ranks-row.is-podium {
-  background: linear-gradient(180deg, var(--nl-panel) 0%, var(--nl-panel-2) 100%);
-}
-
-/* Eigenes Team (team.humanControlled) im Board hervorheben. */
-.is-new-look .nl-ranks-row.is-own-team {
-  border-color: color-mix(in srgb, var(--nl-accent) 45%, var(--nl-line));
-  background: color-mix(in srgb, var(--nl-accent) 7%, var(--nl-panel));
-}
-
-.is-new-look .nl-ranks-row.is-own-team:hover,
-.is-new-look .nl-ranks-row.is-own-team:focus-visible {
-  background: color-mix(in srgb, var(--nl-accent) 12%, var(--nl-panel));
-}
-
-.is-new-look .nl-ranks-own-tag {
-  margin-left: var(--nl-s2);
-  padding: 1px 6px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
-  background: color-mix(in srgb, var(--nl-accent) 14%, transparent);
-  /* F1-Regel (Q1, gemessen 3,18:1): Teamfarbe als Text → --nl-accent-text. */
-  color: var(--nl-accent-text);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.is-new-look .nl-ranks-rank {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.is-new-look .nl-ranks-ranknum {
-  min-width: 26px;
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--nl-mut);
-  text-align: center;
-}
-
-.is-new-look .nl-ranks-team {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--nl-s2);
-  min-width: 0;
-}
-
-.is-new-look .nl-ranks-crest {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--nl-panel-2);
-  border: 1px solid var(--nl-line);
-}
-
-.is-new-look .nl-ranks-crest-fallback {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--nl-mut);
-}
-
-.is-new-look .nl-ranks-team-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.is-new-look .nl-ranks-teamname {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.is-new-look .nl-ranks-teamcode {
-  font-size: 11px;
-  color: var(--nl-mut);
-  letter-spacing: 0.06em;
-}
-
-.is-new-look .nl-ranks-value {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.is-new-look .nl-ranks-value-number {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.is-new-look .nl-ranks-formbonus {
-  /* Formkarten-SCORE-Summe (andere Skala als die PPs daneben) — bewusst gedämpft
-     statt grün: das ist eine Einordnung, kein PP-Bonus (und kann negativ sein;
-     vorher stand auch „−120,9" in Bonus-Grün). */
-  margin-left: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--nl-mut);
-}
-
-.is-new-look .nl-ranks-value-bar .nl-progress-track {
-  height: 6px;
-}
-
-.is-new-look .nl-ranks-areas {
-  display: inline-flex;
-  gap: var(--nl-s1, 4px);
-  justify-self: end;
-}
-
-.is-new-look .nl-ranks-area-chip {
-  min-width: 52px;
-}
-
-.is-new-look .nl-ranks-area-chip.is-active {
-  box-shadow: inset 0 0 0 1px var(--nl-tone, var(--nl-accent));
-}
-
-.is-new-look .nl-ranks-empty {
-  margin: var(--nl-s3) 0 0;
-  font-size: 13px;
-  color: var(--nl-mut);
-}
-
 @media (max-width: 900px) {
-  .is-new-look .nl-ranks-row {
-    grid-template-columns: 40px minmax(0, 1fr) auto;
-  }
-
-  .is-new-look .nl-ranks-areas {
-    grid-column: 1 / -1;
-    justify-self: start;
-  }
 }
 
 /* ============================================================
@@ -45642,7 +45080,7 @@ button.foundation-team-portrait-card {
 
 /* --- Reduced Motion (nl-ranks / nl-leaders / nl-prize) ------------- */
 @media (prefers-reduced-motion: reduce) {
-  .is-new-look .nl-ranks-row,
+  
   .is-new-look .nl-ranks-filter,
   .is-new-look .nl-leaders-hero,
   .is-new-look .nl-leaders-row,
@@ -55950,78 +55388,7 @@ button.foundation-team-portrait-card {
   }
 }
 
-/* --- #10 / #40 Ranks: Expand + klickbare Bereichs-Chips ----------- */
-.is-new-look .nl-ranks-row {
-  grid-template-columns: 44px minmax(160px, 1.1fr) minmax(180px, 1.2fr) auto 22px;
-  cursor: default;
-}
-
-.is-new-look .nl-ranks-row .nl-ranks-team {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-  padding: 0;
-  border-radius: var(--nl-r-sm);
-}
-
-.is-new-look .nl-ranks-row .nl-ranks-team:hover .nl-ranks-teamname,
-.is-new-look .nl-ranks-row .nl-ranks-team:focus-visible .nl-ranks-teamname {
-  text-decoration: underline;
-}
-
-.is-new-look .nl-ranks-expand-toggle {
-  justify-self: end;
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--nl-line-2);
-  border-radius: var(--nl-r-sm);
-  background: var(--nl-panel-2);
-  color: var(--nl-mut);
-  font-size: 11px;
-  cursor: pointer;
-  transition: color var(--nl-t-fast) var(--nl-ease), border-color var(--nl-t-fast) var(--nl-ease);
-}
-
-.is-new-look .nl-ranks-expand-toggle:hover,
-.is-new-look .nl-ranks-expand-toggle:focus-visible {
-  color: var(--nl-accent);
-  border-color: var(--nl-accent);
-}
-
-.is-new-look .nl-ranks-expand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--nl-s2);
-  margin-top: var(--nl-s1, 4px);
-  padding: var(--nl-s3);
-  border: 1px solid var(--nl-line);
-  border-radius: var(--nl-r-md);
-  background: var(--nl-panel-2);
-}
-
-.is-new-look .nl-ranks-expand-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-}
-
-.is-new-look .nl-ranks-radar {
-  width: 100%;
-  max-width: 220px;
-}
-
 @media (max-width: 900px) {
-  .is-new-look .nl-ranks-row {
-    grid-template-columns: 40px minmax(0, 1fr) auto 22px;
-  }
 }
 
 /* --- #56 Preisgeld-Verteilung: anklickbare Balken ----------------- */
@@ -56101,7 +55468,6 @@ button.foundation-team-portrait-card {
   .is-new-look .nl-standings-podium-btn,
   .is-new-look .nl-standings-player,
   .is-new-look .nl-standings-sortchip,
-  .is-new-look .nl-ranks-expand-toggle,
   .is-new-look .nl-prize-dist-fill {
     transition: none;
   }
@@ -70376,98 +69742,6 @@ span.nl-facility-ampel-chip {
   color: var(--nl-mut);
 }
 
-/* Wave C — Ranks+Diszis+Result */
-
-/* ============================================================
-   RANKS — Neuer-Look-Board Politur (nl-ranks-*)
-   Nur aktiv unter `.is-new-look` (Flag an). Additiv zu den in
-   app/globals.css bestehenden Regeln; nichts wird überschrieben.
-   ============================================================ */
-
-/* #3 — Horizontaler Scroll-Container mit Scroll-Schatten, damit auf schmalen
-   Breiten nichts am rechten Rand abgeschnitten wird und die Seite selbst nie
-   horizontal scrollt. Auf normalen Breiten erscheint keine Scrollleiste. */
-.is-new-look .nl-ranks-board-scroll {
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  /* Scroll-Schatten links/rechts (Chris Coyier / Lea Verou Muster). */
-  background:
-    linear-gradient(to right, var(--nl-panel) 30%, transparent) left center,
-    linear-gradient(to left, var(--nl-panel) 30%, transparent) right center,
-    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.14), transparent) left center,
-    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.14), transparent) right center;
-  background-repeat: no-repeat;
-  background-size: 28px 100%, 28px 100%, 12px 100%, 12px 100%;
-  background-attachment: local, local, scroll, scroll;
-}
-
-/* Erste Spalte (Rang + Team) beim horizontalen Scrollen sichtbar halten. */
-.is-new-look .nl-ranks-board-scroll .nl-ranks-rank {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-}
-
-/* #1 — Rang-Bewegungs-Platzhalter unter der Rangzahl. Bewusst zurückhaltend:
-   kein erfundener Trend, nur ein sauberes "—" mit Tooltip. */
-.is-new-look .nl-ranks-rank {
-  flex-direction: column;
-  gap: 2px;
-}
-
-.is-new-look .nl-ranks-trend {
-  font-size: 10px;
-  line-height: 1;
-  font-weight: 700;
-  color: var(--nl-mut);
-}
-
-.is-new-look .nl-ranks-trend.is-empty {
-  opacity: 0.55;
-  cursor: help;
-}
-
-/* #2 — Liga-Ø/Median-Zusammenfassungszeile am Fuß des Boards. */
-.is-new-look .nl-ranks-summaryrow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--nl-s3);
-  margin-top: var(--nl-s2);
-  padding: 8px 12px;
-  border: 1px dashed var(--nl-line-2);
-  border-radius: var(--nl-r-md);
-  background: color-mix(in srgb, var(--nl-tone, var(--nl-accent)) 5%, var(--nl-panel-2));
-  color: var(--nl-ink);
-}
-
-.is-new-look .nl-ranks-summaryrow-label {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--nl-tone, var(--nl-accent));
-}
-
-.is-new-look .nl-ranks-summaryrow-stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-}
-
-.is-new-look .nl-ranks-summaryrow-stat small {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-}
-
-.is-new-look .nl-ranks-summaryrow-stat strong {
-  font-size: 14px;
-  font-weight: 700;
-}
-
 /* ============================================================
    DISZIS — Sprungmarke zum Saison-Matchday-Plan (#5)
    Gilt mit und ohne Flag (klassisches Panel-Layout).
@@ -76910,148 +76184,6 @@ span.nl-facility-ampel-chip {
   color: inherit;
 }
 
-/* ---- Farb-Legende über der Matrix ---- */
-.ranks-color-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 22px;
-  margin: 0 0 12px;
-  padding: 9px 14px;
-  border: 1px solid var(--nl-line, rgba(255, 255, 255, 0.1));
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 0.75rem;
-  color: var(--nl-mut, #93a3bd);
-}
-
-.ranks-color-legend b {
-  color: var(--nl-ink, #f2ede2);
-  font-weight: 700;
-}
-
-.ranks-color-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.ranks-color-legend-item.is-scrollhint {
-  margin-left: auto;
-}
-
-.ranks-heatstrip {
-  display: inline-flex;
-  height: 12px;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.ranks-heatstrip i {
-  display: block;
-  width: 20px;
-  height: 100%;
-}
-
-/* ---- Achsen-Gruppen-Schalter (ersetzen den px-Spalten-Manager) ---- */
-.ranks-axis-groups {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.ranks-axis-groups-label {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--nl-mut, #93a3bd);
-}
-
-.ranks-axis-group-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--nl-mut, #93a3bd);
-  font-size: 0.74rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.ranks-axis-group-toggle small {
-  font-size: 0.66rem;
-  font-weight: 600;
-  opacity: 0.8;
-}
-
-.ranks-axis-group-toggle .ranks-axis-group-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--ranks-axis-color, rgba(255, 255, 255, 0.4));
-}
-
-.ranks-axis-group-toggle.is-power {
-  --ranks-axis-color: var(--nl-pow, #ff6b6b);
-}
-
-.ranks-axis-group-toggle.is-speed {
-  --ranks-axis-color: var(--nl-spe, #57d08a);
-}
-
-.ranks-axis-group-toggle.is-mental {
-  --ranks-axis-color: var(--nl-men, #5b9bff);
-}
-
-.ranks-axis-group-toggle.is-social {
-  --ranks-axis-color: var(--nl-soc, #e6b455);
-}
-
-.ranks-axis-group-toggle.is-active {
-  border-color: color-mix(in srgb, var(--ranks-axis-color, #93a3bd) 60%, transparent);
-  background: color-mix(in srgb, var(--ranks-axis-color, #93a3bd) 14%, transparent);
-  color: var(--nl-ink, #f2ede2);
-}
-
-.ranks-axis-group-toggle:not(.is-active) .ranks-axis-group-dot {
-  opacity: 0.35;
-}
-
-.ranks-axis-groups-reset {
-  font-size: 0.72rem;
-}
-
-.ranks-league-filter {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.ranks-league-filter-toggle {
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: none;
-  background: transparent;
-  color: var(--nl-mut, #93a3bd);
-  font-size: 0.74rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.ranks-league-filter-toggle.is-active {
-  background: color-mix(in srgb, var(--nl-ink, #f2ede2) 16%, transparent);
-  color: var(--nl-ink, #f2ede2);
-}
-
 .ranks-league-badge {
   display: inline-flex;
   align-items: center;
@@ -77096,124 +76228,17 @@ span.nl-facility-ampel-chip {
   margin-left: 0;
 }
 
-/* ---- Gruppenband im Tabellenkopf: die EINZIGE Stelle mit Achsenfarbe ---- */
-.ranks-table thead .ranks-group-row .ranks-group-cell {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  height: 26px;
-  padding: 4px 8px;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  text-align: center;
-  white-space: nowrap;
-  background: rgba(24, 30, 40, 0.99);
-  color: var(--nl-mut, #93a3bd);
-  border-top: 2px solid transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.ranks-table thead .ranks-group-row .ranks-group-cell.ranks-sticky-team,
-.ranks-table thead .ranks-group-row .ranks-group-cell.is-team {
-  z-index: 6;
-  background: rgba(24, 30, 40, 0.99);
-}
-
-/* Gruppen-Text minimal aufgehellt (color-mix mit Weiß), damit auch POW/MEN auf
-   dem dunklen Bandgrund sicher über 4,5:1 liegen. */
-.ranks-table thead .ranks-group-row .ranks-group-cell.is-power {
-  color: color-mix(in srgb, var(--nl-pow, #ff6b6b) 80%, white);
-  border-top-color: var(--nl-pow, #ff6b6b);
-}
-
-.ranks-table thead .ranks-group-row .ranks-group-cell.is-speed {
-  color: color-mix(in srgb, var(--nl-spe, #57d08a) 88%, white);
-  border-top-color: var(--nl-spe, #57d08a);
-}
-
-.ranks-table thead .ranks-group-row .ranks-group-cell.is-mental {
-  color: color-mix(in srgb, var(--nl-men, #5b9bff) 80%, white);
-  border-top-color: var(--nl-men, #5b9bff);
-}
-
-.ranks-table thead .ranks-group-row .ranks-group-cell.is-social {
-  color: color-mix(in srgb, var(--nl-soc, #e6b455) 88%, white);
-  border-top-color: var(--nl-soc, #e6b455);
-}
-
-.ranks-table thead .ranks-group-row .ranks-group-cell.is-base {
-  border-top-color: rgba(255, 255, 255, 0.24);
-}
-
-/* Die eigentliche Kopfzeile rutscht beim Scrollen unter das Gruppenband. */
-.ranks-table thead tr:not(.ranks-group-row) th {
-  top: 26px;
-}
-
-/* ---- Scroll-Affordanz: rechte Kante deutet an, dass rechts mehr Spalten
-   liegen; die Team-Spalte bleibt sticky. ---- */
-.ranks-table-scrollwrap {
-  position: relative;
-}
-
-.ranks-table-scrollwrap::after {
-  content: "";
-  position: absolute;
-  top: 1px;
-  right: 1px;
-  bottom: 1px;
-  width: 22px;
-  pointer-events: none;
-  border-radius: 0 14px 14px 0;
-  background: linear-gradient(to left, rgba(0, 0, 0, 0.4), transparent);
-}
-
 #discipline-ranks .table-shell {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.35) rgba(255, 255, 255, 0.06);
 }
 
-/* ---- Eigene Zeile: Chip + gepinnte Kopie oben ---- */
-.ranks-own-tag {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--nl-accent, #5aa0ff) 55%, transparent);
-  background: color-mix(in srgb, var(--nl-accent, #5aa0ff) 14%, transparent);
-  /* Volle Tinte statt Akzent-Text: der Chip sitzt auf der akzent-getönten
-     eigenen Zeile — Akzent-Text zielt auf Panel-Grund und maß hier nur 3,55:1
-     (dasselbe Muster wie der Viewwidth-Umschalter in F1). Der Teamton sitzt
-     in Rahmen + Grund. */
-  color: var(--nl-ink, #f2ede2);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-/* ---- PP-Board am Saisonstart: Leerzustand + echtes Vorsaison-Podium ---- */
-.is-new-look .nl-ranks-pending {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
-  gap: var(--nl-s4, 20px);
-  align-items: start;
-}
-
 @media (max-width: 900px) {
-  .is-new-look .nl-ranks-pending {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Geteilt mit dem Leaders-Saisonstart (W2, `.nl-leaders-prev-podium`) — eine
    Rezeptur für beide Vorsaison-Podien, keine Kopie. */
-.is-new-look .nl-ranks-prev-podium,
+
 .is-new-look .nl-leaders-prev-podium {
   border: 1px solid var(--nl-line);
   border-radius: var(--nl-r-lg);
@@ -77223,7 +76248,7 @@ span.nl-facility-ampel-chip {
   gap: 10px;
 }
 
-.is-new-look .nl-ranks-prev-podium-eyebrow,
+
 .is-new-look .nl-leaders-prev-podium-eyebrow {
   font-size: 11px;
   font-weight: 800;
@@ -77232,7 +76257,7 @@ span.nl-facility-ampel-chip {
   color: var(--nl-accent-text);
 }
 
-.is-new-look .nl-ranks-prev-podium-list,
+
 .is-new-look .nl-leaders-prev-podium-list {
   list-style: none;
   margin: 0;
@@ -77241,7 +76266,7 @@ span.nl-facility-ampel-chip {
   gap: 6px;
 }
 
-.is-new-look .nl-ranks-prev-podium-row,
+
 .is-new-look .nl-leaders-prev-podium-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -77253,38 +76278,7 @@ span.nl-facility-ampel-chip {
   background: var(--nl-panel);
 }
 
-.is-new-look .nl-ranks-prev-podium-team {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  min-width: 0;
-  border: 0;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: left;
-  color: var(--nl-ink);
-  font: inherit;
-}
 
-.is-new-look .nl-ranks-prev-podium-team strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.is-new-look .nl-ranks-prev-podium-team:hover strong,
-.is-new-look .nl-ranks-prev-podium-team:focus-visible strong {
-  color: var(--nl-accent-text);
-  text-decoration: underline;
-}
-
-.is-new-look .nl-ranks-prev-podium-team small {
-  color: var(--nl-mut);
-  font-size: 11px;
-}
-
-.is-new-look .nl-ranks-prev-podium-value,
 .is-new-look .nl-leaders-prev-podium-value {
   color: var(--nl-mut);
   font-size: 12.5px;
