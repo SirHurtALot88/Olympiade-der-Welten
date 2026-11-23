@@ -311,7 +311,7 @@ export function ArtikelDetail({ row, imageSrc, onClose }: { row: SortimentRow; i
             label="Marktwert"
             value={m?.value != null ? eur(m.value) : m?.range ? `${formatEuroCents(m.range.min)}–${eur(m.range.max)}` : "—"}
             sub={m?.conditionFactor && m.conditionFactor < 1 ? `${m.condition} · ${Math.round(m.conditionFactor * 100)} % von NM` : "Cardmarket"}
-            info={`Durchschnitt aus Trend, Ø 1, 7 und 30 Tage, ab (zählt doppelt) und letztem EK.${m?.conditionFactor && m.conditionFactor < 1 ? ` Zustand ${m.condition}: ${Math.round(m.conditionFactor * 100)} % vom NM-Preis (EX 85, GD 70, LP 60, PL 45, Poor 30 %).` : ""}`}
+            info={`Durchschnitt aus Trend, Ø 1, 7 und 30 Tage, ab (zählt doppelt) und deinem Ø EK (zählt doppelt; ohne Ø EK der letzte EK einfach).${m?.conditionFactor && m.conditionFactor < 1 ? ` Zustand ${m.condition}: ${Math.round(m.conditionFactor * 100)} % vom NM-Preis (EX 85, GD 70, LP 60, PL 45, Poor 30 %).` : ""}`}
           />
           <Stat
             tone={m?.margin == null ? undefined : m.margin < 0 ? "crit" : m.margin < 0.25 ? "warn" : "good"}
