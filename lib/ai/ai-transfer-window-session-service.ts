@@ -509,7 +509,7 @@ async function runTeamCycle(input: {
     // (Umschichten nach Charakter, Ruecklage anzapfen, „Alles auf eine Karte“ — selten und begruendet), BEVOR sie plant.
     // Dieselben Funktionen und Grenzen wie beim Menschen; geschrieben wird in den Spielstand, damit die harte Sperre sie sieht.
     const vorstandMassnahmen = entscheideKiVorstandMassnahmen(save.gameState, input.teamId);
-    if (vorstandMassnahmen.massnahmen.length > 0) {
+    if (vorstandMassnahmen.gameState !== save.gameState) {
       const persistiert = input.persistence.saveSingleplayerState(input.saveId, vorstandMassnahmen.gameState);
       if (input.sessionRunContext) input.sessionRunContext.save = persistiert;
       save = persistiert;
