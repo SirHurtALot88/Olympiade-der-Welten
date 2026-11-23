@@ -161,7 +161,7 @@ export default function SpielerKurzprofil({ data, onClose, onOpenFull, aktionen,
           {reiter === "disziplinen" ? <ReiterDisziplinen data={data} modell={modell} onOpenFull={onOpenFull} /> : null}
           {reiter === "entwicklung" ? <ReiterEntwicklung data={data} modell={modell} entwicklung={entwicklung} eigener={eigener} onOpenFull={onOpenFull} /> : null}
           {reiter === "leistung" ? <ReiterLeistung data={data} modell={modell} onOpenFull={onOpenFull} /> : null}
-          {reiter === "vertrag" ? <ReiterVertrag data={data} onOpenFull={onOpenFull} /> : null}
+          {reiter === "vertrag" ? <ReiterVertrag data={data} modell={modell} onOpenFull={onOpenFull} /> : null}
           {reiter === "karriere" ? <ReiterKarriere data={data} onOpenFull={onOpenFull} /> : null}
         </div>
 

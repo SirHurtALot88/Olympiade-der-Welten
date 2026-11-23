@@ -11,6 +11,7 @@ import type { GameState } from "@/lib/data/olyDataTypes";
 import { fanProfilFuer, leistungsPerzentile, ligaStufeFuer, teamErfolgVorsaison } from "@/lib/marketing/marketing-kontext";
 import { berechneMarketing, type FanProfil } from "@/lib/marketing/marketing-modell";
 import { baueSichtWert } from "@/lib/market/transfermarkt-sicht";
+import { marketingAktiv } from "@/lib/marketing/marketing-regel";
 
 export type MarktMarketabilitySicht = {
   /** Untere und obere Grenze der Stufe (bei exakt gleich dem Wert). */
@@ -59,4 +60,25 @@ export function baueMarktMarketability(
   const von = sicht.von ?? 0;
   const bis = sicht.bis ?? 0;
   return { von, bis, exakt: sicht.exakt, stufe: scoutingStufe, text: sicht.text, schluessel: (von + bis) / 2 };
+}
+
+/** Scouting-Stufe zur Nebelbreite des Spielerprofils (0 = exakt, 5 = beobachtet, 10 = unbekannt), dieselbe Stufung wie im Markt. */
+export function scoutingStufeAusNebelBreite(breite: 0 | 5 | 10): number {
+  return breite === 0 ? 5 : breite === 5 ? 1 : 0;
+}
+
+/**
+ * Marketability eines Spielers aus dem Spielstand fuer das AKTIVE Team (Spielerprofil, Drawer): dieselbe Rechnung wie im Transfermarkt
+ * (`baueMarktMarketability`), gezeigt = gebucht. `null`, wenn Marketing im Spielstand nicht gilt oder der Spieler fehlt.
+ */
+export function marketabilityFuerSpieler(
+  gameState: GameState,
+  teamId: string | null,
+  playerId: string,
+  nebelBreite: 0 | 5 | 10,
+): MarktMarketabilitySicht | null {
+  if (!teamId || !marketingAktiv(gameState)) return null;
+  const p = gameState.players.find((x) => x.id === playerId);
+  if (!p) return null;
+  return baueMarktMarketability(gameState, teamId, p as unknown as MarktSpielerEingabe, scoutingStufeAusNebelBreite(nebelBreite));
 }

@@ -527,7 +527,7 @@ function PickKopf({ k, re, children }: { k: { aktiv: boolean; pfeil: string; ari
   );
 }
 
-type SortKey = "eignung" | "abloese" | "guenstig" | "gefragt" | "fit" | "name" | "gehalt" | MarktAchse;
+type SortKey = "eignung" | "abloese" | "guenstig" | "gefragt" | "fit" | "name" | "gehalt" | "marketability" | MarktAchse;
 
 /** Spalten des Draft-Bretts (Breiten in u); per Ziehen anpassbar und je Benutzer gespeichert, getrennt vom Transfermarkt. */
 export const DRAFT_SPALTEN: SpaltenDef[] = [
@@ -537,6 +537,7 @@ export const DRAFT_SPALTEN: SpaltenDef[] = [
   { id: "eg", standard: 8.6, min: 5, max: 14 },
   { id: "ax", standard: 9, min: 7, max: 18 },
   { id: "fit", standard: 3.6, min: 3, max: 8 },
+  { id: "mk", standard: 3.8, min: 3, max: 8 },
   { id: "abl", standard: 4.4, min: 3, max: 9 },
   { id: "geh", standard: 3.5, min: 3, max: 9 },
   { id: "gef", standard: 3.3, min: 2.6, max: 8 },
@@ -628,6 +629,8 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
           return 0; // alphabetisch, siehe unten
         case "gehalt":
           return z.item.salary ?? 0;
+        case "marketability":
+          return z.item.marketability?.schluessel ?? null;
         case "pow":
         case "spe":
         case "men":
@@ -804,6 +807,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
           <span>{sk("eignung", `Eignung ${DISZIPLIN_KURZ[k.disziplin] ?? ""}`)}{griff("eg")}</span>
           <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((x) => <i key={x} role="button" title="Achsen-Summe · Klick sortiert" className={sort === x ? "so" : ""} style={{ fontStyle: "normal", cursor: "pointer" }} onClick={() => { setSort(x); setBlatt(0); }} data-testid={`draft-kopf-${x}`}>{ACHSEN_LABEL[x]}{sort === x ? " ▾" : ""}</i>)}{griff("ax")}</span>
           <span>{sk("fit", "Fit")}{griff("fit")}</span>
+          <span title="Marketability für DEIN Team (Fanprofil) · Stufe nach Scouting: 10er ungescoutet, 5er beobachtet, exakt gescoutet · dieselbe Rechnung wie im Transfermarkt">{sk("marketability", "Mkt")}{griff("mk")}</span>
           <span className="re">{sk(sort === "abloese" ? "guenstig" : "abloese", "Ablöse", "re")}{griff("abl")}</span>
           <span className="re" title="Jahresgehalt (je Saison) · Klick sortiert, nochmal klicken dreht die Richtung"><button type="button" className={`re${sort === "gehalt" ? " so" : ""}`} onClick={() => klickSort2("gehalt")} data-testid="draft-kopf-gehalt">Gehalt/Sais.{sort === "gehalt" ? (sortUm ? " ▴" : " ▾") : ""}</button>{griff("geh")}</span>
           <span>{sk("gefragt", "gefragt")}{griff("gef")}</span>
@@ -839,6 +843,7 @@ export function DraftBrett({ k, aktionen, tastenAktiv = true }: { k: DraftKontex
                 })}
               </span>
               <FitZelle item={it} />
+              <span className="re" title={it.marketability ? (it.marketability.exakt ? "Marketability für dein Team (gescoutet)" : `Marketability für dein Team als Stufe ${it.marketability.text}; Scouten schärft das Bild`) : "Marketing gilt in dieser Saison noch nicht"} data-testid="draft-marketability"><b className="t">{it.marketability ? it.marketability.text : "—"}</b></span>
               <span className={`re${teuer ? " zt" : ""}`}><b className="t">{de(it.marketValue ?? 0)}</b></span>
               <span className="re"><b className="t">{de(it.salary ?? 0)}</b></span>
               <span><span className={`gef g${Math.min(3, g)} t`}>{g ? `${g}×` : "–"}</span></span>
@@ -941,6 +946,9 @@ export function MeinDraft({ k, aktionen, onAuslassen, onFertig, onSkip }: { k: D
               <div><small>Ablöse</small><strong className={`t${teuer ? " minus" : ""}`}>{de(preis)}</strong><em>C · exakt</em></div>
               <div><small>Gehalt / Saison</small><strong className="t">{de(z.item.salary ?? 0)}</strong><em>C · {de((z.item.salary ?? 0) / 20, 2)} je Spieltag</em></div>
               <div><small>{DISZIPLIN_KURZ[k.disziplin] ?? ""}</small><strong className="t">{eignungText(z, k.disziplin)}</strong><em>Eignung</em></div>
+              {z.item.marketability ? (
+                <div title="Marketability für dein Team (Fanprofil), Stufe nach Scouting; dieselbe Rechnung wie im Transfermarkt und auf der Seite Marketing" data-testid="draft-mein-marketability"><small>Marketability</small><strong className={`t${z.item.marketability.exakt ? "" : " nb"}`}>{z.item.marketability.text}</strong><em>{z.item.marketability.exakt ? "gescoutet" : "Stufe"}</em></div>
+              ) : null}
             </div>
             <div className="trl">
               {z.item.traitsPositive.map((x) => <span key={x} className="tag g">{x}</span>)}
