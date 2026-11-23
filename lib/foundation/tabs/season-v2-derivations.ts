@@ -108,7 +108,7 @@ export function shouldBuildSeasonTopPlayerRows(input: {
 }
 
 export function shouldBuildLeagueTrainingLeaderRows(activeView: FoundationViewId): boolean {
-  return activeView === "ranks" || activeView === "leagueLeaders";
+  return activeView === "ranks" || activeView === "leagueLeaders" || activeView === "recordsLegends";
 }
 
 export function shouldBuildSortedSeasonStandRows(activeView: FoundationViewId): boolean {

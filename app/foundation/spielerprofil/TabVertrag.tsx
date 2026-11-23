@@ -120,6 +120,12 @@ export function TabVertrag({
           <span>Marktwert</span>
           <strong className="spr-t">{geld(data.marketValue, 1)}</strong>
         </div>
+        {modell.marketability ? (
+          <div className="spr-zeile" data-testid="spielerprofil-marketability" title="Marketability für dein Team (Fanprofil), Stufe nach Scouting; dieselbe Rechnung wie im Transfermarkt und im Draft">
+            <span>Marketability<small>für dein Team</small></span>
+            <strong className="spr-t">{modell.marketability.text}</strong>
+          </div>
+        ) : null}
         <div className="spr-zeile">
           <span>Kaufpreis</span>
           <strong className="spr-t">{geld(data.purchasePrice, 1)}</strong>

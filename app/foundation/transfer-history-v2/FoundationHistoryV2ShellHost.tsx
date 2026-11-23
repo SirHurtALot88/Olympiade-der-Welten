@@ -47,7 +47,7 @@ export type FoundationHistoryV2ShellHostProps = {
   loadingMore?: boolean;
   onLoadMore: () => void;
   /** Wechselt den Reiter der Historie (Archiv, Transfers, Ewige Tabelle). */
-  onWechsel: (reiter: "archiv" | "transfers" | "ewig", seasonId?: string, teamId?: string) => void;
+  onWechsel: (reiter: "archiv" | "transfers" | "ewig" | "rekorde", seasonId?: string, teamId?: string) => void;
   onOpenSaisonstand: () => void;
 };
 

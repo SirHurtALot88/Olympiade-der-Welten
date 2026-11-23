@@ -129,7 +129,7 @@ export function isFoundationNavViewActive(activeView: FoundationViewId, itemId: 
   if (itemId === "seasonV2" && activeView === "season") return true;
   if (itemId === "marketV2" && activeView === "market") return true;
   // Ein Schienenpunkt „Historie" mit drei Reitern (Chris 18.11.): Saison-Archiv, Transfers, Ewige Tabelle.
-  if (itemId === "seasonArchive" && (activeView === "historyV2" || activeView === "history" || activeView === "allTimeTable")) {
+  if (itemId === "seasonArchive" && (activeView === "historyV2" || activeView === "history" || activeView === "allTimeTable" || activeView === "recordsLegends")) {
     return true;
   }
   if (itemId === "inboxV2" && activeView === "inbox") return true;

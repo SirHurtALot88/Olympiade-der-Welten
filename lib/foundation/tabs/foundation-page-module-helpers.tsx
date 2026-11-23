@@ -289,6 +289,7 @@ export function getFoundationViewScrollTarget(view: FoundationView | GameFlowVie
     case "diszis":
       return "foundation-diszis";
     case "leagueLeaders":
+    case "recordsLegends":
       return "league-leaders";
     case "allTimeTable":
       return "all-time-table";

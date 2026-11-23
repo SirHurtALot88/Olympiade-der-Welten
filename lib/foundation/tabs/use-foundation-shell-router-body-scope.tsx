@@ -1206,6 +1206,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "leagueLeaders" ||
+    activeView === "recordsLegends" ||
     activeView === "allTimeTable";
   const shouldLoadTeamsHistoryOverview = activeView === "teams" && showExtendedTeamPanels;
   const shouldLoadSeasonOverviewFeedActive = shouldLoadSeasonOverviewFeed || shouldLoadTeamsHistoryOverview;
@@ -1441,6 +1442,7 @@ export function useFoundationShellRouterBodyScope({
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "leagueLeaders" ||
+    activeView === "recordsLegends" ||
     activeView === "prize" ||
     // Diszi-Buehne (matchdayArena): OVR-Anzeigen dort (Chips, Hover-Vorschau, Spieler-/
     // Team-Karte) muessen dieselbe ligaweite OVR zeigen wie Kader/Spielerprofil, nicht
@@ -1454,8 +1456,9 @@ export function useFoundationShellRouterBodyScope({
     activeView === "ranks" ||
     activeView === "diszis" ||
     activeView === "leagueLeaders" ||
+    activeView === "recordsLegends" ||
     activeView === "prize";
-  const shouldBuildLeagueLeaderBoards = activeView === "ranks" || activeView === "leagueLeaders";
+  const shouldBuildLeagueLeaderBoards = activeView === "ranks" || activeView === "leagueLeaders" || activeView === "recordsLegends";
   const shouldBuildAllTimeTable = activeView === "allTimeTable";
   const shouldLoadSeasonLedger = shouldBuildPlayerDirectory;
   const shouldLoadSeasonRatings = shouldBuildPlayerRatings || shouldBuildTrainingView;
@@ -12469,7 +12472,7 @@ export function useFoundationShellRouterBodyScope({
    * Ansichten (`seasonArchive`, `historyV2`, `allTimeTable`); dieser Wechsler setzt zwischen ihnen um und waehlt
    * dabei optional das Transferfenster.
    */
-  const historieWechsel = (reiter: "archiv" | "transfers" | "ewig", seasonId?: string, teamId?: string) => {
+  const historieWechsel = (reiter: "archiv" | "transfers" | "ewig" | "rekorde", seasonId?: string, teamId?: string) => {
     if (reiter === "transfers") {
       if (seasonId) setHistorySeasonFilter(seasonId);
       // „Alle Transfers" eines Teams: alle Fenster, nur dieses Team.
@@ -12480,7 +12483,7 @@ export function useFoundationShellRouterBodyScope({
       setFoundationView("historyV2", setActiveView, { push: true });
       return;
     }
-    setFoundationView(reiter === "ewig" ? "allTimeTable" : "seasonArchive", setActiveView, { push: true });
+    setFoundationView(reiter === "ewig" ? "allTimeTable" : reiter === "rekorde" ? "recordsLegends" : "seasonArchive", setActiveView, { push: true });
   };
   const historieOpenSaisonstand = () => setFoundationView("seasonV2", setActiveView, { push: true });
 
@@ -13094,6 +13097,7 @@ export function useFoundationShellRouterBodyScope({
         }
       : undefined,
     onOpenPlayer: openPlayerProfileById,
+    onOpenRekorde: () => setFoundationView("recordsLegends", setActiveView, { push: true }),
   };
 
   /**

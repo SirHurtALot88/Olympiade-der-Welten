@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   baueMedaillen,
+  baueSpieltagsMvps,
   baueSpielerZeilen,
   baueTeamZeilen,
   ligaFilter,
@@ -98,5 +99,15 @@ describe("Leaders: Medaillen-Hochrechnung", () => {
     expect(wertungText(m, "tdm", 3)).toBe("+3");
     expect(wertungText(m, "tdm", -3.5)).toBe("−3,5");
     expect(wertungText(m, "hockey", 8)).toBe("8");
+  });
+});
+
+describe("Leaders: ein MVP je Spieltag", () => {
+  it("nimmt je Spieltag die beste Einzelbuchung über beide Ligen", () => {
+    const mvps = baueSpieltagsMvps(modell());
+    expect(mvps.map((x) => [x.spieltag, x.spieler.id, x.pp, x.disziplinId])).toEqual([
+      [1, "s2", 5, "hockey"],
+      [2, "s1", 3, "tdm"],
+    ]);
   });
 });

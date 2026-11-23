@@ -181,7 +181,13 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
       const el = wurzelRef.current;
       if (!el) return;
       const oben = el.getBoundingClientRect().top + window.scrollY;
-      setHoehe(Math.max(420, Math.floor(window.innerHeight - oben - 28)));
+      // Alles unter der Seite (Innenabstand des Panels, Fußabstand der Shell) zählt mit, sonst scrollt die Seite um genau diese Summe (23.11.: 36 px bei 1920 x 1080).
+      let darunter = 0;
+      for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+        const cs = window.getComputedStyle(p);
+        darunter += (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.marginBottom) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+      }
+      setHoehe(Math.max(420, Math.floor(window.innerHeight - oben - Math.max(8, darunter))));
     }
     messen();
     window.addEventListener("resize", messen);

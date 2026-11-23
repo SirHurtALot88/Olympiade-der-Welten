@@ -19,6 +19,7 @@ import {
   type SpielerRaenge,
   type VerletzungsAnzeige,
 } from "@/lib/foundation/spielerprofil-modell";
+import { marketabilityFuerSpieler, type MarktMarketabilitySicht } from "@/lib/marketing/marketing-markt";
 import { baueFormMoralAnzeige, moralUrsachen, type FormMoralAnzeige } from "@/lib/lineups/form-moral-anzeige";
 import { einsatzlisteKulisseBild } from "@/lib/lineups/einsatzliste-kulisse-bild";
 import type { PlayerGeneratorAttributeKey } from "@/lib/player-generator/official-discipline-weights";
@@ -33,6 +34,8 @@ export type SpielerprofilModell = {
   ppReihe: PpSpieltag[];
   form: FormMoralAnzeige | null;
   moralGruende: Array<{ id: string; label: string; delta: number }>;
+  /** Marketability für das aktive Team (Stufe nach Scouting), dieselbe Rechnung wie im Transfermarkt; `null`, wenn Marketing nicht gilt. */
+  marketability: MarktMarketabilitySicht | null;
   experte: ExperteIn[];
   werte: Partial<Record<PlayerGeneratorAttributeKey, number | null>>;
   besteDisziplin: string | null;
@@ -59,6 +62,7 @@ export function useSpielerprofilModell(data: PlayerDetailDrawerData): Spielerpro
     const ppReihe = gameState ? baueMatchdayPpReihe(gameState, data.playerId) : [];
     const form = gameState ? baueFormMoralAnzeige(gameState, data.playerId) : null;
     const moralGruende = gameState && !nebel ? moralUrsachen(gameState, data.playerId, data.teamId, 4) : [];
+    const marketability = gameState ? marketabilityFuerSpieler(gameState, betrachterTeamId, data.playerId, breite) : null;
     const experte = bestimmeExperte(data, 6);
     const werte = attributWerteAusDaten(data);
     const beste = besteDisziplinId(data);
@@ -76,6 +80,7 @@ export function useSpielerprofilModell(data: PlayerDetailDrawerData): Spielerpro
       ppReihe,
       form,
       moralGruende,
+      marketability,
       experte,
       werte,
       besteDisziplin: beste,

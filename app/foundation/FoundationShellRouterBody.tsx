@@ -223,6 +223,10 @@ const FoundationLeagueLeadersHost = dynamic(() => import("@/app/foundation/leagu
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Liga-Leader werden geladen…" />,
 });
+const FoundationRecordsLegendsHost = dynamic(() => import("@/app/foundation/league-leaders-v2/FoundationRecordsLegendsHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Rekorde werden geladen…" />,
+});
 const FoundationAllTimeTableHost = dynamic(() => import("@/app/foundation/all-time-table-v2/FoundationAllTimeTableHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Ewige Tabelle wird geladen…" />,
@@ -1172,7 +1176,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 }
               }}
             />
-          ) : activeView === "seasonArchive" || activeView === "historyV2" || activeView === "history" || activeView === "allTimeTable" ? (
+          ) : activeView === "seasonArchive" || activeView === "historyV2" || activeView === "history" || activeView === "allTimeTable" || activeView === "recordsLegends" ? (
             // Historie (Mockup 18.11.): drei Reiter im Regieband statt zwei Schienenpunkten unter Markt und Team.
             <FoundationSubNav
               className="foundation-shell-subnav"
@@ -1180,11 +1184,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
                 { id: "archiv", label: "Saison-Archiv" },
                 { id: "transfers", label: "Transfers" },
                 { id: "ewig", label: "Ewige Tabelle" },
+                { id: "rekorde", label: "Rekorde & Legenden" },
               ]}
-              activeId={activeView === "seasonArchive" ? "archiv" : activeView === "allTimeTable" ? "ewig" : "transfers"}
+              activeId={activeView === "seasonArchive" ? "archiv" : activeView === "allTimeTable" ? "ewig" : activeView === "recordsLegends" ? "rekorde" : "transfers"}
               onSelect={(id) =>
                 setFoundationView(
-                  id === "ewig" ? "allTimeTable" : id === "transfers" ? "historyV2" : "seasonArchive",
+                  id === "ewig" ? "allTimeTable" : id === "rekorde" ? "recordsLegends" : id === "transfers" ? "historyV2" : "seasonArchive",
                   setActiveView,
                   { push: true },
                 )
@@ -2820,6 +2825,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
 
           {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
 
+          {activeView === "recordsLegends" ? <FoundationRecordsLegendsHost {...foundationLeagueLeadersHostProps} /> : null}
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
           {activeView === "seasonArchive" ? <FoundationSeasonArchiveHost {...foundationSeasonArchiveHostProps} /> : null}
 
