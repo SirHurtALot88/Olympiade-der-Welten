@@ -51757,6 +51757,83 @@ button.foundation-team-portrait-card {
   opacity: 0.55;
 }
 
+.is-new-look .nl-facility-ladder-step.is-current {
+  box-shadow: 0 0 0 2px var(--nl-accent);
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-facility-plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--nl-s2) var(--nl-s3);
+  padding: var(--nl-s2) var(--nl-s3);
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  background: var(--nl-panel-2);
+}
+
+.is-new-look .nl-facility-plan-label {
+  font-weight: 700;
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-facility-plan-leer {
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-facility-plan-ziel {
+  display: flex;
+  gap: var(--nl-s1);
+}
+
+.is-new-look .nl-facility-plan-ziel-btn {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 0.85em;
+  color: var(--nl-mut);
+  background: transparent;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+  cursor: pointer;
+}
+
+.is-new-look .nl-facility-plan-ziel-btn.is-active {
+  color: var(--nl-ink);
+  border-color: var(--nl-accent);
+  background: color-mix(in srgb, var(--nl-accent) 16%, transparent);
+}
+
+.is-new-look .nl-facility-plan-schritte {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nl-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.is-new-look .nl-facility-plan-schritte li {
+  display: flex;
+  gap: var(--nl-s2);
+  padding: 2px 8px;
+  border: 1px solid var(--nl-line);
+  border-radius: var(--nl-r-sm);
+}
+
+.is-new-look .nl-facility-plan-summe {
+  margin-left: auto;
+  color: var(--nl-mut);
+}
+
+.is-new-look .nl-facility-plan-summe b {
+  color: var(--nl-ink);
+}
+
+.is-new-look .nl-facility-plan-summe b.is-neg {
+  color: var(--nl-bad, var(--nl-warn));
+}
+
 @keyframes nl-facility-next-pulse {
   0%,
   100% {

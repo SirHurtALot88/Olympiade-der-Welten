@@ -59,13 +59,13 @@ export const NL_AXIS_LABELS: Record<NlAxisKey, string> = {
 };
 
 /** Zahlformat (de-DE), null-sicher. */
-export function formatNlNumber(value: number | null | undefined, maximumFractionDigits = 1): string {
+export function formatNlNumber(value: number | null | undefined, maximumFractionDigits = 1, minimumFractionDigits = 0): string {
   if (value == null || !Number.isFinite(value)) {
     return "—";
   }
   // Clamp a magnitude that rounds to zero so we never render a stray "-0".
   const normalized = Math.round(value * 10 ** maximumFractionDigits) === 0 ? 0 : value;
-  return new Intl.NumberFormat("de-DE", { maximumFractionDigits }).format(normalized);
+  return new Intl.NumberFormat("de-DE", { minimumFractionDigits, maximumFractionDigits }).format(normalized);
 }
 
 /** Vorzeichenbehaftetes Zahlformat ("+4,2" / "-4,2" / "0"), null-sicher. */

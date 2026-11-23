@@ -11,6 +11,7 @@ import type { PlayerEconomyCompareRow } from "@/lib/foundation/player-economy-co
 import { buildPlayerEconomyCompareMap } from "@/lib/foundation/player-economy-compare-service";
 import { resolvePlayerEconomyContract, type PlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { isFiniteNumber, roundValue } from "@/lib/foundation/foundation-number-utils";
+import { baueBelastungsVerlauf, type BelastungsPunkt } from "@/lib/foundation/belastungs-verlauf";
 import { getFatiguePerformancePenaltyPercent } from "@/lib/fatigue/fatigue-calibration";
 import { calculateTeamRecovery, getInjuryRiskBand, getPlayerAvailabilityView } from "@/lib/fatigue/fatigue-injury-service";
 import {
@@ -354,6 +355,8 @@ export type PlayerDetailDrawerData = {
     moralePenalty: number;
   }>;
   fatigue: number | null;
+  /** Belastung vor jedem Einsatz der laufenden Saison (aus den gespeicherten Verletzungswürfen). */
+  fatigueVerlauf: BelastungsPunkt[];
   availability: {
     injuryStatus: "healthy" | "injured" | "recovering";
     injuryUntilMatchday: string | null;
@@ -2654,6 +2657,7 @@ export function buildPlayerDrawerDataFromGameState(input: {
         }
       : null,
     fatigue: availability.fatigue ?? player.fatigue ?? null,
+    fatigueVerlauf: baueBelastungsVerlauf(input.gameState, player.id),
     availability: {
       injuryStatus: availability.injuryStatus,
       injuryUntilMatchday: availability.injuryUntilMatchday ?? null,
@@ -3048,6 +3052,7 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     morale: null,
     demands: [],
     fatigue: rosterPlayer ? rosterPlayer.fatigue ?? catalogPlayer?.fatigue ?? 0 : 0,
+    fatigueVerlauf: [],
     availability: {
       injuryStatus: rosterPlayer?.injuryStatus ?? "healthy",
       injuryUntilMatchday: rosterPlayer ? rosterPlayer.injuryUntilMatchday ?? null : null,

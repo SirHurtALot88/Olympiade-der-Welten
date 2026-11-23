@@ -211,7 +211,7 @@ function FacilityMotif({ facilityId }: { facilityId: FacilityId }) {
  *  (erreicht = voll), alle noch nicht erreichten Stufen sind gedimmt/gesperrt — bewusst KEIN
  *  amber "nächstes Ziel"-Highlight mehr, das wurde als aktueller Stand missverstanden.
  *  Unbebaut (Level 0) bekommt einen expliziten "L0"-Schritt vor der Leiter als aktueller Stand. */
-function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId; level: number }) {
+function FacilityMilestoneLadder({ facilityId, level, stufenKosten }: { facilityId: FacilityId; level: number; stufenKosten?: Array<number | null> }) {
   const isUnbuilt = level <= 0;
   return (
     <div
@@ -245,10 +245,10 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
         return (
           <span
             key={`${facilityId}-ladder-${targetLevel}`}
-            className={`nl-facility-ladder-step ${state}`}
+            className={`nl-facility-ladder-step ${state}${isCurrent ? " is-current" : ""}`}
             title={
               definition
-                ? `L${targetLevel}: ${formatFacilityEffectText(definition.effectDescription)} · Kosten ${formatTransfermarktCurrency(definition.upgradeCost)}${isCurrent ? " · Aktuell" : ""}`
+                ? `L${targetLevel}: ${formatFacilityEffectText(definition.effectDescription)} · Kosten ${formatTransfermarktCurrency(stufenKosten?.[index] ?? definition.upgradeCost)}${isCurrent ? " · Aktuell" : ""}`
                 : `L${targetLevel}${isCurrent ? " · Aktuell" : ""}`
             }
             aria-current={isCurrent ? "step" : undefined}
@@ -258,6 +258,59 @@ function FacilityMilestoneLadder({ facilityId, level }: { facilityId: FacilityId
           </span>
         );
       })}
+    </div>
+  );
+}
+
+/** „Dein Plan": die naechsten Ausbauschritte bis zur gewaehlten Zielstufe, jeder Schritt mit dem Preis, den der Ausbau tatsaechlich bucht
+ *  (`berechneAusbauKosten`, dieselbe Stelle wie der Upgrade-Service). Nichts wird gespeichert, es ist nur die Vorschau der Summe. */
+function FacilityPlanRow({ facility, cash }: { facility: FacilityRowView; cash: number | null }) {
+  const [ziel, setZiel] = useState(FACILITY_MAX_LEVEL);
+  const schritte = Array.from({ length: Math.max(0, FACILITY_MAX_LEVEL - facility.level) }, (_, i) => facility.level + 1 + i);
+  if (schritte.length === 0) {
+    return (
+      <div className="nl-facility-plan" data-testid="facilities-v2-plan">
+        <span className="nl-facility-plan-label">Dein Plan</span>
+        <span className="nl-facility-plan-leer">Höchste Stufe erreicht, nichts mehr auszubauen.</span>
+      </div>
+    );
+  }
+  const gewaehlt = Math.min(Math.max(ziel, facility.level + 1), FACILITY_MAX_LEVEL);
+  const plan = schritte.filter((stufe) => stufe <= gewaehlt);
+  const summe = plan.reduce((acc, stufe) => acc + (facility.stufenKosten[stufe - 1] ?? 0), 0);
+  const nachKasse = cash != null ? cash - summe : null;
+  return (
+    <div className="nl-facility-plan" data-testid="facilities-v2-plan">
+      <span className="nl-facility-plan-label">Dein Plan</span>
+      <div className="nl-facility-plan-ziel" role="group" aria-label="Zielstufe des Plans">
+        {schritte.map((stufe) => (
+          <button
+            key={stufe}
+            type="button"
+            className={`nl-facility-plan-ziel-btn${stufe === gewaehlt ? " is-active" : ""}`}
+            onClick={() => setZiel(stufe)}
+            aria-pressed={stufe === gewaehlt}
+          >
+            bis L{stufe}
+          </button>
+        ))}
+      </div>
+      <ol className="nl-facility-plan-schritte nl-tnum">
+        {plan.map((stufe) => (
+          <li key={stufe}>
+            <b>L{stufe - 1} → L{stufe}</b>
+            <span>{formatTransfermarktCurrency(facility.stufenKosten[stufe - 1] ?? 0)}</span>
+          </li>
+        ))}
+      </ol>
+      <span className="nl-facility-plan-summe nl-tnum">
+        Summe <b>{formatTransfermarktCurrency(summe)}</b>
+        {nachKasse != null ? (
+          <>
+            {" "}· Kasse danach <b className={nachKasse < 0 ? "is-neg" : undefined}>{formatTransfermarktCurrency(nachKasse)}</b>
+          </>
+        ) : null}
+      </span>
     </div>
   );
 }
@@ -904,6 +957,8 @@ export default function FacilitiesV2NewLook({
           (laufende Kosten pro Saison je Stufe) nebeneinander — beide direkt
           aus dem Facility-Katalog (`getFacilityLevelDefinition`), derselben
           Quelle wie der Upgrade-Service. */}
+      <FacilityPlanRow key={activeFacility.id} facility={activeFacility} cash={summary.cashCurrent} />
+
       <NlCard
         className="nl-facility-curve-card"
         eyebrow="Kosten-Kurven"
@@ -923,7 +978,7 @@ export default function FacilitiesV2NewLook({
                 const definition = getFacilityLevelDefinition(activeFacility.id, targetLevel);
                 return {
                   label: `L${targetLevel}`,
-                  value: definition?.upgradeCost ?? 0,
+                  value: activeFacility.stufenKosten[index] ?? definition?.upgradeCost ?? 0,
                   tone:
                     targetLevel <= activeFacility.level
                       ? "good"
@@ -1268,7 +1323,7 @@ export default function FacilitiesV2NewLook({
                     {facility.level <= 0 ? "Nicht gebaut" : `Level ${facility.level}`}
                   </span>
                 </div>
-                <FacilityMilestoneLadder facilityId={facility.id} level={facility.level} />
+                <FacilityMilestoneLadder facilityId={facility.id} level={facility.level} stufenKosten={facility.stufenKosten} />
                 {facility.id === "arena_upgrade" && beliebtheit ? (
                   /* G5: „Basis 0,0 Mio × 1 = 0,0 Mio" las sich wie Debug-Ausgabe.
                      Als Satz mit benannten Größen — und bei 0 wird erklärt statt

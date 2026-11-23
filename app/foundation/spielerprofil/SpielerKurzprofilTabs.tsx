@@ -16,7 +16,7 @@ import { formatLeagueTierShortLabel } from "@/lib/season/league-history";
 import { bremsGrundText } from "@/lib/training/training-modern-modell";
 import { getTrainingModePresentation } from "@/lib/training/training-mode-presentation";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
-import { PpBalken, achseKlasse, geld, kategorieAchse, zahl } from "./bausteine";
+import { BelastungsSparkline, PpBalken, achseKlasse, geld, kategorieAchse, zahl } from "./bausteine";
 import type { SpielerprofilModell } from "./use-spielerprofil-modell";
 
 export type KurzReiterId = "ueberblick" | "disziplinen" | "entwicklung" | "leistung" | "vertrag" | "karriere";
@@ -244,6 +244,7 @@ export function ReiterUeberblick({ data, modell, onOpenFull }: Gemeinsam & { onO
       ) : data.fatigue != null && data.teamId ? (
         <div className="spr-dr-hinweis" data-testid="spielerkurzprofil-belastung">
           Erschöpfung <b className="spr-t">{zahl(data.fatigue, 0)}</b> · Verletzungsrisiko <b className="spr-t">{zahl(data.availability.injuryRiskPercent, 0)} %</b>
+          <BelastungsSparkline verlauf={data.fatigueVerlauf} />
         </div>
       ) : null}
       <Abschnitt titel="Attribute" klein={modell.nebel ? "Bereiche statt Werte" : "vier Achsen, zwölf Werte"}>
