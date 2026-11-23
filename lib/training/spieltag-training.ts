@@ -57,9 +57,12 @@ import {
 } from "@/lib/training/organic-season-progression";
 import { DEVELOPMENT_MAX_ATTRIBUTE_VALUE } from "@/lib/training/training-levelup-service";
 import { getTrainingSetpointsJeSpieltag } from "@/lib/training/training-mode-presentation";
+import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
+import { entwicklungsParameter, trainingsBudgetFaktor } from "@/lib/training/entwicklung-neu";
+import { fokusDominanz, istDiligent, ligaAbbauFaktor } from "@/lib/training/entwicklung-tag";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
-import { isTrainingJeSpieltagAktiv, resolveTrainingJeSpieltagFaktor } from "@/lib/training/training-je-spieltag-schalter";
+import { isTrainingJeSpieltagAktiv, resolveTrainingJeSpieltagFaktor, trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 
 export { isTrainingJeSpieltagAktiv, resolveTrainingJeSpieltagFaktor };
 
@@ -177,6 +180,14 @@ export type SpieltagsZuwachs = {
   deckeBremst: PlayerGeneratorAttributeName[];
   /** Transparenz: was der Weg je Attribut wirklich bringt (dieselbe Rechnung, die bucht). */
   transparenz: SpieltagsTransparenz;
+  /** Entwicklung neu (Runde 2): Abbau dieses Spieltags je Attribut (>= 0), leer bei Regel "alt". */
+  abbau: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /** Entwicklung neu: Ligafaktor, mit dem der Abbau gebucht wird (`ligaAbbauFaktor`); 1 bei Regel "alt". */
+  abbauFaktor: number;
+  /** Entwicklung neu: Obergrenze je Attribut, die die Rechnung angewendet hat (fuer die Zusammenfuehrung mit der Leistung). */
+  deckel: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /** Entwicklung neu: Faktor auf das Spieltags-Budget (Eichung x Gewicht Training x Fokus); 1 bei Regel "alt". */
+  budgetFaktor: number;
 };
 
 /** Warum ein Attribut weniger zulegt als sein Anteil am Budget hergibt. */
@@ -243,6 +254,8 @@ export function berechneSpieltagsZuwachs(input: {
   quelle: "manager" | "ki";
   modus?: PlayerTrainingMode;
   facilities?: TeamFacilityCollection | null;
+  /** Der Spieltag, der gerade gebucht wird (sein eigener Verlaufseintrag zaehlt nicht doppelt in den Fokus). */
+  spieltagId?: string | null;
 }): SpieltagsZuwachs | null {
   if (!hatVollenAttributbogen(input.player)) return null;
   const profil = trainingsProfilFuerZiel(input.ziel);
@@ -251,15 +264,35 @@ export function berechneSpieltagsZuwachs(input: {
   const grundbudget = getTrainingSetpointsJeSpieltag(modus);
   const teamId = input.gameState.rosters.find((eintrag) => eintrag.playerId === input.player.id)?.teamId ?? null;
   const facilities = input.facilities ?? (teamId ? getTeamFacilityState(input.gameState, teamId) : null);
+  // ENTWICKLUNG NEU (Runde 2): Gewicht Training (60 / Diligent 75) und Fokus gehen ins Budget des Spieltags ein, damit
+  // Buchung, Vorschau und Transparenz dieselbe Zahl zeigen.
+  const entNeu = entwicklungNeuFuer(input.gameState);
+  const akku = input.player.seasonTrainingAccumulator;
+  const verlauf = akku && akku.seasonId === input.gameState.season.id ? akku.verlauf : undefined;
+  const budgetFaktor = entNeu
+    ? trainingsBudgetFaktor(
+        istDiligent(input.player),
+        fokusDominanz(verlauf, input.ziel.disziplinId, input.spieltagId ?? undefined),
+        entwicklungsParameter(),
+      )
+    : 1;
   const ergebnis = buildOrganicSeasonProgression({
     gameState: input.gameState,
     player: input.player,
     facilities,
-    accumulatedBaseTrainingBudget: grundbudget,
+    accumulatedBaseTrainingBudget: grundbudget * budgetFaktor,
     trainingProfileOverride: profilAlsGewichte(profil),
     trainingRouteOverride: routeFuerProfil(profil),
     nurTraining: true,
+    mitAbbau: entNeu,
   });
+  const abbauFaktor = entNeu ? ligaAbbauFaktor(input.gameState, input.spieltagId ?? null) : 1;
+  const abbau: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
+  const deckelJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
+  for (const zeile of ergebnis.attributeBreakdown) {
+    if (zeile.abbauTag > 0) abbau[zeile.attribute] = rund(zeile.abbauTag * abbauFaktor, 3);
+    deckelJeAttribut[zeile.attribute] = zeile.deckel;
+  }
   const zuwachs: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   const nebeneffekt: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   const deckeBremst: PlayerGeneratorAttributeName[] = [];
@@ -304,6 +337,10 @@ export function berechneSpieltagsZuwachs(input: {
     modus,
     profil,
     grundbudget: rund(grundbudget, 4),
+    abbau,
+    abbauFaktor: rund(abbauFaktor, 3),
+    deckel: deckelJeAttribut,
+    budgetFaktor: rund(budgetFaktor, 4),
     budget: rund(ergebnis.trainingSetpoints, 4),
     zuwachs,
     nebeneffekt,
@@ -641,7 +678,7 @@ export function ueberlastungsAbzug(modus: PlayerTrainingMode, gesamtBelastung: n
  */
 export function ueberlastungsAbzuegeFuerSpieltag(gameState: GameState, matchdayId: string): Map<string, number> {
   const abzuege = new Map<string, number>();
-  if (!isTrainingJeSpieltagAktiv()) return abzuege;
+  if (!trainingJeSpieltagFuer(gameState)) return abzuege;
   const seasonId = gameState.season.id;
   const imKader = new Set(gameState.rosters.map((eintrag) => eintrag.playerId));
   for (const player of gameState.players) {
@@ -672,6 +709,11 @@ export type TrainingsVerlaufZeile = {
    * `offen` — festgelegt und mit dem Abschluss des Spieltags zu buchen.
    */
   zuwachs: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /** Entwicklung neu: Leistungsanteil dieses Spieltags je Attribut (mit Vorzeichen) und Abbau (>= 0); leer bei Alt-Eintraegen. */
+  leistung: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  abbau: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /** Netto dieses Spieltags: Training + Leistung - Abbau (Summe ueber die Attribute). */
+  netto: number;
   /**
    * Der Spieltag ist erst halb gewertet (Arena-Teilbuchung nach D1): `zuwachs` steht fest, ist aber
    * noch NICHT auf den Attributen (`o` im Verlauf). Die Anzeige kennzeichnet ihn als „offen".
@@ -714,6 +756,13 @@ export function entpackeTrainingsVerlauf(gameState: GameState, playerId: string)
       quelle: e.q === "m" ? "manager" : e.q === "k" ? "ki" : null,
       modus: e.i ?? null,
       zuwachs,
+      leistung: { ...(e.p ?? {}) },
+      abbau: { ...(e.a ?? {}) },
+      netto: rund(
+        Object.values(zuwachs).reduce((a, b) => a + (b ?? 0), 0) +
+          Object.values(e.p ?? {}).reduce((a, b) => a + (b ?? 0), 0) -
+          Object.values(e.a ?? {}).reduce((a, b) => a + (b ?? 0), 0),
+      ),
       offen: e.o === true,
       summe: rund(Object.values(zuwachs).reduce((a, b) => a + (b ?? 0), 0)),
       last: e.l ?? 0,
@@ -729,6 +778,11 @@ export type TrainingsSaisonSumme = {
   /** Gebuchter Zuwachs (ohne offene Spieltage). */
   zuwachsJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>>;
   summe: number;
+  /** Entwicklung neu: gebuchte Leistung (mit Vorzeichen) und gebuchter Abbau der Saison, Summe ueber die Attribute (ohne offene Spieltage). */
+  leistungSumme: number;
+  abbauSumme: number;
+  /** Netto der Saison bisher: Training + Leistung - Abbau. */
+  nettoSumme: number;
   /** Festgelegter, aber noch nicht gebuchter Zuwachs (halb gewerteter Spieltag, `offen`). */
   offenJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>>;
   offenSumme: number;
@@ -745,7 +799,13 @@ export function trainingsSaisonSumme(gameState: GameState, playerId: string): Tr
   const offenJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   let formAbzugGesamt = 0;
   let lastGesamt = 0;
+  let leistungSumme = 0;
+  let abbauSumme = 0;
   for (const z of zeilen) {
+    if (!z.offen) {
+      leistungSumme += Object.values(z.leistung).reduce((a, b) => a + (b ?? 0), 0);
+      abbauSumme += Object.values(z.abbau).reduce((a, b) => a + (b ?? 0), 0);
+    }
     const ziel = z.offen ? offenJeAttribut : zuwachsJeAttribut;
     for (const [attribute, wert] of Object.entries(z.zuwachs) as Array<[PlayerGeneratorAttributeName, number]>) {
       ziel[attribute] = rund((ziel[attribute] ?? 0) + wert);
@@ -762,6 +822,9 @@ export function trainingsSaisonSumme(gameState: GameState, playerId: string): Tr
     spieltageVerletzt: zeilen.filter((z) => z.status === "verletzt").length,
     zuwachsJeAttribut,
     summe: rund(Object.values(zuwachsJeAttribut).reduce((a, b) => a + (b ?? 0), 0)),
+    leistungSumme: rund(leistungSumme),
+    abbauSumme: rund(abbauSumme),
+    nettoSumme: rund(Object.values(zuwachsJeAttribut).reduce((a, b) => a + (b ?? 0), 0) + leistungSumme - abbauSumme),
     offenJeAttribut,
     offenSumme: rund(Object.values(offenJeAttribut).reduce((a, b) => a + (b ?? 0), 0)),
     schwerpunkt,
@@ -796,6 +859,7 @@ export function prognostiziereSpieltagsTraining(input: {
     ziel: bestimmt.ziel,
     quelle: bestimmt.quelle,
     modus: input.modus,
+    spieltagId: naechster,
   });
   return zuwachs ? { ...zuwachs, verletzt: false } : null;
 }

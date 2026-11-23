@@ -205,18 +205,48 @@ export function derivePlayerPotentialCeilingProfileFromAttributeCeilings(input: 
   };
 }
 
+/** Neue Regel: Wahrscheinlichkeitsverschiebung (+2 gegen -2) je Ausblick. */
+const ENTWICKLUNG_NEU_DRIFT_VERSCHIEBUNG = {
+  breakout: 0.12,
+  growth: 0.06,
+  stable: 0,
+  stagnation: -0.06,
+  regression_risk: -0.12,
+} as const;
+/** Verschiebung eines Ausblicks; der Batch mittelt sie ueber die Liga und uebergibt den Schnitt als Zentrum. */
+export function entwicklungNeuDriftVerschiebung(outlook: keyof typeof ENTWICKLUNG_NEU_DRIFT_VERSCHIEBUNG): number {
+  return ENTWICKLUNG_NEU_DRIFT_VERSCHIEBUNG[outlook];
+}
+
 export function applyAttributeCeilingSeasonDrift(input: {
   attributeCeilings: Partial<Record<PlayerGeneratorAttributeName, number>>;
   saveId: string;
   playerId: string;
   seasonId: string;
   growthOutlook: "breakout" | "growth" | "stable" | "stagnation" | "regression_risk";
+  /**
+   * ENTWICKLUNG NEU (22.11., lib/resolve/entwicklung-regel.ts): der Ausblick verschiebt nur die WAHRSCHEINLICHKEIT von +2 und -2
+   * (gegengleich, `ENTWICKLUNG_NEU_DRIFT_ZENTRUM` zieht den Liga-Schnitt auf null), statt Abwaerts- oder Aufwaertsschritte
+   * ganz zu verbieten oder zu erzwingen. Der Liga-Schnitt der Verschiebungen (`entwicklungNeuDriftZentrum`) wird abgezogen, so
+   * verschiebt die Drift den Mittelwert der Decken nicht, egal wie die Ausblicke der Liga gerade verteilt sind.
+   */
+  entwicklungNeu?: boolean;
+  /** Liga-Schwerpunkt der Ausblick-Verschiebungen dieser Saison (Standard 0), vom Batch gemessen. */
+  entwicklungNeuDriftZentrum?: number;
 }): Partial<Record<PlayerGeneratorAttributeName, number>> {
   const drifted = {} as Partial<Record<PlayerGeneratorAttributeName, number>>;
   for (const attribute of playerGeneratorAttributeKeys) {
     const current = input.attributeCeilings[attribute];
     if (!isFiniteNumber(current)) continue;
     const seed = getPlayerSeedValue(`${input.saveId}:${input.playerId}:${input.seasonId}:${attribute}:attr-drift-v1`);
+    if (input.entwicklungNeu) {
+      const verschiebung = ENTWICKLUNG_NEU_DRIFT_VERSCHIEBUNG[input.growthOutlook] - (input.entwicklungNeuDriftZentrum ?? 0);
+      const pMinus = clamp(0.33 - verschiebung, 0, 0.66);
+      const pPlus = clamp(0.33 + verschiebung, 0, 0.66);
+      const schritt = seed < pMinus ? -2 : seed > 1 - pPlus ? 2 : 0;
+      drifted[attribute] = clamp(Math.round(current + schritt), 1, 99);
+      continue;
+    }
     let delta = seed < 0.34 ? -2 : seed > 0.66 ? 2 : 0;
     if (input.growthOutlook === "breakout") delta = Math.max(delta, 2);
     else if (input.growthOutlook === "growth" && delta < 0) delta = 0;

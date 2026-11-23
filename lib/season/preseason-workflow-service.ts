@@ -1,3 +1,4 @@
+import { baueLeistungsErwartung } from "@/lib/training/entwicklung-tag";
 import { marketingStempelFuerSaisonwechsel } from "@/lib/marketing/marketing-team";
 import { kreditRegelFuerNeueSaison, kreditSaisonwechsel } from "@/lib/finance/kredit-raten";
 import { createHash, randomUUID } from "node:crypto";
@@ -6,6 +7,7 @@ import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentsch
 import { vorjahrAnteileFuerSaisonwechsel, wirtschaftsRegelnFuerNeueSaison } from "@/lib/resolve/wirtschafts-regeln";
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
+import { entwicklungsRegelFuerSpielmodus } from "@/lib/resolve/entwicklung-regel";
 import { ausruestungRegelFuerNeueSaison } from "@/lib/ausruestung/ausruestung-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
 import { finanzenJeSpieltagFuerNeueSaison } from "@/lib/finance/finanzen-je-spieltag";
@@ -321,6 +323,8 @@ export function applySeasonBaselineProgression(
       // Anti-cheese Teil B (B.4): clear the per-matchday training accumulator alongside trainingMode /
       // fatigue so the new season starts a fresh mode-count/fatigue tally.
       seasonTrainingAccumulator: null,
+      // Entwicklung neu: aus dem Verlauf der ausgehenden Saison die Leistungs-Erwartung fuer die Prognose der naechsten (nur Prognose).
+      leistungsErwartung: baueLeistungsErwartung(player.seasonTrainingAccumulator),
       // Fatigue an der Saisongrenze für ALLE Spieler auf 0 zurücksetzen — konsistent mit dem geleerten
       // seasonTrainingAccumulator. player.fatigue ist zusammengesetzt aus Match-Fatigue + der
       // aufgelaufenen Trainings-Fatigue-Schicht (siehe matchday-training-accumulator). Wird der
@@ -362,6 +366,7 @@ export function applySeasonBoundaryPlayerResets(gameState: GameState): GameState
       ...player,
       trainingMode: null,
       seasonTrainingAccumulator: null,
+      leistungsErwartung: baueLeistungsErwartung(player.seasonTrainingAccumulator),
       fatigue: 0,
     })),
     playerMoraleState: advancePlayerMoraleCarryState(gameState),
@@ -681,6 +686,9 @@ function buildNextSeasonGameState(
     // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
     // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
     formkartenRegel: nextFormkartenRegel,
+    // ENTWICKLUNGSREGEL (22.11., lib/resolve/entwicklung-regel.ts): gilt ab der FOLGENDEN Saison; Training je Spieltag und
+    // Saisonende-Wirkung muessen in einer Saison dieselbe Regel haben, der Saisonwechsel ist deshalb der einzige Wechselort.
+    entwicklungsRegel: entwicklungsRegelFuerSpielmodus(save.gameState, nextSeasonId) ?? null,
     // MARKETING-REGEL (22.11., lib/marketing/marketing-regel.ts): gilt ab der FOLGENDEN Saison; die Fanfarbe jedes Teams driftet hier
     // (Kader und Erfolg der abgelaufenen Saison), der Verlauf wird fortgeschrieben. Rueckweg OLY_MARKETING=aus.
     marketingRegel: marketingStempelFuerSaisonwechsel(save.gameState, save.gameState.season.id, nextSeasonId),

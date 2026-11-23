@@ -290,7 +290,7 @@ function NlTrainingForecastBar({
   // Ceiling-Hinweis ("Potential erreicht/fast erreicht") steht bewusst NICHT hier —
   // der Cap-Marker unten trägt exakt diesen Text bereits in seinem eigenen `title`
   // (Deklutter: keine zweite, identische Tooltip-Kopie für dieselbe Zeile).
-  const tooltip = `${entry.attribute}: ${formatNlNumber(entry.before, 1)} → ${formatNlNumber(entry.after, 1)} (${formatNlSignedNumber(entry.delta, 1)}) · T ${formatNlSignedNumber(entry.training, 1)} · P ${formatNlSignedNumber(entry.performance, 1)} · R ${formatNlSignedNumber(entry.regression, 1)}${
+  const tooltip = `${entry.attribute}: ${formatNlNumber(entry.before, 1)} → ${formatNlNumber(entry.after, 1)} (${formatNlSignedNumber(entry.delta, 1)}) · T ${formatNlSignedNumber(entry.training, 1)} · Leistung (Erwartung) ${formatNlSignedNumber(entry.performance, 1)} · Abbau ${formatNlSignedNumber(entry.regression, 1)}${
     regression ? ` · kann fallen: fehlen ca. ${formatNlNumber(Math.abs(entry.delta), 1)} SP zum Halten` : ""
   }`;
 

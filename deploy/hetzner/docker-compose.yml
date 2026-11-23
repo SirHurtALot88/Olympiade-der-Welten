@@ -129,6 +129,10 @@ services:
       # plusminus), "aus" = Rueckweg (neue Saisons alt), "aus-sofort" = Notbremse (Gegenfarbe und Duellgewicht aus, auch mitten in
       # der Saison). Nur Server: der Browser loest die Regel nie selbst auf, sie steht im Spielstand. Siehe deploy/hetzner/.env.example.
       OLY_FORMKARTEN_PLUSMINUS: ${OLY_FORMKARTEN_PLUSMINUS:-}
+      # Spielerentwicklung (22.11., docs/design/entwicklung-balance-22-11.md): leer = Standard (neue Saisons bekommen die Regel neu:
+      # Liga-Mittel um 0, wenige starke Auf- und Absteiger, PP-Faktor auf das Training), "alt" = Rueckweg (neue Saisons wie vor dem
+      # 22.11.; gestempelte Saisons rechnen weiter wie gestempelt). Nur Server: die Regel steht im Spielstand. Siehe deploy/hetzner/.env.example.
+      OLY_ENTWICKLUNG: ${OLY_ENTWICKLUNG:-}
       # Marketing (22.11., docs/design/marketing-bau-22-11.md): leer = Standard (neue Saisons bekommen Werbegeld, Team-Anteil, Teammarke und
       # Moral-Zuschlag), "aus" = Rueckweg (neue Saisons ohne), "aus-sofort" = Notbremse (keine Buchung, kein Zuschlag, auch mitten in der
       # Saison). Nur Server (kein NEXT_PUBLIC): die Regel steht im Spielstand (seasonState.marketingRegel). Siehe deploy/hetzner/.env.example.

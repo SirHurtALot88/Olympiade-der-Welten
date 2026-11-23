@@ -365,6 +365,21 @@ export type TrainingsSpieltagEintrag = {
   i?: "leicht" | "mittel" | "hart";
   /** Gebuchter Zuwachs je Attribut (nur Werte ungleich 0), nach Decke. */
   z?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /**
+   * Entwicklung neu, Runde 2 (22.11.): Leistungsanteil dieses Spieltags je Attribut, MIT Vorzeichen (PP gegen den Liga-Median),
+   * und Abbau je Attribut (>= 0). Netto auf dem Attribut = z + p - a. Fehlen beide, ist der Eintrag aelter (nur Training).
+   */
+  p?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  a?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /**
+   * Entwicklung neu (22.11.): Leistungseinheit je Einsatz-Disziplin dieses Spieltags (roh, mit Vorzeichen, vor Gewicht/Schwung/Kappung). Daraus
+   * entsteht beim Saisonwechsel die Leistungs-Erwartung fuer die Folgesaison (`Player.leistungsErwartung`).
+   */
+  y?: Record<string, number>;
+  /** PP-Fingerabdruck dieses Spieltags beim Buchen (`ppHashFuerTag`): weicht er beim erneuten Buchen ab, wird L neu gerechnet. */
+  h?: string;
+  /** Ligafaktor, mit dem der Abbau `a` dieses Spieltags gebucht wurde (`ligaAbbauFaktor`); fehlt = 1. */
+  f?: number;
   /** Trainingslast dieses Spieltags (Fatigue-Anteil, nach Reha-Rabatt). */
   l?: number;
   /**
@@ -1145,6 +1160,12 @@ export type Player = {
     /** Disziplinwerte vor dem ersten je-Spieltag gebuchten Zuwachs dieser Saison (Saisonend-Delta). */
     startDisziplinwerte?: Record<string, number>;
   } | null;
+  /**
+   * Entwicklung neu (22.11.): Leistungs-Erwartung aus der VORSAISON fuer die Prognose zu Saisonbeginn (statt L = 0). `jeDisziplin` summiert die
+   * Leistungseinheiten (z) der Einsaetze je Disziplin, `n` zaehlt sie; `tage` sind die Trainingstage der Saison. Wird beim Saisonwechsel aus
+   * dem Verlauf gebaut (`baueLeistungsErwartung`); nur Prognose, nie gebucht.
+   */
+  leistungsErwartung?: { seasonId: string; tage: number; jeDisziplin: Record<string, { n: number; summe: number }> } | null;
   /**
    * Ziel-Disziplin + Weg (Regel A, Chris 18.11.). Vom Manager gesetzt; fehlt es, trainiert der Spieler
    * auf den Vorschlag der KI-Logik (fuer Mensch und KI dieselbe). Wirkt ab dem naechsten Spieltag.
@@ -4316,6 +4337,11 @@ export type SeasonState = {
    * oder "alt" (18.11.). Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel; gilt fuer die ganze Saison.
    */
   formkartenRegel?: { seasonId: string; regel: "alt" | "plusminus" } | null;
+  /**
+   * ENTWICKLUNGSREGEL DIESER SAISON (22.11., lib/resolve/entwicklung-regel.ts): "neu" (PP-Faktor auf das Training, Ertragskurve,
+   * Verfall, mittelwertneutrale Potentialdrift) oder "alt". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel.
+   */
+  entwicklungsRegel?: { seasonId: string; regel: "alt" | "neu" } | null;
   /**
    * MARKETING-REGEL DIESER SAISON (22.11., lib/marketing/marketing-regel.ts): "an" = Werbegeld, Team-Anteil, Teammarke und Moral-Zuschlag
    * gelten; "aus" = nichts davon. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison. Dazu die Fanfarbe

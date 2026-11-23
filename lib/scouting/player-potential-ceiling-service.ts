@@ -405,6 +405,9 @@ export function applyAxisCeilingSeasonDrift(input: {
   playerId: string;
   seasonId: string;
   growthOutlook: "breakout" | "growth" | "stable" | "stagnation" | "regression_risk";
+  /** Entwicklung neu (22.11.): mittelwertneutrale Attribut-Drift, s. `applyAttributeCeilingSeasonDrift`. */
+  entwicklungNeu?: boolean;
+  entwicklungNeuDriftZentrum?: number;
 }): {
   ceiling: PlayerPotentialCeilingProfile;
   attributeCeilings: Partial<Record<PlayerGeneratorAttributeName, number>>;
@@ -416,6 +419,8 @@ export function applyAxisCeilingSeasonDrift(input: {
       playerId: input.playerId,
       seasonId: input.seasonId,
       growthOutlook: input.growthOutlook,
+      entwicklungNeu: input.entwicklungNeu,
+      entwicklungNeuDriftZentrum: input.entwicklungNeuDriftZentrum,
     });
     return {
       attributeCeilings: driftedAttributes,
