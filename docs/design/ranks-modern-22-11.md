@@ -99,3 +99,71 @@ Liga 2) rollt nur die Liste in ihrer Tafel.
    Mockup nimmt überall die besten sechs, wie die Regel sagt; das ist bewusst ungenau, damit es das Ergebnis nicht verrät.
 3. **Podium der Vorsaison** (heute auf der Seite, wenn noch nichts gespielt ist): hierher oder auf die Historie-Seite?
    Empfehlung: Historie.
+
+## 9. Bau (22.11., Freigabe: „die Mockups sehen gut aus, hast die Freigabe die umzusetzen“)
+
+Gebaut ist `app/foundation/ranks-v2/RanksModern.tsx` (mit `ranks-modern.css`, Präfix `rk-`, Wurzel `bc rk`, Kopf aus dem Broadcast-Fundament
+`BcHero`/`BcReiter`), gerechnet wird in `lib/foundation/ranks-modern.ts` (rein, ohne React). `FoundationRanksHost` reicht nur noch
+`gameState`, das aktive Manager-Team (`activeManagerTeamId`), die Spieltags-Übersichten des Saisonstands und die zwei Sprünge (Teamprofil,
+Spielerprofil) durch. Entfallen sind `FoundationRanksPanel`, `FoundationRanksNewLook`, die alte Matrix im Shell-Router (Achsen-Gruppen,
+Farblegende, Heat-Stufen, Dein-Team-Chip) und ihre Wächter-Tests; `FoundationDiszisHost` (Spielplan der Disziplinen) bleibt unberührt.
+Reine Leseseite: kein Schreibweg, keine Wertung angefasst (Fingerabdruck unverändert).
+
+### Quellen
+
+| Anzeige | Quelle |
+|---|---|
+| Stärke Team (Gesamt, Bereich, Disziplin) | `buildTeamDisciplineRankRowsFromGameState(…, "combined")`, dieselbe Funktion wie Startseite, Vorstandsziel und Einsatzliste; Summe der besten sechs je Disziplin, hier durch 6 geteilt. Gesamt und Bereich mitteln über die Disziplinen. |
+| Punkte Team | Duellpunkte (Tabelle) aus `duellPunkteJeDisziplin` über die Spieltags-Übersichten des Saisonstands; je Disziplin die Summe der Ergebnispunkte (0 bis 10 je Begegnung, Vierergruppen: Platzpunkte). Ohne Duell-Spielplan (Alt-Spielstand) bleibt die Lesart leer und sagt es. |
+| PP Spieler | Punkte-Ledger der Saison (`buildSeasonPointsLedger`), öffentlich. |
+| Eignung, Bereiche, Gesamt Spieler | `player.disciplineRatings` (wie die Team-Rangfunktion), `coreStats`, `rating`. |
+| Nebel | `getEffectiveScoutingLevel(gameState, aktivesTeam, spieler)`: Stufe 0 = 10er, 1 bis 4 = 5er, 5 = exakt; eigener Kader exakt; Einstellung `scenarioMeta.scoutingNebelAus` schaltet ihn ab. |
+
+### Abweichung Mockup (Rang 2) gegen Capture (Rang 1)
+
+Das Mockup rechnete die Stärke selbst: Mittel der besten sechs nach **Gesamtwert** der Spieler. Die App und der Capture
+(`teamStrengthRankCaptures`) ranken nach der **Disziplin-Eignung** (zwanzig Mal die besten sechs, summiert). Beide sind „beste 6“, aber nicht
+dieselbe Größe: Death Peaches sind in der Eignung Rang 1 in Liga 2 (13 von 32), nach Gesamtwert Rang 2. Gebaut ist die kanonische Zahl, damit
+Ranks, Startseite, Vorstandsziel und Saisonstand denselben Rang nennen. Folge: Die Werte im Profil (Ges. 48,1 statt 43,2) und die Reihenfolge
+der Spitze weichen vom Mockup ab, die Kopfzeile sagt „Rang 1 von 16 · 13/32“.
+
+### Mockup gegen App: drin / angepasst / fehlt
+
+| Mockup-Merkmal | Stand |
+|---|---|
+| Kopf mit Wappen, Titel, Reitern Teams/Spieler, Kaderstärke-Kachel rechts | drin (`BcHero`; Kulisse = PixelLab-Kulisse der Disziplin statt der alten `szenen`-Szene, wechselt mit der gewählten Disziplin) |
+| Rang-Matrix 25 Spalten, Disziplin-Icons, Bereichsstrich, Gold/grün/rot | drin |
+| Schalter Stärke/Punkte, Rang/Wert, Liga 2/Liga 1/Alle 32 | drin (Liga-Namen aus der eigenen Liga des aktiven Managers) |
+| Sortierbare Spalten, erste Spalte = Rang der Sortierspalte, klein unter allen 32 | drin |
+| Profil rechts: Papierform gegen Ertrag, 20 Disziplinen nach Stärke-Rang | drin |
+| Spieler-Sicht: Disziplin-Leiste, Klassenfarbe-Filter, Alle/Mein Kader, Liga, Klasse mit Icon in Klassenfarbe, Eignung als Zahl und Balken, PP | drin |
+| Verletzte Marke | drin (`playerAvailabilityState`) |
+| Nebel: Teams 5er, Spieler 10er | angepasst: Spieler nach Wissensstufe (10er unbekannt, 5er beobachtet, exakt gescoutet); im Spielstand ist niemand fremdes gescoutet, sichtbar sind die 10er |
+| Schalter „Nebel aus (Einstellung)“ in der Mockup-Leiste | angepasst: kein Schalter auf der Seite, es gilt die Spielstand-Einstellung |
+| Teamprofil-/Spielerprofil-Sprung | neu (Knopf im Profil-Kopf, die alte Seite öffnete das Teamprofil per Klick auf die Zeile) |
+| Podium der Vorsaison (alte Seite, Saisonstart) | fehlt hier bewusst: gehört auf die Historie-Seite (Offene Frage 3, Empfehlung Historie) |
+| Alte Radar-/Medianchips der Vorseite | entfallen, ersetzt durch die Matrix |
+
+### Nachbesserung 22.11. (Chris: „Ranks sind noch nicht so gut farblich in den Bereichen separiert“)
+
+Alle Bereichsfarben kommen aus den vier Tokens `--rk-pow/spe/men/soc` (Klassenfarben der App); eine Klasse `a-<bereich>` setzt `--ac`, alles Getönte liest nur das.
+
+| Stelle | Änderung |
+|---|---|
+| Rang-Matrix | Gruppenkopf über den Spalten („Gesamt und Bereiche“, POW Power, SPE Speed, MEN Mental, SOC Social) mit Tönung, Unterkante und Trenner; farbige Oberkante je Spalte; die Spalten Ges./POW/SPE/MEN/SOC tragen ihre Farbe als Schrift; Disziplin-Icons als Chip in Bereichsfarbe; Spalten laufen ohne Lücke und sind je Bereich getönt (9 %), 2 px Trenner zwischen den Bereichen, 3 px zwischen Bereichen und Disziplinen |
+| Rang-Ampel | bleibt lesbar: neutrale Zellen dunkel, Gold unverändert, grün und rot mit Rand und etwas mehr Deckkraft |
+| Profil (Team) | Bereichszeilen getönt mit Kante; die 20 Disziplinen **nach Bereich gruppiert** (senkrechtes Kürzel, Tönung), innerhalb nach Stärke-Rang |
+| Profil (Spieler) | Bereichszeilen getönt; Disziplinzeilen mit Bereichskante und Icon-Chip (Reihenfolge nach Eignung bleibt) |
+| Spieler-Sicht | Disziplin-Leiste in vier getönte Gruppen mit Kürzel; Spalten POW/SPE/MEN/SOC getönt, Werte in Bereichsfarbe |
+| Kopf | doppelter Titel behoben: die Dachzeile trägt „Ranks · Saison · Spieltag“ (wie Saisonstand), der Titel ist das Team |
+
+Abgleich (Bildpaare `ranks-modern-22-11/vergleich-<ansicht>-<größe>.png`, links Mockup, rechts App, Live-Abbild, Team D-P; 1920x1080, 2560x1440, 1710x1112, kein Seitenscroll):
+
+| Mockup-Merkmal | Stand |
+|---|---|
+| Matrix, Disziplin-Icons, Bereichsstrich | drin, jetzt mit Gruppenkopf und Tönung (über das Mockup hinaus) |
+| Titel „Ranks“ im Hero | angepasst: das Regieband der Shell nennt „Ranks“ bereits, der Hero trägt Team als Titel und „Ranks“ in der Dachzeile |
+| Spitzenreihenfolge, Werte im Profil | angepasst (kanonische Stärke, siehe oben) |
+| Mockup ohne Shell | die App steht in der Shell (Schiene, Regieband), die Matrix ist dadurch rund 10 % niedriger |
+| Profil: Disziplinen nach Stärke-Rang sortiert | angepasst: nach Bereich gruppiert, innerhalb nach Stärke-Rang |
+| Fehlt | nichts |
