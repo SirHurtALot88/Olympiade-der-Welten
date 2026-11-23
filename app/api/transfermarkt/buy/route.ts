@@ -32,6 +32,8 @@ type BuyRequestBody = {
   contractLength?: number;
   contractShape?: ContractShape;
   offeredSalary?: number;
+  /** Werbeklausel (23.11.): -1 / 0 / 1. */
+  marketingKlausel?: number | null;
   /** Optionaler Idempotenz-Schlüssel: verhindert Doppelbuchung bei Doppelklick/Retry. */
   idempotencyKey?: string;
   dryRun?: boolean;
@@ -78,6 +80,7 @@ export async function POST(request: Request) {
       contractLength: body.contractLength,
       contractShape: body.contractShape,
       offeredSalary: body.offeredSalary,
+      marketingKlausel: body.marketingKlausel === -1 || body.marketingKlausel === 0 || body.marketingKlausel === 1 ? body.marketingKlausel : null,
       // Schickt der Client denselben Schlüssel erneut (Doppelklick/Retry), wird der Kauf
       // nicht ein zweites Mal gebucht — siehe `executeLocalTransfermarktBuy`.
       idempotencyKey: typeof body.idempotencyKey === "string" ? body.idempotencyKey : undefined,

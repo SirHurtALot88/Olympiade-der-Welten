@@ -45,6 +45,9 @@ export const MARKETING_KONFIG = {
   teamAnteilMin: 15,
   teamAnteilMax: 65,
   netzAnteilGehalt: 0.25,
+  /** Werbeklausel (23.11., Mockup Runde 4): Netz in Prozent des Gehalts je Stufe (-1 / 0 / +1) und Gehaltsverschiebung. */
+  klauselNetz: { "-1": 0.22, "0": 0.25, "1": 0.28 } as Record<"-1" | "0" | "1", number>,
+  klauselGehaltProzent: 2.5,
   gesichtWerbeFaktor: 1.25,
   gesichtAnteilPunkte: 8,
   klauselPunkte: 10,
@@ -66,6 +69,41 @@ export function teammarkeAusRang(liga: 1 | 2, rang: number, anzahl: number): num
   const abstand = ((rang - (n + 1) / 2) / (n - 1)) * 15;
   const t = MARKETING_KONFIG.teammarkeLiga[liga] + MARKETING_KONFIG.teammarkeRangSteigung * abstand;
   return Math.round(klemme(t, MARKETING_KONFIG.teammarkeMin, MARKETING_KONFIG.teammarkeMax) * 100) / 100;
+}
+
+export type Werbeklausel = -1 | 0 | 1;
+export const KLAUSEL_NAMEN: Record<"-1" | "0" | "1", string> = { "-1": "Spieler behält mehr", "0": "Standard", "1": "Team bekommt mehr" };
+
+function hatTrait(traits: readonly string[], name: string): boolean {
+  return traits.some((t) => normalisiereTrait(t) === name.toLowerCase());
+}
+
+/** Egomaniac und Diva lehnen „Team bekommt mehr“ ab; alle anderen Stufen sind frei. */
+export function klauselErlaubt(klausel: Werbeklausel, traits: readonly string[]): boolean {
+  if (klausel !== 1) return true;
+  return !(hatTrait(traits, "Egomaniac") || hatTrait(traits, "Diva"));
+}
+
+/** Wer die Stufe nicht annimmt, steht auf Standard (so liest auch die Rechnung einen alten oder verbotenen Wert). */
+export function wirksameKlausel(klausel: Werbeklausel | null | undefined, traits: readonly string[]): Werbeklausel {
+  const k = klausel === -1 || klausel === 1 ? klausel : 0;
+  return klauselErlaubt(k, traits) ? k : 0;
+}
+
+/**
+ * Gehaltsfaktor der Klausel: „Spieler behält mehr“ -2,5 %, „Team bekommt mehr“ +2,5 % (Loyal ohne Aufschlag), Standard 1. Eine Rechenstelle fuer
+ * Vorschau und Buchung (gezeigt = gebucht).
+ */
+export function klauselGehaltFaktor(klausel: Werbeklausel | null | undefined, traits: readonly string[]): number {
+  const k = wirksameKlausel(klausel, traits);
+  if (k === -1) return 1 - MARKETING_KONFIG.klauselGehaltProzent / 100;
+  if (k === 1) return hatTrait(traits, "Loyal") ? 1 : 1 + MARKETING_KONFIG.klauselGehaltProzent / 100;
+  return 1;
+}
+
+/** Gehalt mit Klausel, auf zwei Stellen gerundet (die Zahl, die in den Vertrag geschrieben wird). */
+export function gehaltMitKlausel(basisGehalt: number, klausel: Werbeklausel | null | undefined, traits: readonly string[]): number {
+  return Math.round(basisGehalt * klauselGehaltFaktor(klausel, traits) * 100) / 100;
 }
 
 export function normalisiereTrait(roh: string | null | undefined): string {
@@ -302,8 +340,9 @@ export function berechneMarketing(e: MarketingSpielerEingabe, t: MarketingTeamEi
   let werbegeld =
     MARKETING_KONFIG.werbeMax[t.liga] * Math.pow(Math.max(0, marketability - 30) / 70, 2) * (e.istGesicht ? MARKETING_KONFIG.gesichtWerbeFaktor : 1);
   if (verletztHalb) werbegeld *= 0.5;
-  const anteil = berechneTeamAnteil(e, t);
-  const netz = MARKETING_KONFIG.netzAnteilGehalt * Math.max(0, e.gehalt);
+  const klauselWirksam = wirksameKlausel(e.klausel, e.traits);
+  const anteil = berechneTeamAnteil({ ...e, klausel: klauselWirksam }, t);
+  const netz = MARKETING_KONFIG.klauselNetz[String(klauselWirksam) as "-1" | "0" | "1"] * Math.max(0, e.gehalt);
   const nachAnteil = (anteil.prozent / 100) * werbegeld;
   const netzGreift = nachAnteil > netz + 0.005;
   const ansTeam = Math.min(nachAnteil, netz);

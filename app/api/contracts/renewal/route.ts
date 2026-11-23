@@ -25,6 +25,8 @@ type ContractRenewalBody = {
   contractLength?: number | null;
   offeredSalary?: number | null;
   contractShape?: ContractShape;
+  /** Werbeklausel (23.11.): -1 Spieler behaelt mehr, 0 Standard, 1 Team bekommt mehr. */
+  marketingKlausel?: number | null;
   dryRun?: boolean;
   confirmToken?: string | null;
   source?: "sqlite" | "prisma";
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
     const playerId = body.playerId?.trim() ?? "";
     const action = body.action === "release" ? "release" : body.action === "renew" ? "renew" : null;
     const dryRun = body.dryRun !== false;
+    const marketingKlausel = body.marketingKlausel === -1 || body.marketingKlausel === 0 || body.marketingKlausel === 1 ? body.marketingKlausel : null;
 
     if (source === "prisma") {
       return NextResponse.json({ success: false, error: "Prisma/Supabase mode is read-only in this build." }, { status: 409 });
@@ -101,6 +104,7 @@ export async function POST(request: Request) {
       contractLength: body.contractLength,
       offeredSalary: body.offeredSalary,
       contractShape: body.contractShape,
+      marketingKlausel,
     });
     // Stufe 0.3 (Befund B2): Identitaet AUSSERHALB eines Raums kommt serverseitig aus der Sitzung,
     // nie aus `body.activeOwnerId` — siehe Kommentar an `resolveAuthoritativeWriteOwnerId`.
@@ -146,6 +150,7 @@ export async function POST(request: Request) {
           contractLength: body.contractLength,
           offeredSalary: body.offeredSalary,
           contractShape: body.contractShape,
+          marketingKlausel,
           source: action === "renew" ? "manual_contract_renewal" : "manual_player_release",
         });
     const success = "applied" in summary ? Boolean(summary.applied) : Boolean(summary.ok);

@@ -274,6 +274,20 @@ export function marketingStempelFuerSaisonwechsel(
   const fanfarbe: Record<string, Fanfarbe> = {};
   const verlauf: NonNullable<typeof alt.verlauf> = { ...(alt.verlauf ?? {}) };
   const teamErfolg: Record<string, TeamErfolg> = {};
+  // Aushaengeschild und gewachsene Vorliebe (23.11.): zweimal derselbe in Folge -> seine Klasse ersetzt die fruehere Vorliebe (ein Zugang je Team).
+  const klausel = alt.version === "klausel-v2";
+  const gesichtVorsaison: Record<string, string> = {};
+  const klassenVorliebe: NonNullable<typeof alt.klassenVorliebe> = { ...(alt.klassenVorliebe ?? {}) };
+  for (const teamId of teamIds) {
+    if (!klausel) break;
+    const gesicht = aushaengeschildFuer(gameState, teamId);
+    if (!gesicht) continue;
+    gesichtVorsaison[teamId] = gesicht;
+    if (alt.gesichtVorsaison?.[teamId] === gesicht) {
+      const klasse = gameState.players.find((p) => p.id === gesicht)?.className;
+      if (klasse) klassenVorliebe[teamId] = { klasse, seitSaisonId: naechsteSaisonId };
+    }
+  }
   for (const teamId of teamIds) {
     const start = FANPROFILE[teamId]?.farbeStart ?? ([5, 5, 5, 5] as Fanfarbe);
     const vorher = alt.fanfarbe?.[teamId] ?? start;
@@ -297,7 +311,7 @@ export function marketingStempelFuerSaisonwechsel(
     const liste = verlauf[teamId] ?? [{ seasonId: abgelaufeneSaisonId, farbe: [...vorher] as Fanfarbe, grund: "Start" }];
     verlauf[teamId] = [...liste, { seasonId: naechsteSaisonId, farbe: neu, grund: ergebnis.grund }];
   }
-  return marketingRegelFuerNeueSaison(naechsteSaisonId, teamIds, { fanfarbe, verlauf, teamErfolg });
+  return marketingRegelFuerNeueSaison(naechsteSaisonId, teamIds, { fanfarbe, verlauf, teamErfolg, gesichtVorsaison, klassenVorliebe });
 }
 
 function erfolgJeTeam(gameState: GameState, abgelaufeneSaisonId: string, teamIds: readonly string[]): Record<string, TeamErfolg> {

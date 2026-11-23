@@ -4405,6 +4405,16 @@ export type SeasonState = {
     teamErfolg?: Record<string, { punkte: number; grund: string; stufe: "verfehlt" | "erreicht" | "titel" | "keiner" }>;
     /** Spiegel der Notbremse `OLY_MARKETING=aus-sofort`, vom Server beim naechsten Buchen gesetzt: ab dann buchen/wirken keine neuen Anteile, Gebuchtes bleibt. */
     notbremse?: boolean;
+    /**
+     * WERBEKLAUSEL + AUSHAENGESCHILD (23.11., docs/design/werbeklausel-aushaengeschild-23-11.md): "klausel-v2" = Klausel je Vertrag mit Gehaltswirkung und
+     * Sicherheitsnetz je Stufe, Aushaengeschild mit Sperre und KI-Wahl nach Zusatzertrag. Fehlt = Regel von 22.11. (Klausel immer Standard).
+     * Gesetzt wie die Regel selbst nur beim Anlegen und beim Saisonwechsel.
+     */
+    version?: "klausel-v2";
+    /** Aushaengeschild der VORSAISON je Team (Spieler-Id), beim Saisonwechsel geschrieben: zweimal derselbe in Folge laesst die Klasse in die Vorlieben der Fans wachsen. */
+    gesichtVorsaison?: Record<string, string>;
+    /** Gewachsene Fan-Vorliebe je Team: eine Klasse, die zu den „Fans moegen“ zaehlt (ein Zugang je Team, ein neuer ersetzt den frueheren). */
+    klassenVorliebe?: Record<string, { klasse: string; seitSaisonId: string }>;
   } | null;
   /**
    * KREDIT-REGEL DIESER SAISON (22.11., lib/finance/kredit-raten.ts): "raten" = Zins und Tilgung der Kredite werden je Spieltag
@@ -4434,7 +4444,7 @@ export type SeasonState = {
     }
   > | null;
   /** Manager-Wahl des Aushaengeschilds je Team und Saison (optional; ohne Eintrag gilt die KI-Regel). */
-  marketingAushaengeschild?: Record<string, { seasonId: string; playerId: string }> | null;
+  marketingAushaengeschild?: Record<string, { seasonId: string; playerId: string; /** true: bestaetigt, bis Saisonende gesperrt (23.11.). */ gesperrt?: boolean; von?: "mensch" | "ki" }> | null;
   /**
    * ARENA-REGEL DIESER SAISON (22.11., lib/arena/arena-regel.ts): "an" = Platzarten, Tickets, Dauerkarten, Ausbau von Hand; "aus" = das alte
    * Gebaeude "Arena Upgrade". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison.

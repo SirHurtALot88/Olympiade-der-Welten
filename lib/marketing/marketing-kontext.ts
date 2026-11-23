@@ -14,7 +14,7 @@ import {
   type MarketingSpielerErgebnis,
   type MarketingTeamEingabe,
 } from "@/lib/marketing/marketing-modell";
-import { gueltigerMarketingStempel } from "@/lib/marketing/marketing-regel";
+import { gueltigerMarketingStempel, werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { LEAGUE_SIZE, getLeagueOf } from "@/lib/season/league-split";
 
@@ -23,12 +23,15 @@ export function fanProfilFuer(gameState: Pick<GameState, "seasonState" | "season
   const daten = FANPROFILE[teamId];
   const stempel = gueltigerMarketingStempel(gameState);
   const start: Fanfarbe = daten ? [...daten.farbeStart] : [5, 5, 5, 5];
+  // Gewachsene Vorliebe (23.11.): die Klasse des zweimal in Folge gewaehlten Aushaengeschilds zaehlt zu „Fans moegen“.
+  const gewachsen = stempel?.klassenVorliebe?.[teamId]?.klasse;
+  const mag = daten?.mag ?? { rassen: [], klassen: [], traits: [] };
   return {
     teamId,
     name: daten?.name ?? teamId,
     ton: daten ? tonDerFans(daten.manners) : 0,
     zielgruppe: daten?.zielgruppe ?? "Gemischtes Publikum",
-    mag: daten?.mag ?? { rassen: [], klassen: [], traits: [] },
+    mag: gewachsen && !mag.klassen.includes(gewachsen) ? { ...mag, klassen: [...mag.klassen, gewachsen] } : mag,
     meidet: daten?.meidet ?? { rassen: [], klassen: [], traits: [] },
     fanfarbe: stempel?.fanfarbe?.[teamId] ?? start,
   };
@@ -195,10 +198,67 @@ function teamEingabe(gameState: GameState, teamId: string): MarketingTeamEingabe
 
 const gesichtCache = new WeakMap<object, Map<string, string | null>>();
 
+/** Die sechs besten (nach Rating) des Kaders: nur unter ihnen darf das Aushaengeschild stehen. */
+export function besteSechs(gameState: Pick<GameState, "rosters" | "players">, teamId: string): Array<{ entry: RosterEntry; player: Player }> {
+  return [...kaderEinesTeams(gameState, teamId)].sort((a, b) => b.player.rating - a.player.rating || a.player.id.localeCompare(b.player.id)).slice(0, 6);
+}
+
+export type GesichtKandidat = {
+  playerId: string;
+  jetzt: MarketingSpielerErgebnis;
+  alsGesicht: MarketingSpielerErgebnis;
+  /** Zusatzertrag ans Team in C je Saison (ans Team als Gesicht minus ans Team ohne). */
+  zusatz: number;
+};
+
 /**
- * Aushaengeschild des Teams: die Manager-Wahl (`seasonState.marketingAushaengeschild`), sonst die KI-Regel -- hoechste Marketability
- * unter den sechs besten (nach Rating) des Kaders. `null` bei leerem Kader.
+ * Die sechs Kandidaten mit ihrer Rechnung ohne und mit Gesicht (Werbegeld +25 %, Team-Anteil +8 Punkte, Netz und 65 % gelten weiter).
+ * Dieselbe Funktion waehlt die KI und fuellt die Tabelle der Seite. `moralOhneFn` = Moral ohne Werbe-Zuschlag; ohne sie rechnet die Wahl der
+ * KI mit neutraler Moral -- bewusst: eine Wahl, die vom eingefrorenen Stand abhinge, kippte nach dem ersten Buchen (gezeigt = gebucht).
  */
+export function gesichtKandidaten(
+  gameState: GameState,
+  teamId: string,
+  moralOhneFn?: (playerId: string) => number | null,
+): GesichtKandidat[] {
+  return besteSechs(gameState, teamId).map(({ entry, player }) => {
+    const moral = moralOhneFn ? moralOhneFn(player.id) : null;
+    const jetzt = marketingSpielerFuer(gameState, teamId, player, entry, moral, false);
+    const alsGesicht = marketingSpielerFuer(gameState, teamId, player, entry, moral, true);
+    return { playerId: player.id, jetzt, alsGesicht, zusatz: alsGesicht.ansTeam - jetzt.ansTeam };
+  });
+}
+
+/**
+ * KI-Wahl des Aushaengeschilds. Regel von 23.11. (Stempel `klausel-v2`): hoechster Zusatzertrag ans Team, bei Gleichstand hoehere Marketability,
+ * dann Id. Aeltere Stempel: hoechste Marketability unter den sechs besten.
+ */
+export function kiAushaengeschild(gameState: GameState, teamId: string, moralOhneFn?: (playerId: string) => number | null): string | null {
+  if (werbeklauselAktiv(gameState)) {
+    const liste = gesichtKandidaten(gameState, teamId, moralOhneFn);
+    liste.sort((a, b) => b.zusatz - a.zusatz || b.jetzt.marketability - a.jetzt.marketability || a.playerId.localeCompare(b.playerId));
+    return liste[0]?.playerId ?? null;
+  }
+  let id: string | null = null;
+  let besterWert = -1;
+  for (const k of besteSechs(gameState, teamId)) {
+    const m = marketabilityFuer(gameState, teamId, k.player);
+    if (m > besterWert) {
+      besterWert = m;
+      id = k.player.id;
+    }
+  }
+  return id;
+}
+
+/** Hat der Manager gewaehlt (und steht der Spieler noch im Kader)? */
+export function gewaehltesAushaengeschild(gameState: GameState, teamId: string) {
+  const wahl = gameState.seasonState?.marketingAushaengeschild?.[teamId];
+  if (!wahl || wahl.seasonId !== gameState.seasonState.seasonId) return null;
+  return kaderEinesTeams(gameState, teamId).some((k) => k.player.id === wahl.playerId) ? wahl : null;
+}
+
+/** Aushaengeschild des Teams: die Manager-Wahl (`seasonState.marketingAushaengeschild`), sonst die KI-Wahl. `null` bei leerem Kader. */
 export function aushaengeschildFuer(gameState: GameState, teamId: string): string | null {
   let jeTeam = gesichtCache.get(gameState);
   if (!jeTeam) {
@@ -206,22 +266,7 @@ export function aushaengeschildFuer(gameState: GameState, teamId: string): strin
     gesichtCache.set(gameState, jeTeam);
   }
   if (jeTeam.has(teamId)) return jeTeam.get(teamId)!;
-  const kader = kaderEinesTeams(gameState, teamId);
-  const wahl = gameState.seasonState?.marketingAushaengeschild?.[teamId];
-  let id: string | null = null;
-  if (wahl && wahl.seasonId === gameState.seasonState.seasonId && kader.some((k) => k.player.id === wahl.playerId)) {
-    id = wahl.playerId;
-  } else {
-    const beste = [...kader].sort((a, b) => b.player.rating - a.player.rating || a.player.id.localeCompare(b.player.id)).slice(0, 6);
-    let besterWert = -1;
-    for (const k of beste) {
-      const m = marketabilityFuer(gameState, teamId, k.player);
-      if (m > besterWert) {
-        besterWert = m;
-        id = k.player.id;
-      }
-    }
-  }
+  const id = gewaehltesAushaengeschild(gameState, teamId)?.playerId ?? kiAushaengeschild(gameState, teamId);
   jeTeam.set(teamId, id);
   return id;
 }
@@ -236,6 +281,8 @@ export function marketingSpielerFuer(
   player: Player,
   entry: RosterEntry,
   moralOhne: number | null,
+  /** Nur fuer die Kandidatenrechnung des Aushaengeschilds: erzwingt „ist / ist nicht das Gesicht“. */
+  gesichtErzwingen?: boolean,
 ): MarketingSpielerErgebnis {
   return berechneMarketing(
     {
@@ -250,7 +297,7 @@ export function marketingSpielerFuer(
       klausel: entry.marketingKlausel ?? 0,
       // Verletzte zaehlen zur Haelfte; der Verfuegbarkeitsstatus steht im Kader-Hash des Dauer-Caches (marketing-team.ts).
       verletzt: istVerletzt(gameState, player.id, teamId),
-      istGesicht: aushaengeschildFuer(gameState, teamId) === player.id,
+      istGesicht: gesichtErzwingen ?? aushaengeschildFuer(gameState, teamId) === player.id,
     },
     teamEingabe(gameState, teamId),
   );

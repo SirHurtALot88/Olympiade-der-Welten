@@ -82,6 +82,9 @@ import { computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks"
 import { buildLegacyMatchdayReadiness, type LegacyMatchdayReadinessStatus } from "@/lib/lineups/legacy-matchday-readiness";
 import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { AiNeedSummary } from "@/lib/ai/types";
+import { alleTraitsVon, klauselFuerVertrag, klauselZeilen } from "@/lib/marketing/marketing-klausel";
+import { gehaltMitKlausel, klauselErlaubt } from "@/lib/marketing/marketing-modell";
+import { werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
 import type {
   TransfermarktBuyExecuteResult,
   TransfermarktBuyParams,
@@ -1201,7 +1204,25 @@ function buildLocalTransfermarktBuyPreviewFromContext(
   const festSchedule = festkonditionen
     ? buildFastLocalYearlySalarySchedule({ salary: salary as number, contractLength, contractShape, seasonId: gameState.season.id })
     : null;
-  const contractSalary = festkonditionen ? (salary as number) : (negotiationPreview.offeredSalary ?? salary);
+  const contractSalaryBasis = festkonditionen ? (salary as number) : (negotiationPreview.offeredSalary ?? salary);
+  // WERBEKLAUSEL (23.11.): das gebuchte Gehalt ist das verhandelte Gehalt mit dem Klausel-Faktor; Draft-Festkonditionen bleiben Standard.
+  const klauselAktiv = werbeklauselAktiv(gameState) && !festkonditionen && player != null;
+  const klauselTraits = player ? alleTraitsVon(player) : [];
+  const klauselGewaehlt = klauselAktiv && player ? klauselFuerVertrag(gameState, params.teamId, player, params.marketingKlausel) : 0;
+  const klauselBlocker = klauselAktiv && params.marketingKlausel === 1 && !klauselErlaubt(1, klauselTraits) ? ["werbeklausel_vom_spieler_abgelehnt"] : [];
+  const contractSalary = contractSalaryBasis != null && klauselAktiv ? gehaltMitKlausel(contractSalaryBasis, klauselGewaehlt, klauselTraits) : contractSalaryBasis;
+  const klauselFaktor = contractSalaryBasis != null && contractSalaryBasis > 0 && contractSalary != null ? contractSalary / contractSalaryBasis : 1;
+  const klauselSchedule =
+    klauselFaktor === 1 || festSchedule
+      ? null
+      : negotiationPreview.yearlySalarySchedule.map((jahr) => ({ ...jahr, salary: Math.round(jahr.salary * klauselFaktor * 100) / 100 }));
+  const klauselVorschau =
+    klauselAktiv && player && contractSalaryBasis != null
+      ? {
+          gewaehlt: klauselGewaehlt,
+          zeilen: klauselZeilen(gameState, params.teamId, player, contractSalaryBasis, contractLength, null, true),
+        }
+      : null;
   /**
    * DAS VERDIKT ZAEHLT ERST HIER — und deshalb wird `canBuy` auch erst hier entschieden.
    *
@@ -1209,7 +1230,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
    * Verhandlungsvorschau ueberhaupt gebaut war. Ein abgelehntes Angebot konnte damit gar nicht
    * blocken: die Antwort trug `verdict: "reject_lowball"` und `canBuy: true` nebeneinander.
    */
-  const blockingReasonsMitVerdikt = festkonditionen ? [...blockingReasons] : [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict)];
+  const blockingReasonsMitVerdikt = festkonditionen ? [...blockingReasons] : [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict), ...klauselBlocker];
   const canBuy = blockingReasonsMitVerdikt.length === 0;
 
   return {
@@ -1250,9 +1271,15 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     baseExpectedSalary: negotiationPreview.baseExpectedSalary,
     demandMultiplier: negotiationPreview.demandMultiplier,
     offeredSalary: festkonditionen ? (salary as number) : negotiationPreview.offeredSalary,
+    gehaltMitKlausel: klauselAktiv ? contractSalary : null,
+    klausel: klauselVorschau,
     offerRatio: negotiationPreview.offerRatio,
-    yearlySalarySchedule: festSchedule ?? negotiationPreview.yearlySalarySchedule,
-    totalSalary: festSchedule ? festSchedule.reduce((sum, row) => sum + row.salary, 0) : negotiationPreview.totalSalary,
+    yearlySalarySchedule: festSchedule ?? klauselSchedule ?? negotiationPreview.yearlySalarySchedule,
+    totalSalary: festSchedule
+      ? festSchedule.reduce((sum, row) => sum + row.salary, 0)
+      : klauselSchedule
+        ? Math.round(klauselSchedule.reduce((sum, row) => sum + row.salary, 0) * 100) / 100
+        : negotiationPreview.totalSalary,
     roundingAdjustment: negotiationPreview.roundingAdjustment,
     buyoutCost: negotiationPreview.buyoutCost,
     bracket: negotiationPreview.bracket,
@@ -2769,7 +2796,10 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
         salaryPreferenceAdjustmentPct: contractShapeSalarySurcharge,
       })
     : 1;
-  const salary = baseSalary != null ? roundValue(baseSalary * contractLengthSalaryFactor, 2) : null;
+  const salaryOhneKlausel = baseSalary != null ? roundValue(baseSalary * contractLengthSalaryFactor, 2) : null;
+  // WERBEKLAUSEL (23.11.): auch der KI-Massenkauf folgt der Regel (KI-Wahl nach Finanzwert); Draft-Festkonditionen bleiben Standard.
+  const klauselFast = werbeklauselAktiv(gameState) && params.draftFestkonditionen !== true && player != null ? klauselFuerVertrag(gameState, params.teamId, player, params.marketingKlausel) : null;
+  const salary = salaryOhneKlausel != null && klauselFast != null && player ? gehaltMitKlausel(salaryOhneKlausel, klauselFast, alleTraitsVon(player)) : salaryOhneKlausel;
   const promisedRole = derivePromisedRoleForBuy({
     explicitRole: params.promisedRole ?? null,
     contractLength,
@@ -2947,6 +2977,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
         // durch). `salary` ist das verhandelte JAHRESGEHALT — die Raten entstehen erst in
         // `yearlySalarySchedule`.
         negotiatedAnnualSalary: salary,
+        ...(klauselFast != null ? { marketingKlausel: klauselFast } : {}),
         purchasePrice,
         currentValue: marketValueReference,
         roleTag: "prospect",
@@ -3060,12 +3091,13 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
         contractLength: preview.contractLength,
         contractShape: preview.contractShape,
         yearlySalarySchedule: preview.yearlySalarySchedule,
-        salary: preview.offeredSalary ?? preview.salary,
-        upkeep: preview.offeredSalary ?? preview.salary,
+        salary: preview.gehaltMitKlausel ?? preview.offeredSalary ?? preview.salary,
+        upkeep: preview.gehaltMitKlausel ?? preview.offeredSalary ?? preview.salary,
+        ...(preview.klausel ? { marketingKlausel: preview.klausel.gewaehlt } : {}),
         // UNTERSCHRIFTSPFAD: Transferkauf und Free-Agent-Signing, Mensch wie KI (alle
         // `executeLocalTransfermarktBuy`-Aufrufer). Das VERHANDELTE Gehalt ist `offeredSalary` —
         // faellt es weg, ist es das Formel-Gehalt, weil dann nicht verhandelt wurde.
-        negotiatedAnnualSalary: preview.offeredSalary ?? preview.salary,
+        negotiatedAnnualSalary: preview.gehaltMitKlausel ?? preview.offeredSalary ?? preview.salary,
         purchasePrice: preview.purchasePrice,
         currentValue: marketValueReference,
         roleTag: "prospect",
@@ -3089,7 +3121,7 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
         fromTeamId: null,
         toTeamId: params.teamId,
         fee: preview.purchasePrice,
-        salary: preview.offeredSalary ?? preview.salary,
+        salary: preview.gehaltMitKlausel ?? preview.offeredSalary ?? preview.salary,
         marketValue: marketValueReference,
         remainingContractLength: preview.contractLength,
         happenedAt: new Date().toISOString(),
