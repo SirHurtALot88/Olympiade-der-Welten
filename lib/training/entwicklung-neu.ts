@@ -102,7 +102,7 @@ export const ENTWICKLUNGS_PARAMETER_STANDARD: EntwicklungsParameter = {
  * (60 / 40, Schwung, Ligafaktor, Matrix nur gelesen); alle Raten wachsen um den Faktor `ENTWICKLUNGS_TEMPO_NEU2`, die Summengrenzen mit ihnen.
  * Die Spreizung innerhalb der Liga kommt aus der Trainingsguete (`trainingsGuete`), nicht aus dem Zufall.
  */
-export const ENTWICKLUNGS_TEMPO_NEU2 = 3.5;
+export const ENTWICKLUNGS_TEMPO_NEU2 = 3.9;
 
 export const ENTWICKLUNGS_PARAMETER_NEU2: EntwicklungsParameter = {
   ...ENTWICKLUNGS_PARAMETER_STANDARD,
@@ -115,10 +115,10 @@ export const ENTWICKLUNGS_PARAMETER_NEU2: EntwicklungsParameter = {
   schwungSumme: ENTWICKLUNGS_PARAMETER_STANDARD.schwungSumme * ENTWICKLUNGS_TEMPO_NEU2,
   // Schwung: die positiven Raender kuerzer (sonst zieht ein einzelner Ausreisser die Mitte der Liga ab), der negative Rand tiefer (Ueberlastete,
   // Verletzte, Schwache sollen spuerbar absacken: Chris 23.11. ca. 10 % deutlich schlechter).
-  schwungStaerke: 2.6,
+  schwungStaerke: 2.4,
   schwungMax: 2,
-  schwungMaxNegativ: 0.9,
-  negativSaisonGrenze: 40,
+  schwungMaxNegativ: 1.5,
+  negativSaisonGrenze: 60,
 };
 
 let parameterCache: EntwicklungsParameter | null = null;
