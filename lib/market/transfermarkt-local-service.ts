@@ -2314,6 +2314,8 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
 
     return {
       ...baseItem,
+      // MARKETABILITY (22.11.): auch im vollen Pfad, gleiche Stufe nach Scouting wie in der Kompaktliste.
+      marketability: player && marketingAktiv(gameState) ? baueMarktMarketability(gameState, selectedTeam.teamId, player, playerScoutingLevel) : null,
       traitsPositive: traitView.visiblePositiveTraits,
       traitsNegative: traitView.visibleNegativeTraits,
       preferredDisciplineIds: visiblePreferredDisciplineIds,

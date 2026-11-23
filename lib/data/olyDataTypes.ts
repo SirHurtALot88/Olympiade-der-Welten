@@ -4290,7 +4290,32 @@ export type SeasonState = {
     regel: "an" | "aus";
     fanfarbe?: Record<string, [number, number, number, number]>;
     verlauf?: Record<string, Array<{ seasonId: string; farbe: [number, number, number, number]; grund: string }>>;
+    /** Teamerfolg der VORSAISON je Team, beim Saisonwechsel aus dem Snapshot geschrieben (Browser ohne Snapshots rechnet damit gleich). */
+    teamErfolg?: Record<string, { punkte: number; grund: string; stufe: "verfehlt" | "erreicht" | "titel" | "keiner" }>;
+    /** Spiegel der Notbremse `OLY_MARKETING=aus-sofort`, vom Server beim naechsten Buchen gesetzt: ab dann buchen/wirken keine neuen Anteile, Gebuchtes bleibt. */
+    notbremse?: boolean;
   } | null;
+  /**
+   * MARKETING-STAND JE TEAM (22.11., lib/marketing/marketing-team.ts): das eingefrorene Rechenergebnis der Saison. Nur der Server schreibt
+   * ihn (`bucheSpieltagFinanzen`: erster Spieltag der Saison, neu bei geaendertem Kader-Hash). Seite, GuV-Prognose, Moral-Zuschlag und
+   * Buchung lesen ihn; ohne Stand rechnet die Seite eine als "Vorschau" gekennzeichnete Zahl.
+   */
+  marketingStand?: Record<
+    string,
+    {
+      seasonId: string;
+      kaderHash: string;
+      berechnetAmSpieltag: number;
+      /** Teammarke + Team-Anteile je Saison (Betrag fuer die Kasse). */
+      ansKasse: number;
+      /** Moral OHNE Werbe-Zuschlag je Spieler zum Stand der Berechnung (eingefroren). */
+      moralOhne: Record<string, number | null>;
+      /** Leistungsperzentil je Spieler zum Stand der Berechnung (eingefroren). */
+      leistungPerz: Record<string, number>;
+      /** Moral-Zuschlag je Spieler (nach Deckel). */
+      moralZuschlag: Record<string, number>;
+    }
+  > | null;
   /** Manager-Wahl des Aushaengeschilds je Team und Saison (optional; ohne Eintrag gilt die KI-Regel). */
   marketingAushaengeschild?: Record<string, { seasonId: string; playerId: string }> | null;
   /**

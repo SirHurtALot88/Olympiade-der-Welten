@@ -5,14 +5,16 @@
  * AUFRUF: OLY_APP_SQLITE_PATH=/pfad/kopie.sqlite npx tsx scripts/miss-spieltagsbuchung-dauer.ts <saveId>
  */
 import { bucheSpieltagFinanzen } from "@/lib/finance/finanzen-je-spieltag-buchung";
-import { marketingAktiv } from "@/lib/marketing/marketing-regel";
+import { marketingAktiv, marketingRegelFuerNeueSaison } from "@/lib/marketing/marketing-regel";
+import { stempleFinanzenJeSpieltagBeimAnlegen } from "@/lib/finance/finanzen-je-spieltag";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
 const saveId = process.argv[2];
 if (!saveId || !process.env.OLY_APP_SQLITE_PATH) throw new Error("saveId und OLY_APP_SQLITE_PATH setzen");
 const persistence = createPersistenceService();
 const g0 = persistence.getSaveById(saveId)!.gameState;
-let gs = { ...g0, seasonState: { ...g0.seasonState, spieltagFinanzen: [] } };
+let gs: typeof g0 = stempleFinanzenJeSpieltagBeimAnlegen({ ...g0, seasonState: { ...g0.seasonState, spieltagFinanzen: [], marketingStand: null } });
+if (!marketingAktiv(gs)) gs = { ...gs, seasonState: { ...gs.seasonState, marketingRegel: marketingRegelFuerNeueSaison(gs.season.id, gs.teams.map((t) => t.teamId)) } };
 console.log(`Teams ${gs.teams.length}, Spieler im Kader ${gs.rosters.length}, Marketing aktiv: ${marketingAktiv(gs)}`);
 const ids = gs.season.matchdayIds;
 for (let i = 0; i < 4; i += 1) {

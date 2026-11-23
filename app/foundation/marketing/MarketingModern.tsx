@@ -389,7 +389,7 @@ function KontextSpieler({ z, u }: { z: MarketingKaderZeile | null; u: ReturnType
         <div className="mk-zl"><span>ans Team{e.netzGreift ? " (Sicherheitsnetz: höchstens 25 % des Gehalts)" : ""}</span><b className="bc-t">{C1(e.ansTeam)}</b></div>
         <div className="mk-zl"><span>an ihn: seine Werbeverträge</span><b className="bc-t">{C1(e.anIhn)}</b></div>
         <div className="mk-zl"><span>Moral aus den Werbeverträgen</span><b className="bc-t">{e.moralZuschlag > 0 ? <><BcMoralGesicht wert={Math.min(100, (z.moralOhne ?? 50) + e.moralZuschlag)} groesse={16} /> +{e.moralZuschlag}</> : "±0"}</b></div>
-        <p className="mk-klein">Verletzte zählen zur Hälfte. Team-Anteile gelten je Saison und Kaderstand (Moral im Anteil eingefroren); je Spieltag wird ein Zwanzigstel gebucht. Der Teamerfolg der Vorsaison gilt für alle Spieler des Teams ({u.erfolg.grund}).</p>
+        <p className="mk-klein">Verletzte zählen zur Hälfte. Team-Anteile gelten je Saison und Kaderstand (Moral im Anteil eingefroren{u.vorschau ? "; Vorschau: noch nicht gebucht, die Zahlen rechnen mit dem heutigen Stand" : ""}); je Spieltag wird ein Zwanzigstel gebucht. Der Teamerfolg der Vorsaison gilt für alle Spieler des Teams ({u.erfolg.grund}).</p>
       </div>
     </div>
   );
@@ -459,7 +459,7 @@ export default function MarketingModern({ gameState, teamId, startKontext = "fan
       <BcHero
         wappen={wappen}
         wappenAlt={teamName}
-        dachzeile={<>Saison {saisonNr} · Kader · Marketing</>}
+        dachzeile={<>Saison {saisonNr} · Kader · Marketing{u.vorschau ? <> · <b data-testid="marketing-vorschau">Vorschau</b></> : null}</>}
         titel="Marketing"
         untertitel={
           <>

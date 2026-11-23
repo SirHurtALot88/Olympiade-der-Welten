@@ -80,6 +80,12 @@ const PFADE: Partial<Record<FoundationViewId, ReactNode>> = {
     </>
   ),
   // Ausruestung (22.11.): ein Schild mit Kreuzband, im Strich der uebrigen Symbole.
+  marketing: (
+    <>
+      <path d="M3 10v4h4l8 5V5L7 10z" />
+      <path d="M18 9c1.5 1 1.5 5 0 6" />
+    </>
+  ),
   ausruestung: (
     <>
       <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />

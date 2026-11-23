@@ -21,9 +21,8 @@ import {
   spieltageDerSaison,
   teileJahresbetrag,
 } from "@/lib/finance/finanzen-je-spieltag";
-import { marketingJahresbetrag } from "@/lib/marketing/marketing-team";
-import { marketingAktiv } from "@/lib/marketing/marketing-regel";
-import { buildMoraleLookupIndex, type MoraleLookupIndex } from "@/lib/morale/player-morale-service";
+import { aktualisiereMarketingStand, marketingJahresbetrag } from "@/lib/marketing/marketing-team";
+import type { MoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
 
 export function spieltagBuchungsId(seasonId: string, matchdayId: string, teamId: string): string {
@@ -53,11 +52,15 @@ export function jahresbetraegeEinesTeams(
  */
 export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, jetzt: string = new Date().toISOString()): GameState {
   if (!istJeSpieltagSaison(gameState)) return gameState;
+  const urspruenglich = gameState;
   const seasonId = gameState.season.id;
   const ids = gameState.season.matchdayIds ?? [];
   const index = ids.indexOf(matchdayId) + 1;
   if (index <= 0) return gameState;
   const n = spieltageDerSaison(gameState);
+  // MARKETING (22.11.): der Server schreibt den Marketing-Stand (erster Spieltag, geaenderter Kader) und spiegelt die Notbremse in den
+  // Stempel, BEVOR gelesen wird; die Buchung bucht damit nie eine Vorschau.
+  gameState = aktualisiereMarketingStand(gameState, index);
 
   const ledger = gameState.seasonState.spieltagFinanzen ?? [];
   const jeTeam = new Map<string, SpieltagFinanzBuchung[]>();
@@ -68,15 +71,13 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
 
   const neue: SpieltagFinanzBuchung[] = [];
   const cashDelta = new Map<string, number>();
-  // MARKETING (22.11.): der Moral-Index wird fuer alle Teams EINMAL gebaut (die Team-Anteile lesen die Moral je Spieler).
-  const moralIndex = marketingAktiv(gameState) ? buildMoraleLookupIndex(gameState) : undefined;
   for (const team of gameState.teams) {
     const bisher = jeTeam.get(team.teamId) ?? [];
     if (bisher.some((zeile) => zeile.matchdayId === matchdayId)) continue;
     // Rundungsrest der letzten frueheren Buchung dieser Saison (Reihenfolge nach Spieltag, nicht nach Schreibzeit).
     const vorher = bisher.filter((zeile) => zeile.matchdayIndex < index).sort((a, b) => b.matchdayIndex - a.matchdayIndex)[0];
     const rest0 = vorher?.rest ?? { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, marketing: 0 };
-    const j = jahresbetraegeEinesTeams(gameState, team.teamId, index, moralIndex);
+    const j = jahresbetraegeEinesTeams(gameState, team.teamId, index);
     const gehalt = teileJahresbetrag(j.gehalt, n, rest0.gehalt);
     const sponsor = teileJahresbetrag(j.sponsorBasis, n, rest0.sponsorBasis);
     const einnahme = teileJahresbetrag(j.gebaeudeEinnahme, n, rest0.gebaeudeEinnahme);
@@ -114,7 +115,7 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
     });
     if (delta !== 0) cashDelta.set(team.teamId, delta);
   }
-  if (neue.length === 0) return gameState;
+  if (neue.length === 0) return urspruenglich;
 
   return {
     ...gameState,

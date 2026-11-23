@@ -10,8 +10,10 @@ import {
   aushaengeschildFuer,
   budgetRangFuer,
   fanProfilFuer,
+  gleicheLigaWie,
   istVerletzt,
   kaderEinesTeams,
+  leistungsPerzentile,
   ligaStufeFuer,
   marketingSpielerFuer,
   teamErfolgAusSnapshot,
@@ -20,7 +22,7 @@ import {
 } from "@/lib/marketing/marketing-kontext";
 import { FANPROFILE, KLASSEN_FARBE, type Fanfarbe } from "@/lib/marketing/marketing-daten";
 import { MARKETING_KONFIG, anteile4, moralZuschlagAus, teammarkeAusRang, driftFanfarbe, driftSchritt, type FanProfil, type MarketingSpielerErgebnis } from "@/lib/marketing/marketing-modell";
-import { gueltigerMarketingStempel, marketingAktiv, marketingRegelFuerNeueSaison } from "@/lib/marketing/marketing-regel";
+import { gueltigerMarketingStempel, marketingAktiv, marketingRegelFuerNeueSaison, marketingSchalter } from "@/lib/marketing/marketing-regel";
 import { summeSpieltagBuchungen, ungebuchterAnteil } from "@/lib/finance/finanzen-je-spieltag";
 import { buildMoraleLookupIndex, moralOhneWerbung, type MoraleLookupIndex } from "@/lib/morale/player-morale-service";
 
@@ -62,41 +64,39 @@ export type MarketingTeamUebersicht = {
   ansKasse: number;
   /** Mittlerer Team-Anteil in Prozent des Werbegelds. */
   mittlererAnteilProzent: number;
+  /** true: kein gueltiger Marketing-Stand (Saisonbeginn oder Kader seit dem letzten Buchen geaendert); heutige Werte, die Buchung rechnet neu. */
+  vorschau: boolean;
 };
 
 const uebersichtCache = new WeakMap<object, Map<string, MarketingTeamUebersicht>>();
-/**
- * DAUER-CACHE (Nachbesserung 22.11.): Team-Anteile und Moral werden einmal je Saison und Kaderstand gerechnet, nicht je Spieltag fuer
- * alle Teams neu. Schluessel = Saison, Team, Liga, Fanfarbe, Aushaengeschild-Wahl und ein Hash des Kaders (Spieler, Restlaufzeit,
- * Klausel, Rating, Gehalt, Verletzt-Status). Kauf, Verkauf, Verlaengerung und Klausel aendern den Hash und rechnen neu; je Spieltag wird nur 1/N gebucht.
- * Die Moral im Team-Anteil ist damit auf den Stand beim ersten Rechnen der Saison bzw. nach der Kaderaenderung eingefroren.
- */
-const dauerCache = new Map<string, MarketingTeamUebersicht>();
-const DAUER_CACHE_MAX = 4000;
 
-export function marketingCacheSchluessel(gameState: GameState, teamId: string): string {
+type MarketingStandEintrag = NonNullable<NonNullable<GameState["seasonState"]["marketingStand"]>[string]>;
+
+/**
+ * KADER-HASH: Spieler, Restlaufzeit, Klausel, Rating, Gehalt, Verletzt-Status und die Aushaengeschild-Wahl. Aendert er sich, ist der
+ * Marketing-Stand des Teams veraltet; der Server rechnet ihn beim naechsten Buchen neu (Kauf, Verkauf, Verlaengerung, Klausel, Verletzung).
+ */
+export function marketingKaderHash(gameState: GameState, teamId: string): string {
   const kader = kaderEinesTeams(gameState, teamId)
     .map(({ entry, player }) => `${player.id}:${entry.contractLength}:${entry.marketingKlausel ?? 0}:${player.rating}:${Math.round((entry.salary ?? 0) * 10)}:${istVerletzt(gameState, player.id, teamId) ? 1 : 0}`)
     .sort()
     .join(",");
-  const stempel = gueltigerMarketingStempel(gameState);
-  return [
-    gameState.season?.id ?? "",
-    teamId,
-    ligaStufeFuer(gameState, teamId),
-    stempel?.fanfarbe?.[teamId]?.join("/") ?? "start",
-    gameState.seasonState?.marketingAushaengeschild?.[teamId]?.playerId ?? "",
-    budgetRangFuer(gameState, teamId).rang,
-    kader,
-  ].join("|");
+  return [teamId, gameState.seasonState?.marketingAushaengeschild?.[teamId]?.playerId ?? "", kader].join("|");
 }
 
-/** Leert den Dauer-Cache (Tests). */
-export function leereMarketingCache(): void {
-  dauerCache.clear();
+/** Der Marketing-Stand des Teams in der laufenden Saison (egal ob der Kader-Hash noch passt), sonst `null`. */
+export function marketingStandFuer(gameState: GameState, teamId: string): MarketingStandEintrag | null {
+  const stand = gameState.seasonState?.marketingStand?.[teamId];
+  const seasonId = gameState.seasonState?.seasonId ?? gameState.season?.id;
+  return stand && stand.seasonId === seasonId ? stand : null;
 }
 
-/** Gecacht je Spielstand-Objekt (erste Stufe) und je Saison/Kaderstand (zweite Stufe). */
+/**
+ * Die Team-Uebersicht fuer Seite, Prognose und Buchung. Mit gueltigem Stand (Kader-Hash passt) rechnet sie NUR mit den eingefrorenen
+ * Eingaben des Standes (Moral, Leistungsperzentil, Teamerfolg aus dem Stempel): Server, Browser und Neustart ergeben dieselbe Zahl.
+ * Ohne Stand oder bei geaendertem Kader ist es eine Vorschau (`vorschau: true`) mit den heutigen Werten. Kein modulweiter Cache mit
+ * Zustandswirkung, nur ein Memo je Spielstand-Objekt.
+ */
 export function marketingTeamUebersicht(gameState: GameState, teamId: string, index?: MoraleLookupIndex): MarketingTeamUebersicht {
   let jeTeam = uebersichtCache.get(gameState);
   if (!jeTeam) {
@@ -105,29 +105,68 @@ export function marketingTeamUebersicht(gameState: GameState, teamId: string, in
   }
   const bekannt = jeTeam.get(teamId);
   if (bekannt) return bekannt;
-  const key = marketingCacheSchluessel(gameState, teamId);
-  let neu = dauerCache.get(key);
-  if (!neu) {
-    neu = berechneUebersicht(gameState, teamId, index);
-    if (dauerCache.size >= DAUER_CACHE_MAX) dauerCache.clear();
-    dauerCache.set(key, neu);
-  }
-  jeTeam.set(teamId, neu);
-  return neu;
+  const stand = marketingStandFuer(gameState, teamId);
+  const gueltig = stand != null && stand.kaderHash === marketingKaderHash(gameState, teamId);
+  const neu = berechneUebersicht(gameState, teamId, gueltig ? stand : null, index);
+  jeTeam.set(teamId, { ...neu, vorschau: !gueltig });
+  return jeTeam.get(teamId)!;
 }
 
-/** Moral-Zuschlag EINES Spielers aus der (gecachten, gedeckelten) Team-Uebersicht; 0, wenn er nicht im Kader steht. */
+/** Moral-Zuschlag EINES Spielers aus dem Marketing-Stand des Teams; 0 ohne Stand oder wenn er nicht im Stand steht. */
 export function marketingMoralZuschlag(gameState: GameState, teamId: string, playerId: string): number {
-  return marketingTeamUebersicht(gameState, teamId).zeilen.find((z) => z.playerId === playerId)?.ergebnis.moralZuschlag ?? 0;
+  return marketingStandFuer(gameState, teamId)?.moralZuschlag?.[playerId] ?? 0;
 }
 
-function berechneUebersicht(gameState: GameState, teamId: string, index?: MoraleLookupIndex): MarketingTeamUebersicht {
-  const ix = index ?? buildMoraleLookupIndex(gameState);
+/**
+ * Schreibt den Marketing-Stand (nur Server, aus `bucheSpieltagFinanzen`): beim ersten Spieltag der Saison und neu, wenn sich der
+ * Kader-Hash eines Teams geaendert hat. Moral und Leistungsperzentil werden dabei mit dem Stand dieses Spieltags eingefroren.
+ * Spiegelt ausserdem die Notbremse in den Stempel. Gibt den Spielstand unveraendert zurueck, wenn nichts zu tun ist.
+ */
+export function aktualisiereMarketingStand(gameState: GameState, spieltagIndex: number): GameState {
+  const stempel = gueltigerMarketingStempel(gameState);
+  if (!stempel || stempel.regel !== "an") return gameState;
+  let naechster = gameState;
+  if (marketingSchalter() === "aus-sofort") {
+    if (stempel.notbremse) return gameState;
+    return { ...gameState, seasonState: { ...gameState.seasonState, marketingRegel: { ...stempel, notbremse: true } } };
+  }
+  if (!marketingAktiv(gameState)) return gameState;
+  const seasonId = gameState.seasonState.seasonId ?? gameState.season.id;
+  // Frische Huelle ohne Stand: alle Lesewege (Perzentil, Moral) rechnen mit den heutigen Werten.
+  const live: GameState = { ...gameState, seasonState: { ...gameState.seasonState, marketingStand: null } };
+  const ix = buildMoraleLookupIndex(live);
+  const neuerStand: NonNullable<GameState["seasonState"]["marketingStand"]> = { ...(gameState.seasonState.marketingStand ?? {}) };
+  let geaendert = false;
+  for (const team of gameState.teams) {
+    const hash = marketingKaderHash(gameState, team.teamId);
+    const alt = marketingStandFuer(gameState, team.teamId);
+    if (alt && alt.kaderHash === hash) continue;
+    const u = berechneUebersicht(live, team.teamId, null, ix);
+    const perz = leistungsPerzentile(live);
+    const moralOhne: Record<string, number | null> = {};
+    const leistungPerz: Record<string, number> = {};
+    const moralZuschlag: Record<string, number> = {};
+    for (const z of u.zeilen) {
+      moralOhne[z.playerId] = z.moralOhne;
+      leistungPerz[z.playerId] = perz.get(z.playerId) ?? 0;
+      moralZuschlag[z.playerId] = z.ergebnis.moralZuschlag;
+    }
+    neuerStand[team.teamId] = { seasonId, kaderHash: hash, berechnetAmSpieltag: spieltagIndex, ansKasse: u.ansKasse, moralOhne, leistungPerz, moralZuschlag };
+    geaendert = true;
+  }
+  if (geaendert) naechster = { ...gameState, seasonState: { ...gameState.seasonState, marketingStand: neuerStand } };
+  return naechster;
+}
+
+function berechneUebersicht(gameState: GameState, teamId: string, stand: MarketingStandEintrag | null, index?: MoraleLookupIndex): MarketingTeamUebersicht {
+  // Eingefroren: nur wenn ein Stand die Moral des Spielers kennt, sonst der heutige Wert (Vorschau).
+  let ixLazy = index;
+  const ix = () => (ixLazy ??= buildMoraleLookupIndex(gameState));
   const kader = kaderEinesTeams(gameState, teamId);
   const liga = ligaStufeFuer(gameState, teamId);
   const gesichtId = aushaengeschildFuer(gameState, teamId);
   let zeilen: MarketingKaderZeile[] = kader.map(({ entry, player }) => {
-    const moralOhne = moralOhneWerbung(gameState, player.id, teamId, ix);
+    const moralOhne = stand && player.id in stand.moralOhne ? stand.moralOhne[player.id]! : moralOhneWerbung(gameState, player.id, teamId, ix());
     const ergebnis = marketingSpielerFuer(gameState, teamId, player, entry, moralOhne);
     return zeileAus(player, entry, moralOhne, ergebnis, gesichtId === player.id);
   });
@@ -167,6 +206,7 @@ function berechneUebersicht(gameState: GameState, teamId: string, index?: Morale
     deckelGreift,
     ansKasse: teammarke + teamAnteile,
     mittlererAnteilProzent: werbegeld > 0 ? Math.round((teamAnteile / werbegeld) * 100) : 0,
+    vorschau: false,
   };
 }
 
@@ -188,20 +228,24 @@ function zeileAus(player: Player, entry: RosterEntry, moralOhne: number | null, 
   };
 }
 
-/** Jahresbetrag fuer die Kasse (Teammarke + Team-Anteile) zum heutigen Stand; 0 ohne gueltige Regel. */
+/**
+ * Jahresbetrag fuer die Kasse (Teammarke + Team-Anteile): der Marketing-Stand, sonst (vor dem ersten Buchen) die Vorschau; 0 ohne
+ * gueltige Regel. Die Buchung schreibt den Stand VOR dem Lesen, so dass sie nie eine Vorschau bucht.
+ */
 export function marketingJahresbetrag(gameState: GameState, teamId: string, index?: MoraleLookupIndex): number {
   if (!marketingAktiv(gameState)) return 0;
+  const stand = marketingStandFuer(gameState, teamId);
+  if (stand) return stand.ansKasse;
   return marketingTeamUebersicht(gameState, teamId, index).ansKasse;
 }
 
 /**
- * Marketing-Betrag der GANZEN Saison fuer die GuV: was je Spieltag schon gebucht ist plus der noch ungebuchte Anteil zum heutigen Stand.
- * Am Saisonende (nichts mehr offen) genau die Summe der gebuchten Zeilen. 0 ohne gueltige Regel.
+ * Marketing-Betrag der GANZEN Saison fuer die GuV: was je Spieltag schon gebucht ist (zaehlt IMMER, auch nach der Notbremse) plus der
+ * noch ungebuchte Anteil zum Stand (nur bei aktivem Marketing). Am Saisonende genau die Summe der gebuchten Zeilen.
  */
 export function marketingSaisonbetrag(gameState: GameState, teamId: string, index?: MoraleLookupIndex): number {
-  if (!marketingAktiv(gameState)) return 0;
   const gebucht = summeSpieltagBuchungen(gameState, teamId).marketing;
-  const offen = ungebuchterAnteil(gameState, teamId);
+  const offen = marketingAktiv(gameState) ? ungebuchterAnteil(gameState, teamId) : 0;
   const rest = offen > 0 ? offen * marketingJahresbetrag(gameState, teamId, index) : 0;
   return Math.round((gebucht + rest) * 100) / 100;
 }
@@ -221,11 +265,15 @@ export function marketingStempelFuerSaisonwechsel(
   const teamIds = gameState.teams.map((t) => t.teamId);
   if (!alt || alt.regel !== "an" || alt.seasonId !== abgelaufeneSaisonId) {
     // Vorsaison lief ohne Marketing (bestehender Spielstand oder Rueckweg): die Farbe startet frisch bei den Stammdaten.
-    return marketingRegelFuerNeueSaison(naechsteSaisonId, teamIds, alt?.verlauf ? { verlauf: alt.verlauf } : undefined);
+    return marketingRegelFuerNeueSaison(naechsteSaisonId, teamIds, {
+      ...(alt?.verlauf ? { verlauf: alt.verlauf } : {}),
+      teamErfolg: erfolgJeTeam(gameState, abgelaufeneSaisonId, teamIds),
+    });
   }
   const snap = (gameState.seasonState.seasonSnapshots ?? []).find((s) => s.seasonId === abgelaufeneSaisonId);
   const fanfarbe: Record<string, Fanfarbe> = {};
   const verlauf: NonNullable<typeof alt.verlauf> = { ...(alt.verlauf ?? {}) };
+  const teamErfolg: Record<string, TeamErfolg> = {};
   for (const teamId of teamIds) {
     const start = FANPROFILE[teamId]?.farbeStart ?? ([5, 5, 5, 5] as Fanfarbe);
     const vorher = alt.fanfarbe?.[teamId] ?? start;
@@ -241,12 +289,18 @@ export function marketingStempelFuerSaisonwechsel(
       zeile?.disciplinePointsByArea?.men ?? 0,
       zeile?.disciplinePointsByArea?.soc ?? 0,
     ];
-    const ergebnis = teamErfolgAusSnapshot(snap, teamId);
+    const ergebnis = teamErfolgAusSnapshot(snap, teamId, gleicheLigaWie(gameState, teamId));
+    teamErfolg[teamId] = ergebnis;
     const stufe = ergebnis.stufe === "titel" ? "titel" : ergebnis.stufe === "erreicht" ? "erreicht" : "verfehlt";
     const neu = driftFanfarbe(vorher, start, anteile4(kader), anteile4(erfolg), driftSchritt(stufe));
     fanfarbe[teamId] = neu;
     const liste = verlauf[teamId] ?? [{ seasonId: abgelaufeneSaisonId, farbe: [...vorher] as Fanfarbe, grund: "Start" }];
     verlauf[teamId] = [...liste, { seasonId: naechsteSaisonId, farbe: neu, grund: ergebnis.grund }];
   }
-  return marketingRegelFuerNeueSaison(naechsteSaisonId, teamIds, { fanfarbe, verlauf });
+  return marketingRegelFuerNeueSaison(naechsteSaisonId, teamIds, { fanfarbe, verlauf, teamErfolg });
+}
+
+function erfolgJeTeam(gameState: GameState, abgelaufeneSaisonId: string, teamIds: readonly string[]): Record<string, TeamErfolg> {
+  const snap = (gameState.seasonState.seasonSnapshots ?? []).find((s) => s.seasonId === abgelaufeneSaisonId);
+  return Object.fromEntries(teamIds.map((id) => [id, teamErfolgAusSnapshot(snap, id, gleicheLigaWie(gameState, id))]));
 }

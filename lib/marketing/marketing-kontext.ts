@@ -54,21 +54,35 @@ export type TeamErfolg = { punkte: number; grund: string; stufe: "verfehlt" | "e
  * wird: Saisonziel erreicht = obere Haelfte der Liga, Titel = Rang 1, Farb-Meister = meiste Punkte einer Farbe in der Liga.
  */
 export function teamErfolgVorsaison(gameState: GameState, teamId: string): TeamErfolg {
+  // Der Stempel traegt den Teamerfolg (beim Saisonwechsel aus dem Snapshot geschrieben): Server und Browser rechnen damit gleich, auch
+  // wenn die Kompaktladung keine Snapshots mitbringt. Nur ein Stempel OHNE das Feld faellt auf den Snapshot zurueck.
+  const stempel = gueltigerMarketingStempel(gameState);
+  const gespeichert = stempel?.teamErfolg?.[teamId];
+  if (gespeichert) return gespeichert;
+  if (stempel?.teamErfolg) return { punkte: 0, grund: "erste Saison, noch kein Teamerfolg", stufe: "keiner" };
   const aktuell = gameState.seasonState?.seasonId ?? gameState.season?.id;
   const snaps = (gameState.seasonState?.seasonSnapshots ?? []).filter((s) => s.seasonId !== aktuell);
-  return teamErfolgAusSnapshot(snaps[snaps.length - 1], teamId);
+  return teamErfolgAusSnapshot(snaps[snaps.length - 1], teamId, gleicheLigaWie(gameState, teamId));
+}
+
+/** Prueft, ob ein anderes Team in derselben Liga spielt wie `teamId` (Farb-Meister zaehlt nur dort). */
+export function gleicheLigaWie(gameState: GameState, teamId: string): (anderes: string) => boolean {
+  const liga = getLeagueOf(gameState, teamId);
+  return (anderes) => !liga || getLeagueOf(gameState, anderes) === liga;
 }
 
 export function teamErfolgAusSnapshot(
   snap: NonNullable<GameState["seasonState"]["seasonSnapshots"]>[number] | undefined,
   teamId: string,
+  /** Ligazugehoerigkeit je Team (der Farb-Meister zaehlt nur in der eigenen Liga); ohne sie zaehlen alle. */
+  gleicheLiga?: (anderesTeamId: string) => boolean,
 ): TeamErfolg {
   const zeile = snap?.finalStandings?.find((z) => z.teamId === teamId);
   if (!snap || !zeile || zeile.rank == null) return { punkte: 0, grund: "erste Saison, noch kein Teamerfolg", stufe: "keiner" };
   const farben = ["pow", "spe", "men", "soc"] as const;
   const nameDe = { pow: "POW", spe: "SPE", men: "MEN", soc: "SOC" } as const;
   for (const f of farben) {
-    const meiste = Math.max(...snap.finalStandings.map((z) => z.disciplinePointsByArea?.[f] ?? -Infinity));
+    const meiste = Math.max(...snap.finalStandings.filter((z) => !gleicheLiga || gleicheLiga(z.teamId)).map((z) => z.disciplinePointsByArea?.[f] ?? -Infinity));
     if ((zeile.disciplinePointsByArea?.[f] ?? -Infinity) === meiste && meiste > 0) {
       return { punkte: 6, grund: `Farb-Meister ${nameDe[f]} in der Vorsaison`, stufe: "titel" };
     }
@@ -103,6 +117,14 @@ export function leistungsPerzentile(gameState: Pick<GameState, "players">): Map<
   }
   percentilCache = { quelle: gameState.players, perz };
   return perz;
+}
+
+/** Leistungsperzentil eines Spielers: der eingefrorene Wert aus dem Marketing-Stand des Teams, sonst der heutige Stand. */
+export function perzentilFuer(gameState: GameState, teamId: string, playerId: string): number {
+  const stand = gameState.seasonState?.marketingStand?.[teamId];
+  const seasonId = gameState.seasonState?.seasonId ?? gameState.season?.id;
+  const fest = stand && stand.seasonId === seasonId ? stand.leistungPerz[playerId] : undefined;
+  return fest ?? leistungsPerzentile(gameState).get(playerId) ?? 0;
 }
 
 export function istVerletzt(gameState: Pick<GameState, "seasonState">, playerId: string, teamId: string): boolean {
@@ -148,7 +170,7 @@ export function marketabilityFuer(gameState: GameState, teamId: string, player: 
       className: player.className,
       alignment: player.alignment,
       traits: alleTraits(player),
-      leistungPerz: leistungsPerzentile(gameState).get(player.id) ?? 0,
+      leistungPerz: perzentilFuer(gameState, teamId, player.id),
       gehalt: 0,
     },
     teamEingabe(gameState, teamId),
@@ -221,7 +243,7 @@ export function marketingSpielerFuer(
       className: player.className,
       alignment: player.alignment,
       traits: alleTraits(player),
-      leistungPerz: leistungsPerzentile(gameState).get(player.id) ?? 0,
+      leistungPerz: perzentilFuer(gameState, teamId, player.id),
       gehalt: jahresgehalt(player, entry),
       moralOhne,
       restlaufzeit: Number.isFinite(entry.contractLength) ? entry.contractLength : null,

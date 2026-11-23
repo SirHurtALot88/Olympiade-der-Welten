@@ -684,6 +684,7 @@ function buildNextSeasonGameState(
     // (Kader und Erfolg der abgelaufenen Saison), der Verlauf wird fortgeschrieben. Rueckweg OLY_MARKETING=aus.
     marketingRegel: marketingStempelFuerSaisonwechsel(save.gameState, save.gameState.season.id, nextSeasonId),
     marketingAushaengeschild: null,
+    marketingStand: null,
     // AUSRUESTUNGS-REGEL (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste der neuen Saison, ab Saisonbeginn nach dem
     // Schalter OLY_AUSRUESTUNG (Phase 1a: nur Besitz). Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel.
     ausruestungRegel: ausruestungRegelFuerNeueSaison(save.gameState, nextSeasonId),

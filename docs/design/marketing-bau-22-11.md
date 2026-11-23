@@ -89,20 +89,33 @@ Ziel erreicht: das Verhältnis steigt in keiner Saat und der GuV-Abstand wächst
 weniger als bei 0,5; reiche und arme 8 liegen im Marketing nahe beieinander (6,8 gegen 7,7 C). Der Ausgangswert "ohne Marketing" liegt in diesen Läufen bei 1,24 bis 1,25
 (Saison 1) statt 1,23 der ersten Messung (anderer Draft).
 
-## Nachbesserung 2: Dauer der Spieltagsbuchung
+## Nachbesserung 2: Der Marketing-Stand liegt im Spielstand (Review-Befunde 1 bis 7)
 
-Team-Anteile und Moral werden nicht mehr je Spieltag für alle Teams gerechnet, sondern einmal je Saison und Kaderstand (`dauerCache`,
-Schlüssel aus Saison, Team, Liga, Fanfarbe, Aushängeschild-Wahl, Budget-Rang und einem Hash des Kaders aus Spieler, Restlaufzeit, Klausel, Rating, Gehalt, Verletzt-Status). Je Spieltag
-wird nur 1/N gebucht. Folge: die **Moral im Team-Anteil ist auf den Stand beim ersten Rechnen eingefroren** (bewusst so gelassen). Verletzte zählen weiter zur Hälfte: der Verfügbarkeitsstatus steht im
-Kader-Hash, eine Verletzung oder Genesung rechnet neu (selten, der Cache bleibt fast immer warm). Kauf, Verkauf, Verlängerung und Klausel rechnen ebenfalls neu. Der Moral-Zuschlag liest dieselbe gecachte, gedeckelte Zeile (gezeigt = gebucht).
+Vorher hing die Rechnung an einem modulweiten `dauerCache` (Schlüssel ohne Teamerfolg, Moral und PP-Perzentil). Folgen: der Browser rechnete ab Saison 2 beim ersten
+Rendern mit Teamerfolg 0 (die Kompaktladung hat keine `seasonSnapshots`) und behielt das; der Server fror die Moral beim ersten Rechnen nach jedem Neustart ein; zwischen Spielständen
+im selben Prozess konnte der Cache übergreifen. Jetzt:
 
-Messung `scripts/miss-spieltagsbuchung-dauer.ts` (`bucheSpieltagFinanzen` für alle 32 Teams, 364 Spieler, neues GameState-Objekt je Spieltag, Rechner unter Last):
+- **Teamerfolg im Stempel.** `marketingStempelFuerSaisonwechsel` schreibt den Teamerfolg der Vorsaison je Team nach `seasonState.marketingRegel.teamErfolg`; `teamErfolgVorsaison` liest daraus (Snapshot nur noch als Rückfall für Stempel ohne das Feld).
+- **`seasonState.marketingStand[teamId]`** = `{ seasonId, kaderHash, berechnetAmSpieltag, ansKasse, moralOhne je Spieler, leistungPerz je Spieler, moralZuschlag je Spieler }`.
+  Geschrieben nur vom Server in `bucheSpieltagFinanzen` (`aktualisiereMarketingStand`): beim ersten Spieltag der Saison und neu, wenn sich der Kader-Hash eines Teams ändert (Spieler, Restlaufzeit, Klausel, Rating, Gehalt, Verletzt-Status, Aushängeschild-Wahl). Moral und Perzentil werden dabei mit dem Stand dieses Spieltags eingefroren; beim Saisonwechsel wird der Stand gelöscht.
+- **Lesen:** Seite, GuV-Prognose, Erwartung, Moral-Zuschlag und Buchung lesen nur den Stand. Mit passendem Hash rechnet die Seite mit den eingefrorenen Eingaben (Server, Browser und Neustart ergeben dieselbe Zahl). Ohne Stand oder nach einer Kaderänderung zeigt die Seite eine **Vorschau** (Kennzeichnung „Vorschau“ im Kopf), die Buchung schreibt vor dem Lesen den Stand und bucht nie eine Vorschau. Der Moral-Zuschlag ist ohne Stand 0.
+- **Kein modulweiter Cache mehr**, nur ein Memo je Spielstand-Objekt (WeakMap, ohne Zustandswirkung).
+- **Notbremse (4):** `marketingSaisonbetrag` zählt Gebuchtes immer, nur der offene Rest hängt an `marketingAktiv`. `OLY_MARKETING=aus-sofort` wird beim nächsten Buchen als `marketingRegel.notbremse` in den Stempel gespiegelt; `marketingAktiv` liest ihn, damit der Browser sie sieht.
+- **Farb-Meister (5)** nur innerhalb der eigenen Liga (`gleicheLigaWie`).
+- **PM-Entscheidung (6):** die Marketing-Einnahme bleibt bewusst als Puffer in der Kasse und erhöht keinen Topf der laufenden Saison. Der Sponsor-Rework rechnet die neuen Einnahmen ohnehin gegen den Topf.
+- **Transfermarkt (7):** auch der volle Pfad in `transfermarkt-local-service.ts` (nicht nur die Kompaktliste) füllt `marketability`.
 
-| | Spieltag 1 (kalt) | Spieltag 2 bis 4 |
+Tests (`tests/marketing-bau.test.ts`, Block „Marketing-Stand im Spielstand“): Vorschau gegen Stand und Hash-Änderungen; Neustart (JSON-Roundtrip, Perzentil-Änderung, nächster Spieltag bucht denselben Betrag); Saison 2 mit Kompaktladung ohne Snapshots; Notbremse.
+
+Laufzeit `scripts/miss-spieltagsbuchung-dauer.ts` (`bucheSpieltagFinanzen` für alle 32 Teams, 328 Kaderzeilen, neues GameState-Objekt je Spieltag):
+
+| | Spieltag 1 (kalt, schreibt den Stand) | Spieltag 2 bis 4 (warm) |
 |---|---:|---:|
 | ohne Marketing (`aus-sofort`) | 133 ms | 95 bis 124 ms |
-| Marketing vorher | 828 ms | 516 bis 583 ms |
-| Marketing nachher (Cache) | 734 ms | 84 bis 86 ms |
+| Marketing mit `dauerCache` (vorher) | 734 ms | 84 bis 86 ms |
+| Marketing mit Stand im Spielstand (nachher) | 698 ms | 81 bis 90 ms |
+
+Schere reich/arm: die Zahlen der Nachbesserung 1 hängen an der Formel, nicht am Cache; die Vorschau rechnet dieselbe Formel mit denselben Eingaben (Saison 1 identisch). Eine Saison-2-Neumessung steht aus (nur der Farb-Meister der eigenen Liga ändert dort etwas, nicht neu gemessen).
 
 ## Abgleich Mockup – App (Aufnahmen `docs/design/marketing-bau-22-11/`, Team D-P, Live-Abbild-Kopie)
 

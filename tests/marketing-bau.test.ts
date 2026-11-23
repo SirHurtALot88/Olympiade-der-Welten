@@ -24,7 +24,7 @@ import {
   stempleMarketingBeimAnlegen,
   stempleMarketingNachLaden,
 } from "@/lib/marketing/marketing-regel";
-import { leereMarketingCache, marketingCacheSchluessel, marketingSaisonbetrag, marketingStempelFuerSaisonwechsel, marketingTeamUebersicht } from "@/lib/marketing/marketing-team";
+import { marketingKaderHash, marketingMoralZuschlag, marketingSaisonbetrag, marketingStempelFuerSaisonwechsel, marketingTeamUebersicht } from "@/lib/marketing/marketing-team";
 import { moralOhneWerbung, assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { baueMarktMarketability } from "@/lib/marketing/marketing-markt";
 import { CANONICAL_NEGATIVE_TRAITS, CANONICAL_POSITIVE_TRAITS } from "@/lib/training/class-progression-config";
@@ -326,7 +326,9 @@ describe("Buchung je Spieltag = gezeigt", () => {
 
 describe("Moral: Werbevertraege als Grund", () => {
   it("der Spieler-Anteil hebt die Moral um den Zuschlag und steht als Grund 'Werbeverträge'; ohne Regel kein Grund", () => {
-    const { ohne, mit } = fixture();
+    const { ohne, mit: ungebucht } = fixture();
+    // Der Moral-Zuschlag liest den Marketing-Stand (der Server schreibt ihn beim ersten Spieltag).
+    const mit = bucheSpieltagFinanzen(ungebucht, ungebucht.season.matchdayIds[0]!);
     const u = marketingTeamUebersicht(mit, TEAM_A);
     const z = [...u.zeilen].sort((a, b) => b.ergebnis.moralZuschlag - a.ergebnis.moralZuschlag)[0]!;
     // Die Fixture hat nicht zwingend einen Spieler mit Zuschlag; dann prueft der Test nur den Leerfall.
@@ -468,7 +470,6 @@ describe("Schere: Teammarke nach Finanzwert und Deckel der Team-Anteile", () => 
     const alt = konfig.teamAnteileDeckel;
     try {
       konfig.teamAnteileDeckel = Math.max(0.1, vorher.teamAnteile / 2);
-      leereMarketingCache();
       const nachher = marketingTeamUebersicht({ ...mit }, TEAM_A);
       expect(nachher.deckelGreift).toBe(true);
       expect(nachher.teamAnteile).toBeCloseTo(konfig.teamAnteileDeckel, 6);
@@ -477,38 +478,109 @@ describe("Schere: Teammarke nach Finanzwert und Deckel der Team-Anteile", () => 
       for (const z of nachher.zeilen) expect(z.ergebnis.ansTeam + z.ergebnis.anIhn).toBeCloseTo(z.ergebnis.werbegeld, 9);
     } finally {
       konfig.teamAnteileDeckel = alt;
-      leereMarketingCache();
     }
   });
 });
 
-describe("Dauer-Cache: einmal je Saison und Kaderstand", () => {
-  it("ein neues GameState-Objekt mit gleichem Kader trifft den Cache (gleiches Objekt), ein Kaderwechsel rechnet neu", () => {
+describe("Marketing-Stand im Spielstand: einmal je Saison und Kaderstand", () => {
+  it("ohne Stand ist die Uebersicht eine Vorschau, mit dem Stand des ersten Spieltags nicht; der Kader-Hash erkennt jede Aenderung", () => {
     const { mit } = fixture();
-    leereMarketingCache();
     const a = marketingTeamUebersicht(mit, TEAM_A);
-    const b = marketingTeamUebersicht({ ...mit, teams: [...mit.teams] }, TEAM_A);
-    expect(b).toBe(a);
-    // Gebuchte Spieltage veraendern den Schluessel nicht.
+    expect(a.vorschau).toBe(true);
     const gebucht = bucheSpieltagFinanzen(mit, mit.season.matchdayIds[0]!);
-    expect(marketingCacheSchluessel(gebucht, TEAM_A)).toBe(marketingCacheSchluessel(mit, TEAM_A));
-    expect(marketingTeamUebersicht(gebucht, TEAM_A)).toBe(a);
-    // Verkauf eines Spielers: neuer Schluessel, neue Rechnung.
-    const ohneEinen: GameState = { ...mit, rosters: mit.rosters.filter((r) => !(r.teamId === TEAM_A && r.playerId === a.zeilen[0]!.playerId)) };
-    expect(marketingCacheSchluessel(ohneEinen, TEAM_A)).not.toBe(marketingCacheSchluessel(mit, TEAM_A));
-    expect(marketingTeamUebersicht(ohneEinen, TEAM_A)).not.toBe(a);
-    // Verletzung: anderer Schluessel, Werbegeld des Verletzten halbiert, genesen = wieder der alte Wert.
+    expect(gebucht.seasonState.marketingStand?.[TEAM_A]?.ansKasse).toBeCloseTo(a.ansKasse, 6);
+    const b = marketingTeamUebersicht(gebucht, TEAM_A);
+    expect(b.vorschau).toBe(false);
+    expect(b.ansKasse).toBeCloseTo(a.ansKasse, 6);
+    // Gebuchte Spieltage veraendern den Hash nicht.
+    expect(marketingKaderHash(gebucht, TEAM_A)).toBe(marketingKaderHash(mit, TEAM_A));
+    // Verkauf eines Spielers: neuer Hash, Stand veraltet -> Vorschau mit heutigen Werten.
+    const ohneEinen: GameState = { ...gebucht, rosters: gebucht.rosters.filter((r) => !(r.teamId === TEAM_A && r.playerId === a.zeilen[0]!.playerId)) };
+    expect(marketingKaderHash(ohneEinen, TEAM_A)).not.toBe(marketingKaderHash(mit, TEAM_A));
+    expect(marketingTeamUebersicht(ohneEinen, TEAM_A).vorschau).toBe(true);
+    // Der naechste Spieltag schreibt den Stand neu und bucht dann ohne Vorschau.
+    const folge = bucheSpieltagFinanzen(ohneEinen, ohneEinen.season.matchdayIds[1]!);
+    expect(folge.seasonState.marketingStand![TEAM_A]!.kaderHash).toBe(marketingKaderHash(ohneEinen, TEAM_A));
+    expect(marketingTeamUebersicht(folge, TEAM_A).vorschau).toBe(false);
+    // Verletzung: Werbegeld des Verletzten halbiert.
     const verletzter = a.zeilen.find((z) => z.ergebnis.werbegeld > 0.01) ?? a.zeilen[0]!;
     const verletzt: GameState = {
       ...mit,
       seasonState: { ...mit.seasonState, playerAvailabilityState: [{ playerId: verletzter.playerId, teamId: TEAM_A, injuryStatus: "injured" } as never] },
     };
-    expect(marketingCacheSchluessel(verletzt, TEAM_A)).not.toBe(marketingCacheSchluessel(mit, TEAM_A));
+    expect(marketingKaderHash(verletzt, TEAM_A)).not.toBe(marketingKaderHash(mit, TEAM_A));
     const nachVerletzung = marketingTeamUebersicht(verletzt, TEAM_A).zeilen.find((z) => z.playerId === verletzter.playerId)!;
     expect(nachVerletzung.ergebnis.verletztHalb).toBe(true);
     expect(nachVerletzung.ergebnis.werbegeld).toBeCloseTo(verletzter.ergebnis.werbegeld * 0.5, 9);
-    // Klausel-Aenderung ebenso.
     const klausel: GameState = { ...mit, rosters: mit.rosters.map((r) => (r.teamId === TEAM_A && r.playerId === a.zeilen[0]!.playerId ? { ...r, marketingKlausel: 1 as const } : r)) };
-    expect(marketingCacheSchluessel(klausel, TEAM_A)).not.toBe(marketingCacheSchluessel(mit, TEAM_A));
+    expect(marketingKaderHash(klausel, TEAM_A)).not.toBe(marketingKaderHash(mit, TEAM_A));
+  });
+
+  it("Neustart: die gebuchten Betraege haengen nicht an einem Modul-Zustand; Moral und Perzentil sind im Stand eingefroren", () => {
+    const { mit } = fixture();
+    const drei = buchAlle(mit, 3);
+    const stand = drei.seasonState.marketingStand![TEAM_A]!;
+    // Spielstand-Roundtrip (JSON) = Neustart: kein Modul-Zustand, derselbe Stand, dieselbe Zahl.
+    const neuGeladen: GameState = JSON.parse(JSON.stringify(drei));
+    expect(marketingTeamUebersicht(neuGeladen, TEAM_A).ansKasse).toBeCloseTo(stand.ansKasse, 9);
+    // Aendert sich die Moral (hier: alle Spieler bekommen ein anderes Rating NICHT, nur die Moral-Quelle), bleibt der Betrag.
+    const andereWerte: GameState = { ...neuGeladen, players: neuGeladen.players.map((p) => ({ ...p, pps: (p.pps ?? 0) + 3 })) };
+    expect(marketingTeamUebersicht(andereWerte, TEAM_A).ansKasse).toBeCloseTo(stand.ansKasse, 9);
+    // Der naechste Spieltag nach dem "Neustart" bucht denselben Betrag wie ohne Neustart.
+    const a = bucheSpieltagFinanzen(drei, drei.season.matchdayIds[3]!);
+    const b = bucheSpieltagFinanzen(neuGeladen, neuGeladen.season.matchdayIds[3]!);
+    const z = (g: GameState) => g.seasonState.spieltagFinanzen!.find((r) => r.teamId === TEAM_A && r.matchdayIndex === 4)!.marketing;
+    expect(z(b)).toBeCloseTo(z(a)!, 9);
+    expect(marketingMoralZuschlag(a, TEAM_A, Object.keys(stand.moralZuschlag)[0]!)).toBe(stand.moralZuschlag[Object.keys(stand.moralZuschlag)[0]!]);
+  });
+
+  it("Saison 2: der Stempel traegt den Teamerfolg, eine Kompaktladung ohne Snapshots zeigt denselben Betrag wie die Buchung", () => {
+    const { mit } = fixture();
+    const gs = mitSnapshotFuerTest(mit);
+    const neu = marketingStempelFuerSaisonwechsel(gs, gs.season.id, "season-2");
+    expect(neu.teamErfolg![TEAM_A]!.stufe).toBe("titel");
+    const s2: GameState = { ...gs, season: { ...gs.season, id: "season-2" }, seasonState: { ...gs.seasonState, seasonId: "season-2", marketingRegel: neu, marketingStand: null, spieltagFinanzen: [], finanzenJeSpieltag: { seasonId: "season-2", version: "v1" } } };
+    const gebucht = bucheSpieltagFinanzen(s2, s2.season.matchdayIds[0]!);
+    const ohneSnaps: GameState = { ...gebucht, seasonState: { ...gebucht.seasonState, seasonSnapshots: [] } };
+    expect(marketingTeamUebersicht(ohneSnaps, TEAM_A).erfolg.stufe).toBe("titel");
+    const u = marketingTeamUebersicht(ohneSnaps, TEAM_A);
+    expect(u.vorschau).toBe(false);
+    expect(u.ansKasse).toBeCloseTo(gebucht.seasonState.marketingStand![TEAM_A]!.ansKasse, 9);
+    // Die Vorschau ohne Stand (Saisonbeginn im Browser ohne Snapshots) rechnet mit demselben Teamerfolg.
+    const vorschau: GameState = { ...ohneSnaps, seasonState: { ...ohneSnaps.seasonState, marketingStand: null } };
+    expect(marketingTeamUebersicht(vorschau, TEAM_A).erfolg.punkte).toBe(6);
+  });
+
+  it("Notbremse: schon Gebuchtes bleibt in der GuV, nur der offene Rest und neue Buchungen entfallen; der Stempel spiegelt sie", () => {
+    const { mit } = fixture();
+    const vier = buchAlle(mit, 4);
+    const gebuchtVorher = summeSpieltagBuchungen(vier, TEAM_A).marketing;
+    expect(gebuchtVorher).toBeGreaterThan(0);
+    mitEnv("aus-sofort", () => {
+      expect(marketingSaisonbetrag(vier, TEAM_A)).toBeCloseTo(gebuchtVorher, 6);
+      const weiter = bucheSpieltagFinanzen(vier, vier.season.matchdayIds[4]!);
+      expect(weiter.seasonState.marketingRegel!.notbremse).toBe(true);
+      const zeile = weiter.seasonState.spieltagFinanzen!.find((r) => r.teamId === TEAM_A && r.matchdayIndex === 5)!;
+      expect(zeile.marketing ?? 0).toBe(0);
+      expect(marketingSaisonbetrag(weiter, TEAM_A)).toBeCloseTo(gebuchtVorher, 6);
+    });
+    // Ohne Umgebungsvariable (Browser): der gespiegelte Stempel schaltet Marketing weiterhin ab.
+    const gespiegelt: GameState = { ...vier, seasonState: { ...vier.seasonState, marketingRegel: { ...vier.seasonState.marketingRegel!, notbremse: true } } };
+    expect(marketingAktiv(gespiegelt)).toBe(false);
+    expect(marketingSaisonbetrag(gespiegelt, TEAM_A)).toBeCloseTo(gebuchtVorher, 6);
   });
 });
+
+function mitSnapshotFuerTest(gs: GameState): GameState {
+  const standings = gs.teams.map((t, i) => ({
+    teamId: t.teamId,
+    teamCode: t.teamId,
+    teamName: t.name,
+    rank: t.teamId === TEAM_A ? 1 : i + 2,
+    points: 10,
+    disciplinePoints: 10,
+    disciplinePointsByArea: { pow: 5, spe: 5, men: 5, soc: 5 },
+    cashEnd: 0,
+  }));
+  return { ...gs, seasonState: { ...gs.seasonState, seasonSnapshots: [{ seasonId: gs.season.id, finalStandings: standings } as never] } };
+}

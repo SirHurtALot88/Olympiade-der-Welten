@@ -65,7 +65,7 @@ export function startFanfarben(teamIds: readonly string[]): Record<string, Fanfa
 export function marketingRegelFuerNeueSaison(
   seasonId: string,
   teamIds: readonly string[],
-  optionen?: { fanfarbe?: Record<string, Fanfarbe>; verlauf?: MarketingStempel["verlauf"] },
+  optionen?: { fanfarbe?: Record<string, Fanfarbe>; verlauf?: MarketingStempel["verlauf"]; teamErfolg?: MarketingStempel["teamErfolg"] },
 ): MarketingStempel {
   const s = marketingSchalter();
   return {
@@ -73,6 +73,7 @@ export function marketingRegelFuerNeueSaison(
     regel: s === "an" ? "an" : "aus",
     fanfarbe: optionen?.fanfarbe ?? startFanfarben(teamIds),
     ...(optionen?.verlauf ? { verlauf: optionen.verlauf } : {}),
+    ...(optionen?.teamErfolg ? { teamErfolg: optionen.teamErfolg } : {}),
   };
 }
 
@@ -116,6 +117,7 @@ export function gueltigerMarketingStempel(gameState: MarketingQuelle): Marketing
 export function marketingAktiv(gameState: MarketingQuelle): boolean {
   if (marketingSchalter() === "aus-sofort") return false;
   const stempel = gueltigerMarketingStempel(gameState);
-  if (!stempel || stempel.regel !== "an") return false;
+  // Die Notbremse steht auch im Stempel (der Server spiegelt sie beim naechsten Buchen), damit der Browser sie sieht.
+  if (!stempel || stempel.regel !== "an" || stempel.notbremse) return false;
   return istJeSpieltagSaison(gameState as Parameters<typeof istJeSpieltagSaison>[0]);
 }
