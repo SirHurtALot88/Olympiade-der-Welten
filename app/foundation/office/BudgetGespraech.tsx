@@ -132,7 +132,7 @@ export default function BudgetGespraech({ gameState, teamId, onAktion, kannSchre
             titel={name}
             symbol={schritt > i + 1 || (i === 2 && unterschrieben) ? <BcIcon name="check" /> : <span>{i + 1}</span>}
             wert={erw}
-            wertNote={erwText}
+            wertNote={erwText.length > 0 ? erwText : undefined}
           />
         ))}
         rechts={

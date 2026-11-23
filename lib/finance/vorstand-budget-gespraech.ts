@@ -52,6 +52,7 @@ import {
 import { lesVorstandGespraech } from "@/lib/finance/vorstand-gespraech-zustand";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
+import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 import { toepfeAbSaison1 } from "@/lib/resolve/wirtschafts-regeln";
 
 export type BudgetAmbition = "tief" | "ziel" | "hoch" | "alles";
@@ -131,6 +132,12 @@ export function vorstandZielRang(gameState: GameState, teamId: string): number |
     }
     return null;
   };
+  // Saison 1 vor dem Draft: kein Kader, also keine Staerke. Der Vorstand erwartet nach dem Startbudget (Rang in der Liga), mit demselben
+  // Abstand wie das Erwartungsziel `expectation-rank` (1 + Ambition / 3 Plaetze besser). Nach dem Draft gilt das echte Ziel.
+  if (gameState.rosters.filter((r) => r.teamId === teamId).length < 1) {
+    const start = schaetzeStartZielRang(gameState, teamId);
+    if (start != null) return start;
+  }
   const ziele = (gameState.seasonState.teamSeasonObjectives ?? []).filter((o) => o.seasonId === gameState.season.id && o.teamId === teamId);
   const gespeichert = ziele.find((o) => !o.optional && (o.objectiveId === "expectation-rank" || /^sport-rank-\d+$/.test(o.objectiveId)));
   if (gespeichert) return lies(gespeichert.targetValue);
@@ -152,6 +159,21 @@ export function vorstandZielRang(gameState: GameState, teamId: string): number |
 }
 
 const RANG_CACHE = new WeakMap<object, Map<string, number | null>>();
+
+/** Erwartetes Rang-Ziel vor dem ersten Pick: Rang des Startbudgets in der eigenen Liga, abzueglich des Abstands `1 + Ambition / 3`. */
+function schaetzeStartZielRang(gameState: GameState, teamId: string): number | null {
+  const teams = gameState.teams;
+  const liga = isLeagueSplitActive(gameState) ? getLeagueOf(gameState, teamId) : null;
+  const gleiche = teams.filter((t) => !liga || getLeagueOf(gameState, t.teamId) === liga);
+  const wert = (t: { budget?: number; cash?: number }) => t.budget ?? t.cash ?? 0;
+  const ich = gleiche.find((t) => t.teamId === teamId);
+  if (!ich || gleiche.length < 2) return null;
+  const rang = 1 + gleiche.filter((t) => t.teamId !== teamId && wert(t) > wert(ich)).length;
+  const amb = gameState.teamIdentities?.find((i) => i.teamId === teamId)?.ambition;
+  const ambition = typeof amb === "number" ? (amb > 10 ? amb / 10 : amb) : 5;
+  const abstand = Math.max(1, Math.round(1 + ambition / 3));
+  return Math.min(gleiche.length, Math.max(1, rang - abstand));
+}
 
 /* ============================================================== Zustand */
 
