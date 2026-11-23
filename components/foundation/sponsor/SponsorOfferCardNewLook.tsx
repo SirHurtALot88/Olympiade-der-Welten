@@ -34,6 +34,8 @@ import { sponsorRangraumFuer } from "@/lib/sponsor/sponsor-rangmarke";
 import { SponsorSeasonRankTable } from "@/components/foundation/sponsor/SponsorSeasonRankTable";
 import { describeSponsorOfferModules } from "@/lib/sponsor/sponsor-modules";
 import { NlDeltaChip, type NlTone } from "@/components/foundation/new-look";
+import { SponsorWappen } from "@/components/foundation/sponsor/SponsorWappen";
+import { sponsorMonogramm, sponsorWappenPfad, sponsorWappenPfadFuer } from "@/lib/sponsor/sponsor-wappen";
 
 /**
  * "Neuer Look" Sponsor-Angebotskarte — flag-gated, additiv. Wird nur von
@@ -95,15 +97,30 @@ function difficultyClassName(difficulty: SponsorChallengeDifficulty) {
   return `nl-sponsor-difficulty is-${difficulty}`;
 }
 
-/** Generiertes Wappen/Monogramm aus dem Sponsor-Namen (kein Fake-Logo-Asset). */
-export function SponsorCrest({ name, archetype }: { name: string; archetype: SponsorArchetype }) {
-  const monogram =
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("") || "?";
+/**
+ * Wappen eines Sponsors: das PixelLab-Wappen der Dachmarke, wenn es eines gibt (`sponsorWappenPfad`), sonst das
+ * generierte Monogramm aus dem Namen. `kante` ist die feste Kantenlaenge des Wappenbilds.
+ */
+export function SponsorCrest({
+  name,
+  archetype,
+  brandId,
+  kante = 48,
+}: {
+  name: string;
+  archetype: SponsorArchetype;
+  brandId?: string | null;
+  kante?: number;
+}) {
+  const wappen = sponsorWappenPfad(brandId) ?? sponsorWappenPfadFuer({ name });
+  if (wappen) {
+    return (
+      <span className={`nl-sponsor-crest is-${archetype} hat-wappen`} style={{ width: kante, height: kante }} aria-hidden="true">
+        <SponsorWappen pfad={wappen} kante={kante} />
+      </span>
+    );
+  }
+  const monogram = sponsorMonogramm(name);
   return (
     <span className={`nl-sponsor-crest is-${archetype}`} aria-hidden="true">
       <svg viewBox="0 0 40 44" focusable="false" aria-hidden="true">
@@ -284,7 +301,7 @@ export function SponsorOfferCardNewLook({
       data-golden={presentation.isGolden ? "true" : "false"}
     >
       <header className="nl-sponsor-offer-head">
-        <SponsorCrest name={offer.name} archetype={offer.archetype} />
+        <SponsorCrest name={offer.name} archetype={offer.archetype} brandId={offer.sponsorParentBrandId ?? offer.sponsorBrandId} />
         <div className="nl-sponsor-offer-title">
           <span className="nl-sponsor-offer-kicker">
             {shapeLabel}
