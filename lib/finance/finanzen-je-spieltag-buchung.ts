@@ -22,6 +22,7 @@ import {
   teileJahresbetrag,
 } from "@/lib/finance/finanzen-je-spieltag";
 import { bereiteArenaBuchung } from "@/lib/arena/arena-stand";
+import { bucheKreditRaten } from "@/lib/finance/kredit-raten";
 import { aktualisiereMarketingStand, marketingJahresbetrag } from "@/lib/marketing/marketing-team";
 import type { MoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
@@ -130,15 +131,51 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
   }
   if (neue.length === 0) return urspruenglich;
 
+  // KREDITRATEN JE SPIELTAG (22.11., lib/finance/kredit-raten.ts): in einer Raten-Saison zahlt jeder laufende Kredit seine Rate. Die Funktion
+  // rechnet nur; hier landen Zins, Tilgung und Rueckfluss als Felder der Zeile und in `cashDelta`. Ohne Raten-Saison oder Kredit: nichts.
+  const kreditBuchung = bucheKreditRaten(
+    gameState,
+    new Map(neue.map((zeile) => [zeile.teamId, (gameState.teams.find((t) => t.teamId === zeile.teamId)?.cash ?? 0) + zeile.cashDelta])),
+    new Set(neue.map((zeile) => zeile.teamId)),
+  );
+  const mitKredit = kreditBuchung.jeTeam.size === 0 ? neue : neue.map((zeile) => {
+    const k = kreditBuchung.jeTeam.get(zeile.teamId);
+    if (!k) return zeile;
+    const neuesDelta = runde1(zeile.cashDelta + k.cashDelta);
+    if (neuesDelta !== 0) cashDelta.set(zeile.teamId, neuesDelta);
+    else cashDelta.delete(zeile.teamId);
+    return {
+      ...zeile,
+      cashDelta: neuesDelta,
+      ...(k.kreditZins !== 0 ? { kreditZins: k.kreditZins } : {}),
+      ...(k.kreditTilgung !== 0 ? { kreditTilgung: k.kreditTilgung } : {}),
+      ...(k.kreditEingang !== 0 ? { kreditEingang: k.kreditEingang } : {}),
+      ...(k.posten.length > 0 ? { kredit: k.posten } : {}),
+    };
+  });
+
+  // K1: ein Geber, dessen Zeile fuer diesen Spieltag schon steht, bekommt den Rueckfluss als Posten auf GENAU dieser Zeile (Kasse = Summe der
+  // Buchungen). Ohne Zeile dieses Spieltags (kann nur ein Geber ausserhalb der Liga sein) bleibt es bei der Kasse, es gibt nichts zu buchen.
+  const ledgerNeu = kreditBuchung.direkterEingang.size === 0
+    ? ledger
+    : ledger.map((zeile) => {
+        const eingang = zeile.seasonId === seasonId && zeile.matchdayId === matchdayId ? kreditBuchung.direkterEingang.get(zeile.teamId) : undefined;
+        if (!eingang) return zeile;
+        return { ...zeile, kreditEingang: runde1((zeile.kreditEingang ?? 0) + eingang), cashDelta: runde1(zeile.cashDelta + eingang) };
+      });
+
   const gebucht: GameState = {
     ...gameState,
     teams: gameState.teams.map((team) => {
       const delta = cashDelta.get(team.teamId);
-      return delta == null ? team : { ...team, cash: runde1(team.cash + delta) };
+      const direkt = kreditBuchung.direkterEingang.get(team.teamId) ?? 0;
+      return delta == null && direkt === 0 ? team : { ...team, cash: runde1(team.cash + (delta ?? 0) + direkt) };
     }),
     seasonState: {
       ...gameState.seasonState,
-      spieltagFinanzen: [...ledger, ...neue],
+      spieltagFinanzen: [...ledgerNeu, ...mitKredit],
+      ...(kreditBuchung.loans ? { loans: kreditBuchung.loans } : {}),
+      ...(kreditBuchung.boardConfidence ? { boardConfidence: kreditBuchung.boardConfidence } : {}),
     },
   };
   return arena ? arena.ergebnis(gebucht) : gebucht;

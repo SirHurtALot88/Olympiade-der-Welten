@@ -8,6 +8,15 @@ import type {
   TeamFacilityCollection,
 } from "@/lib/data/olyDataTypes";
 import { ppSkalaUmrechnung } from "@/lib/resolve/pp-skala";
+import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
+import { entwicklungsParameter, ertragsFaktor, trainingsBudgetFaktor } from "@/lib/training/entwicklung-neu";
+import {
+  fokusDominanz,
+  istDiligent,
+  ligaAbbauFaktor,
+  leistungsErwartungJeTag,
+  type AttributWerte,
+} from "@/lib/training/entwicklung-tag";
 import {
   getAcademyDevelopmentBoostPct,
   getFacilityEfficiency,
@@ -29,6 +38,7 @@ import {
   getCombinedAttributeTrainingMultiplier,
 } from "@/lib/foundation/player-potential-display-service";
 import {
+  getAttributeGrowthMultiplier,
   getAttributeHeadroom,
   getPerformanceHeadroomGrowthMultiplier,
   resolvePlayerPotentialRecordFromGameState,
@@ -56,7 +66,7 @@ import {
   getTrainingSetpointsJeSpieltag,
   TRAINING_SETPOINTS_BY_MODE,
 } from "@/lib/training/training-mode-presentation";
-import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
+import { trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 import {
   DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
   getDevelopmentRouteBonusMultiplier,
@@ -88,6 +98,10 @@ export type OrganicProgressionAttributeBreakdown = {
   affinity: AttributeAffinityKind;
   trainingGrowthMultiplier: number;
   performanceGrowthMultiplier: number;
+  /** Entwicklung neu (Runde 2): Abbau EINES Spieltags (>= 0), nur im Tagesmodus `nurTraining` + `mitAbbau`, sonst 0. */
+  abbauTag: number;
+  /** Obergrenze (Decke, hoechstens 99), die diese Rechnung auf das Attribut anwendet. */
+  deckel: number;
 };
 
 export type OrganicSeasonProgressionResult = {
@@ -415,7 +429,7 @@ export function buildProjectedSeasonTrainingAccumulatorOverrides(input: {
   draftMode: PlayerTrainingMode;
 }): { accumulatedBaseTrainingBudget?: number; performanceWeightMultiplier?: number } {
   const totalMatchdays = resolveSeasonTotalMatchdaysForProgression(input.gameState);
-  if (isTrainingJeSpieltagAktiv()) {
+  if (trainingJeSpieltagFuer(input.gameState)) {
     // Training je Spieltag: was schon gebucht ist, steckt bereits in den Attributen und darf hier
     // nicht noch einmal auftauchen. Prognose = ungebuchte Alt-Spieltage (Saisonend-Satz) + offene
     // Spieltage zum Satz JE SPIELTAG im aktuell gewaehlten Modus. Verteilt wird hier weiter nach
@@ -800,6 +814,73 @@ function getPerformanceRecords(gameState: GameState, playerId: string): PlayerDi
   return getPerformanceIndex(gameState).byPlayerId.get(playerId) ?? [];
 }
 
+/**
+ * ENTWICKLUNG NEU, RUNDE 2: was von der Saison noch NICHT je Spieltag gebucht ist (Prognose; das Saisonende bucht nichts mehr nach).
+ * Mit dem Stempel "neu" wird IMMER je Spieltag gebucht (`trainingJeSpieltagFuer`): es gibt keinen "Rutsch" am Saisonende mehr, also
+ * auch keine Gefahr, dass ein Wechsel der Betriebsart mitten in der Saison dasselbe Training zweimal bucht (Review 22.11.).
+ *  - `zukunft`: Spieltage, die noch nicht gespielt sind.
+ *  - `offen`: Spieltage mit festgelegtem, aber noch nicht gebuchtem Zuwachs (`o`, Arena-Teilbuchung nach D1): ihr T und A stehen fest und
+ *    zaehlen mit dem Rest, ihre Leistung ist noch unbekannt (Erwartung).
+ */
+type EntwicklungsRest = {
+  total: number;
+  restAnzahl: number;
+  zukunft: number;
+  offen: Array<NonNullable<NonNullable<Player["seasonTrainingAccumulator"]>["verlauf"]>[number]>;
+  verlauf: NonNullable<NonNullable<Player["seasonTrainingAccumulator"]>["verlauf"]>;
+};
+
+function bestimmeEntwicklungsRest(gameState: GameState, player: Player): EntwicklungsRest {
+  const seasonId = gameState.season.id;
+  const akku = player.seasonTrainingAccumulator && player.seasonTrainingAccumulator.seasonId === seasonId ? player.seasonTrainingAccumulator : null;
+  const verlauf = akku?.verlauf ?? [];
+  const total = resolveSeasonTotalMatchdaysForProgression(gameState);
+  const gespielt = new Set<string>(Object.keys(akku?.modeByMatchday ?? {}));
+  for (const e of verlauf) gespielt.add(e.m);
+  for (const r of gameState.seasonState.matchdayResults ?? []) if ((r.seasonId ?? seasonId) === seasonId) gespielt.add(r.matchdayId);
+  const zukunft = Math.max(0, total - gespielt.size);
+  const offen = verlauf.filter((e) => e.s === "t" && e.o === true);
+  return { total, restAnzahl: zukunft, zukunft, offen, verlauf };
+}
+
+/** Offener, noch nicht gebuchter Trainings- und Abbauanteil (je Attribut, >= 0). */
+function offenerAnteil(rest: EntwicklungsRest): { z: AttributWerte; a: AttributWerte } {
+  const z: AttributWerte = {};
+  const a: AttributWerte = {};
+  for (const e of rest.offen) {
+    for (const [attribute, wert] of Object.entries(e.z ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) z[attribute] = (z[attribute] ?? 0) + wert;
+    for (const [attribute, wert] of Object.entries(e.a ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) a[attribute] = (a[attribute] ?? 0) + wert;
+  }
+  return { z, a };
+}
+
+/**
+ * Leistung (mit Vorzeichen) fuer den Rest der Saison, je Attribut, ohne Ertrags-Kappung. EINE ERWARTUNG, keine Buchung: sie bleibt in der
+ * Anzeige von T und A getrennt ("Leistung (Erwartung)").
+ *  - Mit gebuchten Spieltagen: der bisherige Schnitt je gebuchtem Spieltag, bis zu `erwartungGewichtTage` Spieltage lang mit der Erwartung
+ *    aus der Vorsaison (mittleres z je Einsatz, `player.leistungsErwartung`) gemischt, damit die Prognose nach einem Tag nicht springt.
+ *  - Ohne gebuchten Spieltag: die Erwartung aus der Vorsaison; ohne Vorsaison 0.
+ * Offene Spieltage (`o`) zaehlen mit ihrem erwarteten L zum Rest.
+ */
+function restLeistung(player: Player, rest: EntwicklungsRest): AttributWerte {
+  const summe: AttributWerte = {};
+  const addiere = (werte: AttributWerte, faktor = 1) => {
+    for (const [attribute, wert] of Object.entries(werte) as Array<[PlayerGeneratorAttributeName, number]>) {
+      summe[attribute] = (summe[attribute] ?? 0) + wert * faktor;
+    }
+  };
+  const tage = rest.zukunft + rest.offen.length;
+  if (tage <= 0) return summe;
+  const gebucht = rest.verlauf.filter((e) => e.s === "t" && !e.o);
+  const erwartung = leistungsErwartungJeTag(player);
+  const gewicht = erwartung ? entwicklungsParameter().erwartungGewichtTage : 0;
+  const nenner = gebucht.length + gewicht;
+  if (nenner <= 0) return summe;
+  for (const e of gebucht) addiere(e.p ?? {}, tage / nenner);
+  if (erwartung) addiere(erwartung, (tage * gewicht) / nenner);
+  return summe;
+}
+
 function getDisciplineWeightDistribution(disciplineId: string) {
   if (!officialDisciplineWeightOrder.includes(disciplineId as OfficialDisciplineWeightId)) {
     return null;
@@ -912,10 +993,12 @@ function buildOrganicRegressionBreakdown(input: {
   marketValuePressurePerAttribute: number;
   /** Anteilige Spieltag-Skalierung der Regression (0..1, Default 1 = volle Saison). */
   regressionScale?: number;
+  /** Grundabbau je Attribut (Entwicklung neu: `abbauBasis`; Standard = alter Wert). */
+  basePerAttribute?: number;
 }): OrganicRegressionBreakdown {
   const attributeCount = PROGRESSION_ATTRIBUTE_ORDER.length;
   const scale = normalizeRegressionScale(input.regressionScale);
-  const baseFlatTotal = roundValue(-ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE * attributeCount * scale, 2);
+  const baseFlatTotal = roundValue(-(input.basePerAttribute ?? ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE) * attributeCount * scale, 2);
   const marketValueTotal = roundValue(-input.marketValuePressurePerAttribute * attributeCount * scale, 2);
   return {
     baseFlatTotal,
@@ -970,6 +1053,8 @@ function getOrganicPerformanceGrowthMultiplier(input: {
   potentialGapStars: number;
   /** Gedämpfter Potenzial-Gap-Beschleuniger (>= 1), s. getPerformanceGapAccelerator. */
   gapAccelerator: number;
+  /** Entwicklung neu (22.11.): stetige Ertragskurve statt der alten Stufen am Rand der Decke. */
+  entwicklungNeu?: boolean;
 }) {
   const affinity = getAttributeAffinityKind(input.attribute, input.affinityProfile);
   const headroom = getAttributeHeadroom({
@@ -977,7 +1062,9 @@ function getOrganicPerformanceGrowthMultiplier(input: {
     attribute: input.attribute,
     record: input.record,
   });
-  const base = getOrganicGrowthMultiplier(affinity) * getPerformanceHeadroomGrowthMultiplier(headroom.headroom);
+  const base =
+    getOrganicGrowthMultiplier(affinity) *
+    (input.entwicklungNeu ? Math.max(0.3, ertragsFaktor(headroom.headroom)) : getPerformanceHeadroomGrowthMultiplier(headroom.headroom));
   // A genuinely capped attribute never gets a bailout — the individual cap always wins.
   // Das gilt auch für den Gap-Beschleuniger: an der eigenen Decke wird nichts beschleunigt.
   if (headroom.state === "capped") return base;
@@ -1076,6 +1163,8 @@ export function buildOrganicSeasonProgression(input: {
    * Werte auf drei Nachkommastellen statt einer (sonst schluckt die Rundung den kleinen Spieltagsanteil).
    */
   nurTraining?: boolean;
+  /** Mit `nurTraining` und Regel "neu": zusaetzlich den Abbau EINES Spieltags je Attribut liefern (`abbauTag`). */
+  mitAbbau?: boolean;
 }): OrganicSeasonProgressionResult {
   const attributesBefore = normalizePlayerAttributes(input.player);
   /**
@@ -1222,10 +1311,25 @@ export function buildOrganicSeasonProgression(input: {
   // Bewusst NUR der globale Beschleuniger: der talent_builder-Aufschlag bleibt ein reiner
   // Trainings-Perk dieses GM-Archetyps und soll sich nicht still in einen zweiten Kanal ausweiten.
   const performanceGapAccelerator = getPerformanceGapAccelerator(globalPotentialAccelerator);
-  const baseTrainingBudget =
+  // ENTWICKLUNG NEU (22.11., lib/resolve/entwicklung-regel.ts, Runde 2): Training, Leistung und Abbau je Spieltag. Diese Rechnung
+  // ist ausserhalb des Tagesmodus (`nurTraining`) die PROGNOSE des noch nicht gebuchten Rests (Saisonende: nichts mehr, wenn
+  // je Spieltag gebucht wird; mit abgeschaltetem Training je Spieltag der Rutsch ueber die ganze Saison).
+  const entNeu = entwicklungNeuFuer(input.gameState);
+  const entP = entwicklungsParameter();
+  const entRest = entNeu && !input.nurTraining ? bestimmeEntwicklungsRest(input.gameState, input.player) : null;
+  const entLeistungRest = entRest ? restLeistung(input.player, entRest) : null;
+  const entOffen = entRest ? offenerAnteil(entRest) : null;
+  const entAbbauFaktor = entRest ? ligaAbbauFaktor(input.gameState) : 1;
+  const entBudgetFaktor = entRest
+    ? trainingsBudgetFaktor(istDiligent(input.player), fokusDominanz(entRest.verlauf), entP)
+    : 1;
+  const baseTrainingBudgetRoh =
     input.accumulatedBaseTrainingBudget != null && Number.isFinite(input.accumulatedBaseTrainingBudget)
       ? input.accumulatedBaseTrainingBudget
-      : TRAINING_SETPOINTS_BY_MODE[trainingMode];
+      : entRest
+        ? entRest.zukunft * getTrainingSetpointsJeSpieltag(trainingMode)
+        : TRAINING_SETPOINTS_BY_MODE[trainingMode];
+  const baseTrainingBudget = baseTrainingBudgetRoh * entBudgetFaktor;
   const performanceWeightMultiplier =
     input.performanceWeightMultiplier != null && Number.isFinite(input.performanceWeightMultiplier)
       ? input.performanceWeightMultiplier
@@ -1289,6 +1393,7 @@ export function buildOrganicSeasonProgression(input: {
     marktwertBase,
     marketValuePressurePerAttribute,
     regressionScale,
+    basePerAttribute: entNeu ? entP.abbauBasis : undefined,
   });
   const affinityProfile = resolveSeasonalAffinityProfile({
     player: input.player,
@@ -1312,12 +1417,14 @@ export function buildOrganicSeasonProgression(input: {
       axisPoStars: axisPoStars ?? undefined,
       affinityGrowthMultiplier: organicAffinityMult,
     });
-    const trainingMultiplier = getOrganicTrainingGrowthMultiplier(
-      trainingGrowthMultiplier,
-      attributeHeadroom.state,
-      starSnapshot.potentialGap,
-      performanceSignals,
-    );
+    // Entwicklung neu: der Zustandsschritt (1 / 0,45 / 0,05) wird durch die stetige Ertragskurve ersetzt.
+    const trainingMultiplier =
+      getOrganicTrainingGrowthMultiplier(
+        trainingGrowthMultiplier,
+        attributeHeadroom.state,
+        starSnapshot.potentialGap,
+        performanceSignals,
+      ) * (entNeu ? ertragsFaktor(attributeHeadroom.headroom) / getAttributeGrowthMultiplier(attributeHeadroom.state) : 1);
     const performanceGrowthMultiplier = getOrganicPerformanceGrowthMultiplier({
       player: input.player,
       attribute,
@@ -1326,23 +1433,34 @@ export function buildOrganicSeasonProgression(input: {
       signals: performanceSignals,
       potentialGapStars: starSnapshot.potentialGap,
       gapAccelerator: performanceGapAccelerator,
+      entwicklungNeu: entNeu,
     });
     // B1: headroom-aware regression — a capped/closing attribute plateaus instead of eroding at full
     // speed (mirror of the growth throttle, but gentle). Open attributes keep full regression.
     const regressionHeadroomMultiplier = ORGANIC_REGRESSION_HEADROOM_MULTIPLIER[attributeHeadroom.state] ?? 1;
     // regressionScale: bei Zwischenstands-Prognosen anteilig zu den gespielten Spieltagen (s. o.);
     // im Saisonende-Apply immer 1 → identische Rechnung wie bisher.
+    const abbauJeSpieltag = entNeu
+      ? ((entP.abbauBasis + marketValuePressurePerAttribute * entP.abbauMarktwertSkala) * regressionHeadroomMultiplier * entP.abbauSkala) /
+        Math.max(1, resolveSeasonTotalMatchdaysForProgression(input.gameState))
+      : 0;
     const regression = nurTraining
       ? 0
-      : -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) *
-        regressionHeadroomMultiplier *
-        regressionScale;
-    const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
+      : entNeu
+        ? -abbauJeSpieltag * (entRest?.restAnzahl ?? 0) * entAbbauFaktor - (entOffen?.a[attribute] ?? 0)
+        : -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) * regressionHeadroomMultiplier * regressionScale;
+    const training =
+      applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier) +
+      (nurTraining ? 0 : (entOffen?.z[attribute] ?? 0));
     const performanceDelta = nurTraining
       ? 0
-      : applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) *
-        performanceWeightMultiplier;
-    const delta = roundValue(regression + training + performanceDelta, nurTraining ? 4 : 2);
+      : entNeu
+        ? (() => {
+            const l = entLeistungRest?.[attribute] ?? 0;
+            return l > 0 ? l * Math.max(0.3, ertragsFaktor(attributeHeadroom.headroom)) : l;
+          })()
+        : applyPositiveGrowthMultiplier(performance.deltas[attribute], performanceGrowthMultiplier) * performanceWeightMultiplier;
+    const delta = roundValue(regression + training + performanceDelta, nurTraining || entNeu ? 4 : 2);
     const before = attributesBefore[attribute];
     // Harte Ceiling-Bindung: Attributwachstum darf das (reconciled) Attribut-Ceiling
     // nie ueberschreiten. Damit bindet der Potenzial-Cap (v4) tatsaechlich als
@@ -1357,12 +1475,16 @@ export function buildOrganicSeasonProgression(input: {
     ceilingCapByAttribute[attribute] = Math.max(1, attributeCeilingCap);
     const after = nurTraining
       ? growOnlyTowardsCap(before, delta, ceilingCapByAttribute[attribute])
-      : roundValue(clamp(before + delta, 1, Math.max(1, attributeCeilingCap)), 1);
+      : entNeu
+        ? // Regel "neu": 3 Nachkommastellen wie das je Spieltag Gebuchte (sonst rundet das Saisonende die Attribute auf 1 Stelle und
+          // "nimmt" kleine Betraege zurueck); ein Wert ueber der Decke wird nicht nach unten gezogen.
+          roundValue(Math.max(1, Math.min(before + delta, Math.max(attributeCeilingCap, before))), 3)
+        : roundValue(clamp(before + delta, 1, Math.max(1, attributeCeilingCap)), 1);
     return {
       attribute,
       before,
       after,
-      delta: roundValue(after - before, nurTraining ? 3 : 2),
+      delta: roundValue(after - before, nurTraining || entNeu ? 3 : 2),
       regression: roundValue(regression, 2),
       training: roundValue(training, nurTraining ? 4 : 2),
       performance: roundValue(performanceDelta, 2),
@@ -1370,6 +1492,8 @@ export function buildOrganicSeasonProgression(input: {
       affinity,
       trainingGrowthMultiplier,
       performanceGrowthMultiplier,
+      abbauTag: nurTraining && input.mitAbbau ? roundValue(abbauJeSpieltag, 4) : 0,
+      deckel: ceilingCapByAttribute[attribute],
     };
   });
   // Spillover-Nachlauf: Der Teil des Budgets, den die Fokus-Attribute nicht aufnehmen konnten
@@ -1403,9 +1527,11 @@ export function buildOrganicSeasonProgression(input: {
         const rawDelta = entry.regression + entry.training + entry.spillover + entry.performance;
         const after = nurTraining
           ? growOnlyTowardsCap(entry.before, rawDelta, ceilingCapByAttribute[entry.attribute])
-          : roundValue(clamp(entry.before + rawDelta, 1, ceilingCapByAttribute[entry.attribute]), 1);
+          : entNeu
+            ? roundValue(Math.max(1, Math.min(entry.before + rawDelta, Math.max(ceilingCapByAttribute[entry.attribute], entry.before))), 3)
+            : roundValue(clamp(entry.before + rawDelta, 1, ceilingCapByAttribute[entry.attribute]), 1);
         entry.after = after;
-        entry.delta = roundValue(after - entry.before, nurTraining ? 3 : 2);
+        entry.delta = roundValue(after - entry.before, nurTraining || entNeu ? 3 : 2);
       });
     }
   }
@@ -1466,7 +1592,7 @@ export function buildOrganicSeasonProgression(input: {
             : ("neutral" as const),
     })),
     facilityModifierPct,
-    baseRegressionPerAttribute: ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
+    baseRegressionPerAttribute: entNeu ? entP.abbauBasis : ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE,
     marketValuePressureTotal,
     marketValuePressurePerAttribute,
     marketValueMaintenanceReliefPct: 0,

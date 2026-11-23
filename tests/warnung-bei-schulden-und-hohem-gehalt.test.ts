@@ -162,10 +162,11 @@ describe("Der Builder liest die Schuldenlage aus dem Spielstand", () => {
     },
   } as unknown as GameState;
 
-  it("Restschuld inkl. geplatzter Kredite, Rate nur aus aktiven — dieselbe Sicht wie die Kreditkapazität", () => {
+  it("Restschuld und Rate inkl. Kredite in Verzug — sie werden weiter eingezogen (Verzugsregel 22.11.)", () => {
     const warnung = buildSchuldenlastFruehwarnung(mitKrediten, "M-M", { cash: 0, salaryTotal: 107.7 });
     expect(warnung.schuld).toBe(90.2);
-    expect(warnung.kreditrate).toBe(22);
+    // 22 (aktiv) + 10,7 (in Verzug, wird weiter eingezogen); fremde und getilgte zählen nicht.
+    expect(warnung.kreditrate).toBe(32.7);
     expect(warnung.umsatz).toBe(88.6);
     expect(warnung.score).toBeGreaterThan(0);
   });

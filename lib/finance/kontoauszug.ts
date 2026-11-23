@@ -34,6 +34,9 @@ export type KontoauszugArt =
   | "arena_ausbau"
   | "medaillen"
   | "farb_meister"
+  | "kredit_zins_spieltag"
+  | "kredit_tilgung_spieltag"
+  | "kredit_eingang_spieltag"
   | "apron"
   | "vorstandsziele"
   | "vorstand_praemien"
@@ -152,6 +155,10 @@ export function buildKontoauszuege(gameState: GameState, seasonId?: string | nul
     if ((b.dauerkarten ?? 0) !== 0) {
       add(b.teamId, { ...basis, art: "dauerkarten", text: "Dauerkarten (Standard, vor Spieltag 1 nicht gewählt)", betrag: b.dauerkarten ?? 0 });
     }
+    // KREDITRATEN JE SPIELTAG (22.11.): Zins und Tilgung des Kreditnehmers, Rueckfluss beim Geber eines Team-Kredits.
+    add(b.teamId, { ...basis, art: "kredit_zins_spieltag", text: `Kreditzins Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.kreditZins ?? 0 });
+    add(b.teamId, { ...basis, art: "kredit_tilgung_spieltag", text: `Kredittilgung Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.kreditTilgung ?? 0 });
+    add(b.teamId, { ...basis, art: "kredit_eingang_spieltag", text: `Kreditrückfluss Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.kreditEingang ?? 0 });
   }
 
   // 2c) ARENA (22.11.): Dauerkarten, die der Manager vor Spieltag 1 gewaehlt hat (sofort gutgeschrieben), und Ausbau-Schritte (aus dem Investitionstopf).

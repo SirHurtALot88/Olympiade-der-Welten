@@ -7,7 +7,8 @@ import {
 } from "@/lib/ai/planner-cash-buffer-policy";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
-import { computeEarlyPayoff, computeLoanTerms, estimateTeamAnnualRevenue, getTeamAnnualLoanInstallment, originateLoan } from "@/lib/finance/loan-service";
+import { computeEarlyPayoff, computeLoanTerms, estimateTeamAnnualRevenue, getTeamAnnualLoanInstallment, kreditKonditionen, originateLoan } from "@/lib/finance/loan-service";
+import { pruefeKreditAufnahme } from "@/lib/finance/kredit-pruefung";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
@@ -277,10 +278,32 @@ function resolveServiceableTermSeasons(input: {
     const terms = computeLoanTerms({ principal: input.principal, termSeasons: TERM_CANDIDATES[i]!, finances: input.finances });
     if (terms.installmentPerSeason <= room) return TERM_CANDIDATES[i]!;
   }
-  // Selbst die längste Laufzeit liegt knapp über dem Rahmen — als begründete Ausnahme trotzdem die
-  // längste (kleinste Rate) nehmen statt abzulehnen; Kapazität + Bereitschaft haben den Betrag bereits
-  // gedeckelt.
-  return TERM_CANDIDATES[TERM_CANDIDATES.length - 1];
+  // Selbst die längste Laufzeit sprengt den Rahmen: KEINE Ausnahme mehr (22.11.). Die KI geht durch dieselbe Sperre wie der Mensch.
+  return null;
+}
+
+/**
+ * Die gemeinsame Sperre (`pruefeKreditAufnahme`, 20 % der Planeinnahmen, Sparauflage) mit der ECHTEN Rate des Bankkredits aus
+ * `kreditKonditionen` (Raten je Spieltag in einer Raten-Saison, sonst Jahresrate). Reicht die Rate in der gewaehlten Laufzeit nicht, wird
+ * eine laengere Kandidaten-Laufzeit probiert; passt keine, kommt der Sperrgrund zurueck. Nur der Notkredit der Bank ist ausgenommen.
+ */
+function pruefeKiKredit(input: {
+  gameState: GameState;
+  teamId: string;
+  principal: number;
+  termSeasons: number;
+  finances: number;
+}): { termSeasons: number } | { grund: string } {
+  let letzter: string | null = null;
+  for (const kandidat of TERM_CANDIDATES.filter((t) => t >= input.termSeasons)) {
+    const bank = computeLoanTerms({ principal: input.principal, termSeasons: kandidat, finances: input.finances });
+    const k = kreditKonditionen(input.gameState, input.principal, bank.interestRatePerSeason, kandidat);
+    const pruefung = pruefeKreditAufnahme(input.gameState, input.teamId, k.installmentPerSeason);
+    if (pruefung.ok) return { termSeasons: kandidat };
+    if (pruefung.reason === "vorstand_sparauflage") return { grund: "vorstand_sparauflage" };
+    letzter = pruefung.reason;
+  }
+  return { grund: letzter === "schuldendienst_obergrenze" ? "debt_service_ceiling" : (letzter ?? "debt_service_ceiling") };
 }
 
 /**
@@ -339,10 +362,13 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
       finances: identity?.finances ?? 5,
     });
     if (laufzeit == null) return noLoan("liquidity_debt_service_ceiling");
+    // Auch der Liquiditaetskredit geht durch Obergrenze und Sparauflage; nur der Notkredit der Bank (Backstop) ist ausgenommen.
+    const erlaubt = pruefeKiKredit({ gameState, teamId, principal: betrag, termSeasons: laufzeit, finances: identity?.finances ?? 5 });
+    if ("grund" in erlaubt) return noLoan(erlaubt.grund === "debt_service_ceiling" ? "liquidity_debt_service_ceiling" : erlaubt.grund);
     return {
       shouldBorrow: true,
       loanAmount: betrag,
-      termSeasons: laufzeit,
+      termSeasons: erlaubt.termSeasons,
       reason: "liquidity_negative_cash",
     };
   }
@@ -406,8 +432,10 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const termSeasons = resolveServiceableTermSeasons({ gameState, teamId, principal: loanAmount, finances });
   // Keine kurze Laufzeit ist zusammen mit der bestehenden Last tragbar → Kredit ablehnen statt strecken.
   if (termSeasons == null) return noLoan("debt_service_ceiling");
+  const erlaubt = pruefeKiKredit({ gameState, teamId, principal: loanAmount, termSeasons, finances });
+  if ("grund" in erlaubt) return noLoan(erlaubt.grund);
 
-  return { shouldBorrow: true, loanAmount, termSeasons, reason: "need_driven_borrow" };
+  return { shouldBorrow: true, loanAmount, termSeasons: erlaubt.termSeasons, reason: "need_driven_borrow" };
 }
 
 export type AiEarlyPayoffDecision = {

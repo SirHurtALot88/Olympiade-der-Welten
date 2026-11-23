@@ -39,6 +39,7 @@
 
 import type { GameState, LoanRecord } from "@/lib/data/olyDataTypes";
 import { INSOLVENCY_BACKSTOP_TERM_SEASONS } from "@/lib/finance/loan-service";
+import { istRatenKredit } from "@/lib/finance/kredit-raten";
 
 function roundCash(value: number) {
   return Number(value.toFixed(2));
@@ -64,13 +65,19 @@ export type NotkreditRuecknahmePlan = {
   gameStateRepariert: GameState | null;
 };
 
+/** Noch keine einzige Rate gezahlt: bei Jahresraten `seasonsRemaining`, bei Spieltagsraten (22.11.) die Zahl der offenen Raten. */
+function keineRateGezahlt(loan: LoanRecord): boolean {
+  if (istRatenKredit(loan)) return loan.ratenOffen === loan.termSeasons * (loan.ratenJeSaison ?? 1);
+  return loan.seasonsRemaining === loan.termSeasons;
+}
+
 function istZwangsNotkredit(loan: LoanRecord, seasonId: string): boolean {
   return (
     loan.originatedSeasonId === seasonId &&
     loan.lenderType === "bank" &&
     loan.status === "active" &&
     loan.termSeasons === INSOLVENCY_BACKSTOP_TERM_SEASONS &&
-    loan.seasonsRemaining === loan.termSeasons &&
+    keineRateGezahlt(loan) &&
     Math.abs(loan.principalOutstanding - loan.principalOriginal) < 0.005
   );
 }
@@ -79,7 +86,12 @@ function istZwangsNotkredit(loan: LoanRecord, seasonId: string): boolean {
 function behaltGrund(loan: LoanRecord): string {
   if (loan.status !== "active") return `Status ${loan.status}`;
   if (loan.termSeasons !== INSOLVENCY_BACKSTOP_TERM_SEASONS) return `Laufzeit ${loan.termSeasons} statt ${INSOLVENCY_BACKSTOP_TERM_SEASONS}`;
-  if (loan.seasonsRemaining !== loan.termSeasons) return `bereits ${loan.termSeasons - loan.seasonsRemaining} Rate(n) gezahlt`;
+  if (!keineRateGezahlt(loan)) {
+    const gezahlt = istRatenKredit(loan)
+      ? loan.termSeasons * (loan.ratenJeSaison ?? 1) - (loan.ratenOffen ?? 0)
+      : loan.termSeasons - loan.seasonsRemaining;
+    return `bereits ${gezahlt} Rate(n) gezahlt`;
+  }
   return `Restschuld ${loan.principalOutstanding} weicht von Aufnahme ${loan.principalOriginal} ab`;
 }
 

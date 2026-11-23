@@ -34,7 +34,7 @@ import {
   resolveSeasonEndTrainingAccumulatorOverrides,
   type OrganicSeasonProgressionResult,
 } from "@/lib/training/organic-season-progression";
-import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
+import { trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 import {
   reconcilePlayerPotentialRecordsForGameState,
   resolvePlayerPotentialRecordForProgression,
@@ -281,7 +281,7 @@ function accumulatorProgressionOverrides(gameState: GameState, player: Player) {
     accumulator: player.seasonTrainingAccumulator,
     seasonId: gameState.season.id,
     totalMatchdays: resolveSeasonTotalMatchdays(gameState),
-    jeSpieltag: isTrainingJeSpieltagAktiv(),
+    jeSpieltag: trainingJeSpieltagFuer(gameState),
   });
 }
 

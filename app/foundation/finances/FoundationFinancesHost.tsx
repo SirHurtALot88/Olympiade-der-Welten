@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 
-import FinanzenModern, { type VorstandAktionFn } from "@/app/foundation/finances/FinanzenModern";
+import FinanzenModern, { type FinanzenAnsicht, type VorstandAktionFn } from "@/app/foundation/finances/FinanzenModern";
 import type { ArenaAktionFn } from "@/lib/arena/arena-aktion-typen";
+import type { KreditAbloeseFn, KreditAufnahmeFn } from "@/app/foundation/finances/FinanzenKredite";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildSalaryFactorOutlook } from "@/lib/foundation/finances/salary-factor-outlook";
 import { useFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
@@ -29,14 +30,19 @@ export type FoundationFinancesHostProps = {
   onOpenOffice?: () => void;
   /** Darf der aktive Manager dieses Team verwalten? Sonst ist die Seite nur lesbar. */
   kannVerwalten?: boolean;
+  /** Schreibweg Kredit aufnehmen / ablösen (Reiter Kredite): Shell-Callbacks, serverseitig geprüft. */
+  onKreditAufnehmen?: KreditAufnahmeFn;
+  onKreditAbloesen?: KreditAbloeseFn;
+  /** Reiter, mit dem die Seite aufgeht (der Navigationspunkt „Kredite“ springt auf „kredite“). */
+  startAnsicht?: FinanzenAnsicht;
 };
 
 /**
- * Host/view split mirrors `FoundationCreditsHost` — read-only view. Einzige
+ * Host/view split: die Seite liest nur, geschrieben wird über die Shell-Callbacks. Einzige
  * Ausnahme von "keine Callbacks": der Sprung ins Teamprofil aus der
  * Liga-Tabelle, der nichts verändert, sondern nur navigiert.
  */
-export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam, onVorstandAktion, onArenaAktion, onOpenOffice, kannVerwalten }: FoundationFinancesHostProps) {
+export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam, onVorstandAktion, onArenaAktion, onOpenOffice, kannVerwalten, onKreditAufnehmen, onKreditAbloesen, startAnsicht }: FoundationFinancesHostProps) {
   const model = useFinancesViewModel(gameState, teamId);
   // Liga-weite Finanzübersicht (#Finanzen-Liga-Tabelle) — bewusst getrennt
   // vom Fog-of-War-gesperrten `model` oben, siehe `use-finances-league-table.ts`.
@@ -65,6 +71,9 @@ export default function FoundationFinancesHost({ gameState, teamId, saveId, onOp
       onArenaAktion={onArenaAktion}
       onOpenOffice={onOpenOffice}
       kannVerwalten={kannVerwalten}
+      onKreditAufnehmen={onKreditAufnehmen}
+      onKreditAbloesen={onKreditAbloesen}
+      startAnsicht={startAnsicht}
     />
   );
 }

@@ -367,6 +367,21 @@ export type TrainingsSpieltagEintrag = {
   i?: "leicht" | "mittel" | "hart";
   /** Gebuchter Zuwachs je Attribut (nur Werte ungleich 0), nach Decke. */
   z?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /**
+   * Entwicklung neu, Runde 2 (22.11.): Leistungsanteil dieses Spieltags je Attribut, MIT Vorzeichen (PP gegen den Liga-Median),
+   * und Abbau je Attribut (>= 0). Netto auf dem Attribut = z + p - a. Fehlen beide, ist der Eintrag aelter (nur Training).
+   */
+  p?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  a?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /**
+   * Entwicklung neu (22.11.): Leistungseinheit je Einsatz-Disziplin dieses Spieltags (roh, mit Vorzeichen, vor Gewicht/Schwung/Kappung). Daraus
+   * entsteht beim Saisonwechsel die Leistungs-Erwartung fuer die Folgesaison (`Player.leistungsErwartung`).
+   */
+  y?: Record<string, number>;
+  /** PP-Fingerabdruck dieses Spieltags beim Buchen (`ppHashFuerTag`): weicht er beim erneuten Buchen ab, wird L neu gerechnet. */
+  h?: string;
+  /** Ligafaktor, mit dem der Abbau `a` dieses Spieltags gebucht wurde (`ligaAbbauFaktor`); fehlt = 1. */
+  f?: number;
   /** Trainingslast dieses Spieltags (Fatigue-Anteil, nach Reha-Rabatt). */
   l?: number;
   /**
@@ -1147,6 +1162,12 @@ export type Player = {
     /** Disziplinwerte vor dem ersten je-Spieltag gebuchten Zuwachs dieser Saison (Saisonend-Delta). */
     startDisziplinwerte?: Record<string, number>;
   } | null;
+  /**
+   * Entwicklung neu (22.11.): Leistungs-Erwartung aus der VORSAISON fuer die Prognose zu Saisonbeginn (statt L = 0). `jeDisziplin` summiert die
+   * Leistungseinheiten (z) der Einsaetze je Disziplin, `n` zaehlt sie; `tage` sind die Trainingstage der Saison. Wird beim Saisonwechsel aus
+   * dem Verlauf gebaut (`baueLeistungsErwartung`); nur Prognose, nie gebucht.
+   */
+  leistungsErwartung?: { seasonId: string; tage: number; jeDisziplin: Record<string, { n: number; summe: number }> } | null;
   /**
    * Ziel-Disziplin + Weg (Regel A, Chris 18.11.). Vom Manager gesetzt; fehlt es, trainiert der Spieler
    * auf den Vorschlag der KI-Logik (fuer Mensch und KI dieselbe). Wirkt ab dem naechsten Spieltag.
@@ -2001,7 +2022,23 @@ export type SpieltagFinanzBuchung = {
   tickets?: number;
   /** DAUERKARTEN: das Geld, das an diesem Spieltag gutgeschrieben wurde (nur Spieltag 1, wenn vorher nicht gewaehlt wurde). In `cashDelta` enthalten. */
   dauerkarten?: number;
-  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number; marketing?: number; tickets?: number };
+  /**
+   * KREDITRATEN JE SPIELTAG (22.11., lib/finance/kredit-raten.ts, Stempel `seasonState.kreditRegel`): Zins und Tilgung der laufenden
+   * Kredite dieses Teams (beide <= 0, in `cashDelta` enthalten) und der Rueckfluss aus Team-Krediten an den Geber (>= 0, ebenfalls in
+   * `cashDelta`). In der GuV zaehlt nur der Zins. `kredit` haelt die Aufteilung je Kredit. Fehlt in Zeilen ohne Kreditraten.
+   */
+  kreditZins?: number;
+  kreditTilgung?: number;
+  kreditEingang?: number;
+  kredit?: SpieltagKreditPosten[];
+  rest: {
+    gehalt: number;
+    sponsorBasis: number;
+    gebaeudeEinnahme: number;
+    gebaeudeUnterhalt: number;
+    marketing?: number;
+    tickets?: number;
+  };
   createdAt: string;
 };
 
@@ -2110,6 +2147,18 @@ export type LoanRecord = {
   originatedSeasonId: string;
   status: "active" | "paid" | "defaulted";
   missedPayments: number;
+  /**
+   * RATEN JE SPIELTAG (22.11., lib/finance/kredit-raten.ts, Stempel `seasonState.kreditRegel`): Anzahl der Spieltage je Saison, auf die
+   * sich die Rate verteilt (der Nenner). Gesetzt = der Kredit wird je Spieltag getilgt; fehlt = Rate am Saisonende (alter Weg).
+   * `installmentPerSeason` bleibt die Jahressumme (`rateJeSpieltag x ratenJeSaison`), `seasonsRemaining` ist `ceil(ratenOffen / ratenJeSaison)`.
+   */
+  ratenJeSaison?: number;
+  /** Noch offene Raten (Laufzeit x Spieltage am Anfang, je gebuchtem Spieltag eine weniger). */
+  ratenOffen?: number;
+  /** Die gleichbleibende Rate je Spieltag (Annuitaet mit Zins je Saison / `ratenJeSaison`). */
+  rateJeSpieltag?: number;
+  /** Rundungsrest der Raten (Zins und Tilgung, je unter 0,05), der in die naechste Rate geht; Kasse und Restschuld bleiben so auf Dauer deckungsgleich. */
+  ratenRest?: { zins: number; tilgung: number };
 };
 
 export type LoanApplyLogRecord = {
@@ -2129,6 +2178,15 @@ export type LoanApplyLogRecord = {
    * derselben Saison NICHT als "bereits gelaufen" markieren.
    */
   kind?: "settlement" | "early_payoff";
+};
+
+/** Ein Kredit-Posten einer Spieltagsbuchung (Zahlen positiv): was der Kredit an diesem Spieltag an Zins und Tilgung gezahlt hat. */
+export type SpieltagKreditPosten = {
+  loanId: string;
+  zins: number;
+  tilgung: number;
+  /** Nur bei Zahlungsausfall: der nicht gezahlte Teil der Rate (kapitalisiert, samt 5 % Strafzins). */
+  ausfall?: number;
 };
 
 /**
@@ -4290,6 +4348,11 @@ export type SeasonState = {
    */
   formkartenRegel?: { seasonId: string; regel: "alt" | "plusminus" } | null;
   /**
+   * ENTWICKLUNGSREGEL DIESER SAISON (22.11., lib/resolve/entwicklung-regel.ts): "neu" (PP-Faktor auf das Training, Ertragskurve,
+   * Verfall, mittelwertneutrale Potentialdrift) oder "alt". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel.
+   */
+  entwicklungsRegel?: { seasonId: string; regel: "alt" | "neu" } | null;
+  /**
    * MARKETING-REGEL DIESER SAISON (22.11., lib/marketing/marketing-regel.ts): "an" = Werbegeld, Team-Anteil, Teammarke und Moral-Zuschlag
    * gelten; "aus" = nichts davon. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison. Dazu die Fanfarbe
    * je Team (vier Zahlen, driftet beim Saisonwechsel), ihr Verlauf und der Verlaufstext je Saisonwechsel.
@@ -4304,6 +4367,12 @@ export type SeasonState = {
     /** Spiegel der Notbremse `OLY_MARKETING=aus-sofort`, vom Server beim naechsten Buchen gesetzt: ab dann buchen/wirken keine neuen Anteile, Gebuchtes bleibt. */
     notbremse?: boolean;
   } | null;
+  /**
+   * KREDIT-REGEL DIESER SAISON (22.11., lib/finance/kredit-raten.ts): "raten" = Zins und Tilgung der Kredite werden je Spieltag
+   * gebucht (Ledger `spieltagFinanzen`); "saisonende" = wie bisher eine Jahresrate am Saisonende. Gesetzt beim Anlegen eines Spiels
+   * und beim Saisonwechsel, nie mitten in der Saison. Ein bestehender Spielstand bekommt fuer die laufende Saison "saisonende".
+   */
+  kreditRegel?: { seasonId: string; regel: "raten" | "saisonende" } | null;
   /**
    * MARKETING-STAND JE TEAM (22.11., lib/marketing/marketing-team.ts): das eingefrorene Rechenergebnis der Saison. Nur der Server schreibt
    * ihn (`bucheSpieltagFinanzen`: erster Spieltag der Saison, neu bei geaendertem Kader-Hash). Seite, GuV-Prognose, Moral-Zuschlag und

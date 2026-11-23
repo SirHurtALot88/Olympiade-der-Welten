@@ -127,7 +127,7 @@ export type HomeV2ClientProps = {
   /**
    * Kredit-Kern (`lib/finance/loan-service.ts`): jährliche Kreditrate (Summe
    * `installmentPerSeason` über aktive Kredite) und Restschuld. Eigenes Team
-   * only (Fog of War, siehe `use-credits-view-model.ts`) — `null`/`0` bei
+   * only (Fog of War, siehe `lib/finance/kredite-seite-modell.ts`) — `null`/`0` bei
    * fehlenden Krediten, dann bleibt der Chip ausgeblendet.
    */
   loanInstallment: number | null;

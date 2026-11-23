@@ -62262,237 +62262,73 @@ span.nl-facility-ampel-chip {
    system. Data-agnostic: identical styling whether the seam is
    still `"not_ready"` (stub) or `"ready"` (real credit data).
    ============================================================ */
-.is-new-look .nl-credits {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s4);
-  color: var(--nl-ink);
-  font-family: var(--nl-sans);
-}
 
-.is-new-look .nl-credits-offer-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--nl-s4);
-}
 
-.is-new-look .nl-credits-offer-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s2);
-  padding: var(--nl-s4);
-  border-radius: var(--nl-r-lg);
-  border: 1px solid var(--nl-line);
-  background: var(--nl-panel);
-  box-shadow: var(--nl-e1);
-}
 
-.is-new-look .nl-credits-offer-range {
-  font-size: 15px;
-  font-weight: 700;
-}
 
-.is-new-look .nl-credits-offer-terms {
-  font-size: 12px;
-  color: var(--nl-mut);
-}
+
+
+
+
+
 
 /* --- Angebotsliste: eine Karte je Verleiher, günstigster Zins oben --- */
-.is-new-look .nl-credits-offer-card.is-disabled {
-  opacity: 0.55;
-}
 
-.is-new-look .nl-credits-offer-card.is-best {
-  border-color: var(--nl-warn);
-  box-shadow: 0 0 0 1px var(--nl-warn), var(--nl-e1);
-}
 
-.is-new-look .nl-credits-offer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--nl-s2);
-}
+
+
+
 
 /* K2 (Audit „markt"): Wappen + Name als eigene, nie zerreißbare Gruppe — die Badges (rechts)
    brechen als Ganzes in die naechste Zeile um, statt sich in den Namen zu schieben. */
-.is-new-look .nl-credits-offer-identity {
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s2);
-  min-width: 0;
-  flex: 1 1 140px;
-}
 
-.is-new-look .nl-credits-offer-badges {
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s2);
-  flex: 0 0 auto;
-}
 
-.is-new-look .nl-credits-offer-crest {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid var(--nl-line);
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-offer-crest img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
 
-.is-new-look .nl-credits-offer-crest.is-bank {
-  background: color-mix(in srgb, var(--nl-warn) 20%, transparent);
-  color: var(--nl-warn);
-  font-size: 14px;
-}
 
-.is-new-look .nl-credits-offer-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.is-new-look .nl-credits-offer-best-badge {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--nl-warn);
-  color: #1a1200;
-  white-space: nowrap;
-}
 
-.is-new-look .nl-credits-offer-badge {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--nl-line-2);
-  background: var(--nl-accent-soft);
-  color: var(--nl-mut);
-  white-space: nowrap;
-}
 
-.is-new-look .nl-credits-offer-rate {
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--nl-accent);
-}
 
-.is-new-look .nl-credits-offer-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--nl-s2);
-}
 
-.is-new-look .nl-credits-offer-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 
-.is-new-look .nl-credits-offer-stat-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-offer-stat-value {
-  font-size: 13px;
-  font-weight: 700;
-}
 
-.is-new-look .nl-credits-offer-note {
-  margin: 0;
-  font-size: 12px;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-offer-button {
-  align-self: flex-start;
-}
 
-.is-new-look .nl-credits-empty-text {
-  margin: 0;
-  font-size: 13px;
-}
 
-.is-new-look .nl-credits-blocked-card .nl-credits-empty-text {
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-admin-toggle {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s2);
-  padding: var(--nl-s3) var(--nl-s4);
-  border: 1px dashed var(--nl-line);
-  border-radius: var(--nl-radius-md, 10px);
-  background: color-mix(in srgb, var(--nl-warn, #d9a441) 8%, transparent);
-}
 
-.is-new-look .nl-credits-admin-toggle-label {
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s2);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
 
-.is-new-look .nl-credits-admin-toggle-label input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--nl-warn, #d9a441);
-  cursor: pointer;
-}
 
-.is-new-look .nl-credits-admin-toggle-note {
-  margin: 0;
-  font-size: 12px;
-  color: var(--nl-mut);
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* --- Kredit-Aufnahme: Slider + exakter Betrag + Laufzeit + Live-Quote --- */
-.is-new-look .nl-credits-borrow-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s4);
-}
 
-.is-new-look .nl-credits-borrow-amount {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s2);
-}
 
-.is-new-look .nl-credits-borrow-amount-row {
-  display: flex;
-  align-items: center;
-  gap: var(--nl-s4);
-  flex-wrap: wrap;
-}
+
+
+
 
 .is-new-look .nl-credits-slider {
   flex: 1 1 220px;
@@ -62506,327 +62342,104 @@ span.nl-facility-ampel-chip {
   opacity: 0.5;
 }
 
-.is-new-look .nl-credits-amount-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: var(--nl-r-md, 8px);
-  border: 1px solid var(--nl-line);
-  background: var(--nl-panel-2, var(--nl-panel));
-}
 
-.is-new-look .nl-credits-amount-input {
-  width: 96px;
-  border: none;
-  background: transparent;
-  color: var(--nl-ink);
-  font-size: 15px;
-  font-weight: 700;
-  text-align: right;
-}
 
-.is-new-look .nl-credits-amount-input:focus {
-  outline: none;
-}
 
-.is-new-look .nl-credits-amount-unit {
-  font-size: 12px;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-amount-range {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-term-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 220px;
-}
 
-.is-new-look .nl-credits-term-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-term-select {
-  padding: 8px 10px;
-  border-radius: var(--nl-r-md, 8px);
-  border: 1px solid var(--nl-line);
-  background: var(--nl-panel-2, var(--nl-panel));
-  color: var(--nl-ink);
-  font-size: 13px;
-  font-weight: 600;
-}
 
-.is-new-look .nl-credits-quote-panel {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--nl-s2);
-  padding: var(--nl-s4);
-  border-radius: var(--nl-r-lg);
-  border: 1px solid var(--nl-line-2);
-  background: var(--nl-accent-soft);
-}
 
-.is-new-look .nl-credits-quote-row {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
 
-.is-new-look .nl-credits-quote-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-quote-value {
-  font-size: 16px;
-  font-weight: 700;
-}
 
-.is-new-look .nl-credits-borrow-button {
-  align-self: flex-start;
-}
 
-.is-new-look .nl-credits-borrow-message {
-  margin: 0;
-  font-size: 13px;
-  color: var(--nl-mut);
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* --- Aktive Kredite: "Vorzeitig ablösen" Inline-Aktion ------------- */
-.is-new-look .nl-credits-payoff-button {
-  white-space: nowrap;
-}
 
-.is-new-look .nl-credits-payoff-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s2);
-  min-width: 200px;
-}
 
-.is-new-look .nl-credits-payoff-quote {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--nl-s2);
-  padding: var(--nl-s2);
-  border-radius: var(--nl-r-md, 8px);
-  border: 1px solid var(--nl-line-2);
-  background: var(--nl-accent-soft);
-}
 
-.is-new-look .nl-credits-payoff-actions {
-  display: flex;
-  gap: var(--nl-s2);
-}
+
+
+
+
 
 /* --- Grafik-Welle 2: Kreditrahmen-Gauge ---------------------------- */
-.is-new-look .nl-credits-gauge-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--nl-s5, 24px);
-}
 
-.is-new-look .nl-credits-gauge {
-  position: relative;
-  display: inline-flex;
-  align-items: flex-end;
-  justify-content: center;
-  width: 220px;
-  max-width: 100%;
-  flex: 0 0 auto;
-  font-family: var(--nl-sans);
-}
 
-.is-new-look .nl-credits-gauge svg {
-  display: block;
-  width: 100%;
-  height: auto;
-}
 
-.is-new-look .nl-credits-gauge-zone {
-  opacity: 0.9;
-}
 
-.is-new-look .nl-credits-gauge-fill {
-  transition: stroke var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
-}
 
-.is-new-look .nl-credits-gauge-needle {
-  stroke: var(--nl-panel);
-  stroke-width: 2;
-}
 
-.is-new-look .nl-credits-gauge-copy {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  pointer-events: none;
-}
 
-.is-new-look .nl-credits-gauge-value {
-  font-family: var(--nl-display);
-  font-size: 28px;
-  font-weight: 800;
-  line-height: 1.05;
-  color: var(--nl-ink);
-}
 
-.is-new-look .nl-credits-gauge-label {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  /* „Auslastung" ist Information, kein Ornament (G4, gemessen 3,60:1 auf Karte). */
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-gauge-sub {
-  margin-top: 2px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-gauge-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--nl-s3);
-}
+
+
+
+
+
+
+
+
+
+
+
 
 /* --- Grafik-Welle 2: Tilgung-vs-Cashflow --------------------------- */
-.is-new-look .nl-credits-burden {
-  display: flex;
-  flex-direction: column;
-  gap: var(--nl-s3);
-}
 
-.is-new-look .nl-credits-burden-chart {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  /* Feste, schlanke Balkenhoehe: der Balken soll die Kartenbreite fuellen, aber
-     nicht proportional mitwachsen (sonst wurde er auf breiten Karten zu einem
-     ~70px hohen Vollblock, vor allem wenn nur ein Segment Wert hat). Zusammen
-     mit preserveAspectRatio="none" streckt sich der 320x60-Viewport auf 100%
-     Breite bei fixer 60px Hoehe (vertikal 1:1, keine Hoehenverzerrung). */
-  height: 60px;
-}
 
-.is-new-look .nl-credits-burden-track {
-  fill: var(--nl-bg-2);
-  stroke: var(--nl-line);
-}
 
-.is-new-look .nl-credits-burden-seg {
-  transition: width var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
-}
 
-.is-new-look .nl-credits-burden-seg.is-loan {
-  stroke: var(--nl-risk);
-  stroke-width: 1.5;
-}
 
-.is-new-look .nl-credits-burden-marker line {
-  stroke: var(--nl-ink);
-  stroke-width: 1.5;
-  stroke-dasharray: 3 2;
-}
+
+
+
+
+
+
 
 /* K3 (Audit „markt"): Einnahmen-Referenz als Legendenpunkt statt abgeschnittenem SVG-Text —
    kurzer gestrichelter Strich, derselbe Look wie die Linie im Balken (siehe Marker oben). */
-.is-new-look .nl-credits-burden-legend-marker {
-  display: inline-block;
-  width: 2px;
-  height: 12px;
-  align-self: center;
-  background-image: linear-gradient(var(--nl-ink) 0 3px, transparent 3px 5px);
-  background-size: 2px 5px;
-  background-repeat: repeat-y;
-}
 
-.is-new-look .nl-credits-burden.is-danger .nl-credits-burden-track {
-  stroke: var(--nl-risk);
-}
 
-.is-new-look .nl-credits-burden-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--nl-s3);
-}
 
-.is-new-look .nl-credits-burden-legend-item {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 12px;
-}
 
-.is-new-look .nl-credits-burden-legend-item.is-total {
-  font-weight: 700;
-}
 
-.is-new-look .nl-credits-burden-legend-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  align-self: center;
-}
 
-.is-new-look .nl-credits-burden-legend-label {
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-burden-legend-value {
-  font-weight: 700;
-  color: var(--nl-ink);
-}
 
-.is-new-look .nl-credits-burden-badge {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  padding: 3px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
 
-.is-new-look .nl-credits-burden-badge.is-good {
-  background: var(--heat-good-bg);
-  color: var(--heat-good-text);
-}
 
-.is-new-look .nl-credits-burden-badge.is-risk {
-  background: var(--heat-danger-bg);
-  color: var(--heat-danger-text);
-}
 
-.is-new-look .nl-credits-burden-empty {
-  margin: 0;
-  font-size: 13px;
-}
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* --- Grafik-Welle 2: Slider-Farbfeedback ---------------------------- */
 .is-new-look .nl-credits-slider {
@@ -62834,86 +62447,31 @@ span.nl-facility-ampel-chip {
   height: 6px;
 }
 
-.is-new-look .nl-credits-amount-field {
-  transition: border-color var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
-}
 
-.is-new-look .nl-credits-amount-input {
-  transition: color var(--nl-t-fast, 0.15s) var(--nl-ease, ease);
-}
 
-.is-new-look .nl-credits-amount-tier {
-  flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid currentColor;
-  background: color-mix(in srgb, currentColor 12%, transparent);
-}
+
+
+
 
 /* --- Grafik-Welle 2: Season-1 Vault-Empty-State --------------------- */
-.is-new-look .nl-credits-vault-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--nl-s3);
-  padding: var(--nl-s3) 0;
-}
 
-.is-new-look .nl-credits-vault {
-  display: block;
-  width: 120px;
-  max-width: 100%;
-  height: auto;
-}
 
-.is-new-look .nl-credits-vault-rim {
-  fill: var(--nl-panel-2, var(--nl-panel));
-  stroke: var(--nl-line-2);
-  stroke-width: 6;
-}
 
-.is-new-look .nl-credits-vault-spoke {
-  stroke: var(--nl-line);
-  stroke-width: 5;
-  stroke-linecap: round;
-}
 
-.is-new-look .nl-credits-vault-hub {
-  fill: var(--nl-panel);
-  stroke: var(--nl-accent);
-  stroke-width: 3;
-}
 
-.is-new-look .nl-credits-vault-lock-body {
-  fill: var(--nl-warn);
-}
 
-.is-new-look .nl-credits-vault-lock-shackle {
-  stroke: var(--nl-warn);
-  stroke-width: 4;
-}
 
-.is-new-look .nl-credits-vault-chip {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--nl-warn);
-  color: #1a1200;
-}
+
+
+
+
+
+
+
+
 
 /* --- #182: Liga-Kreditübersicht --- */
-.is-new-look .nl-credits-league-total {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--nl-ink);
-}
+
 
 /*
   ALLE KREDITE DER LIGA — Detail-Tabelle unter der Team-Uebersicht.
@@ -62922,172 +62480,55 @@ span.nl-facility-ampel-chip {
   einen kredit genommen, laufzeit raten usw." Die Liste darueber fasst pro Team zusammen; hier steht
   jeder einzelne Kredit. Beendete Kredite bleiben, nur gedaempft.
 */
-.is-new-look .nl-credits-alle-wrap {
-  overflow-x: auto;
-}
 
-.is-new-look .nl-credits-alle {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--nl-font-size-sm, 0.875rem);
-}
 
-.is-new-look .nl-credits-alle th,
-.is-new-look .nl-credits-alle td {
-  padding: var(--nl-space-2, 0.5rem) var(--nl-space-3, 0.75rem);
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--nl-border-subtle, rgba(255, 255, 255, 0.08));
-}
 
-.is-new-look .nl-credits-alle th {
-  color: var(--nl-text-muted, rgba(255, 255, 255, 0.6));
-  font-weight: 600;
-}
 
-.is-new-look .nl-credits-alle .nl-credits-alle-num {
-  text-align: right;
-}
+
+
+
+
+
 
 /* Eigene Beteiligung hervorheben — als Schuldner ODER als Geldgeber. */
-.is-new-look .nl-credits-alle-row.is-own td {
-  background: var(--nl-surface-raised, rgba(255, 255, 255, 0.04));
-}
+
 
 /* Beendetes bleibt lesbar, tritt aber zurueck. */
-.is-new-look .nl-credits-alle-row.is-done td {
-  opacity: 0.55;
-}
 
-.is-new-look .nl-credits-alle-du,
-.is-new-look .nl-credits-alle-seit,
-.is-new-look .nl-credits-alle-missed {
-  margin-left: var(--nl-space-2, 0.5rem);
-  font-size: var(--nl-font-size-xs, 0.75rem);
-  color: var(--nl-text-muted, rgba(255, 255, 255, 0.6));
-}
 
-.is-new-look .nl-credits-alle-missed {
-  color: var(--nl-danger, #f26d6d);
-}
 
-.is-new-look .nl-credits-league-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 520px;
-  overflow-y: auto;
-}
 
-.is-new-look .nl-credits-league-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(64px, 1fr) auto;
-  align-items: center;
-  gap: var(--nl-s3);
-  padding: 7px var(--nl-s2);
-  border-radius: var(--nl-r-md);
-  border: 1px solid var(--nl-line);
-  background: var(--nl-panel-2);
-}
 
-.is-new-look .nl-credits-league-row.is-current {
-  border-color: color-mix(in srgb, var(--nl-accent) 55%, transparent);
-  background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-panel-2));
-}
 
-.is-new-look .nl-credits-league-row.is-risk {
-  border-color: color-mix(in srgb, var(--nl-risk) 50%, transparent);
-}
 
-.is-new-look .nl-credits-league-team {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
 
-.is-new-look .nl-credits-league-code {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border-radius: var(--nl-r-sm);
-  border: 1px solid var(--nl-line-2);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--nl-mut);
-}
 
-.is-new-look .nl-credits-league-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--nl-ink);
-}
 
-.is-new-look .nl-credits-league-you {
-  flex-shrink: 0;
-  padding: 0 6px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
-  color: var(--nl-accent);
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
 
-.is-new-look .nl-credits-league-missed {
-  flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--nl-risk);
-}
 
-.is-new-look .nl-credits-league-bartrack {
-  height: 7px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--nl-line) 60%, transparent);
-  overflow: hidden;
-}
 
-.is-new-look .nl-credits-league-bar {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--nl-warn) 70%, var(--nl-accent)), var(--nl-warn));
-}
 
-.is-new-look .nl-credits-league-figures {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
-  text-align: right;
-  white-space: nowrap;
-}
 
-.is-new-look .nl-credits-league-outstanding {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--nl-ink);
-}
 
-.is-new-look .nl-credits-league-sub {
-  font-size: 10px;
-  color: var(--nl-mut);
-}
 
-@media (max-width: 640px) {
-  .is-new-look .nl-credits-league-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
 
-  .is-new-look .nl-credits-league-bartrack {
-    display: none;
-  }
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* --- Reduced Motion (Batch b9) ------------------------------------ */
 @media (prefers-reduced-motion: reduce) {
@@ -63097,12 +62538,7 @@ span.nl-facility-ampel-chip {
   .is-new-look .nl-sponsor-rating-toggle {
     transition: none;
   }
-  .is-new-look .nl-credits-gauge-fill,
-  .is-new-look .nl-credits-burden-seg,
-  .is-new-look .nl-credits-amount-field,
-  .is-new-look .nl-credits-amount-input {
-    transition: none;
-  }
+  
 }
 
 /* ============================================================

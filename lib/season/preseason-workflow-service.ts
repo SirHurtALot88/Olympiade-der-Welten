@@ -2,13 +2,16 @@ import { arenaRegelFuerNeueSaison } from "@/lib/arena/arena-regel";
 import { arenaStaendeFuerSaisonwechsel } from "@/lib/arena/arena-stand";
 import { medaillenRegelFuerNeueSaison } from "@/lib/medaillen/medaillen-regel";
 import { moralFuerSaisonwechsel } from "@/lib/medaillen/medaillen-modell";
+import { baueLeistungsErwartung } from "@/lib/training/entwicklung-tag";
 import { marketingStempelFuerSaisonwechsel } from "@/lib/marketing/marketing-team";
+import { kreditRegelFuerNeueSaison, kreditSaisonwechsel } from "@/lib/finance/kredit-raten";
 import { createHash, randomUUID } from "node:crypto";
 
 import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
 import { vorjahrAnteileFuerSaisonwechsel, wirtschaftsRegelnFuerNeueSaison } from "@/lib/resolve/wirtschafts-regeln";
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
+import { entwicklungsRegelFuerSpielmodus } from "@/lib/resolve/entwicklung-regel";
 import { ausruestungRegelFuerNeueSaison } from "@/lib/ausruestung/ausruestung-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
 import { finanzenJeSpieltagFuerNeueSaison } from "@/lib/finance/finanzen-je-spieltag";
@@ -324,6 +327,8 @@ export function applySeasonBaselineProgression(
       // Anti-cheese Teil B (B.4): clear the per-matchday training accumulator alongside trainingMode /
       // fatigue so the new season starts a fresh mode-count/fatigue tally.
       seasonTrainingAccumulator: null,
+      // Entwicklung neu: aus dem Verlauf der ausgehenden Saison die Leistungs-Erwartung fuer die Prognose der naechsten (nur Prognose).
+      leistungsErwartung: baueLeistungsErwartung(player.seasonTrainingAccumulator),
       // Fatigue an der Saisongrenze für ALLE Spieler auf 0 zurücksetzen — konsistent mit dem geleerten
       // seasonTrainingAccumulator. player.fatigue ist zusammengesetzt aus Match-Fatigue + der
       // aufgelaufenen Trainings-Fatigue-Schicht (siehe matchday-training-accumulator). Wird der
@@ -365,6 +370,7 @@ export function applySeasonBoundaryPlayerResets(gameState: GameState): GameState
       ...player,
       trainingMode: null,
       seasonTrainingAccumulator: null,
+      leistungsErwartung: baueLeistungsErwartung(player.seasonTrainingAccumulator),
       fatigue: 0,
     })),
     playerMoraleState: advancePlayerMoraleCarryState(gameState),
@@ -684,6 +690,9 @@ function buildNextSeasonGameState(
     // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
     // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
     formkartenRegel: nextFormkartenRegel,
+    // ENTWICKLUNGSREGEL (22.11., lib/resolve/entwicklung-regel.ts): gilt ab der FOLGENDEN Saison; Training je Spieltag und
+    // Saisonende-Wirkung muessen in einer Saison dieselbe Regel haben, der Saisonwechsel ist deshalb der einzige Wechselort.
+    entwicklungsRegel: entwicklungsRegelFuerSpielmodus(save.gameState, nextSeasonId) ?? null,
     // MARKETING-REGEL (22.11., lib/marketing/marketing-regel.ts): gilt ab der FOLGENDEN Saison; die Fanfarbe jedes Teams driftet hier
     // (Kader und Erfolg der abgelaufenen Saison), der Verlauf wird fortgeschrieben. Rueckweg OLY_MARKETING=aus.
     marketingRegel: marketingStempelFuerSaisonwechsel(save.gameState, save.gameState.season.id, nextSeasonId),
@@ -696,6 +705,18 @@ function buildNextSeasonGameState(
     // MEDAILLEN-REGEL (22.11., lib/medaillen/medaillen-regel.ts): Medaillen und Farb-Meister am Saisonende, aus dem Rangpraemien-Topf; der
     // Moral-Zuschlag der abgelaufenen Vergabe wirkt in der neuen Saison weiter. Rueckweg OLY_MEDAILLEN=aus.
     medaillenRegel: medaillenRegelFuerNeueSaison(nextSeasonId, moralFuerSaisonwechsel(save.gameState)),
+    // KREDIT-REGEL (22.11., lib/finance/kredit-raten.ts): gilt ab der FOLGENDEN Saison; ein Kredit, der bisher am Saisonende zahlte,
+    // wird beim ersten Spieltag auf Spieltagsraten umgerechnet. Rueckweg OLY_KREDIT_RATEN=aus.
+    kreditRegel: kreditRegelFuerNeueSaison(nextSeasonId),
+    // Zaehler verpasster Raten je Saison zurueck; Raten-Kredite auf die Spieltagszahl der neuen Saison neu verrentet (nur in einer Raten-Saison).
+    ...(save.gameState.seasonState.loans?.length
+      ? {
+          loans: kreditSaisonwechsel(
+            save.gameState.seasonState.loans,
+            kreditRegelFuerNeueSaison(nextSeasonId).regel === "raten" && finanzenJeSpieltagFuerNeueSaison(nextSeasonId) ? matchdayIds.length : null,
+          ),
+        }
+      : {}),
     // AUSRUESTUNGS-REGEL (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste der neuen Saison, ab Saisonbeginn nach dem
     // Schalter OLY_AUSRUESTUNG (Phase 1a: nur Besitz). Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel.
     ausruestungRegel: ausruestungRegelFuerNeueSaison(save.gameState, nextSeasonId),

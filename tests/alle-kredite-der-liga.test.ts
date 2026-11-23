@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { buildCreditsViewModel } from "@/lib/foundation/credits/use-credits-view-model";
+import { baueKreditSeitenModell } from "@/lib/finance/kredite-seite-modell";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
@@ -89,81 +89,64 @@ function baueSpielstand(): GameState {
 }
 
 function zeilen() {
-  const modell = buildCreditsViewModel(baueSpielstand(), "S-C");
-  if (modell.status !== "ready") throw new Error("erwartet: ready");
-  return modell.team.leagueLoans;
+  const modell = baueKreditSeitenModell(baueSpielstand(), "S-C");
+  if (!modell) throw new Error("erwartet: Modell");
+  return modell.register;
 }
 
-describe("Kredite-Reiter zeigt alle Kredite der Liga", () => {
+describe("Kredite-Reiter zeigt alle Kredite der Liga (Register)", () => {
   it("listet jeden Kredit einzeln, nicht pro Team zusammengefasst", () => {
     expect(zeilen()).toHaveLength(3);
   });
 
   it("nennt Schuldner UND Geldgeber mit Klarnamen", () => {
     // „welches team hat von welchem einen kredit genommen" — mit Team-Kuerzeln allein unlesbar.
-    const gross = zeilen().find((row) => row.id === "l-gross")!;
-    expect(gross.borrowerName).toBe("Blood Priests");
-    expect(gross.lenderName).toBe("Wolf Legion");
-    const bank = zeilen().find((row) => row.id === "l-klein")!;
-    expect(bank.lenderType).toBe("bank");
-    expect(bank.lenderName).toBe("Bank");
+    const gross = zeilen().find((row) => row.loanId === "l-gross")!;
+    expect(gross.nehmerName).toBe("Blood Priests");
+    expect(gross.geberName).toBe("Wolf Legion");
+    const bank = zeilen().find((row) => row.loanId === "l-klein")!;
+    expect(bank.geberId).toBeNull();
+    expect(bank.geberName).toBe("Bank");
   });
 
-  it("traegt Laufzeit, Rate und Zins mit", () => {
-    // „laufzeit raten usw."
-    const gross = zeilen().find((row) => row.id === "l-gross")!;
-    expect(gross.termSeasons).toBe(3);
-    expect(gross.remainingSeasons).toBe(2);
-    expect(gross.installmentPerSeason).toBe(15.4);
-    expect(gross.interestRate).toBeCloseTo(0.12, 3);
+  it("traegt Zins, Rate und Restlaufzeit mit", () => {
+    // „laufzeit raten usw." Ohne Raten-Stempel gilt bis zum Saisonwechsel die Jahresrate am Saisonende.
+    const gross = zeilen().find((row) => row.loanId === "l-gross")!;
+    expect(gross.rateJeSaison).toBe(15.4);
+    expect(gross.ratenOffen).toBeGreaterThan(0);
+    expect(gross.zins).toBeCloseTo(0.12, 3);
   });
 
   it("behaelt beendete Kredite — „aktiv ODER abgelaufen\"", () => {
     // Eine Historie, die verschwindet sobald sie interessant wird, ist keine.
-    expect(zeilen().some((row) => row.id === "l-abbezahlt")).toBe(true);
-  });
-
-  it("sortiert laufende nach oben, darin die groesste Restschuld zuerst", () => {
-    expect(zeilen().map((row) => row.id)).toEqual(["l-gross", "l-klein", "l-abbezahlt"]);
+    expect(zeilen().some((row) => row.loanId === "l-abbezahlt")).toBe(true);
   });
 
   it("markiert eigene Beteiligung — auch als GELDGEBER, nicht nur als Schuldner", () => {
     // Genau der gemeldete Fall: das eigene Team wurde angezapft, ohne dass es irgendwo stand.
-    const eigen = zeilen().find((row) => row.id === "l-abbezahlt")!;
-    expect(eigen.borrowerTeamId).toBe("H-R");
-    expect(eigen.involvesOwnTeam).toBe(true);
+    const eigen = zeilen().find((row) => row.loanId === "l-abbezahlt")!;
+    expect(eigen.nehmerId).toBe("H-R");
+    expect(eigen.eigene).toBe(true);
   });
 
-  it("haelt verpasste Raten fest", () => {
-    const zeile = zeilen().find((row) => row.missedPayments > 0);
-    expect(zeile ?? null).toBeNull();
+  it("zeigt die Kasse fremder Teams nirgends (Fog of War)", () => {
+    const modell = baueKreditSeitenModell(baueSpielstand(), "S-C")!;
+    for (const zeile of modell.liga) expect(Object.keys(zeile)).not.toContain("kasse");
+    for (const zeile of modell.register) expect(Object.keys(zeile)).not.toContain("kasse");
   });
 });
 
-describe("Die Ansicht zeigt die Tabelle auch an", () => {
-  const PANEL = read("app/foundation/credits/FoundationCreditsNewLook.tsx");
-  const CSS = read("app/globals.css");
+describe("Die Seite zeigt Tabelle und Register an", () => {
+  const SEITE = read("app/foundation/finances/FinanzenKredite.tsx");
 
-  it("rendert die Liga-Kredite als eigene Tabelle", () => {
+  it("rendert das Register als eigene Tabelle mit Nehmer und Geber", () => {
     // Eine Prop, die niemand rendert, waere dieselbe Luecke mit mehr Zeilen.
-    expect(PANEL).toContain("alleKredite.map");
-    expect(PANEL).toContain("Alle Kredite");
+    expect(SEITE).toContain("kre-register");
+    expect(SEITE).toContain("Nehmer");
+    expect(SEITE).toContain("Geber");
   });
 
-  it("zeigt Geldgeber, Laufzeit und Rate als eigene Spalten", () => {
-    expect(PANEL).toContain("Geldgeber");
-    expect(PANEL).toContain("Laufzeit");
-    expect(PANEL).toContain("Rate");
-  });
-
-  it("hebt die eigene Beteiligung hervor und daempft Beendetes", () => {
-    expect(PANEL).toContain("involvesOwnTeam");
-    expect(CSS).toContain(".nl-credits-alle-row.is-own");
-    expect(CSS).toContain(".nl-credits-alle-row.is-done");
-  });
-
-  it("die breite Tabelle scrollt in sich, statt die Seite zu sprengen", () => {
-    expect(CSS).toContain(".is-new-look .nl-credits-alle-wrap");
-    expect(CSS).toMatch(/nl-credits-alle-wrap \{\s*\n\s*overflow-x: auto;/);
+  it("alle Tabellen sind sortierbar", () => {
+    expect(SEITE.match(/useTabellenSortierung/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
   });
 });

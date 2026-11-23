@@ -63,7 +63,9 @@ describe("Trainingshistorie · die Posten ergeben den Saldo", () => {
 
   it("die Alterung ist der einzige negative Posten", () => {
     // nurTraining (Zuwachs je Spieltag) rechnet ganz ohne Abbau; sonst bleibt die Alterung der einzige negative Posten.
-    expect(progression).toMatch(/const regression = nurTraining\s*\?\s*0\s*:\s*-\(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE/);
+    // Seit der Entwicklungs-Regel „neu“ (22.11., Runde 2) rechnet der Abbau je Stempel je Spieltag (Grundabbau + Marktwertdruck,
+    // durch die Saisonlaenge geteilt, mal die noch offenen Spieltage); der Abbau bleibt der einzige negative Posten.
+    expect(progression).toMatch(/const regression = nurTraining\s*\?\s*0\s*:\s*entNeu\s*\?\s*-abbauJeSpieltag/);
   });
 });
 

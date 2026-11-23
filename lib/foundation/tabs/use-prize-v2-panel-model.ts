@@ -103,7 +103,7 @@ export function usePrizeV2PanelModel({
   }, [gameState.players, selectedPrizePreviewRow?.salaryTotal, selectedRoster, selectedTeam]);
 
   // Kredit-Kern (Fog of War): nur für das ausgewählte/aktive Manager-Team,
-  // nie für ein fremdes Team, siehe `use-credits-view-model.ts`. Anders als
+  // nie für ein fremdes Team, siehe `lib/finance/kredite-seite-modell.ts`. Anders als
   // die öffentliche Preisgeld-Tabelle (`displayPrizePreviewRows`, alle Teams)
   // ist dieser 5-Seasons-Forecast schon heute exklusiv "Eigenes Team" —
   // die Kreditrate darf hier also mit in GuV/Cash einfließen, ohne fremde

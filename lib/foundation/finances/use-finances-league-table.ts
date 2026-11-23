@@ -21,7 +21,7 @@ import type { FinanceLeagueTableRow } from "@/lib/foundation/finances/finances-t
  * `resolvePlayerEconomyContract`, `FACILITY_CATALOG`+`calculateFacilitySeasonUpkeep`
  * +`calculateFacilityIncome`, `buildTeamSeasonOverviewRows` für den Marktwert)
  * einmal pro Team in `gameState.teams` auf — genau wie die bestehende Liga-Kreditübersicht
- * (#182, `FoundationCreditsNewLook`) es für Kredite tut. Auf Datenebene gibt
+ * (Kreditregister der Liga auf der Kredite-Seite) es für Kredite tut. Auf Datenebene gibt
  * es hier keine Sperre: jeder Helfer nimmt ohnehin eine `teamId` entgegen.
  * Diese Liga-Tabelle ist bewusste Balancing-Transparenz, kein Leak.
  *
