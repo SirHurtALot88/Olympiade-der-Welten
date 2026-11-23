@@ -3,6 +3,8 @@ import { stempleClimbingFormat } from "@/lib/resolve/climbing-format";
 import { stempleHockeyTorwart } from "@/lib/resolve/hockey-torwart";
 import { stempleBasketballPuste } from "@/lib/resolve/basketball-puste";
 import { stempleBreakingFormat } from "@/lib/resolve/breaking-format";
+import { stempleAusruestungRegel } from "@/lib/ausruestung/ausruestung-regel";
+import { bucheAusruestungNachSpieltag } from "@/lib/ausruestung/ausruestung-spieltag";
 import type {
   DisciplineHighlightRecord,
   DisciplineResultRecord,
@@ -912,7 +914,7 @@ export class LegacyMatchdayResultApplyService {
     // das Ergebnis gebucht wird. Ohne das haette ein Spielstand, der zwischen Saisonwechsel und Spieltag 3 nie neu geladen
     // wurde, beim ersten Neuladen "schon gebucht, kein Stempel -> altes Format" angenommen (Rueckfall der Lade-Migration)
     // und die im neuen Format gebuchten Spieltage rueckwirkend auf das alte Format gesetzt. Rein und idempotent.
-    const gameStateMitLinien = stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleClimbingFormat(stempleBattlefieldFormat(ensureSeasonApronLinesFrozen(save.gameState))))));
+    const gameStateMitLinien = stempleAusruestungRegel(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleClimbingFormat(stempleBattlefieldFormat(ensureSeasonApronLinesFrozen(save.gameState)))))));
     const seasonState = gameStateMitLinien.seasonState;
     const nextGameStateOhnePraemien = {
       ...gameStateMitLinien,
@@ -948,7 +950,12 @@ export class LegacyMatchdayResultApplyService {
     const neuGeschriebeneSeiten = [
       ...new Set(writePayload.disciplineResultPayloads.filter((p) => !frozenSides.has(p.disciplineSide)).map((p) => p.disciplineSide)),
     ];
-    const nextGameState = bucheSiegpraemien(nextGameStateOhnePraemien, matchdayResultId, neuGeschriebeneSeiten);
+    // Ausruestung (Phase 1a, 22.11.): Ruhm, Holztruhen-Gutscheine, Platzierungs-Gold und die KI-Runde. Beruehrt die Wertung nicht
+    // (nur `gameState.ausruestung`); ohne aktive Regel (Manager-Modus, Schalter aus) bleibt der Spielstand dieselbe Referenz.
+    const nextGameState = bucheAusruestungNachSpieltag(
+      bucheSiegpraemien(nextGameStateOhnePraemien, matchdayResultId, neuGeschriebeneSeiten),
+      matchdayResultId,
+    );
     /**
      * DIE GEBUCHTE RECHNUNG WIRD GESTEMPELT — damit die Buehne danach SIE zeigt und nicht neu
      * rechnet.

@@ -82,7 +82,6 @@ export type FoundationView =
   | "trainingV2"
   | "players"
   | "playerProfile"
-  | "merkliste"
   | "teamProfile"
   | "ranks"
   | "diszis"
@@ -99,6 +98,7 @@ export type FoundationView =
   | "admin"
   | "credits"
   | "finances"
+  | "ausruestung"
   | "changelog"
   | "battleArena";
 

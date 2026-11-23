@@ -319,7 +319,7 @@ import { TEAM_BOARD_PRESSURE_TOOLTIP, TEAM_BOARD_RATING_TOOLTIP } from "@/lib/fo
 import { VeloImpactStrip, VeloStatOrbitRow } from "@/components/foundation/velo-ui";
 import FoundationPanelSkeleton from "@/components/foundation/FoundationPanelSkeleton";
 import FoundationPlayerPortraitPreview from "@/components/foundation/player-portrait-card/FoundationPlayerPortraitPreview";
-import { normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
+import { istAlterMerklisteLink, normalizeFoundationViewParam, getDefaultFoundationViewTarget, type FoundationViewId } from "@/lib/foundation/foundation-view-routing";
 import {
   prefetchFoundationPanel,
   prefetchFoundationDefaultPanels,
@@ -810,6 +810,7 @@ import {
   EMPTY_MULTI_SEASON_BALANCE_DASHBOARD,
 } from "@/lib/foundation/tabs/use-cockpit-panel-derivations";
 import type { VorstandAktionEingabe } from "@/lib/finance/vorstand-aktion-typen";
+import type { AusruestungAktion } from "@/lib/ausruestung/ausruestung-aktionen";
 import {
   HISTORY_ALL_SEASONS_FILTER,
   TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE,
@@ -846,7 +847,7 @@ const FoundationSeasonV2Panel = dynamic(() => import("@/app/foundation/season-v2
 });
 const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel"), {
   ssr: false,
-  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Taktik wird geladen…" />,
 });
 const FoundationTeamsDetailPanel = dynamic(() => import("@/app/foundation/teams-v2/FoundationTeamsDetailPanel"), {
   ssr: false,
@@ -5277,7 +5278,9 @@ export function useFoundationShellRouterBodyScope({
     }
 
     if (requestedView === "scoutingCenterV2") {
-      if (requestedTab === "reports" || requestedTab === "recommended" || requestedTab === "overview") {
+      if (istAlterMerklisteLink(new URL(window.location.href).searchParams.get("view"))) {
+        setScoutingCenterTab("merkliste");
+      } else if (requestedTab === "reports" || requestedTab === "recommended" || requestedTab === "overview" || requestedTab === "merkliste") {
         setScoutingCenterTab(requestedTab);
       }
     }
@@ -6343,6 +6346,40 @@ export function useFoundationShellRouterBodyScope({
       const payload = (await response.json()) as { ok?: boolean; reason?: string | null; meldung?: string };
       // Auch ein abgelehnter Antrag aendert den Spielstand (Vermerk fuer die Anzeige): immer neu laden.
       if (payload.reason === "vorstand_lehnt_ab" || (response.ok && payload.ok)) await loadSave(activeSaveId);
+      return { ok: Boolean(response.ok && payload.ok), reason: payload.reason ?? null, meldung: payload.meldung ?? "" };
+    } catch {
+      return { ok: false, reason: "network_error", meldung: "Keine Verbindung zum Server." };
+    }
+  }
+
+  /**
+   * Ausruestung (Phase 1a, 22.11.): Truhe oeffnen, Fund waehlen, Kiste verwerfen, Teil zerlegen. Gleiches Muster wie die
+   * Vorstand-Aktion: POST, dann den Spielstand neu laden. Immer das aktive Team des Managers, nie ein fremdes; der Server prueft
+   * den Besitz ueber `authorizeServerRoomWrite` und liest den Stand frisch (die Lager fremder Teams kennt der Browser nicht).
+   */
+  async function ausruestungAktion(input: AusruestungAktion): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available", meldung: "Nur lesbar." };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available", meldung: "Dieses Team gehoert dir nicht." };
+    }
+    try {
+      const response = await fetch("/api/ausruestung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          ...input,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null; meldung?: string };
+      if (response.ok && payload.ok) await loadSave(activeSaveId);
       return { ok: Boolean(response.ok && payload.ok), reason: payload.reason ?? null, meldung: payload.meldung ?? "" };
     } catch {
       return { ok: false, reason: "network_error", meldung: "Keine Verbindung zum Server." };
@@ -10054,7 +10091,7 @@ export function useFoundationShellRouterBodyScope({
     if (!payload.silent) {
       setFoundationActionFeedback({
         tone: "success",
-        title: "Einsatzliste gespeichert",
+        title: "Taktik gespeichert",
         detail: `${getTeamLockedName(payload.teamId)} ist für ${currentMatchdayDisplayLabel} aktualisiert. KI-Einsatzlisten werden bei Bedarf nachgezogen.`,
       });
     }
@@ -10900,13 +10937,13 @@ export function useFoundationShellRouterBodyScope({
         // kryptische Zwei-Wort-Text ist raus).
         title:
           homeNextMatchdayStatus.openSlots > 0
-            ? `Einsatzliste füllen — ${homeNextMatchdayStatus.openSlots} ${homeNextMatchdayStatus.openSlots === 1 ? "Platz" : "Plätze"} offen`
-            : "Einsatzliste steht",
+            ? `Taktik füllen — ${homeNextMatchdayStatus.openSlots} ${homeNextMatchdayStatus.openSlots === 1 ? "Platz" : "Plätze"} offen`
+            : "Taktik steht",
         detail:
           homeNextMatchdayStatus.openSlots > 0
             ? homeNextMatchdayStatus.requiredSlots > 0
-              ? `${homeNextMatchdayStatus.filledSlots} von ${homeNextMatchdayStatus.requiredSlots} Plätzen besetzt — ohne Einsatzliste startet der Spieltag nicht.`
-              : "Ohne Einsatzliste startet der Spieltag nicht."
+              ? `${homeNextMatchdayStatus.filledSlots} von ${homeNextMatchdayStatus.requiredSlots} Plätzen besetzt — ohne Taktik startet der Spieltag nicht.`
+              : "Ohne Taktik startet der Spieltag nicht."
             : "Alles gesetzt — weiter in die Arena.",
         tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
         view: homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena",
@@ -13418,6 +13455,7 @@ export function useFoundationShellRouterBodyScope({
     orderedDisciplines,
     originateLoanForActiveTeam,
     vorstandBudgetAktion,
+    ausruestungAktion,
     kannVerwaltenAktivesTeam: Boolean(activeManagerTeamId && canManageTeamId(activeManagerTeamId)),
     repayLoanEarlyForActiveTeam,
     ownerQuickSwitchTeams,

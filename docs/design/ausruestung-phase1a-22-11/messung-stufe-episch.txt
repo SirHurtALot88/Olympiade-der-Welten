@@ -1,0 +1,26 @@
+Spiegelkader-Messung · 8 Spiele je Paarung, 3 Paarung(en), je Bedingung 48 gepaarte Spiele
+Stufe episch (15 Attributpunkte je Traeger), Traeger alle, Verteilung typisch, Kappe 100
+
+Disziplin        Chassis     Sitz-Verzerrung (Heim, Kontrolle)   roh   bereinigt   Aufschlag (bereinigt)   SE    eig-Hub  Wirkung
+tdm              arena        45.8%                               72.9%    72.3%        22.3pp          7.2     1.52   wirkt
+mini-dm          arena        83.3%                               58.3%    61.3%        11.3pp          7.2     1.57   vom Rauschen nicht zu trennen
+battlefield      arena        83.3%                               60.4%    59.8%         9.8pp          7.2     1.20   vom Rauschen nicht zu trennen
+gewichtheben     buehne       37.5%                               62.5%    63.9%        13.9pp          7.2     1.70   vom Rauschen nicht zu trennen
+climbing         bahn         79.2%                               63.5%    65.1%        15.1pp          7.2     1.30   wirkt
+staffel          bahn        100.0%                               50.0%    89.0%        39.0pp          7.2     1.03   wirkt
+time-trial       bahn        100.0%                               50.0%    48.8%        -1.2pp          7.2     0.84   vom Rauschen nicht zu trennen
+spurt            bahn         83.3%                               55.2%    60.9%        10.9pp          7.2     1.43   vom Rauschen nicht zu trennen
+tennis           buehne      100.0%                               50.0%    57.6%         7.6pp          7.2     1.00   vom Rauschen nicht zu trennen
+hockey           feldspiel    62.5%                               64.6%    57.5%         7.5pp          7.2     1.51   vom Rauschen nicht zu trennen
+showcase         buehne       87.5%                               56.3%    59.0%         9.0pp          7.2     1.11   vom Rauschen nicht zu trennen
+speed-schach     buehne      100.0%                               54.2%    53.9%         3.9pp          7.2     0.96   vom Rauschen nicht zu trennen
+takeshis-castle  bahn         66.7%                               52.1%    57.5%         7.5pp          7.2     1.02   vom Rauschen nicht zu trennen
+breaking         buehne       62.5%                               67.7%    71.5%        21.5pp          7.2     1.34   wirkt
+wettessen        buehne       54.2%                               56.3%    59.2%         9.2pp          7.2     1.26   vom Rauschen nicht zu trennen
+basketball       feldspiel   100.0%                               50.0%    56.6%         6.6pp          7.2     1.07   vom Rauschen nicht zu trennen
+football         feldspiel    62.5%                               79.2%    67.9%        17.9pp          7.2     1.09   wirkt
+eiskunstlauf     buehne      100.0%                               50.0%    60.7%        10.7pp          7.2     1.18   vom Rauschen nicht zu trennen
+fechten          buehne      100.0%                               50.0%    62.4%        12.4pp          7.2     1.18   vom Rauschen nicht zu trennen
+i-spy            buehne       95.8%                               52.1%    61.5%        11.5pp          7.2     1.17   vom Rauschen nicht zu trennen
+
+Laufzeit 251 s. SE = Standardfehler der Siegquote bei 48 Spielen (konservativ, p = 50 %).

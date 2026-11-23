@@ -30,6 +30,8 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "homeV2", label: "Home", tooltip: "Manager-Dashboard mit KPIs, Top-Spielern und Flow.", icon: "⌂" },
       { id: "inboxV2", label: "Inbox", tooltip: "Offene Aufgaben & Warnungen für dein Team.", icon: "✉" },
+      // Saisonstand über dem Spielplan (22.11.): erst die Tabelle, dann was wann läuft.
+      { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstärken.", icon: "▤" },
       // Spielplan zur Spieltagsfolge (21.11.): erst sehen, was wann läuft, dann aufstellen, spielen, auswerten.
       {
         id: "diszis",
@@ -37,9 +39,8 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
         tooltip: "Saison-Spielplan: welche Disziplinen an welchem Spieltag laufen — farbcodiert nach Achse.",
         icon: "≣",
       },
-      { id: "lineup", label: "Einsatzliste", tooltip: "Spieler setzen, Formplan und Team-Taktik — Focus Mode.", icon: "▣" },
+      { id: "lineup", label: "Taktik", tooltip: "Spieler setzen, Formplan und Team-Taktik — Focus Mode.", icon: "▣" },
       { id: "matchdayArena", label: "Arena", tooltip: "Spieltag live: Disziplinen mit echten Save-Werten (Wert/Fatigue/Form) durchspielen.", icon: "◉" },
-      { id: "seasonV2", label: "Saisonstand", tooltip: "Tabelle, Cards und Teamstärken.", icon: "▤" },
       // Entwurf des Battle Mode. Steht bewusst NEBEN der Arena statt unter "Info":
       // beurteilen laesst er sich nur da, wo man ihn mit der echten Arena vergleicht.
       // Er liest und schreibt keinen Spielstand.
@@ -62,9 +63,10 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
     items: [
       { id: "teams", label: "Teams", tooltip: "Kader, Verträge und Teamdetails.", icon: "◈" },
       { id: "players", label: "Spieler", tooltip: "Spieler suchen und Profil öffnen.", icon: "◎" },
-      { id: "merkliste", label: "Merkliste", tooltip: "Gemerkte Teams und Spieler — deine Lesezeichen.", icon: "★" },
       { id: "trainingCompact", label: "Training", tooltip: "Trainingssteuerung pro Spieler.", icon: "↑" },
       { id: "trainingV2", label: "Gebäude", tooltip: "Facilities, Upgrade und Wirkung.", icon: "▦" },
+      // Ausrüstung (22.11., Phase 1a): Lager, Truhen, Ruhm. Eigene Seite im neuen Stil, Mockup zwischen-den-spieltagen-22-11.html.
+      { id: "ausruestung", label: "Ausrüstung", tooltip: "Lager, Truhen und Ruhm: Beute aus Punkten, Gegenstände mit Affixen.", icon: "⚒" },
     ],
   },
   {

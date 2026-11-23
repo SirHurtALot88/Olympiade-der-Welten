@@ -18,6 +18,16 @@ rechnet ihre Wirkung auf die Balance (c) und stellt fünf Fragen (d). Das Mockup
 > ×2,0). Startbudget-Aufschlag als Messvariante. Alles in **Abschnitt (g)**; wo (f) und (g) sich widersprechen, gilt (g).
 > Die Zeilen „Mehr Geld je Besucher“ und „Arena“ der Tabelle in (c) gelten nicht mehr, siehe g.2. Marketing:
 > `docs/design/marketing-22-11.md`.
+>
+> **Stand nach Runde 4 (Chris, 22.11.):** Der Arena-Ausbau läuft **von Hand in 1.000er-Schritten je Bereich** (Stehplatz,
+> Sitzplatz; Logen in 100er-Schritten) statt über feste Bauteile. Je Schritt stehen Bau, Unterhalt, „bringt ca.“ und
+> Amortisation da. Alles in **Abschnitt (h)**; er ersetzt in g.2 nur den Teil „Ausbau: je Stufe ein Bauteil“ samt
+> Beispiel-Leiter. Preise, Platzarten, Fanbasis, Dauerkarten, Ereignisse (g.3) und die Balance-Tabellen aus (g) bleiben.
+>
+> **Stand nach Runde 5 (Chris, 22.11.):** Die Plätze werden **günstiger und amortisieren sich schneller** (Bau etwa halbiert,
+> bezahlt nach rund 2 Saisons, Logen 3). Dazu das **Gesamtbild Einnahmen gegen Ausgaben** je Saison für das Durchschnittsteam
+> in Liga 1 und Liga 2. Beides in **Abschnitt (i)**; er ersetzt in (h) die Baukosten, den Unterhalt und die Leitern (h.1, h.2).
+> Die Schritte selbst, „bringt ca.“, Vorstand, KI und Mehrspieler aus (h) bleiben.
 
 **Kurzfassung** (Runde 1)
 
@@ -571,7 +581,8 @@ größten Sponsor hat volle Logen, ein Kellerteam mit kleinem Sponsor 20 %.
 **Stufe 0, die Grundarena:** 4.000 Plätze, davon 3.000 Stehplätze und 1.000 Sitzplätze, keine Logen. Volles Haus 3,0 C
 (Liga 2) bzw. 4,0 C (Liga 1) je Saison. Sie kostet nichts und hat keinen Unterhalt.
 
-**Ausbau: je Stufe ein Bauteil nach Wahl, höchstens fünf.** Der Manager entscheidet bei jedem Ausbau, welche Platzart wächst.
+**Ausbau: je Stufe ein Bauteil nach Wahl, höchstens fünf.** *(Ersetzt durch Abschnitt (h): Ausbau von Hand in Schritten. Die
+folgenden zwei Tabellen sind der Stand von Runde 3.)* Der Manager entscheidet bei jedem Ausbau, welche Platzart wächst.
 
 | Bauteil | Plätze | Bau (1. · 2. · 3. dieser Art) | Unterhalt je Saison | volles Haus je Saison, Liga 2 · Liga 1 | je Heimspiel | mehr netto | Bau bezahlt nach (1. der Art) |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -793,3 +804,355 @@ Reiter Budgets scrollt bei 1920×1080 innen, und die Herkunfts-Marke der Abrechn
 | 2 | Dauerkarten: eine Stufe für alle Platzarten oder je Platzart eine? | **Eine.** Drei Regler für dieselbe Wette wären Mikromanagement. |
 | 3 | Tickets ohne Gegenposten lassen die Kassen um 9 bis 18 C je Team und Saison wachsen, solange Ausrüstung und Verpflegung nicht gebaut sind. Zusammen bauen oder die Preise bei 70 % starten? | **Zusammen bauen.** Sonst zuerst 70 % und mit dem Bau der Ausgaben auf 100 %. |
 | 4 | Startbudget-Aufschlag: Die Spreizung steigt von 1,91 auf 2,14, zusammen mit den Tickets doppelt. Erst messen? | **Ja, Messvariante.** Wenn es nur um mehr Geld im Draft geht: +51 C für alle hätte dieselbe Summe und senkt das Verhältnis auf 1,70. |
+
+---
+
+## (h) Runde 4: Arena-Ausbau von Hand in Schritten (Chris 22.11.)
+
+Chris, 22.11., wörtlich: „Beim Stadionausbau hätte ich gerne dass man manuell in 1k-Schritten die 3 Bereiche ausbauen kann und
+dass man klar sieht welche Stufe von was kostet X und bringt ca. Y wenn die Fans auch kommen.“
+
+**Was sich ändert:** Die drei festen Bauteile aus g.2 (Stehtribüne +6.000, Sitzrang +4.500, Logenring +800, höchstens fünf
+Stufen) entfallen. Stattdessen baut der Manager jeden der drei Bereiche einzeln und in kleinen Schritten aus. **Was bleibt:**
+die Grundarena mit 4.000 Plätzen (3.000 Steh, 1.000 Sitz, keine Logen), die Preise je Platzart, Auslastungsregeln, Fanbasis,
+Dauerkarten, Ticketpreis-Stufen, Ereignisse und der Zuschlag bei ausverkauftem Haus.
+
+### h.1 Die Schritte
+
+> **Bau und Unterhalt in dieser Tabelle und die Leitern in h.2 sind der Stand von Runde 4.** Es gelten die Zahlen aus i.1.
+
+| Bereich | Ein Schritt | Grundarena | Obergrenze | Bau je Schritt | Unterhalt je Schritt und Saison | volles Haus je Schritt und Saison, Liga 2 · Liga 1 |
+|---|---:|---:|---:|---|---:|---:|
+| **Stehplatz** | +1.000 | 3.000 | 15.000 (12 Schritte) | 1. bis 6. Schritt 2,0 C · 7. bis 12. Schritt 2,4 C | 0,15 C | 0,6 · 0,8 C |
+| **Sitzplatz** | +1.000 | 1.000 | 10.000 (9 Schritte) | 1. bis 5. Schritt 4,5 C · 6. bis 9. Schritt 5,4 C | 0,25 C | 1,2 · 1,6 C |
+| **Loge** | **+100** | 0 | 1.200 (12 Schritte) | 1. bis 6. Schritt 3,2 C · 7. bis 12. Schritt 3,9 C | 0,12 C | 0,6 · 0,8 C |
+
+**Warum Logen in 100er-Schritten:** Ein Logenplatz kostet das Zehnfache eines Stehplatzes (6,0 gegen 0,6 C je 1.000 Plätze
+und Saison in Liga 2). 1.000 Logenplätze wären mehr als der ganze Logenring aus Runde 3 (800), würden 32 C kosten und 6 C je
+Saison bringen: ein einziger Klick so groß wie zehn Stehplatz-Schritte, und kaum ein Team bekäme sie voll. 100 Logenplätze
+bringen dagegen genauso viel wie 1.000 Stehplätze. Damit ist **ein Schritt in jedem Bereich ungefähr gleich viel Geld**, und
+die drei Regler fühlen sich gleich an.
+
+**Die Staffel ersetzt den Aufschlag „+20 % je weiteres Bauteil“.** Die zweite Hälfte jedes Bereichs kostet 20 % mehr. Die
+Summen sind so gewählt, dass die Arena aus Runde 3 fast dasselbe kostet: 15.000 Steh, 10.000 Sitz und 800 Logen stehen jetzt
+für 97,5 C (Runde 3: 96,4 C) bei 5,0 C Unterhalt (5,0 C). Die Balance-Tabellen in g.2 gelten deshalb weiter.
+
+- Mehrere Schritte auf einmal sind erlaubt, auch in mehreren Bereichen. Es gibt keine Stufen 1 bis 5 mehr und keine
+  Reihenfolge.
+- Bezahlt wird aus dem Investitionstopf, hart gegen die Vorstands-Freigabe, für Mensch und KI gleich. Die neuen Plätze
+  zählen ab dem nächsten Heimspiel.
+- **Kein Rückbau.** Der Minus-Knopf nimmt nur einen geplanten, noch nicht beauftragten Schritt zurück.
+- Der Unterhalt läuft je Spieltag (1/20), auch wenn die Plätze leer bleiben.
+
+### h.2 Die Ausbau-Leitern
+
+„Schritt bringt netto“ und „bezahlt nach“ gelten, **wenn die neuen Plätze voll werden**, nach Unterhalt.
+
+**Stehplatz** (ein Schritt = +1.000 Plätze, Preis 0,6 · 0,8 C je 1.000 Plätze und Saison)
+
+| Schritt | Plätze danach | Bau | Bau gesamt | Unterhalt gesamt | volles Haus in diesem Bereich, Liga 2 · Liga 1 | Schritt bringt netto | Schritt bezahlt nach |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 3.000 | – | – | – | 1,8 · 2,4 C | – | – |
+| 1 | 4.000 | 2,0 C | 2,0 C | 0,15 C | 2,4 · 3,2 C | +0,45 · +0,65 C | 4,4 · 3,1 Saisons |
+| 2 | 5.000 | 2,0 C | 4,0 C | 0,30 C | 3,0 · 4,0 C | +0,45 · +0,65 C | 4,4 · 3,1 Saisons |
+| 3 | 6.000 | 2,0 C | 6,0 C | 0,45 C | 3,6 · 4,8 C | +0,45 · +0,65 C | 4,4 · 3,1 Saisons |
+| 4 | 7.000 | 2,0 C | 8,0 C | 0,60 C | 4,2 · 5,6 C | +0,45 · +0,65 C | 4,4 · 3,1 Saisons |
+| 5 | 8.000 | 2,0 C | 10,0 C | 0,75 C | 4,8 · 6,4 C | +0,45 · +0,65 C | 4,4 · 3,1 Saisons |
+| 6 | 9.000 | 2,0 C | 12,0 C | 0,90 C | 5,4 · 7,2 C | +0,45 · +0,65 C | 4,4 · 3,1 Saisons |
+| 7 | 10.000 | 2,4 C | 14,4 C | 1,05 C | 6,0 · 8,0 C | +0,45 · +0,65 C | 5,3 · 3,7 Saisons |
+| 8 | 11.000 | 2,4 C | 16,8 C | 1,20 C | 6,6 · 8,8 C | +0,45 · +0,65 C | 5,3 · 3,7 Saisons |
+| 9 | 12.000 | 2,4 C | 19,2 C | 1,35 C | 7,2 · 9,6 C | +0,45 · +0,65 C | 5,3 · 3,7 Saisons |
+| 10 | 13.000 | 2,4 C | 21,6 C | 1,50 C | 7,8 · 10,4 C | +0,45 · +0,65 C | 5,3 · 3,7 Saisons |
+| 11 | 14.000 | 2,4 C | 24,0 C | 1,65 C | 8,4 · 11,2 C | +0,45 · +0,65 C | 5,3 · 3,7 Saisons |
+| 12 | 15.000 | 2,4 C | 26,4 C | 1,80 C | 9,0 · 12,0 C | +0,45 · +0,65 C | 5,3 · 3,7 Saisons |
+
+**Sitzplatz** (ein Schritt = +1.000 Plätze, Preis 1,2 · 1,6 C je 1.000 Plätze und Saison)
+
+| Schritt | Plätze danach | Bau | Bau gesamt | Unterhalt gesamt | volles Haus in diesem Bereich, Liga 2 · Liga 1 | Schritt bringt netto | Schritt bezahlt nach |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 1.000 | – | – | – | 1,2 · 1,6 C | – | – |
+| 1 | 2.000 | 4,5 C | 4,5 C | 0,25 C | 2,4 · 3,2 C | +0,95 · +1,35 C | 4,7 · 3,3 Saisons |
+| 2 | 3.000 | 4,5 C | 9,0 C | 0,50 C | 3,6 · 4,8 C | +0,95 · +1,35 C | 4,7 · 3,3 Saisons |
+| 3 | 4.000 | 4,5 C | 13,5 C | 0,75 C | 4,8 · 6,4 C | +0,95 · +1,35 C | 4,7 · 3,3 Saisons |
+| 4 | 5.000 | 4,5 C | 18,0 C | 1,00 C | 6,0 · 8,0 C | +0,95 · +1,35 C | 4,7 · 3,3 Saisons |
+| 5 | 6.000 | 4,5 C | 22,5 C | 1,25 C | 7,2 · 9,6 C | +0,95 · +1,35 C | 4,7 · 3,3 Saisons |
+| 6 | 7.000 | 5,4 C | 27,9 C | 1,50 C | 8,4 · 11,2 C | +0,95 · +1,35 C | 5,7 · 4,0 Saisons |
+| 7 | 8.000 | 5,4 C | 33,3 C | 1,75 C | 9,6 · 12,8 C | +0,95 · +1,35 C | 5,7 · 4,0 Saisons |
+| 8 | 9.000 | 5,4 C | 38,7 C | 2,00 C | 10,8 · 14,4 C | +0,95 · +1,35 C | 5,7 · 4,0 Saisons |
+| 9 | 10.000 | 5,4 C | 44,1 C | 2,25 C | 12,0 · 16,0 C | +0,95 · +1,35 C | 5,7 · 4,0 Saisons |
+
+**Loge** (ein Schritt = +100 Plätze, Preis 6,0 · 8,0 C je 1.000 Plätze und Saison)
+
+| Schritt | Plätze danach | Bau | Bau gesamt | Unterhalt gesamt | volles Haus in diesem Bereich, Liga 2 · Liga 1 | Schritt bringt netto | Schritt bezahlt nach |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | – | – | – | 0,0 · 0,0 C | – | – |
+| 1 | 100 | 3,2 C | 3,2 C | 0,12 C | 0,6 · 0,8 C | +0,48 · +0,68 C | 6,7 · 4,7 Saisons |
+| 2 | 200 | 3,2 C | 6,4 C | 0,24 C | 1,2 · 1,6 C | +0,48 · +0,68 C | 6,7 · 4,7 Saisons |
+| 3 | 300 | 3,2 C | 9,6 C | 0,36 C | 1,8 · 2,4 C | +0,48 · +0,68 C | 6,7 · 4,7 Saisons |
+| 4 | 400 | 3,2 C | 12,8 C | 0,48 C | 2,4 · 3,2 C | +0,48 · +0,68 C | 6,7 · 4,7 Saisons |
+| 5 | 500 | 3,2 C | 16,0 C | 0,60 C | 3,0 · 4,0 C | +0,48 · +0,68 C | 6,7 · 4,7 Saisons |
+| 6 | 600 | 3,2 C | 19,2 C | 0,72 C | 3,6 · 4,8 C | +0,48 · +0,68 C | 6,7 · 4,7 Saisons |
+| 7 | 700 | 3,9 C | 23,1 C | 0,84 C | 4,2 · 5,6 C | +0,48 · +0,68 C | 8,1 · 5,7 Saisons |
+| 8 | 800 | 3,9 C | 27,0 C | 0,96 C | 4,8 · 6,4 C | +0,48 · +0,68 C | 8,1 · 5,7 Saisons |
+| 9 | 900 | 3,9 C | 30,9 C | 1,08 C | 5,4 · 7,2 C | +0,48 · +0,68 C | 8,1 · 5,7 Saisons |
+| 10 | 1.000 | 3,9 C | 34,8 C | 1,20 C | 6,0 · 8,0 C | +0,48 · +0,68 C | 8,1 · 5,7 Saisons |
+| 11 | 1.100 | 3,9 C | 38,7 C | 1,32 C | 6,6 · 8,8 C | +0,48 · +0,68 C | 8,1 · 5,7 Saisons |
+| 12 | 1.200 | 3,9 C | 42,6 C | 1,44 C | 7,2 · 9,6 C | +0,48 · +0,68 C | 8,1 · 5,7 Saisons |
+
+**Voll ausgebaut** (26.200 Plätze): 113,1 C Bau, 5,49 C Unterhalt je Saison, volles Haus 28,2 C (Liga 2) bzw. 37,6 C
+(Liga 1). Gegenüber der Grundarena bezahlt nach 5,7 bzw. 4,0 Saisons bei vollem Haus.
+
+### h.3 „Bringt ca. Y, wenn die Fans kommen“
+
+Mehr Plätze bringen nur Geld, wenn mehr Leute kommen wollen, als hineinpassen. Die Vorschau rechnet deshalb zwei Zahlen:
+
+    Erwartet  = (min(Plätze neu, Nachfrage) − min(Plätze alt, Nachfrage)) × Preis × 10 Heimspiele − Unterhalt
+    Voll      = neue Plätze × Preis × 10 Heimspiele − Unterhalt
+
+- **Nachfrage** je Bereich ist der Schnitt der letzten drei Heimspiele aus der Regel in g.2 (Fanbasis × Stimmung ×
+  Preisfaktor × Ereignis, aufgeteilt auf Stehen und Sitzen; Logen aus Sponsor-Stufe und Tabellenplatz). Bei ausverkauftem
+  Bereich zählt der Überhang mit, der sonst abgewiesen wurde.
+- Ist ein Bereich nicht ausverkauft, ist „Erwartet“ für ihn **negativ** (nur Unterhalt), und „Bezahlt nach“ zeigt „nie“.
+  Der Fuß der Karte sagt dann, welcher Bereich nicht voll ist.
+- **Fan-Maximum:** Die Fanbasis endet bei 1,5 × (Steh- + Sitzplätze). Die Karte zeigt Fanbasis, Maximum und das Maximum nach
+  dem geplanten Ausbau. Wer am Maximum hängt, muss bauen, damit die Fanbasis weiter wachsen kann; wer weit darunter liegt,
+  braucht zuerst Stimmung und Erfolg.
+- Im ersten Jahr rechnet die Vorschau nicht mehr pauschal mit 60 %, sondern mit der gemessenen Nachfrage.
+
+Beispiel des Mockups (Vigilante Wranglers, Liga 2, 9.000 Steh · 5.000 Sitz · 900 Logen, nach Spieltag 12): Stehplätze zu
+98 % voll, Nachfrage rund 10.700. Zwei Schritte Stehplatz (7. und 8., je 2,4 C) kosten 4,8 C, bringen voll +0,9 C und erwartet
++0,7 C je Saison, bezahlt nach rund 6,5 Saisons (voll 5,5; in Liga 1 3,5). Zwei Schritte Loge bei 75 % Auslastung kosten
+7,8 C und bringen erwartet −0,2 C: „nie“.
+
+### h.4 Vorstand, KI, Mehrspieler
+
+- **Empfehlung des Vorstands** je Bereich wie bisher ab 90 % Auslastung über drei Heimspiele, unter 60 % rät er ab (Warnung,
+  keine Sperre). Neu nennt er die Zahl der Schritte, die der Überhang füllt.
+- **KI:** plant nur in Bereichen mit Empfehlung, so viele Schritte, wie der Überhang füllt, höchstens drei je Bereich und
+  Saison, und nur, wenn „Erwartet“ den Bau in höchstens sechs Saisons bezahlt. In Liga 2 sind das Steh- und Sitzplätze,
+  Logen erst mit Erfolg und großem Sponsor.
+- **Mehrspieler:** Der Plan liegt je Team im Spielstand, delegierbar im Bereich Gebäude; geschrieben wird über den
+  vorhandenen Gebäude-Weg hinter `authorizeServerRoomWrite`. Die Arena fremder Teams (Plätze je Bereich) ist sichtbar.
+- **Dauerkarten** zählen weiter als Anteil aller Plätze; neue Plätze mitten in der Saison gehen nur in die Tageskasse.
+
+### h.5 Mockup, Runde 4
+
+`public/mockups/finanzen-modern-18-11.html?ansicht=wahl` (neuer Schalter `&plan=<Steh>,<Sitz>,<Loge>` für geplante Schritte;
+`&bau=` entfällt):
+
+- **Karte „Arena · Ausbau von Hand“:** je Bereich Plätze, Auslastung mit der 90-%-Marke und ein Regler mit Minus und Plus
+  (+1.000, bei Logen +100). Darunter **Kostet** (Schritte und Schrittpreis), **Bringt ca.** (erwartet, daneben volles Haus)
+  und **Bezahlt nach** (erwartet, daneben volles Haus und Liga 1). Ab 1250 px Höhe zusätzlich Nachfrage je Bereich und
+  Fan-Maximum. Der Fuß nennt die Empfehlung oder warnt, wenn ein geplanter Bereich nicht voll ist. Tooltip je Bereich: die
+  ganze Staffel.
+- **Tabelle „Ausbau-Leiter je Bereich“** (ab 1250 px Höhe): Schritt, Staffelpreis, Unterhalt, volles Haus, netto,
+  Amortisation, gebaut und Obergrenze; dazu die Zeilen „Dein Plan“ und „Voll ausgebaut“.
+
+| Mockup-Feature aus Chris' Rückmeldung | Stand |
+|---|---|
+| Drei Bereiche von Hand ausbauen | drin (Plus und Minus je Bereich, klickbar) |
+| 1.000er-Schritte | drin für Steh und Sitz; Logen in 100ern (Begründung h.1) |
+| Klar sehen: Stufe kostet X | drin (Zeile Kostet, Tooltip, Leiter-Tabelle; alle Schritte in h.2) |
+| Bringt ca. Y, wenn die Fans kommen | drin (erwartet aus der Nachfrage, daneben volles Haus) |
+| Hinweis Kapazität und Fan-Maximum | drin (Warnung im Fuß; Nachfrage und Fan-Maximum ab 1250 px Höhe, sonst im Tooltip) |
+
+Das Beispielteam hat jetzt 14.900 Plätze (9.000 Steh, 5.000 Sitz, 900 Logen) statt 15.300; das volle Haus bleibt bei 1,68 C
+je Heimspiel, alle anderen Reiter rechnen unverändert. Die Nachfrage über 90 % Auslastung ist im Mockup aus der Auslastung
+geschätzt, die Fanbasis (16.400) ist ein fester Beispielwert.
+
+| Datei (`docs/design/finanzen-posten-22-11/`) | Zeigt |
+|---|---|
+| `runde4-saisonwahl-ausbau-1920x1080.png` | nach Spieltag 12, zwei Schritte Stehplatz geplant, Vorstand empfiehlt |
+| `runde4-saisonwahl-stehplatz-2560x1440.png` | nach Spieltag 15, drei Schritte Stehplatz, Leiter-Tabelle sichtbar |
+| `runde4-saisonwahl-ausbau-leiter-2560x1440.png` | nach Spieltag 13, Plan in allen drei Bereichen, Warnung „Sitzplätze nicht voll“ |
+| `runde4-saisonwahl-logen-1710x1112.png` | zwei Schritte Loge bei 75 % Auslastung: „nie“ |
+| `runde4-phone-412x900.png` | Nebenprobe Phone |
+
+Geprüft in Chromium unter `flock /tmp/oly-aufnahme.lock`: keine JS-Fehler in der Saisonwahl und in den übrigen Reitern
+(Übersicht, Abrechnung, Aufschlüsselung, Hebel, Budgets, Fans & Arena, Merch); Plus und Minus per Klick getestet; kein
+Seitenscroll und kein inneres Scrollen der Arena-Karte bei 2560×1440, 1920×1080 und 1710×1112. Unverändert aus den Vorrunden:
+der Reiter Budgets scrollt bei 1920×1080 innen, und bei 1710×1112 läuft die Trainingslager-Karte 6 px über.
+
+### h.6 Offene Fragen an Chris
+
+| # | Frage | Empfehlung |
+|---:|---|---|
+| 1 | Logen in 100er-Schritten statt 1.000ern, Obergrenze 1.200? | **Ja.** Ein Schritt ist dann in allen drei Bereichen etwa gleich viel Geld (0,6 C je Saison in Liga 2). |
+| 2 | Obergrenzen 15.000 · 10.000 · 1.200 (zusammen 26.200), oder offen nach oben? | **Mit Obergrenze.** Sie hält das Ziel „volle Top-Arena = ein Viertel der Einnahmen“. Offen wäre möglich, wenn die Staffel weiter steigt. |
+
+---
+
+## (i) Runde 5: günstigere Plätze und das Gesamtbild Einnahmen gegen Ausgaben (Chris 22.11.)
+
+Chris, 22.11., wörtlich: „2. musst du mir sagen, was Einnahmen und Ausgaben angeht, du wolltest ja bisschen mehr Einnahmen
+haben, um die Kosten zu decken 3. die Plätze müssen also günstiger werden und dürfen sich schneller amortisieren“. (Punkt 1
+derselben Rückmeldung, der dynamische Team-Anteil am Werbegeld, steht in `docs/design/marketing-22-11.md` Abschnitt 4.2.)
+
+### i.1 Die Plätze werden günstiger
+
+**Ziel:** Steh- und Sitzplätze sind bei voller Nachfrage in Liga 2 nach 1,5 bis 2,5 Saisons bezahlt, Logen nach rund 3, in
+Liga 1 schneller. **Was sich ändert:** nur Bau und Unterhalt. Schrittgrößen, Obergrenzen, Preise je Platz, Staffel (zweite
+Hälfte +20 %), Nachfrage, Fanbasis und „bringt ca.“ bleiben wie in (h).
+
+| Bereich | Ein Schritt | Bau je Schritt, neu | Bau, Runde 4 | Unterhalt je Schritt und Saison, neu (Runde 4) | volles Haus je Schritt, Liga 2 · Liga 1 | netto je Schritt | Schritt bezahlt nach, Liga 2 · Liga 1 (Runde 4) |
+|---|---:|---|---|---:|---:|---:|---|
+| **Stehplatz** | +1.000 | 1. bis 6. Schritt **0,9 C** · 7. bis 12. **1,1 C** | 2,0 · 2,4 C | 0,10 C (0,15) | 0,6 · 0,8 C | +0,5 · +0,7 C | **1,8 · 1,3** Saisons, zweite Hälfte 2,2 · 1,6 (4,4 · 3,1) |
+| **Sitzplatz** | +1.000 | 1. bis 5. Schritt **2,0 C** · 6. bis 9. **2,4 C** | 4,5 · 5,4 C | 0,20 C (0,25) | 1,2 · 1,6 C | +1,0 · +1,4 C | **2,0 · 1,4** Saisons, zweite Hälfte 2,4 · 1,7 (4,7 · 3,3) |
+| **Loge** | +100 | 1. bis 6. Schritt **1,5 C** · 7. bis 12. **1,8 C** | 3,2 · 3,9 C | 0,10 C (0,12) | 0,6 · 0,8 C | +0,5 · +0,7 C | **3,0 · 2,1** Saisons, zweite Hälfte 3,6 · 2,6 (6,7 · 4,7) |
+
+**Die neue Leiter** (Bau gesamt · Unterhalt gesamt · volles Haus in diesem Bereich, Liga 2 · Liga 1):
+
+| Schritt | Stehplatz: Plätze | Bau gesamt | Unterhalt | volles Haus | Sitzplatz: Plätze | Bau gesamt | Unterhalt | volles Haus | Loge: Plätze | Bau gesamt | Unterhalt | volles Haus |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0 | 3.000 | – | – | 1,8 · 2,4 C | 1.000 | – | – | 1,2 · 1,6 C | 0 | – | – | 0 |
+| 1 | 4.000 | 0,9 C | 0,10 C | 2,4 · 3,2 C | 2.000 | 2,0 C | 0,20 C | 2,4 · 3,2 C | 100 | 1,5 C | 0,10 C | 0,6 · 0,8 C |
+| 2 | 5.000 | 1,8 C | 0,20 C | 3,0 · 4,0 C | 3.000 | 4,0 C | 0,40 C | 3,6 · 4,8 C | 200 | 3,0 C | 0,20 C | 1,2 · 1,6 C |
+| 3 | 6.000 | 2,7 C | 0,30 C | 3,6 · 4,8 C | 4.000 | 6,0 C | 0,60 C | 4,8 · 6,4 C | 300 | 4,5 C | 0,30 C | 1,8 · 2,4 C |
+| 4 | 7.000 | 3,6 C | 0,40 C | 4,2 · 5,6 C | 5.000 | 8,0 C | 0,80 C | 6,0 · 8,0 C | 400 | 6,0 C | 0,40 C | 2,4 · 3,2 C |
+| 5 | 8.000 | 4,5 C | 0,50 C | 4,8 · 6,4 C | 6.000 | 10,0 C | 1,00 C | 7,2 · 9,6 C | 500 | 7,5 C | 0,50 C | 3,0 · 4,0 C |
+| 6 | 9.000 | 5,4 C | 0,60 C | 5,4 · 7,2 C | 7.000 | 12,4 C | 1,20 C | 8,4 · 11,2 C | 600 | 9,0 C | 0,60 C | 3,6 · 4,8 C |
+| 7 | 10.000 | 6,5 C | 0,70 C | 6,0 · 8,0 C | 8.000 | 14,8 C | 1,40 C | 9,6 · 12,8 C | 700 | 10,8 C | 0,70 C | 4,2 · 5,6 C |
+| 8 | 11.000 | 7,6 C | 0,80 C | 6,6 · 8,8 C | 9.000 | 17,2 C | 1,60 C | 10,8 · 14,4 C | 800 | 12,6 C | 0,80 C | 4,8 · 6,4 C |
+| 9 | 12.000 | 8,7 C | 0,90 C | 7,2 · 9,6 C | 10.000 | 19,6 C | 1,80 C | 12,0 · 16,0 C | 900 | 14,4 C | 0,90 C | 5,4 · 7,2 C |
+| 10 | 13.000 | 9,8 C | 1,00 C | 7,8 · 10,4 C | – | | | | 1.000 | 16,2 C | 1,00 C | 6,0 · 8,0 C |
+| 11 | 14.000 | 10,9 C | 1,10 C | 8,4 · 11,2 C | – | | | | 1.100 | 18,0 C | 1,10 C | 6,6 · 8,8 C |
+| 12 | 15.000 | 12,0 C | 1,20 C | 9,0 · 12,0 C | – | | | | 1.200 | 19,8 C | 1,20 C | 7,2 · 9,6 C |
+
+**Voll ausgebaut** (26.200 Plätze): **51,4 C** Bau (Runde 4: 113,1 C), 4,2 C Unterhalt je Saison (5,49 C), volles Haus
+unverändert 28,2 C (Liga 2) bzw. 37,6 C (Liga 1). Gegenüber der Grundarena bezahlt nach 2,4 bzw. 1,7 Saisons (5,7 · 4,0).
+
+**Lohnt weiter nur, wenn die Fans kommen.** Die Rechnung aus h.3 bleibt: „Erwartet“ zählt nur Plätze, für die es Nachfrage
+gibt. Ein Bereich unter 90 % Auslastung bringt für neue Plätze nichts außer Unterhalt, „Bezahlt nach“ zeigt dort weiter
+**„nie“**. Beispiel des Mockups (Vigilante Wranglers, Liga 2, Stehplätze 98 % voll, Nachfrage 10.700): zwei Schritte Stehplatz
+kosten jetzt 2,2 C statt 4,8 C, bringen erwartet +0,8 C je Saison und sind nach rund 2,5 Saisons bezahlt (volles Haus 2, in
+Liga 1 1,5). Zwei Schritte Loge bei 75 % Auslastung kosten 3,6 C und bleiben „nie“.
+
+**Was den Ausbau jetzt bremst, wenn es der Preis nicht mehr tut:** die Nachfrage. Die Fanbasis wächst nur bei vollem Haus und
+nur um 2 % je Heimspiel, also höchstens 22 % je Saison, und endet am Fan-Maximum (1,5 × Steh- und Sitzplätze). Ein
+Durchschnittsteam mit der Grundarena füllt so etwa einen Schritt in der ersten Saison und zwei bis drei je Saison danach. Ein
+beliebtes Team (Beliebtheit 1,5) kann in Saison 1 zwei bis drei Schritte füllen, ein unbeliebtes keinen. Die KI-Regel aus h.4
+bleibt (nur mit Empfehlung, höchstens drei Schritte je Bereich und Saison); ihre Grenze „in höchstens sechs Saisons bezahlt“
+sinkt auf **vier Saisons**.
+
+**Folgen für die Tabellen in g.2:** Die Ticket-Einnahmen je Ausbaustand bleiben. Der Unterhalt der voll ausgebauten Liga sinkt
+von 160 auf 134 C. Der Satz „in der Aufbauphase fängt der Bau das Geld auf“ gilt nur noch halb: Bis zum Schnitt „9.000 Steh,
+5.500 Sitz“ gibt ein Team 14,4 C statt 32 C aus, die Liga 461 C statt 1.024 C.
+
+### i.2 Einnahmen und Ausgaben je Saison: das Gesamtbild
+
+**Grundlage.** Die gemessenen Zeilen kommen aus `docs/design/guv-saisonfaktor-messung-22-11.md` (32 KI-Teams von Anfang an,
+Saison-Faktor 1, ein Lauf, Stand vor PR #1689). Die neuen Zeilen sind die Vorschläge dieses Papiers und des Marketing-Papiers
+mit ihren Startwerten; **sie sind gerechnet, nicht gemessen.** Alle Werte in C je Saison für das Durchschnittsteam.
+
+**Saison 1**
+
+| Posten | Liga 1 | Liga 2 | Herkunft |
+|---|---:|---:|---|
+| Sponsor (Sockel + Rangprämie) | 70,0 | 59,9 | gemessen, **bleibt unverändert** |
+| Sponsor-Ereignisse | +0,4 | −0,6 | gemessen |
+| Vorstandsziele | 4,6 | 5,1 | gemessen |
+| übrige Einnahmen der Messung | 2,0 | 1,3 | Rest zur gemessenen Summe |
+| **Einnahmen heute** | **77,0** | **65,7** | gemessen |
+| Dauerkarten (normal: 40 % der Plätze, Rabatt 25 %) | +1,2 | +0,9 | neu, f.2; vor Spieltag 1 in der Kasse |
+| Tageskarten (Grundarena 4.000 Plätze, Auslastung 85 %, Ereignisse) | +2,2 | +1,6 | neu, g.2 und g.3 |
+| Arena-Ausbau, Mehrertrag (im Mittel ein Schritt, halbe Saison) | +0,3 | +0,2 | neu, i.1 |
+| Marketing: Teammarke (Sockel) | +4,0 | +3,0 | neu, Marketing 4.3 |
+| Marketing: Team-Anteile am Werbegeld (dynamisch) | +4,4 | +3,2 | neu, Marketing 4.2 und 4.4 |
+| Medaillen und Farb-Meister | +2,0 | +1,25 | neu, g.1 |
+| dafür weniger Rangprämie | −2,0 | −1,25 | g.1: aus dem Rangprämien-Topf, im Mittel 0 |
+| Preisgeld | 0 | 0 | abgeschaltet (`CASH_PRIZE_BENCHMARK_ONLY`); die Rangprämie steckt im Sponsor |
+| **Neue Einnahmen** | **+12,1** | **+8,9** | |
+| Gehälter | −74,2 | −57,3 | gemessen |
+| übrige Ausgaben der Messung (Prämien an den Kader u. a.) | −1,9 | −1,3 | Rest zur gemessenen Summe |
+| **Ausgaben heute** | **−76,1** | **−58,6** | gemessen |
+| Verpflegung (Essens-Abo) | −3,5 | −3,5 | geplant, `zwischen-den-spieltagen-22-11.md` |
+| Versicherung (Pauschale minus Erstattung) | −0,4 | −0,3 | neu, f.4 |
+| Trainingslager (vier von fünf Teams) | −1,2 | −1,2 | neu, f.5 |
+| Arena-Unterhalt (ein Schritt) | −0,1 | −0,1 | neu, i.1 |
+| Kreditzins (Kredite ab Saison 1) | −0,15 | −0,15 | neu, f.6 |
+| **Neue Ausgaben** | **−5,4** | **−5,3** | |
+| **Operative GuV heute** | **+0,9** | **+7,2** | gemessen: 16 von 32 Teams ≥ 0 (Liga 1: 6, Liga 2: 10) |
+| Neue Posten netto | +6,8 | +3,7 | |
+| **Operative GuV mit allen Posten** | **+7,7** | **+10,9** | |
+| mit Stellschraube: Teammarke in Liga 2 ebenfalls 4,0 C | +7,7 | +11,9 | Empfehlung, siehe unten |
+
+Nicht in der operativen GuV, wie bisher: Draft und Transfers, Kredit-Tilgung und der **Bau** der Plätze (Investition aus dem
+Investitionstopf, in Saison 1 im Mittel rund 1 C). Noch nicht eingerechnet ist die **Ausrüstung** (Reparatur typisch 6,7 C je
+Saison, voll 19 C): Sie ist ein eigener, späterer Baustein und würde das Plus oben fast ganz aufzehren.
+
+**Welcher Posten trägt wie viel?** Von den neuen Einnahmen kommen in Liga 1 69 % aus dem Marketing (8,4 C), 31 % aus Karten
+(3,7 C). Die Karten sind in Saison 1 klein, weil alle mit der Grundarena starten; sie wachsen erst mit dem Ausbau. Der größte
+neue Kostenposten ist die Verpflegung (zwei Drittel der neuen Ausgaben).
+
+**Wird das Ziel erreicht?** Ziel des Projektmanagers: in Saison 1 rund zwei Drittel der Teams operativ bei 0 oder besser (21
+bis 22 von 32), ohne dass die Schere zwischen Reich und Arm größer wird.
+
+| | heute (gemessen) | mit allen Posten (geschätzt) | mit Stellschraube |
+|---|---:|---:|---:|
+| Liga 1: Teams ≥ 0 (von 16) | 6 | 10 bis 11 | 10 bis 11 |
+| Liga 2: Teams ≥ 0 (von 16) | 10 | 12 | 12 bis 13 |
+| **gesamt (von 32)** | **16** | **22 bis 23** | **22 bis 24** |
+| Einnahmen Liga 1 : Liga 2 | 1,17 | 1,19 | 1,18 |
+| Abstand der operativen GuV, Liga 2 minus Liga 1 | +6,3 C | +3,2 C | +4,2 C |
+
+- **Das Ziel wird geschätzt knapp erreicht.** Die Schätzung verschiebt jedes Team um das Netto seiner Liga und zählt aus den
+  veröffentlichten Rangwerten der Messung, wer über die Null kommt. In Liga 1 liegt der Median heute bei −1, drei bis fünf
+  Teams knapp unter null kippen; mindestens vier Teams des zweiten Budget-Viertels liegen bei −13 oder tiefer und bleiben im
+  Minus. In Liga 2 liegen vier Teams zwischen −10 und 0, zwei bis drei davon kommen über die Linie.
+- **Ehrliche Unsicherheit: 20 bis 26.** Die Messung ist ein einziger Lauf, die Einzelwerte der Teams liegen nicht vor, und das
+  Marketing ist nicht gleich verteilt (4 bis 17 C je Team). Wer wenig Kante im Kader hat, bekommt nur den Sockel.
+- **Die Schere nach Budget wächst kaum:** Liga 1 bekommt mehr (höhere Preise, höherer Werbe-Höchstwert), startet aber
+  operativ tiefer. Das Verhältnis der Einnahmen steigt von 1,17 auf 1,19. Das Marketing öffnet eine andere Schere, quer zum
+  Budget: nach Persönlichkeit im Kader und Passung zu den Fans. Das ist gewollt.
+
+**Stellschrauben, falls die Messung darunter bleibt** (der Sponsor bleibt in jedem Fall unverändert):
+
+| Stellschraube | Wirkung je Team, Liga 1 · Liga 2 | Wirkung auf die Schere | Empfehlung |
+|---|---:|---|---|
+| **Teammarke in Liga 2 von 3,0 auf 4,0 C** | 0 · +1,0 C | wird kleiner (1,19 → 1,18) | **zuerst**, gleich mitmessen |
+| Ticketpreise +10 % | +0,35 · +0,25 C in Saison 1, später das Doppelte | wächst leicht mit dem Ausbau | zweite Wahl |
+| Medaillen und Farb-Meister obendrauf statt aus dem Rangprämien-Topf | +2,0 · +1,25 C | wächst leicht | nur, wenn Chris die Rangprämie nicht anfassen will (g.6, Frage 1) |
+| Teammarke für alle +1,0 C | +1,0 · +1,0 C | bleibt | dritte Wahl; hilft den Teams ohne Kante am meisten |
+
+**Saison 2 und später** (heute gemessen: 27 von 32 Teams ≥ 0, operative GuV +17,1 in Liga 1 und +14,1 in Liga 2):
+
+| | Liga 1 | Liga 2 |
+|---|---:|---:|
+| Operative GuV heute (gemessen) | +17,1 | +14,1 |
+| Karten (Grundarena plus drei Schritte, Auslastung 88 %) | +6,4 | +4,8 |
+| Marketing (mit Schub und Teamerfolg) | +9,0 | +6,8 |
+| Verpflegung, Versicherung, Trainingslager, Arena-Unterhalt | −5,5 | −5,4 |
+| **Operative GuV mit allen Posten** | **+27,0** | **+20,3** |
+| Teams ≥ 0 (geschätzt) | 15 von 16 | 15 von 16 |
+
+Ab Saison 2 ist das Problem nicht mehr die Deckung, sondern der Überschuss: Im Mittel bleiben 20 bis 27 C je Team, die in der
+Kaufphase zu höheren Geboten werden. Dafür ist die **Ausrüstung** der vorgesehene Gegenposten (6,7 bis 19 C). Empfehlung:
+Karten, Marketing und Verpflegung zusammen bauen; die Ausrüstung spätestens eine Saison danach, oder die Ticketpreise ab
+Saison 2 erst bei 80 % starten lassen, bis sie gebaut ist.
+
+**Messplan:** `scripts/miss-teamfinanzen-saison.ts`, 32 KI-Teams von Anfang an, Faktor 1, zwei Saaten, zwei Saisons, nach dem
+Merge von #1689. Abnahme: Saison 1 mindestens 21 von 32 Teams operativ ≥ 0, Verhältnis der Einnahmen Liga 1 zu Liga 2
+höchstens 1,20, Verhältnis reichstes zu ärmstem Team bei der Kasse am Saisonende nicht höher als im Lauf ohne die Posten.
+
+### i.3 Mockup, Runde 5
+
+`public/mockups/finanzen-modern-18-11.html?ansicht=wahl` rechnet die Karte „Arena · Ausbau von Hand“ und die Tabelle
+„Ausbau-Leiter je Bereich“ mit den neuen Bau- und Unterhaltswerten; sonst ist nichts geändert. Die GuV-Tabelle aus i.2 steht
+nur in diesem Papier.
+
+| Datei (`docs/design/finanzen-posten-22-11/`) | Zeigt |
+|---|---|
+| `runde5-saisonwahl-ausbau-1920x1080.png` | zwei Schritte Stehplatz: 2,2 C, bringt +0,8 C, bezahlt nach rund 2,5 Saisons |
+| `runde5-saisonwahl-ausbau-leiter-2560x1440.png` | Plan in allen drei Bereichen, neue Leiter: 1,8 · 2,0 · 3,0 Saisons, voll ausgebaut 51,4 C |
+| `runde5-saisonwahl-logen-1710x1112.png` | zwei Schritte Loge bei 75 % Auslastung: weiter „nie“ |
+
+Geprüft in Chromium unter `flock /tmp/oly-aufnahme.lock`: keine JS-Fehler in Saisonwahl, Übersicht, Aufschlüsselung und
+Fans & Arena; kein Seitenscroll und kein inneres Scrollen in der Saisonwahl bei 2560×1440, 1920×1080 und 1710×1112.
+
+### i.4 Offene Fragen an Chris
+
+| # | Frage | Empfehlung |
+|---:|---|---|
+| 1 | Teammarke in Liga 2 auf 4,0 C heben, damit das Ziel „zwei Drittel im Plus“ auch in Liga 2 hält und die Schere nicht wächst? | **Ja.** Kostet die Liga 16 C je Saison und ist die einzige Schraube, die die Schere kleiner macht. |
+| 2 | Ab Saison 2 bleiben im Mittel 20 bis 27 C Überschuss je Team. Ausrüstung als Gegenposten fest einplanen, oder die Ticketpreise bis dahin bei 80 %? | **Ausrüstung einplanen**, Ticketpreise nur als Notbehelf. |
+

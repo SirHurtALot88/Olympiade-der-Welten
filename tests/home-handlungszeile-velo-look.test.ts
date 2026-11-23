@@ -38,7 +38,7 @@ describe("Beidseitige Klassen-Absicherung Office (Markup ↔ globals.css)", () =
 describe("Handlungstext der Flow-Karte", () => {
   it("die Karte spricht Handlung statt Kryptik — der Text ‚erst Team setzen' ist weg", () => {
     expect(SCOPE).not.toContain("erst Team setzen");
-    expect(SCOPE).toContain("ohne Einsatzliste startet der Spieltag nicht");
+    expect(SCOPE).toContain("ohne Taktik startet der Spieltag nicht");
   });
 
   it("Warnungs-Chips tragen Schlüssel + Label, die Shell liefert beides", () => {

@@ -462,10 +462,10 @@ export function useFoundationCrossTabSeasonBriefing(input: {
       },
       {
         stepId: "set_lineup",
-        title: "Einsatzliste setzen",
+        title: "Taktik setzen",
         kicker: "Matchday",
         detail: `${input.currentMatchdayDisciplineSchedule?.discipline1?.displayName ?? "D1"} / ${input.currentMatchdayDisciplineSchedule?.discipline2?.displayName ?? "D2"}: Slots füllen, Powers/Captains bewusst setzen.`,
-        targetLabel: "Einsatzliste öffnen",
+        targetLabel: "Taktik öffnen",
         targetView: "lineup",
         status: getResolvedStatus(
           "set_lineup",

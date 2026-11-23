@@ -1643,7 +1643,7 @@ export function saveLocalLegacyLineupDraft(
     return {
       ok: false,
       errors: ["lineup_not_operationally_ready"],
-      warnings: ["Alle Slots fuellen oder den gesamten Kader einsetzen, bevor die Einsatzliste gespeichert wird."],
+      warnings: ["Alle Slots fuellen oder den gesamten Kader einsetzen, bevor die Taktik gespeichert wird."],
     };
   }
 
@@ -1847,7 +1847,7 @@ export function saveLocalLegacyLineupDraftBatch(
     if (!isTeamMatchdayLineupOperationallyReady(baseGameState, teamId, candidateDraft)) {
       pushRejected(
         ["lineup_not_operationally_ready"],
-        ["Alle Slots fuellen oder den gesamten Kader einsetzen, bevor die Einsatzliste gespeichert wird."],
+        ["Alle Slots fuellen oder den gesamten Kader einsetzen, bevor die Taktik gespeichert wird."],
       );
       continue;
     }

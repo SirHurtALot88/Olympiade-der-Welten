@@ -191,7 +191,7 @@ export function useHomeV2OverviewDerivations(input: UseHomeV2OverviewDerivations
           key: "lineup",
           kicker: "Matchday",
           title: homeNextMatchdayStatus.openSlots > 0 ? `${homeNextMatchdayStatus.openSlots} Slots offen` : "Einsatz bereit",
-          detail: homeNextMatchdayStatus.openSlots > 0 ? "Zuerst Einsatzliste füllen" : "Direkt in die Arena",
+          detail: homeNextMatchdayStatus.openSlots > 0 ? "Zuerst Taktik füllen" : "Direkt in die Arena",
           tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
         },
         {

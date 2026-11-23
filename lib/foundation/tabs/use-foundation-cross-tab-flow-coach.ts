@@ -47,7 +47,7 @@ export function useFoundationCrossTabFlowCoach(input: {
         return {
           ...base,
           kicker: "Briefing-Flow",
-          title: "Kurz lesen, dann direkt in Markt, HQ oder Einsatzliste springen.",
+          title: "Kurz lesen, dann direkt in Markt, HQ oder Taktik springen.",
           detail: "Home zeigt nur die wichtigsten Signale für die ersten Minuten: Next Play, Druck, Chancen und Spieltag.",
           terms: ["PPs", "MVS", "OVR"],
           progressLabel: "Orientierung",
@@ -56,7 +56,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           actions: [
             { label: "Transfermarkt", targetView: "marketV2", detail: "Deals & Wishlist", tone: "primary" },
             { label: "Office", targetView: "hq", detail: "Druck & Prioritäten" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Slots füllen" },
+            { label: "Taktik", targetView: "lineup", detail: "Slots füllen" },
           ],
         };
       case "homeV2":
@@ -64,7 +64,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           return {
             ...base,
             kicker: "Office-Flow",
-            title: "Baustellen ordnen, Druck lesen und dann gezielt in Markt oder Einsatzliste gehen.",
+            title: "Baustellen ordnen, Druck lesen und dann gezielt in Markt oder Taktik gehen.",
             detail: "Office ist die Manager-Zentrale: Was brennt sofort, was kippt diese Season und was musst du vor dem Wechsel vorbereiten?",
             terms: ["Cash", "Moral", "Kader", "Druck"],
             progressLabel: "Prioritäten",
@@ -73,14 +73,14 @@ export function useFoundationCrossTabFlowCoach(input: {
             actions: [
               { label: "Transfermarkt", targetView: "marketV2", detail: "Kaderlücken", tone: "primary" },
               { label: "Training", targetView: "trainingCompact", detail: "Entwicklung" },
-              { label: "Einsatzliste", targetView: "lineup", detail: "bereit machen" },
+              { label: "Taktik", targetView: "lineup", detail: "bereit machen" },
             ],
           };
         }
         return {
           ...base,
           kicker: "Briefing-Flow",
-          title: "Kurz lesen, dann direkt in Markt, Office oder Einsatzliste springen.",
+          title: "Kurz lesen, dann direkt in Markt, Office oder Taktik springen.",
           detail: "Home zeigt die wichtigsten Signale: Next Play, Druck, Chancen und Spieltag.",
           terms: ["PPs", "MVS", "OVR"],
           progressLabel: "Orientierung",
@@ -89,14 +89,14 @@ export function useFoundationCrossTabFlowCoach(input: {
           actions: [
             { label: "Transfermarkt", targetView: "marketV2", detail: "Deals & Wishlist", tone: "primary" },
             { label: "Office", targetView: "hq", detail: "Druck & Prioritäten" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Slots füllen" },
+            { label: "Taktik", targetView: "lineup", detail: "Slots füllen" },
           ],
         };
       case "hq":
         return {
           ...base,
           kicker: "Office-Flow",
-          title: "Baustellen ordnen, Druck lesen und dann gezielt in Markt oder Einsatzliste gehen.",
+          title: "Baustellen ordnen, Druck lesen und dann gezielt in Markt oder Taktik gehen.",
           detail: "Office ist die Manager-Zentrale: Was brennt sofort, was kippt diese Season und was musst du vor dem Wechsel vorbereiten?",
           terms: ["Cash", "Moral", "Kader", "Druck"],
           progressLabel: "Prioritäten",
@@ -105,7 +105,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           actions: [
             { label: "Transfermarkt", targetView: "marketV2", detail: "Kaderlücken", tone: "primary" },
             { label: "Training", targetView: "trainingCompact", detail: "Entwicklung" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "bereit machen" },
+            { label: "Taktik", targetView: "lineup", detail: "bereit machen" },
           ],
         };
       case "lineup":
@@ -137,7 +137,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           actions: [
             { label: "Saisonstand", targetView: "seasonV2", detail: "Ranking", tone: "primary" },
             { label: "Office", targetView: "hq", detail: "Folgen" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Zurück" },
+            { label: "Taktik", targetView: "lineup", detail: "Zurück" },
           ],
         };
       case "teams":
@@ -153,7 +153,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           actions: [
             { label: "Gebäude", targetView: "trainingV2", detail: "Upgrades", tone: "primary" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Kaufen/Verkaufen" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Slots" },
+            { label: "Taktik", targetView: "lineup", detail: "Slots" },
           ],
         };
       case "trainingV2":
@@ -185,7 +185,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           shortcut: "Upgrade-Button = Spielerfokus",
           actions: [
             { label: "Office", targetView: "hq", detail: "Prioritäten", tone: "primary" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Fit prüfen" },
+            { label: "Taktik", targetView: "lineup", detail: "Fit prüfen" },
             { label: "Transfermarkt", targetView: "marketV2", detail: "Bedarf" },
           ],
         };
@@ -217,7 +217,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           shortcut: "Suche + Teamfilter = Deal-Funnel",
           actions: [
             { label: "Office", targetView: "hq", detail: "Prioritäten", tone: "primary" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "wenn bereit" },
+            { label: "Taktik", targetView: "lineup", detail: "wenn bereit" },
             { label: "Historie", targetView: "history", detail: "Deals" },
           ],
         };
@@ -266,7 +266,7 @@ export function useFoundationCrossTabFlowCoach(input: {
           shortcut: "Ctrl+K = Begriff suchen",
           actions: [
             { label: "Spieler", targetView: "players", detail: "Kennzahlen sehen", tone: "primary" },
-            { label: "Einsatzliste", targetView: "lineup", detail: "Score anwenden" },
+            { label: "Taktik", targetView: "lineup", detail: "Score anwenden" },
             { label: "Training", targetView: "trainingCompact", detail: "Setpoints prüfen" },
           ],
         };

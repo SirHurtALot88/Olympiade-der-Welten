@@ -109,7 +109,7 @@ describe("Startseite Runde 2: Entscheidungen aus dem echten Zustand", () => {
 
   it("Einsatzliste unvollständig mit Zahlen und Sprungziel", () => {
     const z = liste.find((x) => x.id === "einsatzliste")!;
-    expect(z.titel).toBe("Einsatzliste unvollständig");
+    expect(z.titel).toBe("Taktik unvollständig");
     expect(z.detail).toBe("4 von 6 Plätzen gesetzt · 2 offen");
     expect(z.ziel).toEqual({ art: "einsatzliste" });
   });
@@ -153,12 +153,12 @@ describe("Startseite Runde 2: Spieler des Tages, der Saison, bestes Heimspiel", 
 
 describe("Startseite: ein Eintrag je Sache in den Entscheidungen", () => {
   const abgeleitet = [
-    { id: "einsatzliste", titel: "Einsatzliste leer" },
+    { id: "einsatzliste", titel: "Taktik leer" },
     { id: "minuskarte", titel: "2 Pflicht-Minuskarten offen" },
   ];
   it("Inbox-Eintrag „Lineup fehlt“ entfällt, wenn „Einsatzliste leer“ schon dasteht", () => {
     expect(inboxEintragIstDoppelt("Lineup fehlt", abgeleitet)).toBe(true);
-    expect(inboxEintragIstDoppelt("Einsatzliste unvollständig", abgeleitet)).toBe(true);
+    expect(inboxEintragIstDoppelt("Taktik unvollständig", abgeleitet)).toBe(true);
   });
   it("gleicher Titel und Minuskarten-Meldung sind Dubletten, andere Sachen nicht", () => {
     expect(inboxEintragIstDoppelt("2 Pflicht-Minuskarten offen", abgeleitet)).toBe(true);
