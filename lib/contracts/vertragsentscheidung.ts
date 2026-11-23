@@ -58,6 +58,21 @@ export function istVertragsentscheidungNachzuholen(
   return ende != null && ende < laufend;
 }
 
+/**
+ * Darf diese offene Entscheidung auch dann gebucht werden, wenn der Phasen-Riegel `renew_contract` sonst sperrt?
+ *  - Nachholen (Altstand): jederzeit.
+ *  - Spielbarkeit 23.11.: am Saisonende selbst, solange der Vertrag noch `renewal_pending` ist. Der Assistent schaltet die Phase
+ *    bis `lineup_setup` / `next_season_ready` weiter; dort sperrt der Riegel das Verlaengern, die Saisonwechsel-Sperre
+ *    (`vertragsentscheidung_offen`) verlangt es aber noch — Sackgasse, aus der der Spielstand nicht mehr herauskam.
+ */
+export function darfVertragsentscheidungTrotzPhase(
+  entry: Pick<RosterEntry, "contractLength" | "contractEndSeasonNumber" | "contractStatus">,
+  gameState: Pick<GameState, "season" | "gamePhase">,
+): boolean {
+  if (istVertragsentscheidungNachzuholen(entry, gameState)) return true;
+  return isSeasonEndPhase(gameState.gamePhase) && entry.contractStatus === "renewal_pending" && istVertragsentscheidungFaellig(entry, gameState);
+}
+
 /** Entscheidet der Mensch dieses Teams selbst über Verträge? (KI-Teams und delegierte „Käufe, Verkäufe und Verträge“: nein.) */
 export function entscheidetMenschUeberVertraege(gameState: Pick<GameState, "teams" | "seasonState">, teamId: string): boolean {
   return vertragsSteuerung(gameState, teamId) === "mensch";

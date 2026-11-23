@@ -1,0 +1,968 @@
+[
+  {
+    "wertung": {
+      "tdm:arena": 32,
+      "gewichtheben:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-1",
+    "nr": 1,
+    "disziplinen": [
+      "tdm",
+      "gewichtheben"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 17,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 9,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 0,
+    "punkteSummeNachher": 64,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-2",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "takeshis-castle:arena": 32,
+      "staffel:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-2",
+    "nr": 2,
+    "disziplinen": [
+      "takeshis-castle",
+      "staffel"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 17,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 8,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 64,
+    "punkteSummeNachher": 112,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-3",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "climbing:arena": 32,
+      "battlefield:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-3",
+    "nr": 3,
+    "disziplinen": [
+      "climbing",
+      "battlefield"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 18,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 8,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 112,
+    "punkteSummeNachher": 168,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-4",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "eiskunstlauf:arena": 32,
+      "speed-schach:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-4",
+    "nr": 4,
+    "disziplinen": [
+      "eiskunstlauf",
+      "speed-schach"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 23,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 9,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 168,
+    "punkteSummeNachher": 232,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-5",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "fechten:arena": 32,
+      "i-spy:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-5",
+    "nr": 5,
+    "disziplinen": [
+      "fechten",
+      "i-spy"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 21,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 8,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 232,
+    "punkteSummeNachher": 296,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-6",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "football:arena": 32,
+      "breaking:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-6",
+    "nr": 6,
+    "disziplinen": [
+      "football",
+      "breaking"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 32,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 9,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 296,
+    "punkteSummeNachher": 360,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-7",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "spurt:arena": 32,
+      "basketball:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-7",
+    "nr": 7,
+    "disziplinen": [
+      "spurt",
+      "basketball"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 39,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 10,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 360,
+    "punkteSummeNachher": 424,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-8",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "wettessen:arena": 32,
+      "tennis:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-8",
+    "nr": 8,
+    "disziplinen": [
+      "wettessen",
+      "tennis"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 23,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 11,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 424,
+    "punkteSummeNachher": 488,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-9",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "mini-dm:arena": 32,
+      "hockey:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-9",
+    "nr": 9,
+    "disziplinen": [
+      "mini-dm",
+      "hockey"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 42,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 10,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 488,
+    "punkteSummeNachher": 544,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-10",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "showcase:arena": 32,
+      "time-trial:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-10",
+    "nr": 10,
+    "disziplinen": [
+      "showcase",
+      "time-trial"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 30,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 12,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 544,
+    "punkteSummeNachher": 608,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-11",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "time-trial:arena": 32,
+      "staffel:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-11",
+    "nr": 11,
+    "disziplinen": [
+      "time-trial",
+      "staffel"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 30,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 13,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 608,
+    "punkteSummeNachher": 664,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-12",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "battlefield:arena": 32,
+      "mini-dm:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-12",
+    "nr": 12,
+    "disziplinen": [
+      "battlefield",
+      "mini-dm"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 19,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 10,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 664,
+    "punkteSummeNachher": 712,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-13",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "wettessen:arena": 32,
+      "spurt:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-13",
+    "nr": 13,
+    "disziplinen": [
+      "wettessen",
+      "spurt"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 26,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 13,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 712,
+    "punkteSummeNachher": 776,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-14",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "tdm:arena": 32,
+      "fechten:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-14",
+    "nr": 14,
+    "disziplinen": [
+      "tdm",
+      "fechten"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 25,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 10,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 776,
+    "punkteSummeNachher": 840,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-15",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "basketball:arena": 32,
+      "climbing:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-15",
+    "nr": 15,
+    "disziplinen": [
+      "basketball",
+      "climbing"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 43,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 10,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 840,
+    "punkteSummeNachher": 904,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-16",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "hockey:arena": 32,
+      "i-spy:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-16",
+    "nr": 16,
+    "disziplinen": [
+      "hockey",
+      "i-spy"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 55,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 10,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 904,
+    "punkteSummeNachher": 968,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-17",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "football:arena": 32,
+      "breaking:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-17",
+    "nr": 17,
+    "disziplinen": [
+      "football",
+      "breaking"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 21,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 9,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 968,
+    "punkteSummeNachher": 1032,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-18",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "eiskunstlauf:arena": 32,
+      "tennis:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-18",
+    "nr": 18,
+    "disziplinen": [
+      "eiskunstlauf",
+      "tennis"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 20,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 11,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 1032,
+    "punkteSummeNachher": 1096,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-19",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "takeshis-castle:arena": 32,
+      "gewichtheben:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-19",
+    "nr": 19,
+    "disziplinen": [
+      "takeshis-castle",
+      "gewichtheben"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 22,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 12,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 1096,
+    "punkteSummeNachher": 1152,
+    "phaseNachher": "season_active",
+    "naechster": "matchday-20",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "showcase:arena": 32,
+      "speed-schach:arena": 32
+    },
+    "saison": "season-1",
+    "matchdayId": "matchday-20",
+    "nr": 20,
+    "disziplinen": [
+      "showcase",
+      "speed-schach"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 20,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 10,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 1152,
+    "punkteSummeNachher": 1216,
+    "phaseNachher": "season_completed",
+    "naechster": "matchday-20",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "takeshis-castle:arena": 32,
+      "tennis:arena": 32
+    },
+    "saison": "season-2",
+    "matchdayId": "season-2-matchday-1",
+    "nr": 1,
+    "disziplinen": [
+      "takeshis-castle",
+      "tennis"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 21,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 11,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 0,
+    "punkteSummeNachher": 56,
+    "phaseNachher": "season_active",
+    "naechster": "season-2-matchday-2",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "fechten:arena": 32,
+      "gewichtheben:arena": 32
+    },
+    "saison": "season-2",
+    "matchdayId": "season-2-matchday-2",
+    "nr": 2,
+    "disziplinen": [
+      "fechten",
+      "gewichtheben"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 18,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 9,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 56,
+    "punkteSummeNachher": 120,
+    "phaseNachher": "season_active",
+    "naechster": "season-2-matchday-3",
+    "fehler": []
+  },
+  {
+    "wertung": {
+      "staffel:arena": 32,
+      "showcase:arena": 32
+    },
+    "saison": "season-2",
+    "matchdayId": "season-2-matchday-3",
+    "nr": 3,
+    "disziplinen": [
+      "staffel",
+      "showcase"
+    ],
+    "prewarm": 200,
+    "lineupTeams": 32,
+    "verletzteEingesetzt": [],
+    "fremdeEingesetzt": [],
+    "d1": {
+      "status": 200,
+      "ok": true,
+      "sek": 16,
+      "polls": 0,
+      "blocker": []
+    },
+    "d2": {
+      "status": 200,
+      "ok": true,
+      "sek": 11,
+      "polls": 0,
+      "blocker": []
+    },
+    "abschluss": {
+      "status": 200,
+      "applied": true,
+      "blocker": []
+    },
+    "standAktualisiert": true,
+    "punkteSummeVorher": 120,
+    "punkteSummeNachher": 176,
+    "phaseNachher": "season_active",
+    "naechster": "season-2-matchday-4",
+    "fehler": []
+  }
+]

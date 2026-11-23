@@ -1,0 +1,5 @@
+[
+  "http 404 http://127.0.0.1:3237/api/media/player-portrait/player-2560-columbra-and-dovian",
+  "console: Failed to load resource: the server responded with a status of 404 (Not Found)",
+  "TypeError: Cannot set properties of null (setting 'hidden') @     at http://127.0.0.1:3237/mockups/battle-mode.engine.js:66261:70 |     at Array.forEach (<anonymous>) |     at HTMLButtonElement.<anonymous> (http://127.0.0.1:3237/mockups/battle-mode.engine.js:66260:10)"
+]
