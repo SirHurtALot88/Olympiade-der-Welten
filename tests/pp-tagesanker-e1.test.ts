@@ -71,8 +71,10 @@ describe("E1 liest die C2-PP vor dem Tagesanker", () => {
       expect(sicht(b)).toEqual(sicht(a));
       // Gegenprobe: ohne die Map (alter Stand) verschiebt der Tagesfaktor, wo D aus den PP kommt.
       if (f.leistung) {
+        // Faktor 0,6 statt FAKTOR: die Anker vom 23.11. (Kalibrierung neu gezogen) liegen so, dass +37 % in diesem Fixture
+        // am Deckel haengen und die Gegenprobe nichts zeigt; ein Tagesfaktor unter 1 verschiebt D sichtbar.
         const c = f.zeilen();
-        wendeErgebnisSkalaE1An({ teamResults: c, spielerZeilen: klon(mit.zeilen), disciplineId: f.disziplin, playerCount: f.playerCount, podVariante: f.variante });
+        wendeErgebnisSkalaE1An({ teamResults: c, spielerZeilen: klon(spieler(f.teams, PP, 0.6).zeilen), disciplineId: f.disziplin, playerCount: f.playerCount, podVariante: f.variante });
         expect(sicht(c)).not.toEqual(sicht(a));
       }
     });

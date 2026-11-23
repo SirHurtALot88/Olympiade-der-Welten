@@ -692,3 +692,106 @@ wenn die Zeile mit C2 gerechnet wird.
 **Anzeige der laufenden Saison (Info).** "Nach dem Spieltag", die Arena-Paarungsliste und die gebuchte
 Arena-Zeile zeigen die 0-10-Skala und den Pod-Wert nur bei Zeilen mit `ergebnisSkala: "e1"`; eine Zeile der
 laufenden (alten) Saison zeigt exakt wie vor diesem PR.
+
+---
+
+## 23.11. Anker nachgezogen (PP-Skala C2 und Tagesanker, Welle 6)
+
+Warum: seit dem 18.11. haben sich Climbing (Canyon), Breaking (Tag-Team), Battlefield (Fünf Punkte), Hockey (Torwart-Regel), Basketball (Puste) und TDM (Gefecht) geändert; die Anker standen auf dem alten Motor (Median-Abstand 2 bis 9 statt ~3, Climbing 30 % 10:0).
+
+**Messung.** Drei frische Battle-Saves (32 KI-Teams von Anfang an, je 20 Spieltage, `OLY_PP_SKALA=roh`,
+Arena über den Node-Motor `quick-sim`, `scripts/miss-pp-skala.ts 20`), dazu ein vierter Save im Standardmodus (C2 + Tagesanker +
+E1, ungesehen) als Kontrolle außerhalb der Stichprobe. Aus den Kalibrierläufen sind die Spieltage mit `aufloesung: pps_duell`
+herausgenommen (drei Disziplin-Spieltage: Hockey, Basketball, Wettessen; die Arena lief dort nicht, die PP stammen aus der
+Ersatzrechnung und verzerren die Spitze). Reihenfolge wie im Dokument: erst `node scripts/werte-pp-skala-aus.mjs
+--schreibe-kalibrierung`, dann `npx tsx scripts/werte-ergebnisskala-aus.ts --schreibe-kalibrierung` (E1 liest die C2-Niveaus). Die
+Rückweg-Anker (`basketballPusteAlt`, `breakingGauntletAlt`, `hockeyAlt`, `battlefieldOrte3`, `duellPusteAlt`, `duellGauntletAlt`,
+`duellTorwartAlt`, `podOrte3`) wurden vom Schreibpfad unverändert übernommen (Diff geprüft).
+
+**Vorher/nachher je Disziplin** (Spalten 3-4: dieselben drei Kalibrier-Saves, alte gegen neue Anker, nur Arena-Spieltage; „Anteil 10:0“ =
+Kantersiege je Duell; Pods haben kein 10:0, dort steht die Spanne; Spalte 6: Median der Tagesbesten je Disziplin und Spieltag mit Tagesanker,
+alte gegen neue Anker auf denselben Rohdaten gerechnet; Kontrolllauf = vierter Save mit den neuen Ankern, nur Arena-Spieltage, 1 bis 2
+Spieltage je Disziplin, deshalb grob):
+
+| Disziplin | Format | Median-Abstand D alt -> neu | Anteil 10:0 alt -> neu | Kontrolllauf: D / 10:0 | PP-Tagesbester alt -> neu | PP-Tagesbester Kontrolllauf |
+|---|---|---|---|---|---|---|
+| basketball | Duell | 5,5 -> 3,0 | 18 % -> 8 % | 2,5 / 9 % | 4,88 -> 4,90 | 4,90 |
+| battlefield | Pod | 3,0 -> 3,0 | 0 % -> 0 % | 2,0 / 0 % | 4,87 -> 4,86 | 4,80 |
+| breaking | Duell | 3,0 -> 4,0 | 0 % -> 0 % | 4,0 / 0 % | 4,93 -> 4,91 | 4,85 |
+| climbing | Duell | 9,0 -> 3,0 | 30 % -> 8 % | 4,0 / 0 % | 4,78 -> 4,78 | 4,78 |
+| eiskunstlauf | Duell | 4,5 -> 3,0 | 14 % -> 6 % | 4,0 / 0 % | 4,92 -> 4,92 | 4,83 |
+| fechten | Duell | 6,0 -> 3,0 | 19 % -> 5 % | 3,0 / 3 % | 4,86 -> 4,85 | 4,85 |
+| football | Duell | 5,0 -> 3,0 | 17 % -> 7 % | 2,0 / 0 % | 4,83 -> 4,83 | 4,80 |
+| gewichtheben | Duell | 2,0 -> 2,0 | 1 % -> 1 % | 7,0 / 22 % | 4,88 -> 4,88 | 4,87 |
+| hockey | Duell | 5,0 -> 3,0 | 16 % -> 9 % | 2,0 / 6 % | 4,86 -> 4,85 | 4,85 |
+| i-spy | Duell | 7,0 -> 3,0 | 33 % -> 8 % | 2,5 / 0 % | 4,85 -> 4,85 | 4,84 |
+| mini-dm | Pod | 3,0 -> 2,5 | 0 % -> 0 % | 3,0 / 0 % | 4,83 -> 4,82 | 4,80 |
+| showcase | Duell | 2,0 -> 3,0 | 10 % -> 8 % | 3,0 / 13 % | 4,97 -> 4,96 | 4,83 |
+| speed-schach | Duell | 3,0 -> 3,0 | 4 % -> 0 % | 2,0 / 0 % | 4,91 -> 4,91 | 4,81 |
+| spurt | Duell | 4,0 -> 4,0 | 5 % -> 5 % | 4,0 / 25 % | 4,82 -> 4,81 | 4,79 |
+| staffel | Pod | 3,0 -> 2,5 | 0 % -> 0 % | 2,0 / 0 % | 4,78 -> 4,78 | 4,78 |
+| takeshis-castle | Pod | 3,0 -> 2,0 | 0 % -> 0 % | 3,0 / 0 % | 4,88 -> 4,86 | 4,81 |
+| tdm | Duell | 5,0 -> 3,0 | 17 % -> 3 % | 2,5 / 0 % | 4,83 -> 4,82 | 4,81 |
+| tennis | Duell | 2,0 -> 3,0 | 15 % -> 0 % | 3,0 / 9 % | 4,83 -> 4,83 | 4,88 |
+| time-trial | Duell | 3,0 -> 3,0 | 10 % -> 8 % | 3,0 / 3 % | 4,78 -> 4,78 | 4,78 |
+| wettessen | Duell | 5,0 -> 3,0 | 16 % -> 8 % | 3,0 / 19 % | 4,90 -> 4,88 | 4,93 |
+
+**Lesart.** E1: Median-Abstand liegt jetzt in 18 von 20 Disziplinen bei 2,5 bis 4 (Ziel ~3; Breaking 4,0 und Spurt 4,0 sind die Ausreißer nach oben,
+Gewichtheben und Takeshi's Castle mit 2,0 nach unten; Gewichtheben gibt im Motor nur ganzzahlige Margen 0 bis 5), der Anteil 10:0 ist in allen 20 Disziplinen ≤ 9 % (vorher in 10
+Disziplinen über 10 %, Climbing 30 %, I-Spy 33 %, Basketball 18 %, Fechten 19 %, Hockey 16 %, TDM 17 %, Football 17 %, Wettessen 16 %). Der Wert
+von Hockey (9 %) ist die Spitze. Kontrolllauf: 16 Disziplinen im Ziel; über 10 % liegen Gewichtheben (22 %, ein Spieltag mit großem Feld, die
+Margen sind dort ganzzahlig und stufig), Spurt (25 %, Feldgröße 6 ist nicht kalibriert, fällt auf den Disziplin-weiten Anker) und Wettessen (19 %);
+Showcase 13 % (2 von 16 Duellen). Das sind Einzelspieltage eines Saves (stark korreliert), kein Beleg gegen die Anker, aber ein Auftrag für die
+nächste, größere Ziehung (Spurt Feld 6 braucht eigene Anker, Gewichtheben ebenfalls). PP: der Tagesbeste liegt wie vorher je Disziplin
+bei 4,78 bis 4,97 (Median 4,85); der Tagesanker fängt die Anker-Drift selbst ab, deshalb ändert die Neuziehung die Spitze kaum. Climbing,
+Staffel und Zeitfahren bleiben bei 4,78 (16 Laufsieger gleichauf, Abschnitt 6 des Tagesanker-Dokuments). Keine Disziplin liegt systematisch
+über 5,0. Der Nutzen der neuen PP-Anker ist die Skala unterhalb der Spitze: Mittel der Einsätze (R_med) und das Niveau, das E1 liest.
+
+**Anker-Stempel und laufende Spielstände.** Die Anker sind NICHT je Stempel versioniert: `seasonState.wertungsSkalen` sagt nur „C2 / E1 / Tagesanker an
+oder aus“, die Zahlen liegen je Disziplin in einer Datei und gelten für jeden Rechenweg, der sie zur Laufzeit liest. Folgen, soweit nachgeprüft:
+(1) Gebuchte Arena-/Pod-Zeilen (Spieler-PP, `ergebnisNormiert`, `verhaeltnis`, `teamPoints`) liegen im Spielstand und werden nie neu gerechnet; ein
+laufender Spielstand behält also alles, was bis zum Deploy gebucht ist. (2) Neue Spieltage jedes Spielstands mit Stempel C2/E1 rechnen ab dem
+Deploy mit den neuen Ankern (kein neuer Stempel nötig, derselbe Mechanismus wie bei den Anker-Nachzügen vom 22.11.). (3) Rückweg-Regeln und -Formate haben
+ihre eigenen Schlüssel und blieben unberührt: ein Spieltag, der mit der alten Torwart-/Puste-Regel, dem Gauntlet-Format oder Battlefield-Orte3
+gebucht wurde, rechnet mit den alten Ankern weiter. (4) Eine Ausnahme bleibt: Zeilen mit `aufloesung: pps_duell` (Ersatzrechnung ohne Arena) rechnet der
+Ledger beim Lesen aus dem gespeicherten Rohwert neu (`ppAusKurveSkaliert`, `lib/foundation/season-points-ledger.ts`). Deren Spieler-PP in einer
+laufenden C2-Saison ändern sich mit dem Deploy um den Faktor der Tabelle „PP-Anker“ (Faktor alt/neu bei R_top; zum Beispiel Tennis 0,73, Hockey 0,75,
+Eiskunstlauf 0,79, Breaking 0,81, Wettessen 0,86, Basketball 1,08), nur diese Zeilen, nur die laufende Saison. Eine echte Versionierung der Anker je
+Stempel wäre eine neue Mechanik und ist hier bewusst nicht gebaut; sie ist der Folgeauftrag, falls Chris die Verschiebung dieser Ersatzzeilen stört.
+Der Arena-Eingabe-Hash enthält keine Anker, ein vorgerechneter Vorlauf wird also nicht ungültig.
+
+**Anker-Tabelle (PP, Disziplin-weit):**
+
+| Disziplin | R_top alt -> neu | R_med alt -> neu | Faktor alt/neu bei R_top |
+|---|---|---|---|
+| basketball | 6,08 -> 5,61 | 1,317 -> 1,38 | 1,08 |
+| battlefield | 5,54 -> 5,9 | 1,25 -> 1,195 | 0,94 |
+| breaking | 4,9 -> 6,02 | 1,3 -> 0,97 | 0,81 |
+| climbing | 5,5 -> 5,5 | 1,15 -> 1,1 | 1,00 |
+| eiskunstlauf | 5,88 -> 7,47 | 1,06 -> 1,38 | 0,79 |
+| fechten | 4,93 -> 4,72 | 0,99 -> 0,81 | 1,04 |
+| football | 5,44 -> 5,2 | 1,425 -> 1,475 | 1,05 |
+| gewichtheben | 4,47 -> 4,41 | 1,07 -> 0,74 | 1,01 |
+| hockey | 5,51 -> 7,35 | 1,36 -> 1,39 | 0,75 |
+| i-spy | 5,47 -> 6,16 | 1,3 -> 1,23 | 0,89 |
+| mini-dm | 5,31 -> 5,51 | 1,12 -> 1,02 | 0,96 |
+| showcase | 4,77 -> 5 | 1,18 -> 1,02 | 0,95 |
+| speed-schach | 5,12 -> 5,69 | 1,17 -> 1,17 | 0,90 |
+| spurt | 3,15 -> 3,25 | 1,37 -> 1,28 | 0,97 |
+| staffel | 5,5 -> 5,5 | 1,49 -> 1,2 | 1,00 |
+| takeshis-castle | 4,77 -> 4,91 | 1,01 -> 0,935 | 0,97 |
+| tdm | 6,32 -> 6,24 | 1,28 -> 1,32 | 1,01 |
+| tennis | 4,27 -> 5,84 | 0,84 -> 0,665 | 0,73 |
+| time-trial | 5,5 -> 5,5 | 1,32 -> 1,34 | 1,00 |
+| wettessen | 4,28 -> 4,99 | 1,32 -> 1,15 | 0,86 |
+
+**Zwei Befunde nebenbei.** (a) Die automatische Wahl `marge`/`relativ` kippte bei der Neuziehung (Spurt, Wettessen von relativ auf marge, Hockey
+von marge auf relativ), weil sie am Variationskoeffizienten der Seitensumme hängt. Die Summe wächst dort mit der Feldgröße (Spurt 21 bei 3 Spielern,
+55 bei 5, 90 bei 6), eine absolute Marge ist nicht vergleichbar. `scripts/werte-ergebnisskala-aus.ts` hat dafür jetzt `FESTE_QUELLE`:
+Climbing, Spurt, Wettessen immer relativ (Stand 18.11.), Hockey immer nativ (Stand 22.11.). (b) Spieltage mit `aufloesung: pps_duell` (im Kontrolllauf Football,
+TDM, Showcase, Climbing an einem Tag; Fallback ohne Arena) bekommen weder den Tagesanker noch passende E1-Anker: Football-Tagesbester 3,46, 10:0 in
+31 bis 47 % der Duelle, weil die Anker auf der Arena-Marge stehen und die PPS-Skala eine andere ist. Das ist nicht neu und nicht Teil dieser Kalibrierung;
+offen ist, warum der Vorlauf an solchen Tagen nicht läuft (Probe: `quick-sim`).
+
+**Fingerabdruck:** `GESAMT fe1dc086d68d` unverändert (Anker liegen auf der Buchungsseite, die Engine ist nicht angefasst).
+

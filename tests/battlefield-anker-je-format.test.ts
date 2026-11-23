@@ -51,13 +51,13 @@ describe("E1-Anker je Battlefield-Format", () => {
 describe("PP-Anker je Battlefield-Format", () => {
   it("orte3 hat eigene (alte) Anker, das Standardformat die neu gemessenen", () => {
     expect(ppSkalaAnker("battlefield", 4, "orte3")!.rTop).toBe(5.17);
-    expect(ppSkalaAnker("battlefield", 4)!.rTop).toBe(4.69);
+    expect(ppSkalaAnker("battlefield", 4)!.rTop).toBe(5.9);
     expect(ppSkalaAnker("climbing", 4, "orte3")).toEqual(ppSkalaAnker("climbing", 4));
   });
 
   it("der Tagesbeste bleibt je Format bei 5 PP, der Median-Einsatz bei etwa 1,25", () => {
     expect(skaliereUngedeckelt("battlefield", 5.17, 0, { playerCount: 4, variante: "orte3" })).toBe(5);
-    expect(skaliereUngedeckelt("battlefield", 4.69, 0, { playerCount: 4 })).toBe(5);
-    expect(skaliereUngedeckelt("battlefield", 1.19, 0, { playerCount: 4 })).toBeCloseTo(1.25, 1);
+    expect(skaliereUngedeckelt("battlefield", 5.9, 0, { playerCount: 4 })).toBe(5);
+    expect(skaliereUngedeckelt("battlefield", 1.33, 0, { playerCount: 4 })).toBeCloseTo(1.25, 1);
   });
 });
