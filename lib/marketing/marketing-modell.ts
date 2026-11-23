@@ -26,10 +26,21 @@ import {
   type Fanfarbe,
 } from "@/lib/marketing/marketing-daten";
 
-/** Stellschrauben (Konzept 4.1 bis 4.3; Teammarke Liga 2 = 4,0 auf Entscheidung des PM vom 22.11.). */
+/** Stellschrauben (Konzept 4.1 bis 4.3; Teammarke und Deckel nach der Scheren-Messung vom 22.11., docs/design/marketing-bau-22-11.md). */
 export const MARKETING_KONFIG = {
   werbeMax: { 1: 10, 2: 7.5 } as Record<1 | 2, number>,
-  teammarke: { 1: 4.0, 2: 4.0 } as Record<1 | 2, number>,
+  /**
+   * Teammarke (Sockel) je Saison, UMGEKEHRT nach Budget-Rang gestaffelt (Messung 22.11.: ein pauschaler Sockel oeffnete die Schere reich/arm,
+   * und ein Sockel nach Finanzwert (1..10) wirkte nicht, weil der Finanzwert kaum mit dem Budget zusammenhaengt): Liga-Basis (Liga 1: 3,0 C,
+   * Liga 2: 5,0 C, Ligamittel 4,0 C) + 0,5 C je Platz Abstand von der Ligamitte (Budget-Rang 1 = reichstes Team zahlt am wenigsten), 0..9 C.
+   * Liga 2 bekommt mehr, weil ihr Werbe-Hoechstwert kleiner ist (sonst waechst das Einnahmenverhaeltnis Liga 1 zu Liga 2).
+   */
+  teammarkeLiga: { 1: 3.0, 2: 5.0 } as Record<1 | 2, number>,
+  teammarkeRangSteigung: 0.5,
+  teammarkeMin: 0,
+  teammarkeMax: 9,
+  /** Deckel fuer die Summe der Team-Anteile je Team und Saison (C). Was darueber liegt, geht als Spieler-Anteil an die Moral. */
+  teamAnteileDeckel: 12,
   teamAnteilBasis: 40,
   teamAnteilMin: 15,
   teamAnteilMax: 65,
@@ -45,6 +56,17 @@ export const MARKETING_KONFIG = {
     [0.5, 2],
   ] as Array<[number, number]>,
 } as const;
+
+/**
+ * Teammarke je Saison in C. `rang` = Budget-Rang im eigenen Ligakreis (1 = reichstes Team), `anzahl` = Teams dieses Kreises. Der Abstand von der
+ * Mitte wird auf eine 16er-Liga normiert (Spielstaende ohne Liga-Split haben 32 Teams in einem Kreis).
+ */
+export function teammarkeAusRang(liga: 1 | 2, rang: number, anzahl: number): number {
+  const n = Math.max(2, anzahl);
+  const abstand = ((rang - (n + 1) / 2) / (n - 1)) * 15;
+  const t = MARKETING_KONFIG.teammarkeLiga[liga] + MARKETING_KONFIG.teammarkeRangSteigung * abstand;
+  return Math.round(klemme(t, MARKETING_KONFIG.teammarkeMin, MARKETING_KONFIG.teammarkeMax) * 100) / 100;
+}
 
 export function normalisiereTrait(roh: string | null | undefined): string {
   const k = (roh ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");

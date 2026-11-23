@@ -8,6 +8,7 @@
 import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import {
   aushaengeschildFuer,
+  budgetRangFuer,
   fanProfilFuer,
   kaderEinesTeams,
   ligaStufeFuer,
@@ -17,8 +18,8 @@ import {
   type TeamErfolg,
 } from "@/lib/marketing/marketing-kontext";
 import { FANPROFILE, KLASSEN_FARBE, type Fanfarbe } from "@/lib/marketing/marketing-daten";
-import { MARKETING_KONFIG, anteile4, driftFanfarbe, driftSchritt, type FanProfil, type MarketingSpielerErgebnis } from "@/lib/marketing/marketing-modell";
-import { marketingAktiv, marketingRegelFuerNeueSaison } from "@/lib/marketing/marketing-regel";
+import { MARKETING_KONFIG, anteile4, moralZuschlagAus, teammarkeAusRang, driftFanfarbe, driftSchritt, type FanProfil, type MarketingSpielerErgebnis } from "@/lib/marketing/marketing-modell";
+import { gueltigerMarketingStempel, marketingAktiv, marketingRegelFuerNeueSaison } from "@/lib/marketing/marketing-regel";
 import { summeSpieltagBuchungen, ungebuchterAnteil } from "@/lib/finance/finanzen-je-spieltag";
 import { buildMoraleLookupIndex, moralOhneWerbung, type MoraleLookupIndex } from "@/lib/morale/player-morale-service";
 
@@ -51,8 +52,11 @@ export type MarketingTeamUebersicht = {
   teamAnteile: number;
   /** Summe der Spieler-Anteile je Saison (hebt die Moral, nie die Kasse). */
   spielerAnteile: number;
-  /** Teammarke (Sockel) je Saison. */
+  /** Teammarke (Sockel) je Saison, umgekehrt nach Budget-Rang gestaffelt (reich zahlt weniger). */
   teammarke: number;
+  /** Summe der Team-Anteile vor dem Deckel; greift der Deckel, geht der Rest als Spieler-Anteil an die Moral. */
+  teamAnteileVorDeckel: number;
+  deckelGreift: boolean;
   /** Teammarke + Team-Anteile: der Marketing-Betrag je Saison in der Kasse. */
   ansKasse: number;
   /** Mittlerer Team-Anteil in Prozent des Werbegelds. */
@@ -60,8 +64,38 @@ export type MarketingTeamUebersicht = {
 };
 
 const uebersichtCache = new WeakMap<object, Map<string, MarketingTeamUebersicht>>();
+/**
+ * DAUER-CACHE (Nachbesserung 22.11.): Team-Anteile und Moral werden einmal je Saison und Kaderstand gerechnet, nicht je Spieltag fuer
+ * alle Teams neu. Schluessel = Saison, Team, Liga, Fanfarbe, Aushaengeschild-Wahl und ein Hash des Kaders (Spieler, Restlaufzeit,
+ * Klausel, Rating, Gehalt). Kauf, Verkauf, Verlaengerung und Klausel aendern den Hash und rechnen neu; je Spieltag wird nur 1/N gebucht.
+ * Die Moral im Team-Anteil ist damit auf den Stand beim ersten Rechnen der Saison bzw. nach der Kaderaenderung eingefroren.
+ */
+const dauerCache = new Map<string, MarketingTeamUebersicht>();
+const DAUER_CACHE_MAX = 4000;
 
-/** Gecacht je Spielstand-Objekt und Team: GuV, Seite und Buchung lesen im selben Zustand dieselbe Zahl, ohne die Moral mehrfach zu rechnen. */
+export function marketingCacheSchluessel(gameState: GameState, teamId: string): string {
+  const kader = kaderEinesTeams(gameState, teamId)
+    .map(({ entry, player }) => `${player.id}:${entry.contractLength}:${entry.marketingKlausel ?? 0}:${player.rating}:${Math.round((entry.salary ?? 0) * 10)}`)
+    .sort()
+    .join(",");
+  const stempel = gueltigerMarketingStempel(gameState);
+  return [
+    gameState.season?.id ?? "",
+    teamId,
+    ligaStufeFuer(gameState, teamId),
+    stempel?.fanfarbe?.[teamId]?.join("/") ?? "start",
+    gameState.seasonState?.marketingAushaengeschild?.[teamId]?.playerId ?? "",
+    budgetRangFuer(gameState, teamId).rang,
+    kader,
+  ].join("|");
+}
+
+/** Leert den Dauer-Cache (Tests). */
+export function leereMarketingCache(): void {
+  dauerCache.clear();
+}
+
+/** Gecacht je Spielstand-Objekt (erste Stufe) und je Saison/Kaderstand (zweite Stufe). */
 export function marketingTeamUebersicht(gameState: GameState, teamId: string, index?: MoraleLookupIndex): MarketingTeamUebersicht {
   let jeTeam = uebersichtCache.get(gameState);
   if (!jeTeam) {
@@ -70,20 +104,43 @@ export function marketingTeamUebersicht(gameState: GameState, teamId: string, in
   }
   const bekannt = jeTeam.get(teamId);
   if (bekannt) return bekannt;
-  const neu = berechneUebersicht(gameState, teamId, index);
+  const key = marketingCacheSchluessel(gameState, teamId);
+  let neu = dauerCache.get(key);
+  if (!neu) {
+    neu = berechneUebersicht(gameState, teamId, index);
+    if (dauerCache.size >= DAUER_CACHE_MAX) dauerCache.clear();
+    dauerCache.set(key, neu);
+  }
   jeTeam.set(teamId, neu);
   return neu;
+}
+
+/** Moral-Zuschlag EINES Spielers aus der (gecachten, gedeckelten) Team-Uebersicht; 0, wenn er nicht im Kader steht. */
+export function marketingMoralZuschlag(gameState: GameState, teamId: string, playerId: string): number {
+  return marketingTeamUebersicht(gameState, teamId).zeilen.find((z) => z.playerId === playerId)?.ergebnis.moralZuschlag ?? 0;
 }
 
 function berechneUebersicht(gameState: GameState, teamId: string, index?: MoraleLookupIndex): MarketingTeamUebersicht {
   const ix = index ?? buildMoraleLookupIndex(gameState);
   const kader = kaderEinesTeams(gameState, teamId);
   const liga = ligaStufeFuer(gameState, teamId);
-  const zeilen: MarketingKaderZeile[] = kader.map(({ entry, player }) => {
+  const gesichtId = aushaengeschildFuer(gameState, teamId);
+  let zeilen: MarketingKaderZeile[] = kader.map(({ entry, player }) => {
     const moralOhne = moralOhneWerbung(gameState, player.id, teamId, ix);
     const ergebnis = marketingSpielerFuer(gameState, teamId, player, entry, moralOhne);
-    return zeileAus(player, entry, moralOhne, ergebnis, aushaengeschildFuer(gameState, teamId) === player.id);
+    return zeileAus(player, entry, moralOhne, ergebnis, gesichtId === player.id);
   });
+  const teamAnteileVorDeckel = zeilen.reduce((s, z) => s + z.ergebnis.ansTeam, 0);
+  const deckelGreift = teamAnteileVorDeckel > MARKETING_KONFIG.teamAnteileDeckel + 1e-9;
+  if (deckelGreift) {
+    // Deckel (Schere reich/arm): die Team-Anteile werden gleichmaessig gekuerzt, der Rest geht als Spieler-Anteil an die Moral.
+    const faktor = MARKETING_KONFIG.teamAnteileDeckel / teamAnteileVorDeckel;
+    zeilen = zeilen.map((z) => {
+      const ansTeam = z.ergebnis.ansTeam * faktor;
+      const anIhn = z.ergebnis.werbegeld - ansTeam;
+      return { ...z, ergebnis: { ...z.ergebnis, ansTeam, anIhn, moralZuschlag: moralZuschlagAus(anIhn, z.traits) } };
+    });
+  }
   let werbegeld = 0;
   let teamAnteile = 0;
   let spielerAnteile = 0;
@@ -92,18 +149,21 @@ function berechneUebersicht(gameState: GameState, teamId: string, index?: Morale
     teamAnteile += z.ergebnis.ansTeam;
     spielerAnteile += z.ergebnis.anIhn;
   }
-  const teammarke = MARKETING_KONFIG.teammarke[liga];
+  const budgetRang = budgetRangFuer(gameState, teamId);
+  const teammarke = teammarkeAusRang(liga, budgetRang.rang, budgetRang.anzahl);
   return {
     teamId,
     profil: fanProfilFuer(gameState, teamId),
     liga,
     erfolg: teamErfolgVorsaison(gameState, teamId),
-    gesichtId: aushaengeschildFuer(gameState, teamId),
+    gesichtId,
     zeilen,
     werbegeld,
     teamAnteile,
     spielerAnteile,
     teammarke,
+    teamAnteileVorDeckel,
+    deckelGreift,
     ansKasse: teammarke + teamAnteile,
     mittlererAnteilProzent: werbegeld > 0 ? Math.round((teamAnteile / werbegeld) * 100) : 0,
   };

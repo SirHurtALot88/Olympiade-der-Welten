@@ -352,6 +352,8 @@ function marketingMessung(gs: GameState) {
       zuschlagMittel: r2(u.zeilen.reduce((a, z) => a + z.ergebnis.moralZuschlag, 0) / Math.max(1, u.zeilen.length)),
       moralMittel: r2(morale.reduce((a, b) => a + b, 0) / Math.max(1, morale.length)),
       netzGreift: u.zeilen.filter((z) => z.ergebnis.netzGreift).length,
+      deckelGreift: u.deckelGreift,
+      teamAnteileVorDeckel: r2(u.teamAnteileVorDeckel),
       kader: kader.length,
     };
   }

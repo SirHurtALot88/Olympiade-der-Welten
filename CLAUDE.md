@@ -301,18 +301,11 @@ Schalter ist der Stempel `seasonState.wertungsSkalen.ppTagesanker` (neues Spiel 
 ab dem nächsten Saisonwechsel, gebuchte Spieltage bleiben), jeder Rechenweg fragt `ppTagesankerFuer(gameState, matchdayId)`.
 Rückweg `OLY_PP_TAGESANKER=aus` (neue Saisons), Notbremse `=aus-sofort`. Doku: `docs/design/pp-tagesanker-live-22-11.md`.
 
-## Marketing: Werbegeld je Spieler, dynamischer Team-Anteil, Spieler-Anteil hebt die Moral (Chris, 22.11.)
+## Marketing (Chris, 22.11.)
 
-Gebaut nach `docs/design/marketing-22-11.md` (Runde 3), Bau und Messung: `docs/design/marketing-bau-22-11.md`. **Die Regel steht im Spielstand**
-(`seasonState.marketingRegel`, `lib/marketing/marketing-regel.ts`): neues Spiel ab Saison 1, bestehender Spielstand ab dem nächsten Saisonwechsel
-(Lade-Migration stempelt die laufende Saison "aus"); jeder Rechenweg fragt `marketingAktiv(gameState)`, nie die Variable. Rückweg
-`OLY_MARKETING=aus` (neue Saisons), Notbremse `=aus-sofort`, nur Server (compose + `.env`, kein `NEXT_PUBLIC`). Marketing gilt nur zusammen mit
-Finanzen je Spieltag, weil dort gebucht wird. **Eine Wahrheit:** `marketingTeamUebersicht` (`lib/marketing/marketing-team.ts`) rechnet die
-Zerlegung, die Seite, die Buchung je Spieltag (Ledger-Feld `marketing`, Posten "Marketing" in GuV und Kontoauszug) und der Moral-Zuschlag lesen
-genau sie. **Kasse:** Teammarke (Sockel 4,0 C in beiden Ligen) plus Team-Anteile; der **Spieler-Anteil geht nie in die Kasse**, er hebt die Moral
-(+2/+4/+6/+8 ab 0,5/1,5/3/5 C, Grund "Werbeverträge" in `computePlayerMorale`, der Team-Anteil rechnet mit der Moral OHNE diesen Zuschlag).
-**Marketing wirkt nur auf Geld und Moral**, nie auf Wertung, Marktwert oder Sponsor. Mensch und KI gleich; je Manager getrennt
-(`activeManagerTeamId`). Die Marktspalte "Marketability" zeigt für fremde Spieler nur die Scouting-Stufe (10er/5er/exakt), serverseitig verdeckt.
+Werbegeld je Spieler, dynamischer Team-Anteil und Teammarke in der Kasse (Posten "Marketing"), Spieler-Anteil hebt die Moral; wirkt nie auf Wertung,
+Marktwert oder Sponsor. Regel im Spielstand (`seasonState.marketingRegel`, Abfrage nur `marketingAktiv(gameState)`), Rückweg `OLY_MARKETING=aus` / `aus-sofort`, nur
+Server. Eine Rechenstelle: `lib/marketing/marketing-team.ts`. Bau, Messung, Folgeaufträge: `docs/design/marketing-bau-22-11.md`.
 
 ## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
 

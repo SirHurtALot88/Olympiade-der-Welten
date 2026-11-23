@@ -38,6 +38,15 @@ export function ligaStufeFuer(gameState: GameState, teamId: string): 1 | 2 {
   return getLeagueOf(gameState, teamId) === "liga2" ? 2 : 1;
 }
 
+/** Budget-Rang des Teams im eigenen Ligakreis (1 = reichstes Team; `team.budget` ist die Basis, nicht die Kasse) und die Groesse des Kreises. */
+export function budgetRangFuer(gameState: GameState, teamId: string): { rang: number; anzahl: number } {
+  const liga = getLeagueOf(gameState, teamId);
+  const kreis = gameState.teams.filter((t) => !liga || getLeagueOf(gameState, t.teamId) === liga);
+  const eigenes = gameState.teams.find((t) => t.teamId === teamId)?.budget ?? 0;
+  const davor = kreis.filter((t) => t.budget > eigenes || (t.budget === eigenes && t.teamId < teamId)).length;
+  return { rang: davor + 1, anzahl: Math.max(1, kreis.length) };
+}
+
 export type TeamErfolg = { punkte: number; grund: string; stufe: "verfehlt" | "erreicht" | "titel" | "keiner" };
 
 /**
@@ -217,7 +226,8 @@ export function marketingSpielerFuer(
       moralOhne,
       restlaufzeit: Number.isFinite(entry.contractLength) ? entry.contractLength : null,
       klausel: entry.marketingKlausel ?? 0,
-      verletzt: istVerletzt(gameState, player.id, teamId),
+      // Verletzung wirkt hier NICHT: Team-Anteile und Moral gelten je Saison und Kader (gecacht), je Spieltag wird nur 1/N gebucht.
+      verletzt: false,
       istGesicht: aushaengeschildFuer(gameState, teamId) === player.id,
     },
     teamEingabe(gameState, teamId),

@@ -13,6 +13,7 @@ import {
   berechneTeamAnteil,
   driftFanfarbe,
   moralZuschlagAus,
+  teammarkeAusRang,
   tonDerFans,
   type FanProfil,
 } from "@/lib/marketing/marketing-modell";
@@ -23,7 +24,7 @@ import {
   stempleMarketingBeimAnlegen,
   stempleMarketingNachLaden,
 } from "@/lib/marketing/marketing-regel";
-import { marketingSaisonbetrag, marketingStempelFuerSaisonwechsel, marketingTeamUebersicht } from "@/lib/marketing/marketing-team";
+import { leereMarketingCache, marketingCacheSchluessel, marketingSaisonbetrag, marketingStempelFuerSaisonwechsel, marketingTeamUebersicht } from "@/lib/marketing/marketing-team";
 import { moralOhneWerbung, assessPlayerMorale } from "@/lib/morale/player-morale-service";
 import { baueMarktMarketability } from "@/lib/marketing/marketing-markt";
 import { CANONICAL_NEGATIVE_TRAITS, CANONICAL_POSITIVE_TRAITS } from "@/lib/training/class-progression-config";
@@ -441,5 +442,63 @@ describe("Saisonwechsel: die Fanfarbe driftet, der Verlauf waechst", () => {
     expect(neu.regel).toBe("an");
     expect(neu.fanfarbe![TEAM_A]).toEqual(FANPROFILE[TEAM_A]!.farbeStart);
     mitEnv("aus", () => expect(marketingStempelFuerSaisonwechsel(gs, gs.season.id, "season-2").regel).toBe("aus"));
+  });
+});
+
+describe("Schere: Teammarke nach Finanzwert und Deckel der Team-Anteile", () => {
+  it("Teammarke ist umgekehrt gestaffelt (reich weniger, arm mehr), Liga 2 mehr als Liga 1, Ligamittel L1 3,0 / L2 5,0 C", () => {
+    expect(teammarkeAusRang(1, 1, 16)).toBeLessThan(teammarkeAusRang(1, 16, 16));
+    expect(teammarkeAusRang(2, 1, 16)).toBeLessThan(teammarkeAusRang(2, 16, 16));
+    for (const liga of [1, 2] as const) {
+      const werte = Array.from({ length: 16 }, (_, i) => teammarkeAusRang(liga, i + 1, 16));
+      expect(Math.min(...werte)).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...werte)).toBeLessThanOrEqual(9);
+    }
+    const mittel = (l: number[]) => l.reduce((a, b) => a + b, 0) / l.length;
+    expect(mittel(Array.from({ length: 16 }, (_, i) => teammarkeAusRang(1, i + 1, 16)))).toBeCloseTo(3.0, 0);
+    expect(mittel(Array.from({ length: 16 }, (_, i) => teammarkeAusRang(2, i + 1, 16)))).toBeCloseTo(5.0, 0);
+    // Ein Kreis mit 32 Teams (ohne Liga-Split) wird auf dieselbe Spanne normiert.
+    expect(teammarkeAusRang(1, 32, 32)).toBeCloseTo(teammarkeAusRang(1, 16, 16), 5);
+  });
+
+  it("der Deckel kuerzt die Team-Anteile auf die Summe und gibt den Rest als Spieler-Anteil (Moral) weiter", () => {
+    const { mit } = fixture();
+    const vorher = marketingTeamUebersicht(mit, TEAM_A);
+    const konfig = MARKETING_KONFIG as unknown as { teamAnteileDeckel: number };
+    const alt = konfig.teamAnteileDeckel;
+    try {
+      konfig.teamAnteileDeckel = Math.max(0.1, vorher.teamAnteile / 2);
+      leereMarketingCache();
+      const nachher = marketingTeamUebersicht({ ...mit }, TEAM_A);
+      expect(nachher.deckelGreift).toBe(true);
+      expect(nachher.teamAnteile).toBeCloseTo(konfig.teamAnteileDeckel, 6);
+      expect(nachher.werbegeld).toBeCloseTo(vorher.werbegeld, 9);
+      expect(nachher.spielerAnteile).toBeCloseTo(vorher.spielerAnteile + (vorher.teamAnteile - nachher.teamAnteile), 6);
+      for (const z of nachher.zeilen) expect(z.ergebnis.ansTeam + z.ergebnis.anIhn).toBeCloseTo(z.ergebnis.werbegeld, 9);
+    } finally {
+      konfig.teamAnteileDeckel = alt;
+      leereMarketingCache();
+    }
+  });
+});
+
+describe("Dauer-Cache: einmal je Saison und Kaderstand", () => {
+  it("ein neues GameState-Objekt mit gleichem Kader trifft den Cache (gleiches Objekt), ein Kaderwechsel rechnet neu", () => {
+    const { mit } = fixture();
+    leereMarketingCache();
+    const a = marketingTeamUebersicht(mit, TEAM_A);
+    const b = marketingTeamUebersicht({ ...mit, teams: [...mit.teams] }, TEAM_A);
+    expect(b).toBe(a);
+    // Gebuchte Spieltage veraendern den Schluessel nicht.
+    const gebucht = bucheSpieltagFinanzen(mit, mit.season.matchdayIds[0]!);
+    expect(marketingCacheSchluessel(gebucht, TEAM_A)).toBe(marketingCacheSchluessel(mit, TEAM_A));
+    expect(marketingTeamUebersicht(gebucht, TEAM_A)).toBe(a);
+    // Verkauf eines Spielers: neuer Schluessel, neue Rechnung.
+    const ohneEinen: GameState = { ...mit, rosters: mit.rosters.filter((r) => !(r.teamId === TEAM_A && r.playerId === a.zeilen[0]!.playerId)) };
+    expect(marketingCacheSchluessel(ohneEinen, TEAM_A)).not.toBe(marketingCacheSchluessel(mit, TEAM_A));
+    expect(marketingTeamUebersicht(ohneEinen, TEAM_A)).not.toBe(a);
+    // Klausel-Aenderung ebenso.
+    const klausel: GameState = { ...mit, rosters: mit.rosters.map((r) => (r.teamId === TEAM_A && r.playerId === a.zeilen[0]!.playerId ? { ...r, marketingKlausel: 1 as const } : r)) };
+    expect(marketingCacheSchluessel(klausel, TEAM_A)).not.toBe(marketingCacheSchluessel(mit, TEAM_A));
   });
 });

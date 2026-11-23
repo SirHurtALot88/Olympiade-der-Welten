@@ -1,4 +1,5 @@
-import { marketingSpielerFuer } from "@/lib/marketing/marketing-kontext";
+// Zyklus mit marketing-team (das den Moral-Dienst fuer `moralOhneWerbung` liest) ist gewollt: beide nutzen die Funktionen erst zur Laufzeit.
+import { marketingMoralZuschlag } from "@/lib/marketing/marketing-team";
 import { marketingAktiv } from "@/lib/marketing/marketing-regel";
 import type {
   GameState,
@@ -1085,10 +1086,10 @@ function computePlayerMorale(input: {
   // Zuschlag NACH der Streckung (gezeigt = gebucht: die Zeile traegt genau diese Punkte). Der Team-Anteil rechnet mit der Moral VOR
   // dem Zuschlag (`morale` hier), sonst zoege sich der Wert selbst hoch. Im `moralOhneWerbung`-Lauf entfaellt der Zuschlag ganz.
   if (!ohneWerbungLauf && marketingAktiv(gameState)) {
-    const werbung = marketingSpielerFuer(gameState, team.teamId, player, rosterEntry, morale);
-    if (werbung.moralZuschlag !== 0) {
-      morale = roundValue(clamp(morale + werbung.moralZuschlag, 0, 100));
-      addReason(reasons, "marketing_werbevertraege", "Werbeverträge", werbung.moralZuschlag, "marketing");
+    const zuschlag = marketingMoralZuschlag(gameState, team.teamId, player.id);
+    if (zuschlag !== 0) {
+      morale = roundValue(clamp(morale + zuschlag, 0, 100));
+      addReason(reasons, "marketing_werbevertraege", "Werbeverträge", zuschlag, "marketing");
     }
   }
   const visibleMood = getVisibleMood(morale);

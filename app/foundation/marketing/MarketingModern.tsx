@@ -207,7 +207,6 @@ function KaderTabelle({
                 <i className="mk-kl" />
                 {z.className} · {z.race}
                 {z.istGesicht ? <Marke text="GESICHT" art="neu" /> : null}
-                {z.ergebnis.verletztHalb ? <Marke text="VERLETZT" art="ne" /> : null}
               </small>
             </span>
             <ReichweiteBalken z={z} />
@@ -251,8 +250,8 @@ function Karten({ u, gesicht }: { u: ReturnType<typeof marketingTeamUebersicht>;
         <dl>
           <div><dt>Werbegeld im Kader</dt><dd className="bc-t">{C1(u.werbegeld)}</dd></div>
           <div><dt>an die Spieler (Moral)</dt><dd className="bc-t">{C1(u.spielerAnteile)}</dd></div>
-          <div><dt>Team-Anteile</dt><dd className="bc-t">{C1(u.teamAnteile)} <small>({u.mittlererAnteilProzent} %)</small></dd></div>
-          <div><dt>Teammarke (Sockel)</dt><dd className="bc-t">{C1(u.teammarke)}</dd></div>
+          <div><dt>Team-Anteile{u.deckelGreift ? " (Deckel 12 C)" : ""}</dt><dd className="bc-t">{C1(u.teamAnteile)} <small>({u.mittlererAnteilProzent} %)</small></dd></div>
+          <div><dt>Teammarke (nach Budget-Rang)</dt><dd className="bc-t">{C1(u.teammarke)}</dd></div>
           <div className="is-su"><dt>in der Kasse je Saison</dt><dd className="bc-t">{C1(u.ansKasse)}</dd></div>
         </dl>
       </section>
@@ -279,7 +278,7 @@ function Karten({ u, gesicht }: { u: ReturnType<typeof marketingTeamUebersicht>;
           <div><dt>Klausel · Laufzeit</dt><dd className="bc-t">±10 · ±5</dd></div>
           <div><dt>Moral · Gesicht</dt><dd className="bc-t">±5 · +8</dd></div>
           <div><dt>Teamerfolg</dt><dd className="bc-t">{vz(u.erfolg.punkte)} <small>{u.erfolg.grund}</small></dd></div>
-          <div className="is-su"><dt>Grenzen · Netz</dt><dd className="bc-t">15 bis 65 % · höchstens 25 % vom Gehalt</dd></div>
+          <div className="is-su"><dt>Grenzen · Netz · Deckel</dt><dd className="bc-t">15 bis 65 % · 25 % vom Gehalt · 12 C je Team</dd></div>
         </dl>
       </section>
     </div>
@@ -389,7 +388,7 @@ function KontextSpieler({ z, u }: { z: MarketingKaderZeile | null; u: ReturnType
         <div className="mk-zl"><span>ans Team{e.netzGreift ? " (Sicherheitsnetz: höchstens 25 % des Gehalts)" : ""}</span><b className="bc-t">{C1(e.ansTeam)}</b></div>
         <div className="mk-zl"><span>an ihn: seine Werbeverträge</span><b className="bc-t">{C1(e.anIhn)}</b></div>
         <div className="mk-zl"><span>Moral aus den Werbeverträgen</span><b className="bc-t">{e.moralZuschlag > 0 ? <><BcMoralGesicht wert={Math.min(100, (z.moralOhne ?? 50) + e.moralZuschlag)} groesse={16} /> +{e.moralZuschlag}</> : "±0"}</b></div>
-        <p className="mk-klein">Verletzte zählen zur Hälfte. Der Teamerfolg der Vorsaison gilt für alle Spieler des Teams ({u.erfolg.grund}).</p>
+        <p className="mk-klein">Team-Anteile und Moral gelten je Saison und Kaderstand; je Spieltag wird ein Zwanzigstel gebucht. Der Teamerfolg der Vorsaison gilt für alle Spieler des Teams ({u.erfolg.grund}).</p>
       </div>
     </div>
   );
