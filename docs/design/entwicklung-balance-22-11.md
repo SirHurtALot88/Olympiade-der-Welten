@@ -439,3 +439,88 @@ im selben Lauf bis −12,7; die Prognose bleibt eine ruhige Erwartung, keine Hoc
 `OLY_TRAINING_JE_SPIELTAG=aus` ist nur im Test geprüft (`tests/entwicklung-review-22-11.test.ts`), nicht über Saisons gemessen.
 
 Tests: `tests/entwicklung-review-22-11.test.ts` (Fix 1 bis 5, 7, 9, Diligent-Neigung), ergänzt `tests/entwicklung-je-spieltag.test.ts` (negativer Schwung, Ligafaktor mit Schritt, `verteileLeistung` je Einsatz).
+
+
+## 9. Verteilung 10/20/40/20/10 (Chris 23.11.)
+
+Chris, 23.11., wörtlich: „beim training würde ich sagen kannst du ca. 10 % deutlich besser machen und 20 % etwas besser, dann 20 % etwas schlechter und 10 % deutlich schlechter,
+damit Training sich entsprechend auswirkt — ein Spieler muss ja nach ein paar Seasons wirklich mal spürbar besser werden.“ Dazu (Nachtrag): die obersten 3–5 % sollen in einer Saison
+über **+6** Gesamtwert gewinnen, die untersten 3–5 % unter **−6** verlieren; Liga-Mittel bleibt −1 bis +1, die ±6-Ränder sind Teilmenge der „deutlich“-Bänder.
+
+### 9.1 Maß und Schwellen
+
+Gemessen wird die Änderung des **Gesamtwerts** (OVR der Trainingsseite und der Entwicklungs-Tafel im Profil, `computeCurrentAbilityScore(coreStats)`, „Gesamt 45,0 / Potenzial 58,5“), je Spieler und Saison, über
+alle Kaderspieler beider Ligen (32 KI-Teams von Anfang an). Schwellen der PM unverändert: deutlich ≥ +3,0, etwas +1,0 bis +3,0, gleich −1,0 bis +1,0, etwas −1,0 bis −3,0, deutlich ≤ −3,0.
+**Die Skala ist nicht absurd, aber sehr viel größer als die Netto-Summe der Runde 2:** der Gesamtwert ändert sich je Saison um rund **0,14 × Netto-Summe der zwölf Attribute** (Messung: Steigung 0,14 bis 0,15, Korrelation 0,93 bis 0,98).
++3 Gesamtwert sind also etwa +21 Netto-Summe (gut 1,7 je Attribut), +6 etwa +42. Die Runde 2 (Stempel „neu“, Abschnitt 8) lag bei diesem Maß in der Saison 1 bei **0,6 / 6,0 / 81,2 / 12,2 / 0,0 %** (deutlich besser /
+etwas besser / gleich / etwas schlechter / deutlich schlechter; Saat 1, 335 Spieler, Mittel −0,12; Saison 2: Mittel 0,00, p99 +2,8) — „Training spürbar“ im Sinne von Chris war das nicht. Die Schwellen bleiben, die Raten wachsen.
+
+### 9.2 Die Regel „neu2“
+
+Stempel `seasonState.entwicklungsRegel = { seasonId, regel: "neu2" }` (`lib/resolve/entwicklung-regel.ts`): neues Spiel ab Saison 1, bestehender Spielstand ab dem nächsten Saisonwechsel (die laufende Saison rechnet zu Ende wie gestempelt,
+„alt“ oder „neu“). Rückweg `OLY_ENTWICKLUNG=neu` (Fassung vom 22.11., neue Saisons) oder `alt`; `OLY_TRAINING_JE_SPIELTAG=aus` setzt wie bisher „alt“. `entwicklungNeuFuer` ist für „neu“ und „neu2“ wahr
+(Form der Runde 2 bleibt: Delta = T + L − A je Spieltag, 60/40, Diligent 75/25, Ligafaktor, Matrix nur gelesen, kein positiver Deckel, Verletzte kein T/L/A); `entwicklungVerteilungFuer` nur für „neu2“.
+
+Was „neu2“ ändert (`ENTWICKLUNGS_PARAMETER_NEU2`, `lib/training/entwicklung-neu.ts`; Parameter je Saison über `entwicklungsParameterFuer(gameState)`):
+
+| Schraube | „neu“ (22.11.) | „neu2“ | Wirkung |
+|---|---:|---:|---|
+| Tempo `ENTWICKLUNGS_TEMPO_NEU2` auf `trainingsSkala`, `leistungsSkala`, `abbauSkala`, `schwungSumme` | 1 | 3,9 | alle Raten wachsen gemeinsam, 60/40 und Gleichgewicht bleiben |
+| `trainingsSkala` zusätzlich | 0,6 | × 1,25 | Training wiegt stärker („spürbar“) |
+| `abbauMarktwertSkala` | 1,437 | 1,0 | teure Spieler geben nicht allein durch den Abbau den halben negativen Rand ab |
+| `schwungStaerke` / `schwungMax` | 3,3 / 3 | 2,4 / 2 | kürzerer positiver Rand (ein Ausreißer zog die Mitte ab) |
+| `schwungMaxNegativ` / `negativSaisonGrenze` | 0,8 / 10 | 1,5 / 60 | tieferer negativer Rand (schwache Leistung über die Saison kostet spürbar) |
+
+**Trainingsgüte** (`lib/training/trainings-guete.ts`, `trainings-guete-spieler.ts`): ein Faktor auf das Trainingsbudget je Trainingstag (0,35 bis 1,9) und ein Abbau-Aufschlag, aus Ursachen, die der Manager beeinflusst, plus einer festen Saisonkomponente:
+
+- **Passung der Intensität** gegen den Wunsch des Spielers (`resolvePreferredTrainingMode`): erfüllt +0,20, eine Stufe daneben −0,15, zwei Stufen −0,35;
+- **Belastung** (`player.fatigue`): ab 50 −0,15, ab 80 −0,40, im Modus „hart“ ×1,5, im Modus „leicht“ keine; kostet zusätzlich Abbau (Aufschlag = Betrag × 1,0);
+- **Entfaltung** ±0,5, fest je Spieler und Saison aus FNV-Hash von Id und Saison (kein Würfel je Spieltag, Buchung = Vorschau = Heatmap). Das ist die „mäßige Zufallsschwankung“; sie ist klein gegen die Ursachen unten.
+
+Weiter im Budget wie bisher: Vorlieben (Liebling × 1,3, ungeliebt × 0,5), Fokus (0,5 bis 1,5), Potenzial-Beschleuniger, Trait Diligent, Ertragskurve zur Decke (Potenzial bremst nahe der Decke). **Gezeigt = gebucht:**
+`berechneSpieltagsZuwachs` rechnet die Güte (`guete` im Ergebnis, Faktor im `budgetFaktor`, Abbau-Aufschlag im gebuchten Abbau), Buchung, Vorschau, Heatmap und Prognose (`buildOrganicSeasonProgression`) nutzen dieselbe Funktion bzw. denselben Faktor.
+Die Anzeige selbst ist unverändert (nur die Zahlen sind größer), deshalb keine neue Aufnahme.
+
+### 9.3 Messung
+
+Werkzeug `scripts/miss-entwicklung.ts` (neu: Gesamtwert je Spieler und Saison `ca0`/`ca1`/`dCa`, Bänder, Anteile über +6 / unter −6, Korrelationen, Ursachen-Felder; `OLY_GUETE_PARAMS` für die Güte-Eichung), 32 KI-Teams von Anfang an, drei Saisons,
+**zwei getrennt angelegte Spiele (Saaten)**, Endstand der Parameter oben.
+
+**Tabelle 10: Bänder je Saison** (Gesamtwert-Änderung, % der Spieler; Soll 10 / 20 / 40 / 20 / 10 je ±3 Punkte, > +6 und < −6 je 3–5 %, Liga-Mittel −1 bis +1)
+
+| Saat | Saison | Spieler | Mittel | deutlich besser % | etwas besser % | gleich % | etwas schlechter % | deutlich schlechter % | > +6 % | < -6 % | min | max | Korr. Training Z | Korr. Leistung P | Korr. Abbau A |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 1 | 317 | -0.07 | 12.0 | 13.2 | 40.7 | 20.5 | 13.6 | 4.4 | 4.4 | -11.1 | 17.8 | 0.69 | 0.80 | -0.18 |
+| 1 | 2 | 305 | +0.38 | 12.5 | 14.4 | 43.9 | 18.7 | 10.5 | 6.6 | 2.6 | -9.2 | 22.1 | 0.53 | 0.89 | 0.18 |
+| 1 | 3 | 291 | +0.13 | 10.3 | 14.4 | 48.8 | 16.8 | 9.6 | 4.1 | 2.1 | -7.0 | 14.4 | 0.60 | 0.80 | 0.07 |
+| 2 | 1 | 309 | +0.06 | 13.6 | 15.5 | 39.2 | 17.1 | 14.6 | 6.2 | 3.6 | -9.5 | 14.7 | 0.68 | 0.82 | -0.25 |
+| 2 | 2 | 302 | +0.39 | 13.6 | 15.9 | 44.4 | 17.6 | 8.6 | 6.6 | 3.6 | -12.1 | 20.8 | 0.63 | 0.84 | -0.07 |
+| 2 | 3 | 294 | +0.11 | 10.2 | 14.3 | 45.9 | 23.1 | 6.5 | 3.7 | 0.7 | -7.1 | 19.7 | 0.69 | 0.75 | 0.02 |
+
+Gemittelt über die sechs Zeilen: deutlich besser **12,0 %** (Soll 10), etwas besser **14,6 %** (20), gleich **43,8 %** (40), etwas schlechter **18,9 %** (20), deutlich schlechter **10,6 %** (10), über +6 **5,3 %**, unter −6 **2,8 %**;
+Liga-Mittel −0,07 bis +0,39, kein Abdriften über die Saisons. **Ehrlich offen:** „etwas besser“ liegt mit 13 bis 16 % unter dem Soll (17 bis 23), „gleich“ in Saison 2 und 3 bei 44 bis 49 % über dem Soll (37 bis 43), deutlich schlechter schwankt zwischen
+6,5 und 14,6 % (Saatenrauschen etwa ±3 Punkte), über +6 liegt mit 6,2 bis 6,6 % in drei Zeilen knapp über 5 %. Stellschrauben dafür: das Ziel des Ligafaktors (Mittel leicht anheben holt „gleich“ nach „etwas besser“), `schwungStaerke`
+(über +6), `schwungMaxNegativ`/`negativSaisonGrenze` (deutlich schlechter).
+
+**Drei Saisons** (Spieler, die in allen drei Saisons im Kader standen; n = 585): Änderung Mittel **+0,3**, p5 −10,6, p25 −3,8, Median −0,3, p75 +3,3, p90 +9,6, p95 +13,4, kleinster Wert −21,2, größter +33,2.
+**Gut trainiert** (oberes Drittel Training, höchstens 2 Ausfalltage, Leistung nicht stark negativ; n = 108): im Mittel **+8,0**, typisch +3,5 bis +11,4, 55 % über +6, keiner unter −6. **Schlecht** (unteres Drittel Training mit negativer Leistung, oder
+mindestens 6 Ausfalltage; n = 153): im Mittel **−5,2**, typisch −8,7 bis −1,6, 35 % unter −6. Das trifft die Vorgabe „gut trainiert typisch +6 bis +12, überlastet/verletzt/schlecht spielend deutlich schlechter“.
+
+**Ursachen, kein Würfel** (Korrelation der Saisonänderung mit …): gebuchtes Training 0,53 bis 0,69, Leistung 0,75 bis 0,89, Abbau −0,25 bis +0,18, Ausfalltage −0,15 (3 Saisons), Start-Gesamt −0,16. Die Spieler über +6 (n = 96 Spielersaisons): Training 33,8 (Schnitt
+aller 18,1), Leistung +45,1 (Schnitt −2,1), 32 % harter Modus (16 %), 31 % Lieblings-Disziplin (25 %), 23 % Diligent (16 %), 0,4 Ausfalltage (0,5). Die Spieler unter −6 (n = 52): Training 9,0, Leistung −42,0, Abbau 19,3, 17,2 Einsätze (14,7),
+1,1 Ausfalltage, 8 % harter Modus, nur 4 % Diligent, hoher Start-Gesamt (49,8 gegen 43,2: wer oben steht und schlecht spielt, fällt tief). Wer die Saison hoch gewinnt, hat also gut trainiert (Intensität, Ziel, Lieblings-Disziplin, Fokus) **und** über dem Median gespielt; wer tief fällt, hat schlecht gespielt, wenig
+bekommen und mehr abgebaut.
+
+Beispiele (3 Saisons, Gesamt am Anfang → Ende): `player-0948-cheeseburger` 39,8 → 73,0 (+33,2; Training 28,4/Saison, Leistung +62,5, 53 % harter Modus, 1 Ausfalltag), `player-2832-virethra` 52,7 → 81,3 (+28,6), `player-1825-eike` 45,0 → 73,1 (+28,1; Liebling 28 %),
+`player-2592-noctra-corviscourge` 59,2 → 82,0 (+22,8), `player-0540-auza` 54,6 → 76,9 (+22,3; Diligent). Unten: `player-2507-lunara` 58,4 → 37,2 (−21,2; Training 9,9, Leistung −40,3), `player-1944-tzeentch` 56,6 → 35,7 (−20,9; Leistung −53,3, 5 Ausfalltage),
+`player-2589-gyford-driftwood` 60,8 → 42,6 (−18,2), `player-0992-frostveil` 60,9 → 43,7 (−17,2; 4 Ausfalltage), `player-2211-kranha` 59,9 → 43,6 (−16,3).
+
+**Eichungsläufe davor** (je eine Saison, andere Saaten): Tempo 3,5 ohne Nachstellen: 7,7 / 12,2 / 49,4 / 14,1 / 16,7 % (negativer Rand zu schwer, Kern zu schmal); Training × 1,25, Schwung negativ 0,5: 7,3 / 15,0 / 32,2 / 28,0 / 17,5 % (Median −0,6, ein Ausreißer +26);
+dazu Marktwertabbau 1,0 und kürzerer positiver Schwung (Tempo 3,5): 12,7 / 16,6 / 39,8 / 23,3 / 7,6 %, aber unter −6 nur 0,3 %. Ein vollständiger Dreisaison-Lauf mit den Zwischenwerten (Tempo 3,5, negativer Schwung 0,9 / Grenze 40, Güte schwächer) gab über sechs Zeilen im Mittel
+10,7 / 15,8 / 44,3 / 20,1 / 9,2 %, über +6 4,6 %, unter −6 nur 1,1 % — die Untergrenze −6 verlangte den tieferen negativen Rand der Endfassung.
+
+### 9.4 Tests und Prüfung
+
+`tests/entwicklung-verteilung-23-11.test.ts` (Parameter, Güte: Wunsch, Belastung, Entfaltung fest je Spieler und Saison, Grenzen; Güte nur bei „neu2“, im Budget und im Abbau; „neu2“ trainiert je Spieltag mehr als „neu“), ergänzt
+`tests/entwicklung-regel.test.ts` und `tests/entwicklung-review-22-11.test.ts` (Standard-Stempel „neu2“, „neu“ als Rückweg). Wertungs-Fingerabdruck unverändert `GESAMT fe1dc086d68d` (Entwicklung ist keine Arena-Wertung). Nicht gemessen: Rotation von Menschen,
+Bank-Messfall und Wirkung von Ausrüstung auf die Güte; Menschen, die gezielter trainieren als die KI, liegen im Mittel leicht darüber.

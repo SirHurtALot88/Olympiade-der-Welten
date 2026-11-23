@@ -14,6 +14,8 @@
  * `setzeEntwicklungsParameterFuerMessung` (`scripts/miss-entwicklung.ts`); die Umgebung wird im Spiel nie gelesen.
  */
 
+import { entwicklungVerteilungFuer, type EntwicklungsRegelQuelle } from "@/lib/resolve/entwicklung-regel";
+
 export type EntwicklungsParameter = {
   /** Gewichte Training / Leistung (Chris, 22.11.: 60 / 40) und fuer Spieler mit dem Merkmal Diligent (75 / 25). */
   gewichtTraining: number;
@@ -91,7 +93,36 @@ export const ENTWICKLUNGS_PARAMETER_STANDARD: EntwicklungsParameter = {
   fokusMinTage: 5,
 };
 
+/**
+ * VERTEILUNG 10/20/40/20/10 (Chris, 23.11.; Stempel "neu2", docs/design/entwicklung-balance-22-11.md Abschnitt 9).
+ *
+ * Gemessen wird die Aenderung des Gesamtwerts (OVR der Trainingsseite und des Profils, `computeCurrentAbilityScore`): sie liegt je Saison bei
+ * rund 0,14 x der Netto-Summe der zwoelf Attribute. Die Runde 2 (Stempel "neu") gab dort bei 81 % der Spieler eine Aenderung unter +-1; Chris will je Saison
+ * 10 % deutlich besser (>= +3), 20 % etwas besser, 40 % etwa gleich, 20 % etwas schlechter, 10 % deutlich schlechter. Die Form der Runde 2 bleibt
+ * (60 / 40, Schwung, Ligafaktor, Matrix nur gelesen); alle Raten wachsen um den Faktor `ENTWICKLUNGS_TEMPO_NEU2`, die Summengrenzen mit ihnen.
+ * Die Spreizung innerhalb der Liga kommt aus der Trainingsguete (`trainingsGuete`), nicht aus dem Zufall.
+ */
+export const ENTWICKLUNGS_TEMPO_NEU2 = 3.9;
+
+export const ENTWICKLUNGS_PARAMETER_NEU2: EntwicklungsParameter = {
+  ...ENTWICKLUNGS_PARAMETER_STANDARD,
+  // Training wiegt staerker als im reinen Tempo (x1,25): Training soll sich spuerbar auswirken (Chris, 23.11.); das Verhaeltnis 60 / 40 der Gewichte bleibt.
+  trainingsSkala: ENTWICKLUNGS_PARAMETER_STANDARD.trainingsSkala * ENTWICKLUNGS_TEMPO_NEU2 * 1.25,
+  leistungsSkala: ENTWICKLUNGS_PARAMETER_STANDARD.leistungsSkala * ENTWICKLUNGS_TEMPO_NEU2,
+  abbauSkala: ENTWICKLUNGS_PARAMETER_STANDARD.abbauSkala * ENTWICKLUNGS_TEMPO_NEU2,
+  // Teure Spieler geben weniger ab als im Stand 22.11. (Messung 23.11.: sonst bilden sie den halben negativen Rand allein durch den Abbau).
+  abbauMarktwertSkala: 1.0,
+  schwungSumme: ENTWICKLUNGS_PARAMETER_STANDARD.schwungSumme * ENTWICKLUNGS_TEMPO_NEU2,
+  // Schwung: die positiven Raender kuerzer (sonst zieht ein einzelner Ausreisser die Mitte der Liga ab), der negative Rand tiefer (Ueberlastete,
+  // Verletzte, Schwache sollen spuerbar absacken: Chris 23.11. ca. 10 % deutlich schlechter).
+  schwungStaerke: 2.4,
+  schwungMax: 2,
+  schwungMaxNegativ: 1.5,
+  negativSaisonGrenze: 60,
+};
+
 let parameterCache: EntwicklungsParameter | null = null;
+let parameterNeu2Cache: EntwicklungsParameter | null = null;
 let messUeberschreibung: Partial<EntwicklungsParameter> = {};
 
 /**
@@ -101,12 +132,20 @@ let messUeberschreibung: Partial<EntwicklungsParameter> = {};
 export function setzeEntwicklungsParameterFuerMessung(ueberschreibung: Partial<EntwicklungsParameter> | null): void {
   messUeberschreibung = ueberschreibung ?? {};
   parameterCache = null;
+  parameterNeu2Cache = null;
 }
 
 export function entwicklungsParameter(): EntwicklungsParameter {
   if (parameterCache) return parameterCache;
   parameterCache = { ...ENTWICKLUNGS_PARAMETER_STANDARD, ...messUeberschreibung };
   return parameterCache;
+}
+
+/** Die Parameter der Saison: Stempel "neu2" (Verteilung, 23.11.) rechnet mit `ENTWICKLUNGS_PARAMETER_NEU2`, "neu" mit dem Stand vom 22.11. */
+export function entwicklungsParameterFuer(gameState: EntwicklungsRegelQuelle): EntwicklungsParameter {
+  if (!entwicklungVerteilungFuer(gameState)) return entwicklungsParameter();
+  if (!parameterNeu2Cache) parameterNeu2Cache = { ...ENTWICKLUNGS_PARAMETER_NEU2, ...messUeberschreibung };
+  return parameterNeu2Cache;
 }
 
 /**

@@ -4385,7 +4385,7 @@ export type SeasonState = {
    * ENTWICKLUNGSREGEL DIESER SAISON (22.11., lib/resolve/entwicklung-regel.ts): "neu" (PP-Faktor auf das Training, Ertragskurve,
    * Verfall, mittelwertneutrale Potentialdrift) oder "alt". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel.
    */
-  entwicklungsRegel?: { seasonId: string; regel: "alt" | "neu" } | null;
+  entwicklungsRegel?: { seasonId: string; regel: "alt" | "neu" | "neu2" } | null;
   /**
    * TRAININGSVORLIEBEN DIESER SAISON (22.11., lib/resolve/trainings-vorlieben.ts): "v1" = zwei Lieblings-Disziplinen (Training x1,15, Moral +3) und eine
    * ungeliebte (x0,80, Moral -6) je Spieler gelten; "aus" = nichts davon. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison.

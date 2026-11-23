@@ -60,7 +60,9 @@ import { getTrainingSetpointsJeSpieltag } from "@/lib/training/training-mode-pre
 import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
 import { trainingsVorliebenAktivFuer } from "@/lib/resolve/trainings-vorlieben";
 import { TRAININGS_VORLIEBEN_AUSGLEICH, vorliebeArt, vorliebeFaktor, type VorliebeArt } from "@/lib/training/trainings-vorlieben";
-import { entwicklungsParameter, trainingsBudgetFaktor } from "@/lib/training/entwicklung-neu";
+import { entwicklungsParameterFuer, trainingsBudgetFaktor } from "@/lib/training/entwicklung-neu";
+import { trainingsGueteFuerSpieler } from "@/lib/training/trainings-guete-spieler";
+import type { TrainingsGuete } from "@/lib/training/trainings-guete";
 import { fokusDominanz, istDiligent, ligaAbbauFaktor } from "@/lib/training/entwicklung-tag";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
@@ -192,6 +194,8 @@ export type SpieltagsZuwachs = {
   budgetFaktor: number;
   /** Trainingsvorlieben (22.11.): Art der Ziel-Disziplin fuer diesen Spieler (1 Liebling, -1 ungeliebt, 0 neutral / Regel aus) und der Faktor, der im Budget steckt. */
   vorliebe: { art: VorliebeArt; faktor: number };
+  /** Trainingsguete (Stempel "neu2"): Passung, Belastung, Entfaltung; `null` bei "neu"/"alt". Der Faktor steckt schon in `budgetFaktor`, der Abbau-Aufschlag in `abbauFaktor`. */
+  guete: TrainingsGuete | null;
 };
 
 /** Warum ein Attribut weniger zulegt als sein Anteil am Budget hergibt. */
@@ -277,7 +281,7 @@ export function berechneSpieltagsZuwachs(input: {
     ? trainingsBudgetFaktor(
         istDiligent(input.player),
         fokusDominanz(verlauf, input.ziel.disziplinId, input.spieltagId ?? undefined),
-        entwicklungsParameter(),
+        entwicklungsParameterFuer(input.gameState),
       )
     : 1;
   // TRAININGSVORLIEBEN (22.11.): Lieblings-Disziplin x1,15, ungeliebte x0,80 auf dem Budget -- nur, wenn der Stempel der Saison "v1" sagt. Der Ausgleich
@@ -285,7 +289,9 @@ export function berechneSpieltagsZuwachs(input: {
   const vorlieben = trainingsVorliebenAktivFuer(input.gameState);
   const vorliebeKind: VorliebeArt = vorlieben ? vorliebeArt(input.player, input.ziel.disziplinId, input.gameState.season?.id ?? "") : 0;
   const vorliebeF = vorlieben ? vorliebeFaktor(vorliebeKind) : 1;
-  const budgetFaktor = budgetEntwicklung * vorliebeF * (vorlieben ? TRAININGS_VORLIEBEN_AUSGLEICH : 1);
+  // TRAININGSGUETE (neu2, 23.11.): Passung der Intensitaet zum Wunsch, Belastung, Entfaltung der Saison (`trainings-guete.ts`); `null` ausserhalb von "neu2".
+  const guete = entNeu ? trainingsGueteFuerSpieler(input.gameState, input.player, modus) : null;
+  const budgetFaktor = budgetEntwicklung * vorliebeF * (vorlieben ? TRAININGS_VORLIEBEN_AUSGLEICH : 1) * (guete?.faktor ?? 1);
   const ergebnis = buildOrganicSeasonProgression({
     gameState: input.gameState,
     player: input.player,
@@ -300,7 +306,7 @@ export function berechneSpieltagsZuwachs(input: {
   const abbau: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   const deckelJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   for (const zeile of ergebnis.attributeBreakdown) {
-    if (zeile.abbauTag > 0) abbau[zeile.attribute] = rund(zeile.abbauTag * abbauFaktor, 3);
+    if (zeile.abbauTag > 0) abbau[zeile.attribute] = rund(zeile.abbauTag * abbauFaktor * (guete?.abbauFaktor ?? 1), 3);
     deckelJeAttribut[zeile.attribute] = zeile.deckel;
   }
   const zuwachs: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
@@ -352,6 +358,7 @@ export function berechneSpieltagsZuwachs(input: {
     deckel: deckelJeAttribut,
     budgetFaktor: rund(budgetFaktor, 4),
     vorliebe: { art: vorliebeKind, faktor: rund(vorliebeF, 3) },
+    guete,
     budget: rund(ergebnis.trainingSetpoints, 4),
     zuwachs,
     nebeneffekt,

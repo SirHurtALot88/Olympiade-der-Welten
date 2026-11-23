@@ -19,7 +19,14 @@ import type { GameState, Player, PlayerGeneratorAttributeName, TrainingsSpieltag
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { officialDisciplineWeightTable, playerGeneratorAttributeKeys } from "@/lib/player-generator/official-discipline-weights";
 import { getLeagueOf } from "@/lib/season/league-split";
-import { ertragsFaktor, entwicklungsParameter, leistungsEinheit, leistungsFaktor, schwungFaktor } from "@/lib/training/entwicklung-neu";
+import {
+  ertragsFaktor,
+  entwicklungsParameter,
+  leistungsEinheit,
+  leistungsFaktor,
+  schwungFaktor,
+  type EntwicklungsParameter,
+} from "@/lib/training/entwicklung-neu";
 
 export type AttributWerte = Partial<Record<PlayerGeneratorAttributeName, number>>;
 
@@ -193,13 +200,15 @@ export function leistungFuerTag(input: {
   player: Player;
   verlauf: readonly VerlaufEintrag[] | undefined;
   einheiten?: Map<string, number>;
+  /** Parameter der Saison (`entwicklungsParameterFuer(gameState)`); ohne Angabe der Stand vom 22.11. */
+  parameter?: EntwicklungsParameter;
 }): AttributWerte {
   const roh = leistungsEinheitFuerTag(input.index, input.matchdayId, input.player.id);
   if (!roh) return {};
   if (input.einheiten) for (const [disziplinId, einheit] of roh.jeDisziplin) input.einheiten.set(disziplinId, einheit);
   if (roh.einheit === 0) return {};
-  const p = entwicklungsParameter();
-  const faktor = leistungsFaktor(istDiligent(input.player)) * schwungFaktor(nettoBisher(input.verlauf, input.matchdayId), roh.einheit);
+  const p = input.parameter ?? entwicklungsParameter();
+  const faktor = leistungsFaktor(istDiligent(input.player), p) * schwungFaktor(nettoBisher(input.verlauf, input.matchdayId), roh.einheit, p);
   const verteilt = verteileLeistung(roh.jeDisziplin, faktor);
   // Saisongrenze fuer den negativen Anteil: nur die negativen Attributteile dieses Tages zaehlen gegen den Rest der Grenze.
   let negativHeute = 0;
@@ -275,12 +284,15 @@ export function mittleresZJeEinsatz(erwartung: Player["leistungsErwartung"] | nu
  * (Einsaetze je Trainingstag) und dem Leistungsfaktor, nach Matrixgewicht der gespielten Disziplinen verteilt. Ohne Schwung (neutral).
  * `null` ohne Vorsaison-Daten (dann Erwartung 0).
  */
-export function leistungsErwartungJeTag(player: Pick<Player, "leistungsErwartung" | "traitsPositive">): AttributWerte | null {
+export function leistungsErwartungJeTag(
+  player: Pick<Player, "leistungsErwartung" | "traitsPositive">,
+  parameter: EntwicklungsParameter = entwicklungsParameter(),
+): AttributWerte | null {
   const e = player.leistungsErwartung;
   if (!e || e.tage <= 0) return null;
   const jeDisziplin = new Map<string, number>();
   for (const [disziplinId, z] of Object.entries(e.jeDisziplin)) jeDisziplin.set(disziplinId, z.summe / e.tage);
-  return verteileLeistung(jeDisziplin, leistungsFaktor(istDiligent(player)));
+  return verteileLeistung(jeDisziplin, leistungsFaktor(istDiligent(player), parameter));
 }
 
 const abbauFaktorCache = new WeakMap<object, Map<string, { seasonId: string; wert: number }>>();

@@ -67,9 +67,14 @@ einfach gut drauf, haben bessere Ausrüstung etc. Das MUSS sich ja sogar auswirk
 **Weitere Grundsätze vom 22.11.:** Ein Abgang durch Vertragsende ist ein **Verkauf** (ablösefrei) — Begriffe und Regeln
 nicht getrennt behandeln. Ligaregeln dürfen sich ändern (z. B. per Abstimmung der Teams), aber **nur befristet**
 (wenige Spieltage bis höchstens eine Saison) als Regel-Stempel im Spielstand, nie dauerhaft im Code. Ligaweite
-Ereignisse treffen **alle Teams gleich**. Ligaformat bleibt vorerst **2×16** (später potentiell 2×20). Entwicklung:
-wenige Spieler werden je Saison deutlich besser, wenige deutlich schlechter, die Masse kaum; Trainingspunkte und
-Leistung (PP) stehen in einem gesunden Verhältnis.
+Ereignisse treffen **alle Teams gleich**. Ligaformat bleibt vorerst **2×16** (später potentiell 2×20). Entwicklung
+(Chris, 23.11., ersetzt „wenige deutlich besser, die Masse kaum“): je Saison über alle Spieler mit Vertrag, gemessen als Änderung
+des Gesamtwerts (OVR): **ca. 10 % deutlich besser (≥ +3), 20 % etwas besser (+1 bis +3), 40 % etwa gleich (±1), 20 % etwas
+schlechter, 10 % deutlich schlechter (≤ −3)**, die obersten 3–5 % über +6, die untersten 3–5 % unter −6; Liga-Mittel bleibt
+−1 bis +1, ein gut trainierter Spieler ist nach drei Saisons spürbar besser. Aus Ursachen (Trainingsgüte, Belastung, Einsatz,
+Vorlieben, Potenzial), nicht aus dem Würfel; Stempel `entwicklungsRegel` Version „neu2“, Rückweg `OLY_ENTWICKLUNG=neu` (Stand
+22.11.) bzw. `alt`, Doku `docs/design/entwicklung-balance-22-11.md` Abschnitt 9. Trainingspunkte und Leistung (PP) stehen in
+einem gesunden Verhältnis (60/40).
 
 Das ist strenger, als es klingt — aber die Grenze liegt woanders, als der erste Anlauf
 vermutete, und der Unterschied entscheidet, wo man arbeitet.

@@ -12,6 +12,9 @@
  *
  *   "neu"   Entwicklung nach Chris' Vorgaben vom 22.11. (PP-Faktor auf das Training, Ertragskurve, Verfall, mittelwert-
  *           neutrale Potentialdrift)
+ *   "neu2"  Entwicklung mit Verteilung 10/20/40/20/10 (Chris, 23.11.): wie "neu", dazu eine Trainingsguete je Spieler (Passung der Intensitaet,
+ *           Vorlieben, Wunsch, Fokus, Belastung) und Entfaltung je Saison, die die Gesamtwert-Aenderung (OVR) spreizt
+ *           (docs/design/entwicklung-balance-22-11.md, Abschnitt "Verteilung 10/20/40/20/10")
  *   "alt"   Stand vor dem 22.11.
  *
  * BESTEHENDE SAVES: ohne Stempel (oder mit dem Stempel einer anderen Saison) gilt "alt"; die Lade-Migration
@@ -19,14 +22,15 @@
  * Saisonwechsel gilt der Schalter. Kein Prozesszustand: jeder Rechenweg liest den Stempel des Spielstands, den er rechnet.
  *
  * SCHALTER `OLY_ENTWICKLUNG` (nur Server, deploy/hetzner/docker-compose.yml):
- *   nicht gesetzt | "neu" | "an"   neue Saisons bekommen "neu" (Standard)
+ *   nicht gesetzt | "neu2" | "an" neue Saisons bekommen "neu2" (Standard, seit 23.11.)
+ *   "neu"                          Rueckweg auf die Fassung vom 22.11. (Runde 2 ohne Verteilung)
  *   "alt" | "aus" | "0"            Rueckweg: neue Saisons bekommen "alt"; gestempelte Saisons rechnen weiter wie gestempelt
  *   (`OLY_TRAINING_JE_SPIELTAG=aus` wirkt wie `OLY_ENTWICKLUNG=alt`, solange `OLY_ENTWICKLUNG` nicht gesetzt ist)
  * Nur Battle-Spielstaende bekommen einen Stempel; der Manager-Modus bleibt "alt".
  */
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
 
-export type EntwicklungsRegelVersion = "alt" | "neu";
+export type EntwicklungsRegelVersion = "alt" | "neu" | "neu2";
 
 export type EntwicklungsRegelStempel = { seasonId: string; regel: EntwicklungsRegelVersion };
 
@@ -34,7 +38,9 @@ function leseSchalter(wert: string | undefined): EntwicklungsRegelVersion | null
   const w = (wert ?? "").trim().toLowerCase();
   if (w === "") return null;
   if (w === "alt" || w === "aus" || w === "0" || w === "false" || w === "nein" || w === "off") return "alt";
-  return "neu";
+  // "neu" = die Fassung vom 22.11. (Rueckweg von "neu2" auf den Stand davor); alles andere (an, neu2, ...) = die aktuelle Fassung.
+  if (w === "neu" || w === "v2") return "neu";
+  return "neu2";
 }
 
 /**
@@ -45,7 +51,7 @@ function leseSchalter(wert: string | undefined): EntwicklungsRegelVersion | null
 export function entwicklungsRegelSchalter(): EntwicklungsRegelVersion {
   const ausdruecklich = leseSchalter(process.env.OLY_ENTWICKLUNG);
   if (ausdruecklich) return ausdruecklich;
-  return leseSchalter(process.env.OLY_TRAINING_JE_SPIELTAG) === "alt" ? "alt" : "neu";
+  return leseSchalter(process.env.OLY_TRAINING_JE_SPIELTAG) === "alt" ? "alt" : "neu2";
 }
 
 export type EntwicklungsRegelQuelle =
@@ -98,7 +104,13 @@ export function entwicklungsRegelFuer(gameState: EntwicklungsRegelQuelle): Entwi
   return stempel.regel;
 }
 
-/** Kurzform fuer die Rechenwege: gilt in dieser Saison die neue Entwicklungsregel? Ohne Spielstand: nein. */
+/** Kurzform fuer die Rechenwege: gilt in dieser Saison die neue Entwicklungsregel (je Spieltag, 60/40; "neu" und "neu2")? Ohne Spielstand: nein. */
 export function entwicklungNeuFuer(gameState: EntwicklungsRegelQuelle): boolean {
-  return entwicklungsRegelFuer(gameState) === "neu";
+  const regel = entwicklungsRegelFuer(gameState);
+  return regel === "neu" || regel === "neu2";
+}
+
+/** Gilt in dieser Saison die Verteilungs-Fassung (Chris, 23.11.: 10/20/40/20/10)? Nur bei Stempel "neu2". */
+export function entwicklungVerteilungFuer(gameState: EntwicklungsRegelQuelle): boolean {
+  return entwicklungsRegelFuer(gameState) === "neu2";
 }

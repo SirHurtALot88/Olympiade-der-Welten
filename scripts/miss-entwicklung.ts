@@ -34,10 +34,12 @@ import { applyPreSeasonNextSeasonSetupLightweight, buildPreSeasonNextSeasonSetup
 import { runLocalSeasonCompletion, SEASON_COMPLETION_CONFIRM_TOKEN } from "@/lib/season/season-completion-service";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { computeCurrentAbilityScore } from "@/lib/scouting/current-ability-score";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 import { ppAbstandFuerEinsatz, ppTagesIndex } from "@/lib/training/entwicklung-tag";
 import { buildOrganicSeasonProgression, buildProjectedSeasonTrainingAccumulatorOverrides } from "@/lib/training/organic-season-progression";
 import { setzeEntwicklungsParameterFuerMessung, type EntwicklungsParameter } from "@/lib/training/entwicklung-neu";
+import { setzeGueteParameterFuerMessung, type GueteParameter } from "@/lib/training/trainings-guete";
 
 // Messhebel: einzelne Parameter fuer diesen Lauf ueberschreiben (JSON in OLY_ENT_PARAMS). Das Spiel liest die Variable nie.
 if (process.env.OLY_ENT_PARAMS) {
@@ -45,6 +47,14 @@ if (process.env.OLY_ENT_PARAMS) {
     setzeEntwicklungsParameterFuerMessung(JSON.parse(process.env.OLY_ENT_PARAMS) as Partial<EntwicklungsParameter>);
   } catch {
     throw new Error("OLY_ENT_PARAMS ist kein gueltiges JSON");
+  }
+}
+
+if (process.env.OLY_GUETE_PARAMS) {
+  try {
+    setzeGueteParameterFuerMessung(JSON.parse(process.env.OLY_GUETE_PARAMS) as Partial<GueteParameter>);
+  } catch {
+    throw new Error("OLY_GUETE_PARAMS ist kein gueltiges JSON");
   }
 }
 
@@ -63,6 +73,9 @@ const log = (msg: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 const STARK = 8;
+// Gesamt (OVR) je Saison: deutlich >= +3,0, etwas +1,0..+3,0, gleich -1..+1 (PM 23.11.; ggf. in der Doku angepasst).
+const CA_DEUTLICH = Number(process.env.OLY_CA_DEUTLICH ?? 3);
+const CA_ETWAS = Number(process.env.OLY_CA_ETWAS ?? 1);
 const KAUM = 2;
 
 type Zeile = {
@@ -99,6 +112,14 @@ type Zeile = {
   sumPMinus: number;
   sumA: number;
   diligent: boolean;
+  /** Gesamt (OVR der Profil-/Trainingsseite = `computeCurrentAbilityScore(coreStats)`) zu Saisonstart und -ende, Aenderung. */
+  ca0: number | null;
+  ca1: number | null;
+  dCa: number | null;
+  /** Ursachen: Anteil harter Trainingstage, Anteil Lieblings-Disziplin (v=1), ungeliebt (v=-1), Anteil Tage mit Ziel. */
+  hartAnteil: number;
+  lieblingAnteil: number;
+  ungeliebtAnteil: number;
   /** Messfall Bank (`--bank`): zusaetzlich verpflichteter Spieler, der vorwiegend auf der Bank sitzt. */
   bank?: boolean;
   /** Je Spieltag der Saison (Reihenfolge `matchdayIds`): gebuchtes Training, Abbau und PP-Abstand zum Liga-Median (null = kein Einsatz) -- fuer die Offline-Eichung. */
@@ -122,6 +143,17 @@ function deckenSummen(gs: GameState): Record<string, number> {
     let s = 0;
     for (const a of PROGRESSION_ATTRIBUTE_ORDER) s += Number(c[a] ?? 0);
     out[rec.playerId] = s;
+  }
+  return out;
+}
+
+function caSnapshot(gs: GameState): Record<string, number> {
+  const out: Record<string, number> = {};
+  const ids = new Set(gs.rosters.map((r) => r.playerId));
+  for (const p of gs.players) {
+    if (!ids.has(p.id)) continue;
+    const v = computeCurrentAbilityScore(p.coreStats);
+    if (v != null) out[p.id] = v;
   }
   return out;
 }
@@ -227,7 +259,41 @@ function kennzahlen(zeilen: Zeile[]) {
   const medianPp = median(mitEinsatz);
   const stark = zeilen.filter((z) => z.netto >= STARK);
   const verdient = (z: Zeile) => medianPp != null && z.ppEinsatz != null && z.ppEinsatz > medianPp && z.halten;
+  const mitCa = zeilen.filter((z) => z.dCa != null);
+  const nc = Math.max(1, mitCa.length);
+  const caAnteil = (f: (d: number) => boolean) => r2((mitCa.filter((z) => f(z.dCa!)).length / nc) * 100);
+  const korr = (x: number[], y: number[]) => {
+    const m = x.length; if (m < 3) return 0;
+    const mx = x.reduce((a, b) => a + b, 0) / m, my = y.reduce((a, b) => a + b, 0) / m;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < m; i += 1) { sxy += (x[i]! - mx) * (y[i]! - my); sxx += (x[i]! - mx) ** 2; syy += (y[i]! - my) ** 2; }
+    return sxx > 0 && syy > 0 ? r2(sxy / Math.sqrt(sxx * syy)) : 0;
+  };
+  const caKz = {
+    caN: mitCa.length,
+    caMittel: r2(mitCa.reduce((a, z) => a + z.dCa!, 0) / nc),
+    caDeutlichBesserPct: caAnteil((d) => d >= CA_DEUTLICH),
+    caEtwasBesserPct: caAnteil((d) => d >= CA_ETWAS && d < CA_DEUTLICH),
+    caGleichPct: caAnteil((d) => d > -CA_ETWAS && d < CA_ETWAS),
+    caEtwasSchlechterPct: caAnteil((d) => d <= -CA_ETWAS && d > -CA_DEUTLICH),
+    caDeutlichSchlechterPct: caAnteil((d) => d <= -CA_DEUTLICH),
+    caUeber6Pct: caAnteil((d) => d > 6),
+    caUnter6Pct: caAnteil((d) => d < -6),
+    caMin: r2(Math.min(0, ...mitCa.map((z) => z.dCa!))),
+    caMax: r2(Math.max(0, ...mitCa.map((z) => z.dCa!))),
+    caKorrTraining: korr(mitCa.map((z) => z.sumZ), mitCa.map((z) => z.dCa!)),
+    caKorrLieblingAnteil: korr(mitCa.map((z) => z.lieblingAnteil), mitCa.map((z) => z.dCa!)),
+    caKorrAbbau: korr(mitCa.map((z) => z.sumA), mitCa.map((z) => z.dCa!)),
+    caKorrLeistung: korr(mitCa.map((z) => z.sumP), mitCa.map((z) => z.dCa!)),
+    caKorrStart: korr(mitCa.map((z) => z.ca0!), mitCa.map((z) => z.dCa!)),
+    caUeber6TrainingMittel: r2(mitCa.filter((z) => z.dCa! > 6).reduce((a, z) => a + z.sumZ, 0) / Math.max(1, mitCa.filter((z) => z.dCa! > 6).length)),
+    caUeber6LeistungMittel: r2(mitCa.filter((z) => z.dCa! > 6).reduce((a, z) => a + z.sumP, 0) / Math.max(1, mitCa.filter((z) => z.dCa! > 6).length)),
+    caUnter6AbbauMittel: r2(mitCa.filter((z) => z.dCa! < -6).reduce((a, z) => a + z.sumA, 0) / Math.max(1, mitCa.filter((z) => z.dCa! < -6).length)),
+    caUnter6LeistungMittel: r2(mitCa.filter((z) => z.dCa! < -6).reduce((a, z) => a + z.sumP, 0) / Math.max(1, mitCa.filter((z) => z.dCa! < -6).length)),
+    caUnter6AusfallMittel: r2(mitCa.filter((z) => z.dCa! < -6).reduce((a, z) => a + z.ausfall, 0) / Math.max(1, mitCa.filter((z) => z.dCa! < -6).length)),
+  };
   return {
+    ...caKz,
     spieler: n,
     mittel: r2(zeilen.reduce((a, z) => a + z.netto, 0) / Math.max(1, n)),
     p1: r2(perzentil(zeilen.map((z) => z.netto), 0.01)),
@@ -345,6 +411,7 @@ async function main() {
   for (let k = 0; k < SAISONS; k += 1) {
     const sid = get().gameState.season.id;
     let start: Record<string, number>;
+    const caStartMap = caSnapshot(get().gameState);
     if (flag("nur-abschluss") && START_JSON) start = JSON.parse(fs.readFileSync(START_JSON, "utf8")) as Record<string, number>;
     else {
       start = startSnapshot(get().gameState);
@@ -382,12 +449,13 @@ async function main() {
       if (flag("stop-vor-abschluss")) { log("Stop vor Abschluss (SQLite bleibt)"); return; }
     }
     const regelArg = arg("regel", "");
-    if (regelArg === "neu" || regelArg === "alt") {
+    if (regelArg === "neu" || regelArg === "alt" || regelArg === "neu2") {
       // Messhebel: Stempel der laufenden Saison setzen (ein vor dem 22.11. angelegter Stand traegt "alt").
       const gs0 = get().gameState;
       persistence.saveSingleplayerState(saveId, { ...gs0, seasonState: { ...gs0.seasonState, entwicklungsRegel: { seasonId: sid, regel: regelArg } } });
     }
     const vor = get().gameState;
+    const caStart = caStartMap;
     const daten = leistungsDaten(vor);
     const vorSumme = startSnapshot(vor);
     const tagesIndex = ppTagesIndex(vor);
@@ -435,6 +503,7 @@ async function main() {
       }
     }
     const nachSumme = startSnapshot(get().gameState);
+    const caEnde = caSnapshot(get().gameState);
     const deckeNach = deckenSummen(get().gameState);
     const potNach = potWerte(get().gameState);
     const zeilen: Zeile[] = [];
@@ -464,6 +533,17 @@ async function main() {
         potDelta: potVor[id] != null && potNach[id] != null ? r2(potNach[id]! - potVor[id]!) : null,
         sumZ: r2(v?.training ?? 0), sumP: r2(v?.p ?? 0), sumPPlus: r2(v?.pPlus ?? 0), sumPMinus: r2(v?.pMinus ?? 0), sumA: r2(v?.a ?? 0),
         bank: bankIds.has(id),
+        ca0: caStart[id] ?? null, ca1: caEnde[id] ?? null,
+        dCa: caStart[id] != null && caEnde[id] != null ? r2(caEnde[id]! - caStart[id]!) : null,
+        ...(() => {
+          const ev = (vor.players.find((p) => p.id === id)?.seasonTrainingAccumulator?.verlauf ?? []).filter((e) => e.s === "t");
+          const mitZiel = ev.filter((e) => e.d).length || 1;
+          return {
+            hartAnteil: r2(ev.filter((e) => e.i === "hart").length / Math.max(1, ev.length)),
+            lieblingAnteil: r2(ev.filter((e) => e.v === 1).length / mitZiel),
+            ungeliebtAnteil: r2(ev.filter((e) => e.v === -1).length / mitZiel),
+          };
+        })(),
         diligent: Boolean(vor.players.find((p) => p.id === id)?.traitsPositive?.some((t) => String(t).toLowerCase() === "diligent")),
         ...(flag("tage")
           ? (() => {
