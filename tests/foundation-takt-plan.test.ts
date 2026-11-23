@@ -116,3 +116,21 @@ describe("Ablauf-Speicher", () => {
     expect(hoerer).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("Sponsorwahl offen vor Spieltag 1 (23.11.)", () => {
+  it("zeigt den optionalen Sponsor-Schritt gelb, ohne den Spieltag zu sperren", () => {
+    const plan = baueTaktPlan({
+      steps: [
+        schritt("choose_sponsor", "optional", { optional: true, warnings: ["sponsor_choice_open_before_matchday_1"] }),
+        schritt("set_lineup", "ready"),
+      ],
+      currentStepId: "set_lineup",
+      formatGrund: (g) => g,
+      sprungZuSchritt: () => () => undefined,
+      inbox: [],
+    });
+    const eintrag = plan.schritte.find((s) => s.id === "schritt:choose_sponsor");
+    expect(eintrag?.status).toBe("gelb");
+    expect(plan.kritisch).toHaveLength(0);
+  });
+});

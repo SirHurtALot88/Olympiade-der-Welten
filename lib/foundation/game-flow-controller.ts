@@ -15,6 +15,8 @@ import {
 import { getTeamBoardFlowSignals } from "@/lib/board/team-season-objectives-service";
 import { FACILITY_CATALOG } from "@/lib/facilities/facility-catalog";
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
+import { isBereichDelegiert } from "@/lib/foundation/team-delegation";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 import { findPlayersWithoutTrainingMode, isTeamTrainingComplete } from "@/lib/foundation/team-training-status";
@@ -708,7 +710,12 @@ function buildMatchdaySteps(gameState: GameState, activeTeamId: string | null): 
       teamId: activeTeamId,
       optional: !hasSponsorContract,
       blockers: hasActiveTeam ? [] : ["no_active_team"],
-      warnings: hasActiveTeam && !hasSponsorContract ? ["sponsor_choice_required"] : [],
+      // Vor Spieltag 1 meldet der Schritt ein eigenes, sichtbares Gelb (Taktgeber zeigt ihn dann trotz „optional“); danach ist die
+      // Wahl gesperrt. Delegiert (`sponsor: "ki"`) wählt die KI zum ersten Spieltag, dann keine Warnung an den Menschen.
+      warnings:
+        hasActiveTeam && !hasSponsorContract
+          ? [sponsorWahlVorSpieltagEinsOffen(gameState, activeTeamId) ? "sponsor_choice_open_before_matchday_1" : "sponsor_choice_required"]
+          : [],
     }),
     step({
       stepId: "review_last_matchday",
@@ -1006,6 +1013,17 @@ export function shouldAutoOpenSeasonBriefing(
 
 export function getGameFlowTransferWindowHint(gameState: GameState) {
   return getTransferWindowStatus(gameState);
+}
+
+/** Menschliches Team, Sponsorbereich nicht delegiert, in dieser Saison noch kein Spieltag gewertet: die Wahl ist jetzt noch frei. */
+export function sponsorWahlVorSpieltagEinsOffen(gameState: GameState, teamId: string | null): boolean {
+  if (!teamId || getTeamSponsorContract(gameState, teamId)) return false;
+  const gespielt = (gameState.seasonState.matchdayResults ?? []).some(
+    (result) => result.seasonId === gameState.season.id && result.status === "preview_applied",
+  );
+  if (gespielt) return false;
+  const einstellung = buildTeamControlSettingsMap(gameState.teams, gameState.seasonState.teamControlSettings)[teamId];
+  return einstellung?.controlMode === "manual" && !isBereichDelegiert(einstellung, "sponsor");
 }
 
 export function buildGameFlowState(input: { gameState: GameState; activeTeamId?: string | null }): GameFlowState {

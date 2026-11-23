@@ -40,6 +40,9 @@ const GAME_FLOW_BLOCKER_LABELS: Record<string, string> = {
   incomplete_lineup: "Taktik noch nicht spielbereit — alle Slots füllen oder den gesamten Kader einsetzen.",
   training_missing: "Training für alle Kaderspieler muss zuerst gesetzt werden.",
   captain_recommended: "Noch kein Saison-Kapitän benannt — vor der ersten Disziplin einen aus deinen Spielern wählen.",
+  sponsor_choice_open_before_matchday_1:
+    "Sponsor für diese Saison noch nicht gewählt — nach Spieltag 1 ist die Wahl gesperrt. Das hält den Spieltag nicht auf.",
+  sponsor_choice_required: "Sponsor für diese Saison noch nicht gewählt.",
   no_active_team: "Kein aktives Team ausgewählt.",
   empty_roster: "Kader ist leer — erst Spieler hinzufügen.",
   transfer_window_closed: "Transferfenster ist aktuell geschlossen.",

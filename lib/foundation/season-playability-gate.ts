@@ -102,6 +102,8 @@ const AUDIT_HINT_LABELS: Record<string, string> = {
     "Training fehlt für mindestens einen Kaderspieler; Flow-Schritt, kein Season-Gate-Blocker.",
   sponsor_choice_required:
     "Sponsor noch nicht gewählt; Pflicht vor Saisonabschluss (harter Gate in der Season-Completion), mid-season nur Aktions-Hinweis.",
+  sponsor_choice_open_before_matchday_1:
+    "Sponsor noch nicht gewählt, Spieltag 1 steht an; die Wahl ist nur bis dahin frei, hält den Spieltag aber nicht auf.",
   transfer_window_closed:
     "Transferfenster ist geschlossen; erwarteter Phasen-Hinweis, kein technischer Season-Blocker.",
 };

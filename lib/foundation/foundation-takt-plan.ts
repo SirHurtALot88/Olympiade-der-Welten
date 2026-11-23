@@ -86,7 +86,8 @@ export function baueTaktPlan(input: {
 
   input.steps.forEach((schritt, index) => {
     if (schritt.stepId === "review_last_matchday" && input.hatGespielt === false) return;
-    if (schritt.optional && schritt.status !== "warning" && schritt.status !== "blocked" && index !== aktuellerIndex) return;
+    const sponsorOffen = schritt.warnings.includes("sponsor_choice_open_before_matchday_1");
+    if (schritt.optional && !sponsorOffen && schritt.status !== "warning" && schritt.status !== "blocked" && index !== aktuellerIndex) return;
     const istJetzt = schritt.stepId === input.currentStepId;
     // Rot (hält auf) gilt nur für den aktuellen und frühere Schritte; spätere sind naturgemäß noch zu.
     const blockiert =
