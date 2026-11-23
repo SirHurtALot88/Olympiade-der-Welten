@@ -2008,7 +2008,27 @@ export type SpieltagFinanzBuchung = {
   /** Tabellenplatz, nach dem der Abschlag berechnet wurde (Anzeige: "Platz x"). */
   rang?: number | null;
   cashDelta: number;
-  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number };
+  /**
+   * MARKETING (22.11., docs/design/marketing-22-11.md, Stempel `seasonState.marketingRegel`): Teammarke und Team-Anteile am Werbegeld,
+   * zu 1/N je Spieltag, immer >= 0 und in `cashDelta` enthalten. Fehlt in Zeilen ohne Marketing (dann 0).
+   */
+  marketing?: number;
+  /**
+   * KREDITRATEN JE SPIELTAG (22.11., lib/finance/kredit-raten.ts, Stempel `seasonState.kreditRegel`): Zins und Tilgung der laufenden
+   * Kredite dieses Teams (beide <= 0, in `cashDelta` enthalten) und der Rueckfluss aus Team-Krediten an den Geber (>= 0, ebenfalls in
+   * `cashDelta`). In der GuV zaehlt nur der Zins. `kredit` haelt die Aufteilung je Kredit. Fehlt in Zeilen ohne Kreditraten.
+   */
+  kreditZins?: number;
+  kreditTilgung?: number;
+  kreditEingang?: number;
+  kredit?: SpieltagKreditPosten[];
+  rest: {
+    gehalt: number;
+    sponsorBasis: number;
+    gebaeudeEinnahme: number;
+    gebaeudeUnterhalt: number;
+    marketing?: number;
+  };
   createdAt: string;
 };
 
@@ -2117,6 +2137,18 @@ export type LoanRecord = {
   originatedSeasonId: string;
   status: "active" | "paid" | "defaulted";
   missedPayments: number;
+  /**
+   * RATEN JE SPIELTAG (22.11., lib/finance/kredit-raten.ts, Stempel `seasonState.kreditRegel`): Anzahl der Spieltage je Saison, auf die
+   * sich die Rate verteilt (der Nenner). Gesetzt = der Kredit wird je Spieltag getilgt; fehlt = Rate am Saisonende (alter Weg).
+   * `installmentPerSeason` bleibt die Jahressumme (`rateJeSpieltag x ratenJeSaison`), `seasonsRemaining` ist `ceil(ratenOffen / ratenJeSaison)`.
+   */
+  ratenJeSaison?: number;
+  /** Noch offene Raten (Laufzeit x Spieltage am Anfang, je gebuchtem Spieltag eine weniger). */
+  ratenOffen?: number;
+  /** Die gleichbleibende Rate je Spieltag (Annuitaet mit Zins je Saison / `ratenJeSaison`). */
+  rateJeSpieltag?: number;
+  /** Rundungsrest der Raten (Zins und Tilgung, je unter 0,05), der in die naechste Rate geht; Kasse und Restschuld bleiben so auf Dauer deckungsgleich. */
+  ratenRest?: { zins: number; tilgung: number };
 };
 
 export type LoanApplyLogRecord = {
@@ -2136,6 +2168,15 @@ export type LoanApplyLogRecord = {
    * derselben Saison NICHT als "bereits gelaufen" markieren.
    */
   kind?: "settlement" | "early_payoff";
+};
+
+/** Ein Kredit-Posten einer Spieltagsbuchung (Zahlen positiv): was der Kredit an diesem Spieltag an Zins und Tilgung gezahlt hat. */
+export type SpieltagKreditPosten = {
+  loanId: string;
+  zins: number;
+  tilgung: number;
+  /** Nur bei Zahlungsausfall: der nicht gezahlte Teil der Rate (kapitalisiert, samt 5 % Strafzins). */
+  ausfall?: number;
 };
 
 /**
@@ -2618,6 +2659,11 @@ export type RosterEntry = {
    * `app/`). Die Wahrheit ist die Endsaison; siehe `lib/contracts/vertragslaufzeit.ts`.
    */
   contractLength: number;
+  /**
+   * WERBEKLAUSEL (22.11., Marketing): -1 = Spieler behaelt mehr, 0 = Standard, +1 = Team bekommt mehr. Fehlt = 0 (neutral). Die Verhandlung
+   * ueber die Klausel ist Folgeauftrag; das Feld ist vorbereitet und wird vom Team-Anteil gelesen.
+   */
+  marketingKlausel?: -1 | 0 | 1;
   /**
    * DIE SAISON, NACH DER DER VERTRAG ENDET — die Wahrheit ueber die Laufzeit.
    *
@@ -4296,6 +4342,50 @@ export type SeasonState = {
    * Verfall, mittelwertneutrale Potentialdrift) oder "alt". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel.
    */
   entwicklungsRegel?: { seasonId: string; regel: "alt" | "neu" } | null;
+  /**
+   * MARKETING-REGEL DIESER SAISON (22.11., lib/marketing/marketing-regel.ts): "an" = Werbegeld, Team-Anteil, Teammarke und Moral-Zuschlag
+   * gelten; "aus" = nichts davon. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison. Dazu die Fanfarbe
+   * je Team (vier Zahlen, driftet beim Saisonwechsel), ihr Verlauf und der Verlaufstext je Saisonwechsel.
+   */
+  marketingRegel?: {
+    seasonId: string;
+    regel: "an" | "aus";
+    fanfarbe?: Record<string, [number, number, number, number]>;
+    verlauf?: Record<string, Array<{ seasonId: string; farbe: [number, number, number, number]; grund: string }>>;
+    /** Teamerfolg der VORSAISON je Team, beim Saisonwechsel aus dem Snapshot geschrieben (Browser ohne Snapshots rechnet damit gleich). */
+    teamErfolg?: Record<string, { punkte: number; grund: string; stufe: "verfehlt" | "erreicht" | "titel" | "keiner" }>;
+    /** Spiegel der Notbremse `OLY_MARKETING=aus-sofort`, vom Server beim naechsten Buchen gesetzt: ab dann buchen/wirken keine neuen Anteile, Gebuchtes bleibt. */
+    notbremse?: boolean;
+  } | null;
+  /**
+   * KREDIT-REGEL DIESER SAISON (22.11., lib/finance/kredit-raten.ts): "raten" = Zins und Tilgung der Kredite werden je Spieltag
+   * gebucht (Ledger `spieltagFinanzen`); "saisonende" = wie bisher eine Jahresrate am Saisonende. Gesetzt beim Anlegen eines Spiels
+   * und beim Saisonwechsel, nie mitten in der Saison. Ein bestehender Spielstand bekommt fuer die laufende Saison "saisonende".
+   */
+  kreditRegel?: { seasonId: string; regel: "raten" | "saisonende" } | null;
+  /**
+   * MARKETING-STAND JE TEAM (22.11., lib/marketing/marketing-team.ts): das eingefrorene Rechenergebnis der Saison. Nur der Server schreibt
+   * ihn (`bucheSpieltagFinanzen`: erster Spieltag der Saison, neu bei geaendertem Kader-Hash). Seite, GuV-Prognose, Moral-Zuschlag und
+   * Buchung lesen ihn; ohne Stand rechnet die Seite eine als "Vorschau" gekennzeichnete Zahl.
+   */
+  marketingStand?: Record<
+    string,
+    {
+      seasonId: string;
+      kaderHash: string;
+      berechnetAmSpieltag: number;
+      /** Teammarke + Team-Anteile je Saison (Betrag fuer die Kasse). */
+      ansKasse: number;
+      /** Moral OHNE Werbe-Zuschlag je Spieler zum Stand der Berechnung (eingefroren). */
+      moralOhne: Record<string, number | null>;
+      /** Leistungsperzentil je Spieler zum Stand der Berechnung (eingefroren). */
+      leistungPerz: Record<string, number>;
+      /** Moral-Zuschlag je Spieler (nach Deckel). */
+      moralZuschlag: Record<string, number>;
+    }
+  > | null;
+  /** Manager-Wahl des Aushaengeschilds je Team und Saison (optional; ohne Eintrag gilt die KI-Regel). */
+  marketingAushaengeschild?: Record<string, { seasonId: string; playerId: string }> | null;
   /**
    * BASKETBALL-PUSTE-REGEL DIESER SAISON (22.11., lib/resolve/basketball-puste.ts): Wechselliste "alt"/"neu" je Spieltag,
    * gesetzt beim Laden. Gebuchte Spieltage behalten ihre Regel.

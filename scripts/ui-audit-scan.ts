@@ -70,7 +70,6 @@ const VIEW_DIR_MAP: Record<string, string[]> = {
   cockpit: ["app/foundation/cockpit-v2"],
   teamSettings: ["app/foundation/team-settings"],
   changelog: ["app/foundation/changelog"],
-  credits: ["app/foundation/credits"],
   "sponsors (unter Finanzen/HQ)": ["app/foundation/sponsors-v2"],
   "debug (Resolve-Lab)": ["app/foundation/legacy-resolve-lab"],
   "shell/gemeinsam": ["app/foundation/shell", "app/foundation/contract-offer", "app/foundation/debug"],

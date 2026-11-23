@@ -6,7 +6,7 @@
  * `lib/sponsor/sponsor-offer-read.ts`, `lib/facilities/facility-effects.ts`,
  * `lib/foundation/team-management-overview.ts`, `gameState.transferHistory`)
  * — this file only describes what the Finanzen UI needs to render. Mirrors
- * the Kredite split (`lib/foundation/credits/credits-types.ts`): game logic
+ * the Kredite model (`lib/finance/kredite-seite-modell.ts`): game logic
  * lives in the services, this is a pure read-model.
  */
 
@@ -376,7 +376,7 @@ export type FinancesViewModel = { status: "not_ready" } | { status: "ready"; tea
 
 /**
  * Eine kompakte Liga-weite Finanzzeile — bewusste Balancing-Transparenz
- * (analog zur Liga-Kreditübersicht in `FoundationCreditsNewLook`, #182),
+ * (analog zum Kreditregister der Liga auf der Kredite-Seite),
  * KEIN Fog-of-War-Verstoß: siehe `buildFinancesLeagueTable` in
  * `use-finances-league-table.ts`.
  */

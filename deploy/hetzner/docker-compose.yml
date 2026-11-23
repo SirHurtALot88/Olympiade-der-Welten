@@ -133,6 +133,10 @@ services:
       # Liga-Mittel um 0, wenige starke Auf- und Absteiger, PP-Faktor auf das Training), "alt" = Rueckweg (neue Saisons wie vor dem
       # 22.11.; gestempelte Saisons rechnen weiter wie gestempelt). Nur Server: die Regel steht im Spielstand. Siehe deploy/hetzner/.env.example.
       OLY_ENTWICKLUNG: ${OLY_ENTWICKLUNG:-}
+      # Marketing (22.11., docs/design/marketing-bau-22-11.md): leer = Standard (neue Saisons bekommen Werbegeld, Team-Anteil, Teammarke und
+      # Moral-Zuschlag), "aus" = Rueckweg (neue Saisons ohne), "aus-sofort" = Notbremse (keine Buchung, kein Zuschlag, auch mitten in der
+      # Saison). Nur Server (kein NEXT_PUBLIC): die Regel steht im Spielstand (seasonState.marketingRegel). Siehe deploy/hetzner/.env.example.
+      OLY_MARKETING: ${OLY_MARKETING:-}
       # Breaking-Format (22.11., docs/design/breaking-tagteam-22-11.md): leer = Tag-Team (6 gegen 6, je Team einer im Ring,
       # Gang mit zwei Phasen, verdeckter Wechsel, Waffe frei waehlbar), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten
       # Spieltag wieder der Gauntlet; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.

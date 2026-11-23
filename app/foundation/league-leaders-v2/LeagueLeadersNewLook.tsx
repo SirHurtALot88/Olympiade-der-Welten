@@ -483,8 +483,11 @@ export default function LeagueLeadersNewLook({
   returnContext,
   onReturnToPlayer,
   onOpenPlayer,
+  nurMehrsaison = false,
 }: LeagueLeadersClientProps) {
-  const [subTab, setSubTab] = useState<NlLeagueLeadersSubTab>("leaders");
+  // Seit 22.11.: die laufende Saison zeigt `LeadersModern`; diese Komponente trägt nur noch die Mehrsaison-Inhalte
+  // (Rekorde, Legenden, All-Time, Erfolge), erreichbar über „Rekorde & Legenden“.
+  const [subTab, setSubTab] = useState<NlLeagueLeadersSubTab>(nurMehrsaison ? "records" : "leaders");
 
   /**
    * Liga-Filter (Saisonstand-Auftrag Chris, 19.10. Punkt 5) — lazy-init auf "liga1", sobald der
@@ -732,7 +735,7 @@ export default function LeagueLeadersNewLook({
       >
         {footprint.hasTeam ? <OwnTeamFootprintSummary footprint={footprint} onOpenPlayer={onOpenPlayer} /> : null}
         <NlSubTabs
-          items={NL_LEADERS_SUBTABS}
+          items={nurMehrsaison ? NL_LEADERS_SUBTABS.filter((t) => t.id !== "leaders") : NL_LEADERS_SUBTABS}
           activeId={subTab}
           onSelect={(id) => setSubTab(id as NlLeagueLeadersSubTab)}
           aria-label="Liga-Leaders Ansicht"

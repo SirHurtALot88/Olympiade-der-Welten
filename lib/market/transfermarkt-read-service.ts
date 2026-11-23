@@ -125,6 +125,11 @@ export type TransfermarktFreeAgentItem = {
    * der Stufe, ab Stufe 5 exakt). Nur der Nebel-Pfad der Markt-Seite liest es (`transfermarkt-sicht.ts`).
    */
   disciplineEstimates?: Record<string, number>;
+  /**
+   * MARKETABILITY fuer das gewaehlte Team (22.11., lib/marketing/marketing-markt.ts): nur die STUFE nach Scouting-Stand (10er unbekannt, 5er
+   * beobachtet, exakt gescoutet), nie ein genauerer Wert. Fehlt ohne gueltige Marketing-Regel oder ohne Team.
+   */
+  marketability?: { von: number; bis: number; exakt: boolean; stufe: number; text: string; schluessel: number } | null;
   currentAbilityTier: PlayerProgressionRatingTier | null;
   potentialTier: PlayerProgressionRatingTier | null;
   potentialBand: PlayerPotentialBand;

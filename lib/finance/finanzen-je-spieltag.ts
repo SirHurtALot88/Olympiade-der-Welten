@@ -35,6 +35,12 @@ export type SpieltagTeilsummen = {
   gebaeudeUnterhalt: number;
   /** Summe der Rang-Abschlaege auf die Sponsor-Rangpraemie (22.11.). */
   rangAbschlag: number;
+  /** Marketing: Teammarke + Team-Anteile am Werbegeld (22.11.), immer >= 0. */
+  marketing: number;
+  /** Kreditraten je Spieltag (22.11.): Zins und Tilgung (beide <= 0) und Rueckfluss aus verliehenen Krediten (>= 0). */
+  kreditZins: number;
+  kreditTilgung: number;
+  kreditEingang: number;
   cashDelta: number;
   /** Anzahl gebuchter Spieltage dieses Teams in der Saison. */
   anzahl: number;
@@ -105,13 +111,17 @@ export function summeSpieltagBuchungen(
   teamId: string,
   seasonId?: string,
 ): SpieltagTeilsummen {
-  const out: SpieltagTeilsummen = { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, rangAbschlag: 0, cashDelta: 0, anzahl: 0 };
+  const out: SpieltagTeilsummen = { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, rangAbschlag: 0, marketing: 0, kreditZins: 0, kreditTilgung: 0, kreditEingang: 0, cashDelta: 0, anzahl: 0 };
   for (const b of spieltagBuchungenDerSaison(gameState, teamId, seasonId)) {
     out.gehalt += b.gehalt;
     out.sponsorBasis += b.sponsorBasis;
     out.gebaeudeEinnahme += b.gebaeudeEinnahme;
     out.gebaeudeUnterhalt += b.gebaeudeUnterhalt;
     out.rangAbschlag += b.rangAbschlag ?? 0;
+    out.marketing += b.marketing ?? 0;
+    out.kreditZins += b.kreditZins ?? 0;
+    out.kreditTilgung += b.kreditTilgung ?? 0;
+    out.kreditEingang += b.kreditEingang ?? 0;
     out.cashDelta += b.cashDelta;
     out.anzahl += 1;
   }
@@ -121,6 +131,10 @@ export function summeSpieltagBuchungen(
     gebaeudeEinnahme: runde1(out.gebaeudeEinnahme),
     gebaeudeUnterhalt: runde1(out.gebaeudeUnterhalt),
     rangAbschlag: runde1(out.rangAbschlag),
+    marketing: runde1(out.marketing),
+    kreditZins: runde1(out.kreditZins),
+    kreditTilgung: runde1(out.kreditTilgung),
+    kreditEingang: runde1(out.kreditEingang),
     cashDelta: runde1(out.cashDelta),
     anzahl: out.anzahl,
   };

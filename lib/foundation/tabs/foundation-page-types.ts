@@ -98,6 +98,7 @@ export type FoundationView =
   | "admin"
   | "credits"
   | "finances"
+  | "marketing"
   | "ausruestung"
   | "changelog"
   | "battleArena";

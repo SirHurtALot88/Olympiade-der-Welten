@@ -30,6 +30,12 @@ const PFADE = {
     </>
   ),
   krone: <path d="M3 18h18l1-10-5 4-5-7-5 7-5-4z" />,
+  bank: (
+    <>
+      <path d="M3 10l9-6 9 6z" />
+      <path d="M5.5 10v7M10 10v7M14 10v7M18.5 10v7M3 20h18" />
+    </>
+  ),
   auf2: <path d="M6 12l6-6 6 6M6 18l6-6 6 6" />,
   auf: <path d="M6 15l6-6 6 6" />,
   gleich: <path d="M6 12h12" />,

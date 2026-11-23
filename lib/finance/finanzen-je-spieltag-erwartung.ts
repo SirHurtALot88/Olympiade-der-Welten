@@ -6,6 +6,8 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { computeFacilitySeasonCash } from "@/lib/finance/season-end-guv";
 import { kaderJahresgehaltAmSpieltag, spieltageDerSaison } from "@/lib/finance/finanzen-je-spieltag";
+import { erwarteteKreditRate } from "@/lib/finance/kredit-raten";
+import { marketingJahresbetrag } from "@/lib/marketing/marketing-team";
 import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
 
 export type ErwarteteSpieltagBuchung = {
@@ -15,6 +17,11 @@ export type ErwarteteSpieltagBuchung = {
   gebaeudeUnterhalt: number;
   /** Rang-Abschlag beim aktuellen Tabellenplatz (22.11.). */
   rangAbschlag: number;
+  /** Marketing: Teammarke + Team-Anteile (22.11.), 0 ohne gueltige Regel. */
+  marketing: number;
+  /** Kreditrate des naechsten Spieltags (<= 0) und Rueckfluss aus verliehenen Krediten (>= 0), nur in einer Raten-Saison (22.11.). */
+  kreditRate: number;
+  kreditEingang: number;
   netto: number;
 };
 
@@ -29,8 +36,11 @@ export function erwarteteSpieltagBuchung(gameState: GameState, teamId: string): 
   const gebaeudeUnterhalt = -teil(gebaeude.paidUpkeep);
   // Offene Spieltage laufen mit dem aktuellen Platz weiter (gleiche Rechnung wie die Buchung).
   const rangAbschlag = sponsorRangAbschlag(gameState, teamId, sponsorRangFuerAbschlag(gameState, teamId), n).abschlag;
+  const marketing = teil(marketingJahresbetrag(gameState, teamId));
+  const kredit = erwarteteKreditRate(gameState, teamId);
   return {
-    gehalt, sponsorBasis, gebaeudeEinnahme, gebaeudeUnterhalt, rangAbschlag,
-    netto: gehalt + sponsorBasis + gebaeudeEinnahme + gebaeudeUnterhalt + rangAbschlag,
+    gehalt, sponsorBasis, gebaeudeEinnahme, gebaeudeUnterhalt, rangAbschlag, marketing,
+    kreditRate: kredit.rate, kreditEingang: kredit.eingang,
+    netto: gehalt + sponsorBasis + gebaeudeEinnahme + gebaeudeUnterhalt + rangAbschlag + marketing + kredit.rate + kredit.eingang,
   };
 }

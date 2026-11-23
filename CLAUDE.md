@@ -301,6 +301,12 @@ Schalter ist der Stempel `seasonState.wertungsSkalen.ppTagesanker` (neues Spiel 
 ab dem nächsten Saisonwechsel, gebuchte Spieltage bleiben), jeder Rechenweg fragt `ppTagesankerFuer(gameState, matchdayId)`.
 Rückweg `OLY_PP_TAGESANKER=aus` (neue Saisons), Notbremse `=aus-sofort`. Doku: `docs/design/pp-tagesanker-live-22-11.md`.
 
+## Marketing (Chris, 22.11.)
+
+Werbegeld je Spieler, dynamischer Team-Anteil und Teammarke in der Kasse (Posten "Marketing"), Spieler-Anteil hebt die Moral; wirkt nie auf Wertung,
+Marktwert oder Sponsor. Regel im Spielstand (`seasonState.marketingRegel`, Abfrage nur `marketingAktiv(gameState)`), Rückweg `OLY_MARKETING=aus` / `aus-sofort`, nur
+Server. Eine Rechenstelle: `lib/marketing/marketing-team.ts`. Bau, Messung, Folgeaufträge: `docs/design/marketing-bau-22-11.md`.
+
 ## Jeder Bau: Abgleich mit dem Mockup und Korrekturschleife (Chris, 18.11.)
 
 Wörtlich: „Wichtig: wenn du neue Dinge baust, IMMER einen Abgleich machen — Screenshot schauen und vergleichen mit dem

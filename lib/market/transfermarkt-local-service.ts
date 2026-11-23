@@ -1,3 +1,5 @@
+import { baueMarktMarketability } from "@/lib/marketing/marketing-markt";
+import { marketingAktiv } from "@/lib/marketing/marketing-regel";
 import { pruefeKaufGegenVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { randomUUID } from "node:crypto";
 
@@ -2161,6 +2163,8 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
         scoutingLevel: playerScoutingLevel,
         topDisciplineScores,
         disciplineEstimates,
+        // MARKETABILITY (22.11.): fuer das gewaehlte Team, nur als Stufe nach dem Scouting-Stand dieses Spielers; ohne gueltige Regel keine Spalte.
+        marketability: player && marketingAktiv(gameState) ? baueMarktMarketability(gameState, selectedTeam.teamId, player, playerScoutingLevel) : null,
         teamContextAvailable: true,
         teamCash: selectedTeam.cash,
         teamSalary,
@@ -2310,6 +2314,8 @@ export function listLocalTransfermarktFreeAgents(input: TransfermarktReadParams 
 
     return {
       ...baseItem,
+      // MARKETABILITY (22.11.): auch im vollen Pfad, gleiche Stufe nach Scouting wie in der Kompaktliste.
+      marketability: player && marketingAktiv(gameState) ? baueMarktMarketability(gameState, selectedTeam.teamId, player, playerScoutingLevel) : null,
       traitsPositive: traitView.visiblePositiveTraits,
       traitsNegative: traitView.visibleNegativeTraits,
       preferredDisciplineIds: visiblePreferredDisciplineIds,

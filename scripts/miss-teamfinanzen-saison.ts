@@ -65,7 +65,10 @@ import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-servic
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
-import { stempleFinanzenJeSpieltagBeimAnlegen } from "@/lib/finance/finanzen-je-spieltag";
+import { stempleFinanzenJeSpieltagBeimAnlegen, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
+import { marketingRegelFuerNeueSaison } from "@/lib/marketing/marketing-regel";
+import { marketingTeamUebersicht } from "@/lib/marketing/marketing-team";
+import { assessPlayerMorale, buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import { berechneVorstandBudgetStand, SPERRE_ZAEHLER } from "@/lib/finance/vorstand-budgetfreigabe";
 import { applyNewGameSetup, previewNewGameSetup } from "@/lib/game/new-game-setup-service";
 import { fuehreLigaSetupDraftAus } from "@/lib/game/league-setup-draft-service";
@@ -324,6 +327,39 @@ function transfers(gs: GameState, seasonId: string, nurSeit: number) {
   return { anzahlEintraege: eintraege.length, byTeam };
 }
 
+/**
+ * MARKETING-MESSUNG (22.11., docs/design/marketing-bau-22-11.md): je Team die gebuchte Summe (Ledger), der Jahresstand
+ * (Werbegeld, Team-Anteile, Spieler-Anteile, Teammarke) und die mittlere Moral des Kaders. Ohne gueltige Regel steht die Moral trotzdem da
+ * (Vergleich "ohne Marketing").
+ */
+function marketingMessung(gs: GameState) {
+  const index = buildMoraleLookupIndex(gs);
+  const out: Record<string, unknown> = {};
+  for (const t of gs.teams) {
+    const kader = gs.rosters.filter((r) => r.teamId === t.teamId);
+    const morale = kader
+      .map((r) => assessPlayerMorale({ gameState: gs, playerId: r.playerId, teamId: t.teamId, index })?.morale)
+      .filter((m): m is number => typeof m === "number");
+    const u = marketingTeamUebersicht(gs, t.teamId, index);
+    out[t.teamId] = {
+      liga: getLeagueOf(gs, t.teamId),
+      gebucht: summeSpieltagBuchungen(gs, t.teamId).marketing,
+      werbegeld: r2(u.werbegeld),
+      teamAnteile: r2(u.teamAnteile),
+      spielerAnteile: r2(u.spielerAnteile),
+      teammarke: u.teammarke,
+      ansKasse: r2(u.ansKasse),
+      zuschlagMittel: r2(u.zeilen.reduce((a, z) => a + z.ergebnis.moralZuschlag, 0) / Math.max(1, u.zeilen.length)),
+      moralMittel: r2(morale.reduce((a, b) => a + b, 0) / Math.max(1, morale.length)),
+      netzGreift: u.zeilen.filter((z) => z.ergebnis.netzGreift).length,
+      deckelGreift: u.deckelGreift,
+      teamAnteileVorDeckel: r2(u.teamAnteileVorDeckel),
+      kader: kader.length,
+    };
+  }
+  return out;
+}
+
 function guvSnapshot(gs: GameState) {
   const parts = resolveSeasonGuvPartsByTeam(gs);
   const out: Record<string, unknown> = {};
@@ -396,6 +432,14 @@ async function main() {
     const ohne = { ...g, seasonState: { ...g.seasonState, finanzenJeSpieltag: null } };
     persistence.saveSingleplayerState(saveId, finanzenStempel === "an" ? stempleFinanzenJeSpieltagBeimAnlegen(ohne) : ohne);
     log(`Finanzen je Spieltag: Stempel ${finanzenStempel}`);
+  }
+  // MARKETING (22.11.): fuer den paarweisen A/B-Lauf desselben Draft-Standes wird der Marketing-Stempel auf "an" oder "aus" gesetzt.
+  const marketingStempel = arg("marketing-stempel", "");
+  if (marketingStempel) {
+    const g = get().gameState;
+    const stempel = { ...marketingRegelFuerNeueSaison(g.season.id, g.teams.map((t) => t.teamId)), regel: marketingStempel === "an" ? ("an" as const) : ("aus" as const) };
+    persistence.saveSingleplayerState(saveId, { ...g, seasonState: { ...g.seasonState, marketingRegel: stempel } });
+    log(`Marketing: Stempel ${marketingStempel}`);
   }
   const phasen = run.phasen as Record<string, unknown>;
   const schreibe = () => {
@@ -519,7 +563,7 @@ async function main() {
       phasen[`${praefix}_02_saisonstart`] = { snap: (phasen["s1_01_nach_draft"] as { snap: unknown }).snap, seasonId: sid, hinweis: "aus s1_01_nach_draft uebernommen (Wiederaufnahme)" };
       phasen[`${praefix}_02b_wiederaufnahme_stand`] = { snap: snap(get().gameState), naechsterSpieltagIndex: ersterIdx };
     } else if (!(RESUME && saison === startSaison && phasen[`${praefix}_02_saisonstart`])) {
-      phasen[`${praefix}_02_saisonstart`] = { snap: snap(get().gameState), seasonId: sid };
+      phasen[`${praefix}_02_saisonstart`] = { snap: snap(get().gameState), seasonId: sid, marketing: marketingMessung(get().gameState) };
     }
     schreibe();
     if (STOP_AFTER === "kaufphase" && saison === 2) { log("stop-after kaufphase erreicht"); break; }
@@ -555,7 +599,7 @@ async function main() {
     }
     const vorAbschluss = get().gameState;
     phasen[`${praefix}_03_nach_spieltagen`] = {
-      snap: snap(vorAbschluss), kasseJeSpieltag, verletztJeSpieltag,
+      snap: snap(vorAbschluss), kasseJeSpieltag, verletztJeSpieltag, marketing: marketingMessung(vorAbschluss),
       sponsorEvents: (vorAbschluss.seasonState.sponsorEvents ?? []).filter((e) => (e as { seasonId?: string }).seasonId === sid || true).length,
     };
     schreibe();

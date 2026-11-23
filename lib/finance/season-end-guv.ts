@@ -43,6 +43,7 @@
 import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebtheit";
 import { apronKonjunkturKurzhinweis } from "@/lib/finance/apron-konjunktur-hinweis";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
+import { kreditSaisonZerlegung, ratenSicht } from "@/lib/finance/kredit-raten";
 import { FACILITY_CATALOG, getFacilityLevelDefinition } from "@/lib/facilities/facility-catalog";
 import {
   calculateFacilitySeasonUpkeep,
@@ -82,6 +83,7 @@ export const SEASON_GUV_POSTEN_KEYS = [
   "sponsor",
   "sponsorereignisse",
   "gebaeude_einnahme",
+  "marketing",
   "apron",
   "boardziele",
   "gehaelter",
@@ -137,6 +139,11 @@ export type SeasonGuvParts = {
   sponsorEventCount?: number | null;
   /** Gebäude-Einnahme brutto (vor Unterhalt). */
   facilityIncome?: number | null;
+  /**
+   * MARKETING (22.11.): Teammarke + Team-Anteile am Werbegeld der ganzen Saison (gebucht je Spieltag plus der Rest zum heutigen Stand).
+   * Der Spieler-Anteil steht nie hier, er hebt nur die Moral. Ohne gueltige Marketing-Regel 0.
+   */
+  marketingCash?: number | null;
   /** Tatsächlich bezahlter Gebäude-Unterhalt (Season-End-Semantik), als positive Zahl. */
   facilityUpkeep?: number | null;
   /** Apron-Netto beim aktuellen Rang hochgerechnet: `ausgleich − abgabe`. Negativ = Abgabe. */
@@ -207,6 +214,7 @@ const POSTEN_LABEL: Record<SeasonGuvPostenKey, string> = {
   sponsor: "Sponsor",
   sponsorereignisse: "Sponsor-Ereignisse",
   gebaeude_einnahme: "Gebäude-Einnahme",
+  marketing: "Marketing",
   apron: "Apron",
   boardziele: "Vorstandsziele",
   gehaelter: "Gehälter",
@@ -240,6 +248,13 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
           : "keine in dieser Saison",
     },
     { key: "gebaeude_einnahme", label: POSTEN_LABEL.gebaeude_einnahme, amount: round2(num(parts.facilityIncome)), counted: true },
+    {
+      key: "marketing",
+      label: POSTEN_LABEL.marketing,
+      amount: round2(num(parts.marketingCash)),
+      counted: true,
+      note: "Teammarke und Team-Anteile am Werbegeld",
+    },
     {
       key: "apron",
       label: POSTEN_LABEL.apron,
@@ -446,6 +461,8 @@ export type TeamLoanShareRow = {
   outstanding: number;
   /** Verbleibende Saisons bis zur letzten Rate. */
   remainingSeasons: number;
+  /** Raten-Saison: die Rate je Spieltag (sonst fehlt das Feld). */
+  rateJeSpieltag?: number;
 };
 
 /**
@@ -459,8 +476,10 @@ export function computeTeamLoanShareRows(gameState: GameState, teamId: string): 
   return (gameState.seasonState.loans ?? [])
     .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
     .map((loan) => {
-      const installment = round1(loan.installmentPerSeason ?? 0);
-      const interest = round1(loan.principalOutstanding * loan.interestRatePerSeason);
+      // RATEN JE SPIELTAG (22.11.): in einer Raten-Saison Saisonsumme der Spieltagsraten (gebucht plus offen), sonst wie bisher.
+      const z = kreditSaisonZerlegung(gameState, loan);
+      const installment = z.jeSpieltag ? round1(z.rate) : round1(loan.installmentPerSeason ?? 0);
+      const interest = z.jeSpieltag ? round1(z.zins) : round1(loan.principalOutstanding * loan.interestRatePerSeason);
       return {
         loanId: loan.loanId,
         lenderName:
@@ -472,6 +491,7 @@ export function computeTeamLoanShareRows(gameState: GameState, teamId: string): 
         principal: Math.max(0, round1(installment - interest)),
         outstanding: round1(loan.principalOutstanding),
         remainingSeasons: loan.seasonsRemaining,
+        ...(z.jeSpieltag ? { rateJeSpieltag: ratenSicht(gameState, loan)?.rateJeSpieltag } : {}),
       };
     })
     .sort((left, right) => right.installment - left.installment);

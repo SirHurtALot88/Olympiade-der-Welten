@@ -87,7 +87,7 @@ export type ManagerOfficeClientProps = {
   /**
    * Kredit-Kern (`lib/finance/loan-service.ts`): jährliche Kreditrate und
    * Restschuld des aktiven Manager-Teams (Fog of War — nie ein fremdes Team,
-   * siehe `use-credits-view-model.ts`). `null`/`0` blendet die Anzeige aus.
+   * siehe `lib/finance/kredite-seite-modell.ts`). `null`/`0` blendet die Anzeige aus.
    */
   loanInstallment?: number | null;
   outstandingDebt?: number | null;

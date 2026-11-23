@@ -3,7 +3,16 @@ import { randomUUID } from "@/lib/utils/random-id";
 import type { GameState, LoanApplyLogRecord, LoanOriginationLogRecord, LoanRecord } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
-import { isSeasonOne } from "@/lib/season/transfer-season-policy";
+import {
+  alsJahresrateKredit,
+  istRatenKredit,
+  kreditLaeuft,
+  kreditSaisonZerlegung,
+  kreditZinsBeendeterKredite,
+  ratenJeSaisonFuer,
+  ratenKonditionen,
+  ratenSicht,
+} from "@/lib/finance/kredit-raten";
 import { parseSeasonNumber } from "@/lib/season/transfer-standings-balance";
 import { getTeamRelationship } from "@/lib/rivalries/team-rivalries";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
@@ -24,10 +33,19 @@ const CAPACITY_MARKET_VALUE_SHARE = 0.3;
 const DEFAULT_PENALTY_RATE = 0.05;
 /** Vorfälligkeits-Entschädigung bei Vorab-Rückzahlung, siehe docs/design/kredit-system.md. */
 const PREPAYMENT_FEE_RATE = 0.2;
+/**
+ * Die Sperre fuer Saison 1 ist gefallen (Finanzkonzept `finanzen-posten-22-11.md` f.6: "Kredite ab Saison 1"). Die Konstante bleibt, weil die
+ * KI-Entscheidung sie fuer sich weiter nutzt (`resolveAiLoanDecision`: die KI leiht in Saison 1 nie fuer den Draft).
+ */
 export const SEASON_ONE_NO_LOANS_REASON = "season_one_no_loans";
 /** Distress-Gate-Reason: Team schleppt einen geplatzten (defaulted) Kredit → keine Neuaufnahme (siehe `isDefaultedDebtBorrowBlocked`). */
 export const DISTRESS_DEFAULTED_DEBT_REASON = "distress_defaulted_debt";
-const DEFAULT_MISSED_PAYMENTS_THRESHOLD = 2;
+/**
+ * "In Verzug" im alten Saisonende-Weg: der Zaehler `missedPayments` gilt je Saison und je Regel (Saisonwechsel setzt ihn zurueck). Mit EINER Rate
+ * je Saison ist die verpasste Jahresrate schon mehr als ein Viertel der Saison, also gilt der Kredit nach einer verpassten Rate als in Verzug.
+ * Je Spieltag zaehlt `KREDIT_AUSFALL_ANTEIL` der Saison (`kredit-raten.ts`).
+ */
+const DEFAULT_MISSED_PAYMENTS_THRESHOLD = 1;
 const MIN_TERM_SEASONS = 1;
 const MAX_TERM_SEASONS = 10;
 
@@ -109,6 +127,24 @@ export function computeBorrowingCapacity(input: {
   return roundCash(Math.max(0, teamwertCap - Math.max(0, input.currentOutstandingDebt)));
 }
 
+/**
+ * Kreditrahmen eines Teams in EINER Rechnung: Gesamtrahmen (15 % der Kasse + 30 % des Kaderwerts), davon schon genutzt (aktive und geplatzte
+ * Restschuld) und der freie Rest. Seite und Kern lesen dieselbe Funktion (`computeBorrowingCapacity`), damit gezeigt = gebucht.
+ */
+export function berechneKreditRahmen(gameState: GameState, teamId: string) {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  const kaderwert = getTeamMarketValueTotal(gameState, teamId);
+  const schuld = getTeamOwedOutstandingDebt(gameState, teamId);
+  const frei = computeBorrowingCapacity({
+    cash: team?.cash ?? 0,
+    marketValueTotal: kaderwert,
+    annualRevenue: estimateTeamAnnualRevenue(gameState, teamId),
+    currentOutstandingDebt: schuld,
+  });
+  const gesamt = roundCash(CAPACITY_CASH_SHARE * Math.max(0, team?.cash ?? 0) + CAPACITY_MARKET_VALUE_SHARE * Math.max(0, kaderwert));
+  return { kaderwert: roundCash(kaderwert), gesamt, schuld, frei };
+}
+
 export function getTeamOutstandingDebt(gameState: GameState, teamId: string): number {
   const loans = gameState.seasonState.loans ?? [];
   return roundCash(
@@ -168,10 +204,11 @@ export function isDefaultedDebtBorrowBlocked(gameState: GameState, teamId: strin
  */
 export function getTeamAnnualLoanInstallment(gameState: GameState, teamId: string): number {
   const loans = gameState.seasonState.loans ?? [];
+  // RATEN JE SPIELTAG (22.11.): in einer Raten-Saison ist es die Saisonsumme der Spieltagsraten (gebucht plus offen), sonst die Jahresrate.
   return roundCash(
     loans
-      .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
-      .reduce((sum, loan) => sum + loan.installmentPerSeason, 0),
+      .filter((loan) => loan.borrowerTeamId === teamId && kreditLaeuft(loan))
+      .reduce((sum, loan) => sum + kreditSaisonZerlegung(gameState, loan).rate, 0),
   );
 }
 
@@ -187,10 +224,12 @@ export function getTeamAnnualLoanInstallment(gameState: GameState, teamId: strin
  */
 export function getTeamAnnualLoanInterest(gameState: GameState, teamId: string): number {
   const loans = gameState.seasonState.loans ?? [];
+  // RATEN JE SPIELTAG (22.11.): gebuchter Zins plus der Zins der offenen Spieltage; dazu der schon gezahlte Zins von Krediten, die in
+  // dieser Saison getilgt sind. Ohne Raten-Stempel exakt wie bisher (Restschuld x Zinssatz je Kredit).
   return roundCash(
     loans
-      .filter((loan) => loan.borrowerTeamId === teamId && loan.status === "active")
-      .reduce((sum, loan) => sum + roundCash(loan.principalOutstanding * loan.interestRatePerSeason), 0),
+      .filter((loan) => loan.borrowerTeamId === teamId && kreditLaeuft(loan))
+      .reduce((sum, loan) => sum + kreditSaisonZerlegung(gameState, loan).zins, 0) + kreditZinsBeendeterKredite(gameState, teamId),
   );
 }
 
@@ -366,7 +405,39 @@ export type LoanOffer = {
   interestRatePerSeason: number;
   installmentPerSeason: number;
   relationshipValue: number | null;
+  /** Raten-Saison: die gleichbleibende Rate je Spieltag und die Zahl der Raten (Laufzeit x Spieltage). */
+  rateJeSpieltag?: number;
+  ratenGesamt?: number;
+  /** Zinsen ueber die ganze Laufzeit. */
+  gesamtZinsen: number;
 };
+
+/**
+ * Rate und Gesamtzinsen eines Kredits zu einem Satz: in einer Raten-Saison je Spieltag, sonst als Jahresrate. EINE Rechnung fuer Angebot,
+ * Vorschau und Buchung, damit gezeigt = gebucht.
+ */
+export function kreditKonditionen(gameState: GameState, principal: number, ratePerSeason: number, termSeasons: number) {
+  const n = ratenJeSaisonFuer(gameState);
+  const laufzeit = clamp(Math.round(termSeasons), MIN_TERM_SEASONS, MAX_TERM_SEASONS);
+  if (n != null) {
+    const k = ratenKonditionen(principal, ratePerSeason, laufzeit, n);
+    return {
+      installmentPerSeason: k.installmentPerSeason,
+      rateJeSpieltag: k.rateJeSpieltag as number | undefined,
+      ratenGesamt: k.ratenGesamt as number | undefined,
+      ratenJeSaison: n as number | undefined,
+      gesamtZinsen: roundCash(Math.max(0, k.rateJeSpieltag * k.ratenGesamt - Math.max(0, principal))),
+    };
+  }
+  const installment = annuityInstallment(principal, ratePerSeason, laufzeit);
+  return {
+    installmentPerSeason: installment,
+    rateJeSpieltag: undefined as number | undefined,
+    ratenGesamt: undefined as number | undefined,
+    ratenJeSaison: undefined as number | undefined,
+    gesamtZinsen: roundCash(Math.max(0, installment * laufzeit - Math.max(0, principal))),
+  };
+}
 
 /**
  * Baut die Angebotsliste für eine Kreditsumme/Laufzeit — Bank + jedes eligible Team, siehe
@@ -396,7 +467,8 @@ export function buildLoanOffers(
   termSeasons: number,
   options?: { allowSeason1?: boolean },
 ): LoanOffer[] {
-  if (!options?.allowSeason1 && isSeasonOne(gameState.season.id)) return [];
+  // Saison 1 ist frei (Finanzkonzept f.6); `allowSeason1` bleibt als wirkungslose Option, damit alte Aufrufer nicht brechen.
+  void options;
 
   const borrower = gameState.teams.find((team) => team.teamId === borrowerTeamId) ?? null;
   if (!borrower) return [];
@@ -422,6 +494,7 @@ export function buildLoanOffers(
   });
 
   const bankTerms = computeLoanTerms({ principal, termSeasons, finances: borrowerFinances });
+  const bankK = kreditKonditionen(gameState, principal, bankTerms.interestRatePerSeason, termSeasons);
   const offers: LoanOffer[] = [
     {
       lenderType: "bank",
@@ -429,8 +502,10 @@ export function buildLoanOffers(
       lenderName: "Bank",
       maxAmount: capacity,
       interestRatePerSeason: bankTerms.interestRatePerSeason,
-      installmentPerSeason: bankTerms.installmentPerSeason,
+      installmentPerSeason: bankK.installmentPerSeason,
       relationshipValue: null,
+      ...(bankK.rateJeSpieltag != null ? { rateJeSpieltag: bankK.rateJeSpieltag, ratenGesamt: bankK.ratenGesamt } : {}),
+      gesamtZinsen: bankK.gesamtZinsen,
     },
   ];
 
@@ -472,14 +547,17 @@ export function buildLoanOffers(
       lenderHighestDebtRate: getTeamHighestDebtRate(gameState, lender.teamId),
     });
 
+    const teamK = kreditKonditionen(gameState, principal, rate, termSeasons);
     offers.push({
       lenderType: "team",
       lenderTeamId: lender.teamId,
       lenderName: lender.name,
       maxAmount: Math.min(lenderOfferAmount, capacity, manuellerRahmen),
       interestRatePerSeason: rate,
-      installmentPerSeason: annuityInstallment(principal, rate, termSeasons),
+      installmentPerSeason: teamK.installmentPerSeason,
       relationshipValue,
+      ...(teamK.rateJeSpieltag != null ? { rateJeSpieltag: teamK.rateJeSpieltag, ratenGesamt: teamK.ratenGesamt } : {}),
+      gesamtZinsen: teamK.gesamtZinsen,
     });
   }
 
@@ -528,11 +606,8 @@ export function originateLoan(
   // die S1-Sperre, das Distress-Gate und die Kapazitätsgrenze — er ist unfreiwillig, nicht strategisch.
   const emergency = options?.emergency === true;
 
-  // Season 1 = keine Kredite (harte Regel), siehe docs/design/kredit-system.md. Unabhängig von
-  // Kapazität — man kommt mit dem aus, was man hat. (Notkredit ausgenommen.)
-  if (!options?.allowSeason1 && !emergency && isSeasonOne(gameState.season.id)) {
-    return { ok: false, loan: null, reason: SEASON_ONE_NO_LOANS_REASON, capacity: 0, terms: null, gameState };
-  }
+  // Saison 1 ist frei (Finanzkonzept f.6, 22.11.: "Kredite ab Saison 1"); die alte harte Regel aus docs/design/kredit-system.md ist gefallen.
+  // Die KI leiht in Saison 1 trotzdem nie fuer den Draft: das entscheidet `resolveAiLoanDecision`, nicht dieser Kern.
 
   const termSeasons = Math.round(input.termSeasons);
   if (!Number.isFinite(input.principal) || input.principal <= 0) {
@@ -561,6 +636,16 @@ export function originateLoan(
     const lenderOfferAmount = computeLenderOfferAmount(gameState, input.lenderTeamId, { relationshipValue });
     if (lenderOfferAmount < input.principal) {
       return { ok: false, loan: null, reason: "lender_insufficient_cash", capacity: 0, terms: null, gameState };
+    }
+    // MEHRSPIELER (M3): ein von Hand gefuehrter Geber verleiht nur sein freigegebenes `lendingBudget` (minus dem, was schon draussen ist) --
+    // dieselbe Regel wie im Angebot (`buildLoanOffers`), damit ein direkter POST kein fremdes Geld ueber die Freigabe hinaus holt. Ohne
+    // Freigabe gar nichts. Der Notkredit laeuft ueber die Bank und beruehrt das nicht.
+    const lenderControl = getTeamControlSettings(gameState, input.lenderTeamId);
+    if ((lenderControl?.controlMode ?? "ai") === "manual") {
+      const rahmen = Math.max(0, (lenderControl?.lendingBudget ?? 0) - getTeamLentOutTotal(gameState, input.lenderTeamId));
+      if (rahmen < input.principal) {
+        return { ok: false, loan: null, reason: "lender_budget_not_released", capacity: 0, terms: null, gameState };
+      }
     }
   }
 
@@ -598,11 +683,19 @@ export function originateLoan(
       relationshipValue,
       lenderFinances: lenderIdentity?.finances ?? 5,
       lenderCashPriority: lenderProfile?.bias.cashPriority ?? 5,
+      // Wie im Angebot (`buildLoanOffers`): der Verleiher geht nicht unter seinen eigenen Schuldzins. Ohne diese Zeile wich der gebuchte
+      // Satz vom gezeigten ab (gezeigt = gebucht).
+      lenderHighestDebtRate: getTeamHighestDebtRate(gameState, lender.teamId),
     });
     terms = {
       interestRatePerSeason: teamRate,
       installmentPerSeason: annuityInstallment(input.principal, teamRate, termSeasons),
     };
+  }
+  // RATEN JE SPIELTAG (22.11.): in einer Raten-Saison tilgt der Kredit je Spieltag; die Jahresrate ist dann Rate x Spieltage.
+  const konditionen = kreditKonditionen(gameState, input.principal, terms.interestRatePerSeason, termSeasons);
+  if (konditionen.rateJeSpieltag != null) {
+    terms = { interestRatePerSeason: terms.interestRatePerSeason, installmentPerSeason: konditionen.installmentPerSeason };
   }
 
   const loan: LoanRecord = {
@@ -619,6 +712,9 @@ export function originateLoan(
     originatedSeasonId: gameState.season.id,
     status: "active",
     missedPayments: 0,
+    ...(konditionen.rateJeSpieltag != null
+      ? { ratenJeSaison: konditionen.ratenJeSaison, ratenOffen: konditionen.ratenGesamt, rateJeSpieltag: konditionen.rateJeSpieltag }
+      : {}),
   };
 
   if (!options?.execute) {
@@ -687,7 +783,11 @@ function buildSettlementRows(gameState: GameState, seasonId: string): LoanSettle
   const cashByTeamId = new Map(gameState.teams.map((team) => [team.teamId, team.cash] as const));
   const rows: LoanSettlementRow[] = [];
 
-  for (const loan of loans) {
+  for (const loan0 of loans) {
+    // RATEN JE SPIELTAG (22.11.): in einer Raten-Saison buchen die Spieltage diesen Kredit; hier nichts, sonst doppelt.
+    if (ratenSicht(gameState, loan0)) continue;
+    // Ein Raten-Kredit in einer Saison OHNE Raten (Rueckweg) wird zur Jahresrate zurueckgerechnet.
+    const loan = alsJahresrateKredit(loan0);
     if (loan.status === "paid") {
       rows.push({
         loanId: loan.loanId,
@@ -705,23 +805,8 @@ function buildSettlementRows(gameState: GameState, seasonId: string): LoanSettle
       });
       continue;
     }
-    if (loan.status === "defaulted") {
-      rows.push({
-        loanId: loan.loanId,
-        borrowerTeamId: loan.borrowerTeamId,
-        status: "already_defaulted",
-        installmentCharged: 0,
-        interestPortion: 0,
-        principalPortion: 0,
-        cashDelta: 0,
-        capitalizedShortfall: 0,
-        penaltyApplied: 0,
-        boardConfidenceDelta: 0,
-        loanBecomesDefaulted: false,
-        loanBecomesPaid: false,
-      });
-      continue;
-    }
+    // Ein Kredit in Verzug (`defaulted`) wird WEITER eingezogen (PM-Entscheidung 22.11.): wie ein aktiver, dazu -1 Vorstandsvertrauen je Saison in Verzug.
+    const inVerzug = loan.status === "defaulted";
 
     const interestPortion = roundCash(loan.principalOutstanding * loan.interestRatePerSeason);
     const rawInstallment = loan.seasonsRemaining <= 1 ? loan.principalOutstanding + interestPortion : loan.installmentPerSeason;
@@ -744,7 +829,7 @@ function buildSettlementRows(gameState: GameState, seasonId: string): LoanSettle
         cashDelta: -installment,
         capitalizedShortfall: 0,
         penaltyApplied: 0,
-        boardConfidenceDelta: 0,
+        boardConfidenceDelta: inVerzug ? -1 : 0,
         loanBecomesDefaulted: false,
         loanBecomesPaid: nextOutstanding <= 0 || nextSeasonsRemaining === 0,
       });
@@ -755,7 +840,10 @@ function buildSettlementRows(gameState: GameState, seasonId: string): LoanSettle
     const paidPortion = roundCash(Math.max(0, availableCash));
     const shortfall = roundCash(Math.max(0, installment - paidPortion));
     const penalty = roundCash(shortfall * DEFAULT_PENALTY_RATE);
-    const capitalizedShortfall = roundCash(shortfall + penalty);
+    // Auf die Restschuld kommt nur der UNGEZAHLTE ZINS plus der Strafzins: die ungezahlte Tilgung steckt schon in `principalOutstanding`
+    // (naechste Restschuld = Restschuld - gezahlte Tilgung + capitalizedShortfall) und darf nicht ein zweites Mal aufgeschlagen werden.
+    const unpaidInterest = roundCash(Math.max(0, interestPortion - Math.min(interestPortion, paidPortion)));
+    const capitalizedShortfall = roundCash(unpaidInterest + penalty);
     cashByTeamId.set(loan.borrowerTeamId, 0);
     const nextMissedPayments = loan.missedPayments + 1;
 
@@ -770,7 +858,7 @@ function buildSettlementRows(gameState: GameState, seasonId: string): LoanSettle
       capitalizedShortfall,
       penaltyApplied: penalty,
       boardConfidenceDelta: -1,
-      loanBecomesDefaulted: nextMissedPayments >= DEFAULT_MISSED_PAYMENTS_THRESHOLD,
+      loanBecomesDefaulted: !inVerzug && nextMissedPayments >= DEFAULT_MISSED_PAYMENTS_THRESHOLD,
       loanBecomesPaid: false,
     });
   }
@@ -844,7 +932,10 @@ export function applyLoanSettlement(
     }
   }
 
-  const nextLoans = (gameState.seasonState.loans ?? []).map((loan) => {
+  const nextLoans = (gameState.seasonState.loans ?? []).map((loan0) => {
+    // Siehe `buildSettlementRows`: Spieltags-Kredite bleiben unberuehrt, Raten-Kredite ohne Raten-Saison werden zur Jahresrate.
+    if (ratenSicht(gameState, loan0)) return loan0;
+    const loan = alsJahresrateKredit(loan0);
     const row = rowsByLoanId.get(loan.loanId);
     if (!row || row.status === "already_paid" || row.status === "already_defaulted") {
       return loan;
@@ -861,11 +952,16 @@ export function applyLoanSettlement(
       };
     }
     // defaulted_capitalized
-    const nextOutstanding = roundCash(loan.principalOutstanding - row.principalPortion + row.capitalizedShortfall);
+    const nextOutstanding = Math.max(0, roundCash(loan.principalOutstanding - row.principalPortion + row.capitalizedShortfall));
     const nextMissedPayments = loan.missedPayments + 1;
+    // Keine Ballonzahlung am Laufzeitende: die verpasste Saison bleibt Restlaufzeit, und ist es die letzte, kommt eine Saison dazu; die Rate
+    // wird ueber die Restlaufzeit neu verrentet.
+    const nextSeasonsRemaining = Math.max(2, loan.seasonsRemaining);
     return {
       ...loan,
-      principalOutstanding: Math.max(0, nextOutstanding),
+      principalOutstanding: nextOutstanding,
+      seasonsRemaining: nextSeasonsRemaining,
+      installmentPerSeason: annuityInstallment(nextOutstanding, loan.interestRatePerSeason, nextSeasonsRemaining),
       missedPayments: nextMissedPayments,
       status: row.loanBecomesDefaulted ? ("defaulted" as const) : loan.status,
     };
@@ -1043,8 +1139,13 @@ export type EarlyPayoffQuote = {
  * Nur sinnvoll für `status === "active"` — für andere Status liefert es trotzdem eine
  * (rechnerisch bedeutungslose) Zahl zurück; Aufrufer prüfen den Status separat.
  */
-export function computeEarlyPayoff(loan: LoanRecord): EarlyPayoffQuote {
-  const remainingScheduled = roundCash(loan.installmentPerSeason * loan.seasonsRemaining);
+export function computeEarlyPayoff(loan0: LoanRecord, gameState?: GameState): EarlyPayoffQuote {
+  // GEZEIGT = GEBUCHT (M1): in einer Saison ohne Raten bucht das Saisonende die Jahresrate; ein Raten-Kredit wird dort zurueckgerechnet.
+  const loan = gameState && istRatenKredit(loan0) && !ratenSicht(gameState, loan0) ? alsJahresrateKredit(loan0) : loan0;
+  // RATEN JE SPIELTAG (22.11.): die geplante Restsumme sind die offenen Spieltagsraten.
+  const remainingScheduled = istRatenKredit(loan)
+    ? roundCash((loan.rateJeSpieltag ?? 0) * (loan.ratenOffen ?? 0))
+    : roundCash(loan.installmentPerSeason * loan.seasonsRemaining);
   const foregoneInterest = roundCash(Math.max(0, remainingScheduled - loan.principalOutstanding));
   const feePortion = roundCash(PREPAYMENT_FEE_RATE * foregoneInterest);
   const principalPortion = roundCash(Math.max(0, loan.principalOutstanding));
@@ -1124,7 +1225,13 @@ export function applyEarlyPayoff(
       ...gameState.seasonState,
       loans: (gameState.seasonState.loans ?? []).map((entry) =>
         entry.loanId === loanId
-          ? { ...entry, status: "paid" as const, principalOutstanding: 0, seasonsRemaining: 0 }
+          ? {
+              ...entry,
+              status: "paid" as const,
+              principalOutstanding: 0,
+              seasonsRemaining: 0,
+              ...(istRatenKredit(entry) ? { ratenOffen: 0 } : {}),
+            }
           : entry,
       ),
       loanApplyLogs: [...(gameState.seasonState.loanApplyLogs ?? []), earlyPayoffLog],

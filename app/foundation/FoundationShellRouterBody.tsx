@@ -243,13 +243,13 @@ const FoundationDisciplineStageHost = dynamic(() => import("@/app/foundation/dis
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Arena wird geladen…" />,
 });
-const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/FoundationCreditsHost"), {
-  ssr: false,
-  loading: () => <FoundationPanelSkeleton label="Kredite werden geladen…" />,
-});
 const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/FoundationFinancesHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
+});
+const FoundationMarketingHost = dynamic(() => import("@/app/foundation/marketing/FoundationMarketingHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Marketing wird geladen…" />,
 });
 const FoundationAusruestungHost = dynamic(() => import("@/app/foundation/ausruestung/FoundationAusruestungHost"), {
   ssr: false,
@@ -1816,7 +1816,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
           {activeView === "homeV2" ? (() => {
           // Kredit-Kern (Fog of War): nur für das aktive Manager-Team, nie für
-          // ein fremdes Team, siehe `use-credits-view-model.ts`.
+          // ein fremdes Team; die Kredite-Seite liest dieselben Kerne (`lib/finance/kredite-seite-modell.ts`).
           const homeLoanInstallment = activeManagerTeamId
             ? getTeamAnnualLoanInstallment(gameState, activeManagerTeamId)
             : null;
@@ -2894,19 +2894,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             hostProps={foundationHistoryV2HostProps}
           />
 
-          {activeView === "credits" ? (
-            <FoundationCreditsHost
-              gameState={gameState}
-              teamId={activeManagerTeamId}
-              onBorrow={originateLoanForActiveTeam}
-              onEarlyPayoff={repayLoanEarlyForActiveTeam}
-            />
-          ) : null}
-
-          {/* saveId: Seed fürs Season-Ökonomie-Fenster (Salary-Factor-Chip) — muss die echte
-              activeSaveId sein, damit Finanzen dieselben Faktoren zeigen wie Briefing + KI. */}
-          {activeView === "finances" ? (
+          {/* Finanzen und Kredite (22.11.): „Kredite“ in der Navigation springt auf den Reiter Kredite der Finanzseite (eine Seite, ein Reiter).
+              saveId: Seed fürs Season-Ökonomie-Fenster (Salary-Factor-Chip) — muss die echte activeSaveId sein, damit Finanzen dieselben
+              Faktoren zeigen wie Briefing + KI. */}
+          {activeView === "finances" || activeView === "credits" ? (
             <FoundationFinancesHost
+              key={activeView}
               gameState={gameState}
               teamId={activeManagerTeamId}
               saveId={activeSaveId}
@@ -2914,8 +2907,14 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onVorstandAktion={vorstandBudgetAktion}
               onOpenOffice={() => navigateHomeTab("office")}
               kannVerwalten={kannVerwaltenAktivesTeam}
+              onKreditAufnehmen={originateLoanForActiveTeam}
+              onKreditAbloesen={repayLoanEarlyForActiveTeam}
+              startAnsicht={activeView === "credits" ? "kredite" : undefined}
             />
           ) : null}
+
+          {/* Marketing (22.11.): nur der eigene Kader des AKTIVEN Managers, je Manager getrennt. */}
+          {activeView === "marketing" ? <FoundationMarketingHost gameState={gameState} teamId={activeManagerTeamId} /> : null}
 
           {activeView === "ausruestung" ? (
             <FoundationAusruestungHost

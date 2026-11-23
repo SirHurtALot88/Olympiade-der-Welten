@@ -14,6 +14,9 @@
  * (`standingsByTeamId`), nicht über einen eigenen Aufruf.
  */
 
+import { marketingSaisonbetrag } from "@/lib/marketing/marketing-team";
+import { marketingAktiv } from "@/lib/marketing/marketing-regel";
+import { buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import { getObjectiveCashByTeam } from "@/lib/board/objective-settlement-cash-source";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildApronProjection } from "@/lib/finance/apron-projection";
@@ -93,6 +96,7 @@ export function resolveSeasonGuvPartsByTeam(
   })();
 
   const byTeam = new Map<string, SeasonGuvParts>();
+  const moralIndex = marketingAktiv(gameState) ? buildMoraleLookupIndex(gameState) : undefined;
   for (const team of gameState.teams) {
     const facilities = computeFacilitySeasonCash(gameState, team.teamId, team.cash);
     const loans = computeTeamLoanShares(gameState, team.teamId);
@@ -103,6 +107,7 @@ export function resolveSeasonGuvPartsByTeam(
       sponsorEventCash: sponsorEventCash.byTeamId.get(team.teamId) ?? 0,
       sponsorEventCount: sponsorEventCash.anzahlByTeamId.get(team.teamId) ?? 0,
       facilityIncome: facilities.income,
+      marketingCash: marketingSaisonbetrag(gameState, team.teamId, moralIndex),
       facilityUpkeep: facilities.paidUpkeep,
       apronNetto: apronCash.gebucht ? (apronCash.byTeamId.get(team.teamId) ?? 0) : (apronRow?.nettoDelta ?? 0),
       apronRank: apronRow?.rank ?? null,
