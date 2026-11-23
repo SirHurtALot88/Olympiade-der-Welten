@@ -98,3 +98,68 @@ daran.
    Alternative: grobe Stufen wie beim Scouting-Nebel.
 3. **Zinsspanne.** Der Code rechnet 7 bis 20 % (Death Peaches 18 %), `finanzen-posten-22-11.md` nennt 5 bis 12 %. Das
    Mockup folgt dem Code. Falls 5 bis 12 % gewollt ist, muss die Formel neu geeicht werden.
+
+## 9. Bau (22.11., nach „bau das“)
+
+Entscheidungen (PM, verbindlich): Raten je Spieltag als eigener erster Teil; das Kreditregister der Liga ist öffentlich und exakt, die Kasse fremder
+Teams bleibt verborgen; Zinsspanne bleibt 7 bis 20 %; Kredite gehören zum Bereich „Käufe/Verkäufe/Verträge“, kein eigener Delegationsschalter.
+
+**Teil 1, Mechanik** (`lib/finance/kredit-raten.ts`): Stempel `seasonState.kreditRegel` (`raten` | `saisonende`), neues Spiel ab Saison 1, bestehender
+Spielstand ab dem nächsten Saisonwechsel (Lade-Migration schreibt `saisonende` fest), Rückweg `OLY_KREDIT_RATEN=aus` (neue Saisons). Jeder Rechenweg fragt
+`kreditRatenAktiv(gameState)`. Rate = Annuität über Laufzeit x Spieltage mit Zins/N, gebucht in `bucheSpieltagFinanzen` als Posten `kreditZins`,
+`kreditTilgung`, `kreditEingang` (Rückfluss an den Geber eines Team-Kredits), Kasse = Summe der Buchungen, idempotent über das Ledger. Die
+Saisonende-Abrechnung überspringt, was die Spieltage buchen; ein Raten-Kredit in einer Saison ohne Raten wird zur Jahresrate zurückgerechnet, ein alter Kredit in
+einer Raten-Saison umgerechnet: keine Doppelbuchung, keine Lücke. Zahlungsausfall je Spieltag: bezahlt wird, was da ist, Rest plus 5 % Strafzins kapitalisiert, ein
+Vertrauenspunkt je Kredit und Saison, geplatzt nach einem Viertel der Saison (5 Raten). GuV: nur der Zins (eine Zerlegung `kreditSaisonZerlegung` für GuV,
+Verpflichtungen, Planer). Notkredit-Rücknahme, Ablöse, Kontoauszug und Kassenprognose angepasst. Die Sperre für Saison 1 ist gefallen (Finanzkonzept f.6); die KI leiht in
+Saison 1 weiter nie für den Draft. Gefundener Fehler: der gebuchte Team-Satz ignorierte den Eigenzins des Gebers, das Angebot nicht; jetzt gleich.
+
+**Teil 2, Seite** (`FinanzenKredite.tsx`, `kredite-modern.css`, Modell `lib/finance/kredite-seite-modell.ts`): Reiter „Kredite“ der Finanzseite, drei Tafeln. Der
+Navigationspunkt „Kredite“ springt auf den Reiter. `FoundationCreditsNewLook`, Host, View-Modell und `.nl-credit*` sind entfernt. Sperren (Obergrenze 20 % der
+Planeinnahmen, Sparauflage) in `lib/finance/kredit-pruefung.ts`: dieselbe Funktion sperrt den Knopf und die Route `POST /api/finance/loan/originate`.
+
+| Mockup-Merkmal | Stand | Anmerkung |
+|---|---|---|
+| Reiter Kredite im Kopf der Finanzseite, Schulden und Zahl | drin | |
+| Vorstand rechts im Kopf (Vertrauen, Freigabe, erlaubt/gesperrt) | drin | zeigt „Kredit nur in der Vorsaison“, wenn das Fenster zu ist |
+| Fünf Kennzahlen (Schulden, Rate groß/klein, Ø Zins, Rahmen, Schuldendienst) | drin | |
+| Tabelle laufender Kredite, sortierbar, Ablösen | drin | Ablösen wählt den Kredit und fragt im Fuß nach (zwei Schritte) |
+| Tilgungsplan: Diagramm, Tabelle je Saison, Spieltagsleiste, Ablösefuß | drin | Plan wird aus dem Kredit nachgerechnet; bei verpassten Raten oder alten Krediten nur der Rest ab heute |
+| Rechner: Betrag, Laufzeit 1 bis 10, Angebote, günstigstes, gesperrter Geber | drin | |
+| Wirkung vorher → nachher | angepasst | Transfertopf, Kasse, GuV kommen aus der simulierten echten Aufnahme; „Raten im Gehaltstopf“ heißt „Raten je Saison (Fixkosten)“, weil die Rate den Gehaltstopf im Code nicht mindert |
+| Warnung bei Kasse im Minus (Pflichtkredit) | angepasst | der Pflichtkredit am Kassensturz ist nicht gebaut; gezeigt wird der echte Notkredit der Bank am Ende des Kauffensters (4 Saisons, Bankzins) |
+| Schuldendienst-Balken mit 10 % / 20 % | drin | 20 % sperrt auf Seite und Server |
+| Liga-Vergleich, Rang 1 = geringste Schulden, Rang unter 32 klein | drin | alle Spalten sortierbar |
+| Kreditregister (alle Kredite, Nehmer und Geber) | neu | Reiter „Register“ im Liga-Vergleich (Wunsch aus der alten Seite, bleibt erhalten) |
+| Beispielmarken „Beispiel“ | entfallen | die App zeigt echte Werte |
+| Zweiter Beispielkredit (Wrecking Legionnaires) | fehlt im Bild | Team-Geber hatte in der Aufnahme nicht genug freies Geld; die Zeile ist in Test und Seite vorhanden |
+| Aufnehmen mitten in der Saison | fehlt (bewusst) | die Phasenregel `credit_borrow` bleibt: Vorsaison und vor dem ersten Spieltag |
+
+Bilder (Mockup | App): `vergleich-1920x1080.png` (Spieltag 12, Fenster zu), `vergleich-2560x1440.png`, `vergleich-1710x1112.png` (Vorsaison, Aufnehmen und Ablösen aktiv),
+`vergleich-leer-1920x1080.png` (kein Kredit); dazu `app-kredite-register-1920x1080.png`. Kein Seitenscroll, keine Überlappung bei 1920, 2560 und 1710.
+
+### 9a. Review-Fixes zu PR #1717 (22.11.) und die Verzugsregel
+
+**Verzug (PM-Entscheidung, verbindlich; ersetzt „geplatzt“).** Ein Kredit „in Verzug“ (Status `defaulted`) wird **weiter eingezogen**:
+
+- An jedem Spieltag mit positiver Kasse zahlt das Team die Rate oder so viel, wie da ist, Zins zuerst. Kein Strafzins über die 5 % auf den Fehlbetrag hinaus.
+- Bei Team-Krediten geht der Rückfluss weiter an den Geber (eigene Ledger-Zeile, `kreditEingang`), der Geber verliert nichts dauerhaft.
+- Solange der Kredit in Verzug ist: Neukreditsperre (`isDefaultedDebtBorrowBlocked`) und **−1 Vorstandsvertrauen je Saison in Verzug** (einmal, beim ersten Einzug oder beim ersten Ausfall der Saison, nicht je Spieltag).
+- „In Verzug“ gilt ab 5 verpassten Raten **innerhalb einer Saison** (ein Viertel der Spieltage). `missedPayments` zählt je Saison und je Regel und wird beim Saisonwechsel zurückgesetzt (`kreditSaisonwechsel`). Im alten Saisonende-Weg gibt es nur eine Rate je Saison, dort gilt die eine verpasste Jahresrate als Verzug.
+- Ist die Restschuld getilgt, endet der Verzug (Status `paid`). Der Status selbst bleibt über den Saisonwechsel stehen, bis getilgt ist.
+- Am Laufzeitende gibt es keine Ballonzahlung: Nach einem Ausfall wird die Rate über die Restlaufzeit neu verrentet (`rateFuerRestraten`); war es die letzte Rate, kommt eine Saison Laufzeit dazu (Saisonende-Weg: Mindestlaufzeit 2, Jahresrate neu). Kein NaN, keine Endlosschleife.
+- `ratenSicht` liefert für Kredite in Verzug nicht mehr `null`; GuV, Schuldendienst und Verpflichtungen zählen sie als laufend (`kreditLaeuft`).
+
+| Befund | Änderung |
+|---|---|
+| W1 doppelt gezählte Tilgung | neue Restschuld = Restschuld − gezahlte Tilgung + ungezahlter Zins + 5 % Fehlbetrag, in `bucheKreditRaten` und in `buildSettlementRows`/`applyLoanSettlement` (`capitalizedShortfall` = ungezahlter Zins + Strafzins). Beispiel 100 C, 3 Saisons, n=10, Kasse im Minus: 102,19 statt 104,7. |
+| W2 Verzug | siehe oben |
+| W3 KI | `resolveAiLoanDecision` ruft vor jedem `shouldBorrow: true` `pruefeKreditAufnahme` mit der echten Rate aus `kreditKonditionen`; die Ausnahme „längste Laufzeit trotz Überschreitung“ ist weg, der Liquiditätszweig geht ebenfalls durch Obergrenze und Sparauflage, nur der Notkredit der Bank ist ausgenommen. Eine gemeinsame Grenze von 20 %; die 10 % sind nur noch die Warnfarbe der Seite. |
+| M1 gezeigt = gebucht | `kreditSaisonZerlegung`, `computeEarlyPayoff(loan, gameState)` und `kreditZeile` rechnen ohne Raten-Saison mit `alsJahresrateKredit`, wie die Saisonende-Abrechnung. |
+| M2 Rechner = Route | die Vorschau prüft mit `sim.loan.installmentPerSeason` (wie die Route); „bis Saisonende“ ohne Raten-Saison ist die Jahresrate. |
+| M3 Mehrspieler | `originateLoan` prüft wie `buildLoanOffers`: ein manuell geführter Geber verleiht nur sein freigegebenes `lendingBudget` minus Verliehenes, sonst `lender_budget_not_released`. |
+| K1 | `direkterEingang` bucht `kreditEingang` und `cashDelta` auf die schon stehende Zeile des Gebers (Kasse = Summe der Buchungen). |
+| K2 | `kreditSaisonwechsel` im Saisonwechsel: Zähler zurück, Raten-Kredit bei geänderter Spieltagszahl neu verrentet. |
+| K5 | Baseline-Eintrag der gelöschten Datei entfernt, Kommentar im Router aktualisiert. |
+
+Tests: `tests/kredit-review-fixes-22-11.test.ts` (alle Befunde), angepasst `tests/loan-service.test.ts` (Verzug wird eingezogen, Schwelle 1 im Saisonende-Weg) und `tests/ai-loan-decision-service.test.ts` (Sperre mit echter Rate).

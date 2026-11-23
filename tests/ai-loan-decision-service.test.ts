@@ -1,4 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// W3: die KI fragt vor jedem `shouldBorrow: true` die gemeinsame Sperre; der Spion ruft standardmaessig die echte Pruefung.
+vi.mock("@/lib/finance/kredit-pruefung", async (importOriginal) => {
+  const echt = await importOriginal<typeof import("@/lib/finance/kredit-pruefung")>();
+  return { ...echt, pruefeKreditAufnahme: vi.fn(echt.pruefeKreditAufnahme) };
+});
+import { pruefeKreditAufnahme } from "@/lib/finance/kredit-pruefung";
 
 import { resolveAiEarlyPayoffDecision, resolveAiLoanDecision } from "@/lib/ai/ai-loan-decision-service";
 import { computeEarlyPayoff, getTeamOutstandingDebt } from "@/lib/finance/loan-service";
@@ -501,6 +508,53 @@ describe("Liquiditaets-Kredit bei negativem Cash", () => {
     expect(decision.loanAmount).toBeGreaterThanOrEqual(4.2 + puffer - 0.05);
   });
 
+  it("geht durch dieselbe Sperre wie der Mensch: ueber 20 % der Planeinnahmen leiht auch die Liquiditaets-KI nicht", () => {
+    // Review-Fix W3: vorher nur der Notkredit der Bank ausgenommen, der Liquiditaetszweig umging Obergrenze und Sparauflage.
+    const rate: LoanRecord = {
+      loanId: "alt",
+      borrowerTeamId: "T-1",
+      lenderType: "bank",
+      principalOriginal: 120,
+      principalOutstanding: 120,
+      interestRatePerSeason: 0.1,
+      termSeasons: 6,
+      seasonsRemaining: 6,
+      installmentPerSeason: 20,
+      originatedSeasonId: "season-1",
+      status: "active",
+      missedPayments: 0,
+    };
+    const gameState = buildTeamGameState({ cash: -4.2, rosterCount: 12, playerOpt: 12, annualRevenue: 50, loans: [rate] });
+    const decision = resolveAiLoanDecision(gameState, "T-1");
+    expect(decision.shouldBorrow).toBe(false);
+    expect(["liquidity_debt_service_ceiling", "liquidity_no_capacity", "vorstand_sparauflage"]).toContain(decision.reason);
+  });
+
+  it("fragt die gemeinsame Sperre mit der echten Rate und leiht bei Nein nicht (Obergrenze und Sparauflage)", () => {
+    const gameState = buildTeamGameState({ cash: -4.2, rosterCount: 12, playerOpt: 12, annualRevenue: 50 });
+    const spion = vi.mocked(pruefeKreditAufnahme);
+    const sperre = (reason: "schuldendienst_obergrenze" | "vorstand_sparauflage") =>
+      ({ ok: false, reason, planEinnahmen: 50, quoteAlt: 0, quoteNeu: 0.5, stufe: "x", freigabeAnteil: 1 }) as ReturnType<typeof pruefeKreditAufnahme>;
+
+    const echt = spion.getMockImplementation();
+    spion.mockClear();
+    expect(resolveAiLoanDecision(gameState, "T-1").shouldBorrow).toBe(true);
+    // Mit der echten Jahresrate des Kredits (> 0), nicht mit einer Schaetzung.
+    expect(spion).toHaveBeenCalled();
+    expect(spion.mock.calls[0]![2]).toBeGreaterThan(0);
+
+    spion.mockReturnValue(sperre("vorstand_sparauflage"));
+    const spar = resolveAiLoanDecision(gameState, "T-1");
+    expect(spar.shouldBorrow).toBe(false);
+    expect(spar.reason).toBe("vorstand_sparauflage");
+
+    spion.mockReturnValue(sperre("schuldendienst_obergrenze"));
+    const obergrenze = resolveAiLoanDecision(gameState, "T-1");
+    expect(obergrenze.shouldBorrow).toBe(false);
+    expect(obergrenze.reason).toBe("liquidity_debt_service_ceiling");
+    spion.mockImplementation(echt!);
+  });
+
   it("laesst ein Team im Plus unangetastet", () => {
     // Die wichtigste Eigenschaft: der neue Zweig darf den Normalfall nicht anfassen.
     const gameState = buildTeamGameState({ cash: 60, rosterCount: 12, playerOpt: 12, annualRevenue: 50 });
@@ -661,8 +715,8 @@ describe("Der Kreditboden ist eine Rampe, keine Schwelle", () => {
   it("die Stufe haengt am KADER — dieselbe Kasse, anderes Ziel, andere Antwort", () => {
     // Der Beweis, dass wirklich die Rampe entscheidet: identische Finanzen, identische Rate,
     // nur die Zielgroesse unterscheidet sich.
-    const aufOpt = resolveAiLoanDecision(lage(9, 9, 3), "T-1");
-    const unterOpt = resolveAiLoanDecision(lage(9, 14, 3), "T-1");
+    const aufOpt = resolveAiLoanDecision(lage(9, 9, 1), "T-1");
+    const unterOpt = resolveAiLoanDecision(lage(9, 14, 1), "T-1");
     expect(aufOpt.shouldBorrow).toBe(false);
     expect(unterOpt.reason).not.toBe("debt_service_ceiling");
   });

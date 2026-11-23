@@ -171,12 +171,6 @@ describe("Fall 3: getTeamActualSalaryTotal ist die Cashflow-Summe", () => {
     expect(display).toContain("const salary = contract.expectedSalary ?? normalizeEconomyMoney(contract.salary) ?? 0;");
   });
 
-  it("der Kredite-Chart nutzt die echte Summe", () => {
-    const credits = quelle("lib/foundation/credits/use-credits-view-model.ts");
-    expect(credits).toContain("getTeamActualSalaryTotal(gameState, teamId)");
-    expect(credits).not.toContain("getTeamDisplaySalaryTotal(");
-  });
-
   it("die Finanzen-Seite summiert über denselben Helper", () => {
     expect(quelle("lib/foundation/finances/use-finances-view-model.ts")).toContain(
       "const salaryTotal = getTeamActualSalaryTotal(gameState, teamId);",

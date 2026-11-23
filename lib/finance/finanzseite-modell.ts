@@ -13,6 +13,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { erwarteteSpieltagBuchung } from "@/lib/finance/finanzen-je-spieltag-erwartung";
 import { istJeSpieltagSaison, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
+import { kreditSaisonTilgungRaten } from "@/lib/finance/kredit-raten";
 import { buildTeamKontoauszug, type KontoauszugZeile, type TeamKontoauszug } from "@/lib/finance/kontoauszug";
 import { berechneVorstandBudgetStand, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 import type { FinancesViewModel, TeamFinancesState } from "@/lib/foundation/finances/finances-types";
@@ -134,7 +135,10 @@ export function buildFinanzSeiteModell(gameState: GameState, teamId: string, fin
   // und kommt am Saisonende nicht noch einmal. Die Prognose zeigt nur den Rest.
   const jeSpieltag = istJeSpieltagSaison(gameState);
   const jeSpieltagGebucht = jeSpieltag ? summeSpieltagBuchungen(gameState, teamId).cashDelta : 0;
-  const erwartung = saisonendeGebucht ? 0 : r2((guv ?? 0) - transferNetto - jeSpieltagGebucht);
+  // KREDITRATEN JE SPIELTAG (22.11.): die GuV zaehlt nur den Zins, die Tilgung steht aber in der Kasse (gebucht) und kommt noch (offen).
+  // Die ganze Saisontilgung zieht die Prognose deshalb zusaetzlich ab; ohne Raten-Saison ist es 0 und nichts aendert sich.
+  const kreditTilgung = jeSpieltag && !saisonendeGebucht ? kreditSaisonTilgungRaten(gameState, teamId) : 0;
+  const erwartung = saisonendeGebucht ? 0 : r2((guv ?? 0) - transferNetto - jeSpieltagGebucht - kreditTilgung);
   const prognosePosten = saisonendeGebucht
     ? undefined
     : [
@@ -144,6 +148,7 @@ export function buildFinanzSeiteModell(gameState: GameState, teamId: string, fin
         ...(Math.abs(jeSpieltagGebucht) > 0.004
           ? [{ key: "spieltag_gebucht", label: "Schon je Spieltag gebucht", betrag: r2(-jeSpieltagGebucht) }]
           : []),
+        ...(Math.abs(kreditTilgung) > 0.004 ? [{ key: "kredittilgung", label: "Kredittilgung (Bilanz, nicht GuV)", betrag: r2(-kreditTilgung) }] : []),
       ];
   const prognoseEnde = saisonendeGebucht ? kasse : r2(kasse + erwartung);
   // Gespielte Spieltage nach heute tragen die heutige Kasse fort (flach), damit die Linie bis zum Ende sichtbar bleibt.

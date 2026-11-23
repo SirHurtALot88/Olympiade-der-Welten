@@ -266,9 +266,9 @@ describe("buildLoanOffers", () => {
     expect(largePrincipalOffers.some((offer) => offer.lenderType === "bank")).toBe(true);
   });
 
-  it("returns an empty list in Season 1 (hard rule)", () => {
+  it("bietet auch in Saison 1 an (Finanzkonzept f.6, 22.11.: Kredite ab Saison 1)", () => {
     const gameState = buildBorrowLenderState({ seasonId: "season-1" });
-    expect(buildLoanOffers(gameState, BORROWER_ID, 5, 4)).toEqual([]);
+    expect(buildLoanOffers(gameState, BORROWER_ID, 5, 4).some((offer) => offer.lenderType === "bank")).toBe(true);
   });
 });
 

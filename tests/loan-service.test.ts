@@ -239,9 +239,9 @@ describe("getTeamAnnualLoanInterest (GuV loan expense = interest only)", () => {
         { ...baseLoan(), loanId: "l3", borrowerTeamId: "A-A", principalOutstanding: 999, interestRatePerSeason: 0.2, installmentPerSeason: 999, status: "defaulted" },
       ],
     });
-    // Interest only: 100*0.1 + 50*0.2 = 10 + 10 = 20 (NOT the 30 + 20 = 50 of full installments,
-    // and the defaulted loan is not an active P&L interest expense).
-    expect(getTeamAnnualLoanInterest(gameState, "A-A")).toBeCloseTo(20, 1);
+    // Interest only: 100*0.1 + 50*0.2 = 10 + 10 = 20 (NOT the 30 + 20 = 50 of full installments).
+    // A loan IN VERZUG (defaulted) is still collected (PM decision 22.11.), so its interest is a real P&L expense: + 999*0.2 = 199.8.
+    expect(getTeamAnnualLoanInterest(gameState, "A-A")).toBeCloseTo(219.8, 1);
   });
 });
 
@@ -427,24 +427,23 @@ describe("originateLoan", () => {
     );
   });
 
-  it("Season 1 = keine Kredite: refuses regardless of capacity, no mutation", () => {
+  it("Saison 1 ist frei (Finanzkonzept f.6, 22.11.): ein Kredit wird aufgenommen, solange der Rahmen reicht", () => {
     const gameState = { ...gameStateWithCapacity(), season: { ...gameStateWithCapacity().season, id: "season-1" } };
     const result = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 10, termSeasons: 3 }, { execute: true });
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe("season_one_no_loans");
-    expect(result.loan).toBeNull();
-    expect(result.gameState).toBe(gameState);
-    expect(result.gameState.seasonState.loans ?? []).toHaveLength(0);
-    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(50);
+    expect(result.ok).toBe(true);
+    expect(result.loan).not.toBeNull();
+    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(60);
+    const ueberRahmen = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 9999, termSeasons: 3 }, { execute: true });
+    expect(ueberRahmen.reason).toBe("over_capacity");
   });
 
   describe("emergency option (Notkredit)", () => {
-    it("bypasses the Season 1 lock when emergency:true, blocked otherwise", () => {
+    it("bypasses the capacity limit when emergency:true, blocked otherwise", () => {
       const gameState = { ...gameStateWithCapacity(), season: { ...gameStateWithCapacity().season, id: "season-1" } };
 
-      const blocked = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 10, termSeasons: 3 }, { execute: true });
+      const blocked = originateLoan(gameState, { borrowerTeamId: "A-A", principal: 9999, termSeasons: 3 }, { execute: true });
       expect(blocked.ok).toBe(false);
-      expect(blocked.reason).toBe("season_one_no_loans");
+      expect(blocked.reason).toBe("over_capacity");
 
       const emergency = originateLoan(
         gameState,
@@ -670,10 +669,12 @@ describe("applyLoanSettlement", () => {
 
     const loan = result.gameState.seasonState.loans?.[0];
     expect(loan?.missedPayments).toBe(1);
-    expect(loan?.status).toBe("active");
-    // Shortfall (installment 8.79 - paid 3 = 5.79) plus 5% penalty gets capitalized onto principal.
-    // principalOutstanding should now exceed the pre-installment outstanding of 20.
-    expect(loan?.principalOutstanding ?? 0).toBeGreaterThan(20);
+    // One rate per season: a missed annual rate puts the loan IN VERZUG (counter is per season and rule).
+    expect(loan?.status).toBe("defaulted");
+    // W1: only the UNPAID INTEREST plus 5 % on the shortfall go onto the principal -- the unpaid principal part is already in it.
+    // interest 20*0.152 = 3.04, installment 8.79, paid 3 (all of it interest, no principal), unpaid interest 0.04, shortfall 5.79, penalty 0.29.
+    // Old (double counted) result: 20 + 5.79 + 0.29 = 26.1.
+    expect(loan?.principalOutstanding ?? 0).toBeCloseTo(20 + 0.04 + 0.29, 1);
   });
 
   it("marks the loan defaulted after repeated missed payments", () => {
@@ -699,7 +700,7 @@ describe("applyLoanSettlement", () => {
     expect(board?.value).toBeLessThan(5);
   });
 
-  it("ignores loans that are already paid or defaulted", () => {
+  it("ignores paid loans but keeps collecting a loan in Verzug (defaulted)", () => {
     const gameState = createGameState({
       teams: [createTeam({ teamId: "A-A", cash: 50 })],
       loans: [
@@ -708,10 +709,13 @@ describe("applyLoanSettlement", () => {
       ],
     });
     const preview = previewLoanSettlement(gameState);
-    expect(preview.canApply).toBe(false);
+    expect(preview.rows.find((r) => r.loanId === "paid-loan")?.status).toBe("already_paid");
+    expect(preview.rows.find((r) => r.loanId === "defaulted-loan")?.status).toBe("paid_full");
     const result = applyLoanSettlement(gameState, { execute: true });
-    expect(result.applied).toBe(false);
-    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBe(50);
+    expect(result.applied).toBe(true);
+    expect(result.gameState.teams.find((t) => t.teamId === "A-A")?.cash).toBeLessThan(50);
+    // Verzug costs the board one confidence point per season, even when the rate is paid.
+    expect(result.gameState.seasonState.boardConfidence?.["A-A"]?.value).toBeLessThan(5);
   });
 });
 
