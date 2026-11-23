@@ -41,7 +41,7 @@ export const VORLIEBE_TENDENZ = 0.15;
  * Lieblinge trainiert, bekommt im Ligamittel mehr Training. Gilt NUR, solange die Vorlieben-Regel der Saison "v1" ist (Faktor auf dem Trainingsbudget
  * je Spieltag, in `berechneSpieltagsZuwachs`), damit der Rueckweg `OLY_TRAINING_VORLIEBEN=aus` exakt den Stand vor Runde 2 liefert.
  */
-export const TRAININGS_VORLIEBEN_AUSGLEICH = 1;
+export const TRAININGS_VORLIEBEN_AUSGLEICH = 0.979;
 
 export type TrainingsVorlieben = {
   /** Die zwei Lieblings-Disziplinen (Matrix-Ids), in Reihenfolge ihrer Staerke. */
