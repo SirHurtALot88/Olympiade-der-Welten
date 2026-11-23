@@ -455,7 +455,7 @@ export default function BudgetGespraech({ gameState, teamId, onAktion, kannSchre
           <button type="button" className="btn ja" onClick={onFertig} disabled={wartetAuf.length > 0} title={wartetAuf.length > 0 ? `Der Draft wartet auf ${wartetAuf.join(", ")}.` : undefined}>Zum Draft<BcIcon name="rechts" /></button>
         ) : (
           <button type="button" className="btn ja" disabled={!darf} onClick={() => void unterschreibe(u.wirksam)} title={kannSchreiben ? undefined : "Nur der Manager dieses Teams kann unterschreiben."}>
-            <BcIcon name="liste" />{u.urteil === "zustimmung" ? "Unterschreiben" : "Vorschlag unterschreiben"}
+            <BcIcon name="liste" />{unterschrieben ? "Neu unterschreiben" : u.urteil === "zustimmung" ? "Unterschreiben" : "Vorschlag unterschreiben"}
           </button>
         )}
       </div>

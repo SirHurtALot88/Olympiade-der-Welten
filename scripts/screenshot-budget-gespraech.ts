@@ -103,8 +103,10 @@ async function main() {
       await ctx.close();
     };
 
-    for (const [b, h] of GROESSEN) {
-      const ctx = await browser.newContext({ viewport: { width: b, height: h }, deviceScaleFactor: 1 });
+    {
+      // Ein Durchgang, jeder Zustand in beiden Groessen (die Unterschrift laesst sich nicht zurueckdrehen).
+      const [b0, h0] = GROESSEN[0]!;
+      const ctx = await browser.newContext({ viewport: { width: b0, height: h0 }, deviceScaleFactor: 1 });
       const page = await ctx.newPage();
       page.on("pageerror", (e) => console.log(`[budget-shot] Seitenfehler: ${String(e).slice(0, 160)}`));
       const url = new URL("/foundation", BASE_URL);
@@ -125,7 +127,9 @@ async function main() {
       await seite.waitFor({ state: "visible", timeout: 60_000 });
       await page.waitForTimeout(800);
       const aufnahme = async (name: string) => {
-        await page.waitForTimeout(500);
+        for (const [b, h] of GROESSEN) {
+        await page.setViewportSize({ width: b, height: h });
+        await page.waitForTimeout(700);
         await page.screenshot({ path: path.join(OUTPUT_DIR, `app-${name}-${b}.png`) });
         const ueberlauf = await page.evaluate(() => {
           const wurzel = document.querySelector(".bgs") as HTMLElement | null;
@@ -136,6 +140,8 @@ async function main() {
           return { seitenScroll: document.documentElement.scrollHeight > window.innerHeight + 2, kaputt };
         });
         console.log(`[budget-shot] ${name}-${b}: ${JSON.stringify(ueberlauf)}`);
+        }
+        await page.setViewportSize({ width: b0, height: h0 });
       };
       await aufnahme("1-lage");
       await page.getByRole("button", { name: /^Verhandeln/ }).click();
