@@ -41,10 +41,10 @@ beforeAll(() => {
 afterEach(() => setzeGueteParameterFuerMessung(null));
 
 describe("Verteilung neu2: Parameter", () => {
-  it("alle Raten wachsen um das Tempo, die Summengrenzen mit; die Form (60/40, Schwung, Gamma) bleibt", () => {
+  it("alle Raten wachsen um das Tempo (Training noch um 1,25 mehr), die Summengrenze des Schwungs mit; die Form (60/40, Gamma) bleibt", () => {
     const k = ENTWICKLUNGS_TEMPO_NEU2;
     expect(k).toBeGreaterThan(1);
-    expect(ENTWICKLUNGS_PARAMETER_NEU2.trainingsSkala).toBeCloseTo(ENTWICKLUNGS_PARAMETER_STANDARD.trainingsSkala * k);
+    expect(ENTWICKLUNGS_PARAMETER_NEU2.trainingsSkala).toBeCloseTo(ENTWICKLUNGS_PARAMETER_STANDARD.trainingsSkala * k * 1.25);
     expect(ENTWICKLUNGS_PARAMETER_NEU2.leistungsSkala).toBeCloseTo(ENTWICKLUNGS_PARAMETER_STANDARD.leistungsSkala * k);
     expect(ENTWICKLUNGS_PARAMETER_NEU2.abbauSkala).toBeCloseTo(k);
     expect(ENTWICKLUNGS_PARAMETER_NEU2.schwungSumme).toBeCloseTo(ENTWICKLUNGS_PARAMETER_STANDARD.schwungSumme * k);
