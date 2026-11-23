@@ -52,6 +52,12 @@ export type ArenaHeimspiel = {
   tickets: number;
 };
 
+/** Ein Grund fuer eine Aenderung der Fanbasis (Fan-Modell organisch, 23.11.): `delta` in Fans, mit Vorzeichen. */
+export type ArenaFanGrund = { id: string; label: string; delta: number };
+
+/** Gemerkter Kaderspieler (fuer Kauf und Verkauf von Stars): Stern-Gewicht zum Zeitpunkt des Zugangs und Name. */
+export type ArenaKaderMerk = { w: number; n: string };
+
 export type ArenaAusbauZeile = {
   seasonId: string;
   matchdayIndex: number;
@@ -103,4 +109,22 @@ export type ArenaTeamStand = {
   ausbau: ArenaAusbauZeile[];
   /** Ausbau-Schritte DIESER Saison je Bereich (Grundlage der KI-Grenze). */
   ausbauSaison: ArenaPlaetze;
+  /** Langzeitwert der Fans dieses Teams (Anker): die Fanbasis zieht langsam dorthin, er folgt ihr am Saisonende zu 40 %. */
+  fanAnker?: number;
+  /** Fanbasis zu Beginn dieser Saison (Grundlage der Saison-Schranke -15 % bis +30 %). */
+  fanStart?: number;
+  /** Erwartung der Kaderstaerke (0 = schwaechster Kader der Liga, 1 = staerkster), zu Beginn der Saison gemerkt. */
+  erwartung?: number;
+  /** Kader beim letzten gebuchten Spieltag; Unterschiede = Kaeufe und Verkaeufe. Fehlt es, wird es ohne Wirkung angelegt. */
+  kader?: Record<string, ArenaKaderMerk>;
+  /** Bilanz der Fan-Aenderung DIESER Saison je Grund (Summe in Fans). */
+  fanBilanz?: ArenaFanGrund[];
+  /** Bilanz der Vorsaison, einschliesslich des Saisonende-Schritts. */
+  fanBilanzVorsaison?: ArenaFanGrund[];
+  /** Die letzte Aenderung (Spieltag `tag`, 0 = Saisonwechsel) mit Gruenden. */
+  fanLetzte?: { tag: number; seasonId: string; delta: number; gruende: ArenaFanGrund[] };
+  /** Fanbasis nach jedem gebuchten Spieltag dieser Saison (Index = Spieltag, 0 = Saisonstart). */
+  fanVerlauf?: number[];
+  /** Relative Aenderung der Fanbasis in der Vorsaison (Grundlage der KI-Prognose vor Spieltag 5). */
+  fanTrendVorsaison?: number;
 };

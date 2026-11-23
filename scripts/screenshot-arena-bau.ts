@@ -141,8 +141,8 @@ async function main() {
       await p.locator('[data-testid^="mk-zeile-"]').nth(1).click().catch(() => undefined);
     };
     const planen = (steh: number, sitz: number, loge: number) => async (p: Page) => {
-      await p.getByRole("tab", { name: /Arena/ }).first().click().catch(() => undefined);
-      await p.waitForTimeout(500);
+      await p.getByRole("tab", { name: /Arena/i }).first().click({ timeout: 60_000 }).catch(() => undefined);
+      await p.waitForTimeout(1500);
       const klick = async (name: string, n: number) => { for (let i = 0; i < n; i += 1) await p.getByRole("button", { name }).first().click().catch(() => undefined); };
       await klick("Stehplätze mehr", steh);
       await klick("Sitzplätze mehr", sitz);

@@ -4,7 +4,7 @@
  * "bringt ca." lohnt.
  *
  *   - nur in Bereichen mit Empfehlung: Schnitt der letzten drei Heimspiele bei 85 % oder mehr (vorher 90 %) (mindestens zwei gespielt);
- *   - so viele Schritte, wie der Ueberhang der Nachfrage der NAECHSTEN Saison fuellt (Nachfrage x 1,22), hoechstens sechs je Bereich und Saison
+ *   - so viele Schritte, wie der Ueberhang der Nachfrage der NAECHSTEN Saison fuellt (Nachfrage x Fan-Trend, `fanPrognoseFaktor`), hoechstens sechs je Bereich und Saison
  *     (23.11. "KI baut schneller", vorher drei);
  *   - nur, wenn "Erwartet" den Bau in hoechstens acht Saisons bezahlt (vorher vier, davor sechs);
  *   - Logen nur mit Erfolg und grossem Sponsor (Sponsor-Stufe und Tabellenplatz je mindestens die Haelfte);
@@ -16,7 +16,8 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { KI_REHA_RUECKLAGE_S1_FAKTOR } from "@/lib/ai/ki-schonung-reha-regeln";
 import { resolveKiRuecklageFuerTeam } from "@/lib/finance/ki-ruecklage";
-import { FANBASIS_WACHSTUM_SAISON, SCHRITT_GROESSE, ausbauVorschau, auslastungFan, fanMaximum, maxSchritte, plaetzeNachSchritten, schritteGebaut } from "@/lib/arena/arena-modell";
+import { SCHRITT_GROESSE, ausbauVorschau, maxSchritte, schritteGebaut } from "@/lib/arena/arena-modell";
+import { fanPrognoseFaktor } from "@/lib/arena/fan-modell";
 import { arenaAktiv } from "@/lib/arena/arena-regel";
 import { holeArenaStand, istLiga1, letzteDreiSchnitt, ligaTabellenAnteil, sponsorStufen, heimspieleDerSaison } from "@/lib/arena/arena-stand";
 import { ARENA_BEREICHE, type ArenaBereich } from "@/lib/arena/arena-typen";
@@ -25,8 +26,6 @@ import { ARENA_BEREICHE, type ArenaBereich } from "@/lib/arena/arena-typen";
 export const KI_MAX_SCHRITTE_JE_BEREICH_UND_SAISON = 6;
 export const KI_MAX_BEZAHLT_SAISONS = 8;
 export const KI_EMPFEHLUNG_AUSLASTUNG = 0.85;
-/** Die KI baut auf die Nachfrage der naechsten Saison vor (Fanbasis waechst bei vollem Haus um hoechstens 22 %), nicht nur auf die von heute. */
-export const KI_VORAUS_FAKTOR = FANBASIS_WACHSTUM_SAISON;
 
 export type KiArenaEntscheidung = {
   /** Gewuenschte Schritte je Bereich (nur Bereiche mit Empfehlung und Amortisation). */
@@ -59,17 +58,6 @@ export function freiesGeldNachRuecklage(gameState: GameState, teamId: string): n
   return (team.cash ?? 0) - (saisonNummer(gameState) <= 1 ? ruecklage * KI_REHA_RUECKLAGE_S1_FAKTOR : ruecklage);
 }
 
-/**
- * Fanbasis in der naechsten Saison, wie die KI sie erwartet (23.11. "KI baut schneller"): ist das Haus voll (Steh + Sitz im Schnitt der letzten
- * drei Heimspiele bei 85 % oder mehr), waechst die Fanbasis um hoechstens 22 % je Saison, aber nie ueber das Fan-Maximum der Plaetze. Wer am
- * Maximum haengt, waechst nur mit mehr Plaetzen (h.3 "wer am Maximum haengt, muss bauen"); wer darunter liegt, braucht die Plaetze fuer das
- * Wachstum von morgen. Ist das Haus nicht voll, bleibt die Fanbasis, wie sie ist.
- */
-function fanbasisPrognose(fanbasis: number, plaetze: Parameters<typeof fanMaximum>[0], hausVoll: boolean): number {
-  if (!hausVoll || fanbasis >= fanMaximum(plaetze)) return fanbasis;
-  return Math.min(fanMaximum(plaetze), fanbasis * FANBASIS_WACHSTUM_SAISON);
-}
-
 /** Bewertet den Ausbau fuer EIN Team; ohne zu schreiben. Fuer Tests und Messskripte exportiert. */
 export function bewerteKiArena(gameState: GameState, teamId: string): KiArenaEntscheidung | null {
   if (!arenaAktiv(gameState)) return null;
@@ -81,7 +69,9 @@ export function bewerteKiArena(gameState: GameState, teamId: string): KiArenaEnt
   const tabelle = ligaTabellenAnteil(gameState, teamId);
   const heim = heimspieleDerSaison(gameState, teamId);
   let frei = freiesGeldNachRuecklage(gameState, teamId);
-  const hausVoll = auslastungFan(stand.plaetze, schnitt.auslastung) >= KI_EMPFEHLUNG_AUSLASTUNG;
+  // Fan-Modell organisch (23.11.): die KI prognostiziert den FAN-TREND (Aenderung der Fanbasis dieser Saison, hochgerechnet; vor Spieltag 5 die der
+  // Vorsaison), nicht die Auslastung. Die Fans haengen nicht am Stadion: dieselbe Prognose gilt mit und ohne Ausbau.
+  const fanFaktor = fanPrognoseFaktor({ fanbasis: stand.fanbasis, saisonStart: stand.fanStart, spieltage: stand.stand, trendVorsaison: stand.fanTrendVorsaison, saisonLaenge: gameState.season?.matchdayIds?.length || 20 });
   const kandidaten: Array<{ b: ArenaBereich; schritte: number; bezahlt: number }> = [];
   for (const b of ARENA_BEREICHE) {
     if (stand.plaetze[b] <= 0 && b !== "loge") continue;
@@ -96,10 +86,10 @@ export function bewerteKiArena(gameState: GameState, teamId: string): KiArenaEnt
       continue;
     }
     // Ueberhang der Nachfrage in Schritten (mindestens einer, weil der Bereich voll ist); Logen fuellen sich anteilig, dort ein Schritt.
-    const ueberhang = b === "loge" ? 1 : Math.max(1, Math.floor((schnitt.nachfrage[b] * KI_VORAUS_FAKTOR - stand.plaetze[b]) / SCHRITT_GROESSE[b]));
+    const ueberhang = b === "loge" ? 1 : Math.max(1, Math.floor((schnitt.nachfrage[b] * fanFaktor - stand.plaetze[b]) / SCHRITT_GROESSE[b]));
     // Schritte so weit zuruecknehmen, bis sie sich in acht Saisons bezahlen und das freie Geld reicht.
     for (let n = Math.min(ueberhang, grenze); n >= 1; n -= 1) {
-      const v = ausbauVorschau({ plaetze: stand.plaetze, schritte: { [b]: n }, fanbasis: stand.fanbasis, fanbasisOhneAusbau: fanbasisPrognose(stand.fanbasis, stand.plaetze, hausVoll), fanbasisNachher: fanbasisPrognose(stand.fanbasis, plaetzeNachSchritten(stand.plaetze, { [b]: n }), hausVoll), stimmung: stand.stimmung, liga1: istLiga1(gameState, teamId), sponsorStufe: sponsor, tabellenAnteil: tabelle, heimspiele: heim });
+      const v = ausbauVorschau({ plaetze: stand.plaetze, schritte: { [b]: n }, fanbasis: stand.fanbasis * fanFaktor, stimmung: stand.stimmung, liga1: istLiga1(gameState, teamId), sponsorStufe: sponsor, tabellenAnteil: tabelle, heimspiele: heim });
       if (v.bezahltErwartet != null && v.bezahltErwartet <= KI_MAX_BEZAHLT_SAISONS) {
         kandidaten.push({ b, schritte: n, bezahlt: v.bezahltErwartet });
         break;
@@ -110,7 +100,7 @@ export function bewerteKiArena(gameState: GameState, teamId: string): KiArenaEnt
   kandidaten.sort((a, c) => a.bezahlt - c.bezahlt);
   const gewaehlt: Partial<Record<ArenaBereich, number>> = {};
   for (const k of kandidaten) {
-    const v = ausbauVorschau({ plaetze: stand.plaetze, schritte: { [k.b]: k.schritte }, fanbasis: stand.fanbasis, stimmung: stand.stimmung, liga1: istLiga1(gameState, teamId), sponsorStufe: sponsor, tabellenAnteil: tabelle, heimspiele: heim });
+    const v = ausbauVorschau({ plaetze: stand.plaetze, schritte: { [k.b]: k.schritte }, fanbasis: stand.fanbasis * fanFaktor, stimmung: stand.stimmung, liga1: istLiga1(gameState, teamId), sponsorStufe: sponsor, tabellenAnteil: tabelle, heimspiele: heim });
     if (v.kosten > frei + 1e-9) {
       aus.abgelehnt.push({ bereich: k.b, grund: "das freie Geld nach der Rücklage reicht nicht" });
       continue;

@@ -24,7 +24,6 @@ import {
   SCHRITT_GROESSE,
   ausbauVorschau,
   dauerkartenGeld,
-  fanMaximum,
   gesamtPlaetze,
   leiterZeile,
   maxSchritte,
@@ -34,6 +33,8 @@ import {
   volleHausSaison,
 } from "@/lib/arena/arena-modell";
 import { arenaAktiv } from "@/lib/arena/arena-regel";
+import { fanGruendeAnzeige } from "@/lib/arena/fan-modell";
+import type { ArenaFanGrund } from "@/lib/arena/arena-typen";
 import {
   heimSpieltage,
   heimspieleDerSaison,
@@ -54,6 +55,8 @@ const zahl = (v: number, st = 2) => v.toLocaleString("de-DE", { minimumFractionD
 const ganz = (v: number) => Math.round(v).toLocaleString("de-DE");
 const C = (v: number, st = 2) => `${zahl(v, st)} C`;
 const pct = (v: number) => `${Math.round(v * 100)} %`;
+const vz = (v: number) => (Math.round(v) >= 0 ? "+" : "−") + Math.abs(Math.round(v)).toLocaleString("de-DE");
+const gruendeText = (g: readonly ArenaFanGrund[] | undefined, max = 4) => fanGruendeAnzeige(g, max).map((x) => `${vz(x.delta)} ${x.label}`).join(", ") || "keine nennenswerten Gründe";
 const saisons = (v: number | null) => (v == null ? "nie" : `${zahl(v, 1)} Saisons`);
 
 export type ArenaAnsichtProps = {
@@ -124,6 +127,8 @@ export default function ArenaAnsicht({ gameState, teamId, onAktion, kannSchreibe
   const dauerGeldStufen = DAUERKARTEN_STUFEN.map((s) => dauerkartenGeld(stand.plaetze, s, liga1, heim));
   const voll = volleHausSaison(stand.plaetze, liga1, heim);
   const letztes = stand.heimspiele[stand.heimspiele.length - 1] ?? null;
+  const fanSaisonDelta = stand.fanbasis - (stand.fanStart ?? stand.fanbasis);
+  const fanLetzte = stand.fanLetzte;
 
   return (
     <div className="arena-gr" data-testid="arena-ansicht">
@@ -133,8 +138,8 @@ export default function ArenaAnsicht({ gameState, teamId, onAktion, kannSchreibe
           <strong className="bc-t">{ganz(gesamtPlaetze(stand.plaetze))}</strong>
         </div>
         <div>
-          <small>Fanbasis · Maximum</small>
-          <strong className="bc-t">{ganz(stand.fanbasis)} · {ganz(fanMaximum(stand.plaetze))}</strong>
+          <small>Fanbasis · Trend der Saison</small>
+          <strong className="bc-t" data-testid="arena-fanbasis">{ganz(stand.fanbasis)} · <span className={fanSaisonDelta >= 0 ? "plus" : "minus"}>{vz(fanSaisonDelta)}</span></strong>
         </div>
         <div>
           <small>Stimmung</small>
@@ -216,6 +221,15 @@ export default function ArenaAnsicht({ gameState, teamId, onAktion, kannSchreibe
         <section className="fin-sd" data-testid="arena-fans">
           <div className="fin-kopf">Fans &amp; Heimspiele<small>Stimmung {Math.round(stand.stimmung)} · Serie {stand.serie}</small></div>
           <div className="fin-in">
+            <div className="fin-rek" data-testid="arena-fan-trend">
+              <span>Fanbasis <small>unabhängig vom Stadion</small></span>
+              <FanVerlauf werte={stand.fanVerlauf} />
+            </div>
+            {fanLetzte ? (
+              <div className="fin-txt"><b>{fanLetzte.tag === 0 ? "Saisonwechsel" : `Spieltag ${fanLetzte.tag}`} ({vz(fanLetzte.delta)}):</b> {gruendeText(fanLetzte.gruende.map((g) => ({ ...g })), 4)}</div>
+            ) : null}
+            <div className="fin-txt"><b>Diese Saison ({vz(fanSaisonDelta)}):</b> {gruendeText(stand.fanBilanz, 3)}</div>
+            {stand.fanBilanzVorsaison ? <div className="fin-txt"><b>Vorsaison:</b> {gruendeText(stand.fanBilanzVorsaison, 3)}</div> : null}
             <div className="fin-rek"><span>Tageskasse bisher</span><b className="bc-t plus">{C(stand.heimspiele.reduce((s, h) => s + h.tickets, 0))}</b></div>
             <div className="fin-rek"><span>Heimspiele gespielt</span><b className="bc-t">{stand.heimspiele.length} von {heim}</b></div>
             {letztes ? (
@@ -224,7 +238,6 @@ export default function ArenaAnsicht({ gameState, teamId, onAktion, kannSchreibe
             ) : (
               <div className="fin-txt">Noch kein Heimspiel gebucht. Die Nachfrage folgt der Fanbasis, der Stimmung und dem Anlass des Spiels (Derby, Spitzenspiel, Unwetter …).</div>
             )}
-            <div className="fin-txt">Ausverkauft: der Überhang hebt die Tageskarten bis +25 % (Logen bis +50 %). Dauerkarten bleiben beim festen Preis.</div>
           </div>
         </section>
 
@@ -279,5 +292,20 @@ export default function ArenaAnsicht({ gameState, teamId, onAktion, kannSchreibe
         </div>
       </section>
     </div>
+  );
+}
+
+/** Kleine Linie der Fanbasis je Spieltag (nur Tokens, keine Achsen). */
+function FanVerlauf({ werte }: { werte?: number[] }) {
+  const w = (werte ?? []).filter((x) => Number.isFinite(x));
+  if (w.length < 2) return <b className="bc-t">–</b>;
+  const min = Math.min(...w);
+  const max = Math.max(...w);
+  const spanne = Math.max(1, max - min);
+  const pkt = w.map((v, i) => `${(i / (w.length - 1)) * 100},${22 - ((v - min) / spanne) * 20}`).join(" ");
+  return (
+    <svg className="arena-fanlinie" viewBox="0 0 100 24" preserveAspectRatio="none" role="img" aria-label="Fanbasis je Spieltag">
+      <polyline points={pkt} fill="none" strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
+    </svg>
   );
 }

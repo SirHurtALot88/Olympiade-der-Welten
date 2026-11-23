@@ -38,20 +38,14 @@ export const DAUERKARTEN_STUFEN: readonly DauerkartenStufe[] = ["wenig", "normal
 export const DAUERKARTEN_LABEL: Record<DauerkartenStufe, string> = { wenig: "Wenig", normal: "Normal", viel: "Viel" };
 
 /** Nachfrage (g.2): Fanbasis x (0,30 + 0,85 x Stimmung/100) x Ereignis; Aufteilung auf Stehen und Sitzen nach der Stimmung. */
-export const NACHFRAGE_GRUND = 0.3;
-export const NACHFRAGE_STIMMUNG = 0.85;
+export const NACHFRAGE_GRUND = 0.45;
+export const NACHFRAGE_STIMMUNG = 0.9;
 export const STEH_ANTEIL_GRUND = 0.35;
 export const STEH_ANTEIL_STIMMUNG = 0.3;
 /** Wer keinen Stehplatz bekommt, kauft zu 50 % einen Sitzplatz; wer keinen Sitzplatz bekommt, zu 80 % einen Stehplatz. */
 export const UEBERLAUF_STEH_ZU_SITZ = 0.5;
 export const UEBERLAUF_SITZ_ZU_STEH = 0.8;
-/** Fanbasis: Start 5.000 x Beliebtheit; +2 % nach einem Heimspiel mit mindestens 90 % Auslastung, -1 % unter 60 %; Maximum 1,5 x (Steh + Sitz). */
-export const FANBASIS_START = 5000;
-export const FANBASIS_WACHSTUM = 1.02;
-export const FANBASIS_SCHWUND = 0.99;
-/** Hoechstwachstum der Fanbasis je Saison (10 Heimspiele a +2 %), Grundlage der KI-Rechnung am Fan-Maximum. */
-export const FANBASIS_WACHSTUM_SAISON = 1.22;
-export const FANBASIS_MAX_FAKTOR = 1.5;
+/** Fanbasis: haengt NICHT am Stadion (Fan-Modell organisch, 23.11., `fan-modell.ts`); das Stadion begrenzt nur die verkauften Tickets. */
 /** Zuschlag auf Tageskarten bei ausverkauftem Haus: halber Ueberhang, hoechstens +25 % (Logen +50 %). */
 export const ZUSCHLAG_MAX: Record<ArenaBereich, number> = { steh: 0.25, sitz: 0.25, loge: 0.5 };
 
@@ -67,15 +61,6 @@ export const runde1 = (v: number) => Math.round(v * 10) / 10;
 
 export function gesamtPlaetze(p: ArenaPlaetze): number {
   return p.steh + p.sitz + p.loge;
-}
-
-/** Steh + Sitz: Grundlage des Fan-Maximums (Logen zaehlen nicht). */
-export function fanPlaetze(p: ArenaPlaetze): number {
-  return p.steh + p.sitz;
-}
-
-export function fanMaximum(p: ArenaPlaetze): number {
-  return FANBASIS_MAX_FAKTOR * fanPlaetze(p);
 }
 
 /** Preis EINES Platzes je Heimspiel in C. */
@@ -205,19 +190,11 @@ export function rechneHeimspiel(e: HeimspielEingabe): HeimspielErgebnis {
   return { nachfrage, auslastung, zuschlag, kasse, tickets, besucher };
 }
 
-/** Gesamte Auslastung (Steh + Sitz gewichtet nach Plaetzen), Grundlage des Fanbasis-Wachstums. */
+/** Gesamte Auslastung (Steh + Sitz gewichtet nach Plaetzen); Logen zaehlen nicht. */
 export function auslastungFan(plaetze: ArenaPlaetze, auslastung: ArenaPlaetze): number {
-  const n = fanPlaetze(plaetze);
+  const n = plaetze.steh + plaetze.sitz;
   if (n <= 0) return 0;
   return (plaetze.steh * auslastung.steh + plaetze.sitz * auslastung.sitz) / n;
-}
-
-/** Fanbasis nach einem Heimspiel (g.2). */
-export function fanbasisNachHeimspiel(fanbasis: number, auslastungFanAnteil: number, plaetze: ArenaPlaetze): number {
-  let neu = fanbasis;
-  if (auslastungFanAnteil >= 0.9) neu = fanbasis * FANBASIS_WACHSTUM;
-  else if (auslastungFanAnteil < 0.6) neu = fanbasis * FANBASIS_SCHWUND;
-  return neu > fanbasis ? Math.min(neu, Math.max(fanMaximum(plaetze), fanbasis)) : neu;
 }
 
 /* ------------------------------------------------------------------------------------------------ Stimmung */
@@ -298,8 +275,6 @@ export type AusbauVorschau = {
   nettoErwartet: number;
   bezahltVoll: number | null;
   bezahltErwartet: number | null;
-  /** Fan-Maximum nach dem Ausbau. */
-  fanMaximumNachher: number;
 };
 
 export const NIE_NACH_SAISONS = 20;
@@ -325,16 +300,12 @@ export function ausbauVorschau(input: {
   sponsorStufe: number;
   tabellenAnteil: number;
   heimspiele?: number;
-  /** Fanbasis NACH dem Ausbau (Wachstum bis zum neuen Fan-Maximum); ohne Angabe die von heute. Nur die KI rechnet damit. */
-  fanbasisNachher?: number;
-  /** Fanbasis OHNE den Ausbau (Wachstum bis zum heutigen Fan-Maximum), damit der Gewinn nur den Ausbau zaehlt; ohne Angabe die von heute. Nur die KI rechnet damit. */
-  fanbasisOhneAusbau?: number;
 }): AusbauVorschau {
   const n = input.heimspiele ?? HEIMSPIELE_REFERENZ;
   const nachher = plaetzeNachSchritten(input.plaetze, input.schritte);
   const basis = { fanbasis: input.fanbasis, stimmung: input.stimmung, liga1: input.liga1, sponsorStufe: input.sponsorStufe, tabellenAnteil: input.tabellenAnteil };
-  const alt = rechneHeimspiel({ ...basis, fanbasis: input.fanbasisOhneAusbau ?? input.fanbasis, plaetze: input.plaetze });
-  const neu = rechneHeimspiel({ ...basis, fanbasis: input.fanbasisNachher ?? input.fanbasis, plaetze: nachher });
+  const alt = rechneHeimspiel({ ...basis, plaetze: input.plaetze });
+  const neu = rechneHeimspiel({ ...basis, plaetze: nachher });
   const zeilen: AusbauZeile[] = ARENA_BEREICHE.map((b) => {
     const gewuenscht = Math.max(0, Math.round(input.schritte[b] ?? 0));
     const gebaut = schritteGebaut(b, input.plaetze[b]);
@@ -370,7 +341,6 @@ export function ausbauVorschau(input: {
     nettoErwartet,
     bezahltVoll: saisonsBisBezahlt(kosten, nettoVoll),
     bezahltErwartet: saisonsBisBezahlt(kosten, nettoErwartet),
-    fanMaximumNachher: fanMaximum(nachher),
   };
 }
 

@@ -10,6 +10,8 @@ import { computeTeamBeliebtheitFromGameState } from "@/lib/economy/team-beliebth
 import { getTeamFacilityState } from "@/lib/facilities/facility-effects";
 import { sponsorBasisJahr } from "@/lib/sponsor/sponsor-settlement-service";
 import { RELEGATION_COUNT, getLeagueOf } from "@/lib/season/league-split";
+import { findLeagueMovementLog } from "@/lib/season/league-movement-service";
+import { budgetRangFuer, kaderEinesTeams, marketabilityFuer, perzentilFuer, teamErfolgAusSnapshot, gleicheLigaWie } from "@/lib/marketing/marketing-kontext";
 import { kaderJahresgehaltAmSpieltag } from "@/lib/finance/finanzen-je-spieltag";
 import { findeSpieltagsFixtures } from "@/lib/resolve/battle-mode-pps-duell";
 import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
@@ -19,14 +21,11 @@ import { arenaAusAltemGebaeude, arenaAktiv, gueltigerArenaStempel } from "@/lib/
 import {
   DAUERKARTEN_ANTEIL,
   EINS_PLAETZE,
-  FANBASIS_START,
   GRUND_PLAETZE,
   HEIMSPIELE_REFERENZ,
   auslastungFan,
   dauerkartenGeld,
   dauerkartenPlaetze,
-  fanMaximum,
-  fanbasisNachHeimspiel,
   grundNachfrage,
   kiDauerkartenStufe,
   mapBereiche,
@@ -37,7 +36,23 @@ import {
   stimmungNachSpieltag,
 } from "@/lib/arena/arena-modell";
 import {
+  FAN_KONFIG,
+  ankerNachSaison,
+  erwartetePunkteJeSpieltag,
+  fanBilanzAddiere,
+  fanGruendeSaisonende,
+  fanGruendeSpieltag,
+  fanbasisStart,
+  sternFans,
+  sternGewicht,
+  startStadionPlaetze,
+  startStadionSchritte,
+  wendeFanGruendeAn,
+} from "@/lib/arena/fan-modell";
+import {
   ARENA_BEREICHE,
+  type ArenaFanGrund,
+  type ArenaKaderMerk,
   type ArenaEreignisZeile,
   type ArenaHeimspiel,
   type ArenaPlaetze,
@@ -143,22 +158,46 @@ export function holeArenaStand(gameState: GameState, teamId: string): ArenaTeamS
   return neuerArenaStand(gameState, teamId);
 }
 
+/** Matrix-Beliebtheit (TeamIdentity.popularity 1..10) eines Teams; `null` ohne Eintrag. */
+function matrixBeliebtheit(gameState: GameState, teamId: string): number | null {
+  const p = gameState.teamIdentities?.find((t) => t.teamId === teamId)?.popularity;
+  return typeof p === "number" && Number.isFinite(p) ? p : null;
+}
+
+/**
+ * START-STADION (Chris, 23.11.): Grundarena 4.000 fuer alle plus ein Bonus von 0 bis 3 Schritten (je 1.000 Plaetze) aus einer gedeckelten Mischung:
+ * 60 % Beliebtheit/Tradition aus der Team-Matrix, 25 % Liga (Liga 1 vor Liga 2), nur 15 % Budget. Starke Teams starten etwas groesser, muessen
+ * aber weiter investieren; das Budget allein vergroessert das Stadion nicht (sonst werden die Starken noch staerker, weil sie Invest sparen).
+ */
+export function startStadionFuer(gameState: GameState, teamId: string): { plaetze: ArenaPlaetze; schritte: number } {
+  const pop = matrixBeliebtheit(gameState, teamId);
+  const popAnteil = pop == null ? 0.5 : (pop - 1) / 8;
+  const rang = budgetRangFuer(gameState, teamId);
+  const budgetAnteil = rang.anzahl > 1 ? 1 - (rang.rang - 1) / (rang.anzahl - 1) : 0.5;
+  const schritte = startStadionSchritte(popAnteil, istLiga1(gameState, teamId), budgetAnteil);
+  return { plaetze: startStadionPlaetze(GRUND_PLAETZE, schritte), schritte };
+}
+
 export function neuerArenaStand(gameState: GameState, teamId: string): ArenaTeamStand {
   const stempel = gueltigerArenaStempel(gameState);
-  let plaetze: ArenaPlaetze = { ...GRUND_PLAETZE };
+  let plaetze: ArenaPlaetze = startStadionFuer(gameState, teamId).plaetze;
   let umstieg = false;
   if (stempel?.umstieg) {
     const stufe = getTeamFacilityState(gameState, teamId).facilities.arena_upgrade?.level ?? 0;
     plaetze = arenaAusAltemGebaeude(stufe);
     umstieg = stufe > 0;
+    if (!umstieg) plaetze = { ...GRUND_PLAETZE };
   }
   const bel = computeTeamBeliebtheitFromGameState(gameState, teamId).value;
-  const max = fanMaximum(plaetze);
-  // Umstieg: die Arena ist schon da, die Fans sollen sie fuellen koennen (halbes Fan-Maximum x Beliebtheit); neues Spiel: 5.000 x Beliebtheit.
-  const start = umstieg ? Math.max(FANBASIS_START * bel, 0.5 * max * bel) : FANBASIS_START * bel;
+  // Fanbasis unabhaengig vom Stadion (23.11.). Umstieg: die Arena ist schon da, die Fans sollen sie fuellen koennen (halbes Haus x Beliebtheit).
+  const start = fanbasisStart(bel, matrixBeliebtheit(gameState, teamId));
+  const fans = umstieg ? Math.max(start, Math.round(0.5 * 1.5 * (plaetze.steh + plaetze.sitz) * bel)) : start;
   return {
     plaetze,
-    fanbasis: Math.round(Math.min(max, start)),
+    fanbasis: fans,
+    fanAnker: fans,
+    fanStart: fans,
+    fanVerlauf: [fans],
     stimmung: 50,
     serie: 0,
     punkte: gameState.seasonState?.standings?.[teamId]?.points ?? 0,
@@ -172,12 +211,59 @@ export function neuerArenaStand(gameState: GameState, teamId: string): ArenaTeam
   };
 }
 
+/** Kaderstaerke je Team als Anteil in der Liga (1 = staerkster Kader, 0 = schwaechster): Mittel der besten sechs Spieler nach Rating. */
+const STAERKE_MEMO = new WeakMap<object, Map<string, number>>();
+export function kaderStaerken(gameState: GameState): Map<string, number> {
+  const gemerkt = STAERKE_MEMO.get(gameState);
+  if (gemerkt) return gemerkt;
+  const aus = new Map<string, number>();
+  for (const ids of ligaTeams(gameState).values()) {
+    const wert = ids.map((id) => {
+      const top = kaderEinesTeams(gameState, id).map((k) => k.player.rating).sort((a, b) => b - a).slice(0, 6);
+      return { id, w: top.length ? top.reduce((x, y) => x + y, 0) / top.length : 0 };
+    });
+    wert.sort((a, b) => b.w - a.w || a.id.localeCompare(b.id));
+    wert.forEach((e, i) => aus.set(e.id, anteilVonRang(i + 1, wert.length)));
+  }
+  STAERKE_MEMO.set(gameState, aus);
+  return aus;
+}
+
+/**
+ * Kauf und Verkauf von Stars (Chris, 23.11.): vergleicht den Kader von heute mit dem gemerkten. Ein Zugang mit Stern-Gewicht (Marketability
+ * und Leistung) bringt Fans, ein Abgang (Verkauf oder Vertragsende) kostet sie. Ohne gemerkten Kader wird er ohne Wirkung angelegt;
+ * `auffrischen` rechnet die Gewichte der bleibenden Spieler neu (einmal je Saison).
+ */
+export function kaderDifferenz(gameState: GameState, teamId: string, alt: Record<string, ArenaKaderMerk> | undefined, auffrischen: boolean): { kader: Record<string, ArenaKaderMerk>; gruende: ArenaFanGrund[] } {
+  const kader: Record<string, ArenaKaderMerk> = {};
+  const gruende: ArenaFanGrund[] = [];
+  for (const { player } of kaderEinesTeams(gameState, teamId)) {
+    const bekannt = alt?.[player.id];
+    if (bekannt && !auffrischen) {
+      kader[player.id] = bekannt;
+      continue;
+    }
+    const w = sternGewicht(marketabilityFuer(gameState, teamId, player), perzentilFuer(gameState, teamId, player.id));
+    kader[player.id] = { w, n: player.name };
+    if (!bekannt && alt && w >= FAN_KONFIG.sternMin) gruende.push({ id: `kauf:${player.id}`, label: `Kauf ${player.name}`, delta: sternFans(w, true) });
+  }
+  if (alt) {
+    for (const [id, m] of Object.entries(alt)) {
+      if (!(id in kader) && m.w >= FAN_KONFIG.sternMin) gruende.push({ id: `verkauf:${id}`, label: `Verkauf ${m.n}`, delta: sternFans(m.w, false) });
+    }
+  }
+  return { kader, gruende };
+}
+
+export type SaisonendeErfolg = { rangAnteil: number | null; titel: boolean; aufgestiegen: boolean; abgestiegen: boolean };
+
 /** Der Stand der Fans fuer die naechste Saison: Plaetze, Fanbasis und Stimmung ruecken nach, die Saison-Listen beginnen neu. */
 export function arenaStandFuerSaisonwechsel(
   gameState: GameState,
   teamId: string,
   naechsteSaisonId: string,
   endRang: { rang: number; n: number } | null,
+  erfolg?: SaisonendeErfolg,
 ): ArenaTeamStand | null {
   const alt = gameState.seasonState?.arena?.[teamId];
   if (!alt) return null;
@@ -187,9 +273,31 @@ export function arenaStandFuerSaisonwechsel(
     if (endRang.rang === 1) s += 10;
     else if (endRang.rang > endRang.n - RELEGATION_COUNT) s -= 10;
   }
+  // FAN-MODELL ORGANISCH (23.11.): der grosse Schritt am Saisonende (Platz, Platz gegen Erwartung, Titel, Auf- und Abstieg), in der Saison-Schranke.
+  const fanStart = alt.fanStart ?? alt.fanbasis;
+  const rangAnteil = erfolg?.rangAnteil ?? (endRang ? anteilVonRang(endRang.rang, endRang.n) : null);
+  const gruende = fanGruendeSaisonende({
+    fanbasis: alt.fanbasis,
+    rangAnteil,
+    erwartungAnteil: alt.erwartung ?? null,
+    titel: erfolg?.titel ?? endRang?.rang === 1,
+    aufgestiegen: erfolg?.aufgestiegen ?? false,
+    abgestiegen: erfolg?.abgestiegen ?? false,
+  });
+  const w = wendeFanGruendeAn(alt.fanbasis, fanStart, gruende);
+  const fanbasis = Math.round(w.fanbasis);
   return {
     ...alt,
     seasonId: naechsteSaisonId,
+    fanbasis,
+    fanStart: fanbasis,
+    fanAnker: Math.round(ankerNachSaison(alt.fanAnker ?? fanStart, fanbasis)),
+    fanBilanzVorsaison: fanBilanzAddiere(alt.fanBilanz, w.gruende),
+    fanBilanz: [],
+    fanLetzte: { tag: 0, seasonId: naechsteSaisonId, delta: Math.round(fanbasis - alt.fanbasis), gruende: w.gruende.map((g) => ({ ...g, delta: Math.round(g.delta * 10) / 10 })) },
+    fanVerlauf: [fanbasis],
+    fanTrendVorsaison: fanStart > 0 ? (fanbasis - fanStart) / fanStart : 0,
+    erwartung: undefined,
     stimmung: Math.min(100, Math.max(0, 50 + 0.5 * (s - 50))),
     serie: 0,
     stand: 0,
@@ -207,9 +315,24 @@ export function arenaStaendeFuerSaisonwechsel(gameState: GameState, naechsteSais
   const alt = gameState.seasonState?.arena;
   if (!alt || Object.keys(alt).length === 0) return null;
   const raenge = ligaRaenge(gameState);
+  // Erfolg der abgelaufenen Saison aus dem Snapshot (Endtabelle, Farb-Meister) und dem Liga-Log (Auf- und Abstieg).
+  const seasonId = seasonIdVon(gameState);
+  const snap = (gameState.seasonState?.seasonSnapshots ?? []).find((x) => x.seasonId === seasonId);
+  const log = findLeagueMovementLog(gameState, seasonId);
+  const aufgestiegen = new Set(log?.promotedTeamIds ?? []);
+  const abgestiegen = new Set(log?.relegatedTeamIds ?? []);
   const aus: Record<string, ArenaTeamStand> = {};
   for (const teamId of Object.keys(alt)) {
-    const neu = arenaStandFuerSaisonwechsel(gameState, teamId, naechsteSaisonId, raenge.get(teamId) ?? null);
+    const zeile = snap?.finalStandings?.find((z) => z.teamId === teamId);
+    const n = Math.max(2, ligaTeams(gameState).get(getLeagueOf(gameState, teamId) ?? "alle")?.length ?? 16);
+    const rangAnteil = zeile?.rank != null ? anteilVonRang(zeile.rank, n) : null;
+    const stufe = snap ? teamErfolgAusSnapshot(snap, teamId, gleicheLigaWie(gameState, teamId)).stufe : "keiner";
+    const neu = arenaStandFuerSaisonwechsel(gameState, teamId, naechsteSaisonId, raenge.get(teamId) ?? null, {
+      rangAnteil,
+      titel: stufe === "titel",
+      aufgestiegen: aufgestiegen.has(teamId),
+      abgestiegen: abgestiegen.has(teamId),
+    });
     if (neu) aus[teamId] = neu;
   }
   return aus;
@@ -433,12 +556,33 @@ export function bereiteArenaBuchung(gameState: GameState, matchdayId: string, in
     const delta = punkteJetzt - punkteBasis;
     const serie = serieNachSpieltag(stand.serie, delta);
     const stimmung = stimmungNachSpieltag(stand.stimmung, delta, heim, serie);
-    const fanbasis = heimspiel ? fanbasisNachHeimspiel(stand.fanbasis, auslastungFan(stand.plaetze, heimspiel.auslastung), stand.plaetze) : stand.fanbasis;
+    // FAN-MODELL ORGANISCH (23.11.): die Fanbasis haengt nicht am Stadion. Ergebnis gegen die Erwartung der Kaderstaerke, Serien,
+    // Rueckzug zum Anker, Kauf und Verkauf von Stars; je Saison zwischen -15 % und +30 % des Saisonstarts.
+    const neueSaison = stand.erwartung === undefined;
+    const erwartung = stand.erwartung ?? kaderStaerken(gameState).get(teamId) ?? 0.5;
+    const diff = kaderDifferenz(gameState, teamId, stand.kader, neueSaison);
+    const fanStart = stand.fanStart ?? stand.fanbasis;
+    const gruende = [
+      ...fanGruendeSpieltag({ fanbasis: stand.fanbasis, anker: stand.fanAnker ?? stand.fanbasis, deltaPunkte: fixture ? delta : null, erwartetePunkte: erwartetePunkteJeSpieltag(erwartung), serie }),
+      ...diff.gruende,
+    ];
+    const fan = wendeFanGruendeAn(stand.fanbasis, fanStart, gruende);
+    const fanbasis = fan.fanbasis;
+    const verlauf = [...(stand.fanVerlauf ?? [Math.round(stand.fanbasis)])];
+    while (verlauf.length < index) verlauf.push(verlauf[verlauf.length - 1] ?? Math.round(stand.fanbasis));
+    verlauf[index] = Math.round(fanbasis);
     neueStaende[teamId] = {
       ...stand,
       stimmung,
       serie,
       fanbasis,
+      fanStart,
+      fanAnker: stand.fanAnker ?? stand.fanbasis,
+      erwartung,
+      kader: diff.kader,
+      fanBilanz: fanBilanzAddiere(stand.fanBilanz, fan.gruende),
+      fanLetzte: { tag: index, seasonId, delta: fanbasis - stand.fanbasis, gruende: fan.gruende.map((g) => ({ ...g, delta: Math.round(g.delta * 10) / 10 })).filter((g) => Math.abs(g.delta) >= 0.5) },
+      fanVerlauf: verlauf,
       punkte: punkteJetzt,
       stand: index,
       dauerkarten: dauer,
