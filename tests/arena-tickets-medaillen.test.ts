@@ -9,6 +9,7 @@ import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
 import { bauArenaAus } from "@/lib/arena/arena-ausbau";
 import {
   GRUND_PLAETZE,
+  PREIS_ANHEBUNG,
   OBERGRENZE,
   ausbauVorschau,
   bauKosten,
@@ -50,23 +51,23 @@ describe("Arena: Zahlen der Vorlage (i.1, h.1)", () => {
     expect(leiterZeile("sitz", 6, false).bauGesamt).toBeCloseTo(12.4, 5);
     const voll = { steh: 15000, sitz: 10000, loge: 1200 };
     expect(unterhaltSaison(voll)).toBeCloseTo(4.2, 5);
-    expect(volleHausSaison(voll, false)).toBeCloseTo(28.2, 5);
-    expect(volleHausSaison(voll, true)).toBeCloseTo(37.6, 5);
+    expect(volleHausSaison(voll, false)).toBeCloseTo(28.2 * PREIS_ANHEBUNG, 5);
+    expect(volleHausSaison(voll, true)).toBeCloseTo(37.6 * PREIS_ANHEBUNG, 5);
   });
 
   it("Grundarena hat 4.000 Plaetze und Obergrenzen 15.000 / 10.000 / 1.200", () => {
     expect(GRUND_PLAETZE).toEqual({ steh: 3000, sitz: 1000, loge: 0 });
     expect(OBERGRENZE).toEqual({ steh: 15000, sitz: 10000, loge: 1200 });
     expect([maxSchritte("steh"), maxSchritte("sitz"), maxSchritte("loge")]).toEqual([12, 9, 12]);
-    expect(volleHausSaison(GRUND_PLAETZE, false)).toBeCloseTo(3.0, 5);
-    expect(volleHausSaison(GRUND_PLAETZE, true)).toBeCloseTo(4.0, 5);
+    expect(volleHausSaison(GRUND_PLAETZE, false)).toBeCloseTo(3.0 * PREIS_ANHEBUNG, 5);
+    expect(volleHausSaison(GRUND_PLAETZE, true)).toBeCloseTo(4.0 * PREIS_ANHEBUNG, 5);
   });
 
   it("Steh und Sitz zahlen sich bei voller Nachfrage in Liga 2 in 1,5 bis 2,5 Saisons", () => {
-    expect(leiterZeile("steh", 1, false).bezahlt!).toBeGreaterThan(1.5);
-    expect(leiterZeile("steh", 12, false).bezahlt!).toBeLessThan(2.5);
-    expect(leiterZeile("sitz", 1, false).bezahlt!).toBeGreaterThan(1.5);
-    expect(leiterZeile("sitz", 9, false).bezahlt!).toBeLessThan(2.5);
+    expect(leiterZeile("steh", 1, false).bezahlt!).toBeGreaterThan(1.5 / PREIS_ANHEBUNG - 0.05);
+    expect(leiterZeile("steh", 12, false).bezahlt!).toBeLessThan(2.5 / PREIS_ANHEBUNG);
+    expect(leiterZeile("sitz", 1, false).bezahlt!).toBeGreaterThan(1.5 / PREIS_ANHEBUNG - 0.05);
+    expect(leiterZeile("sitz", 9, false).bezahlt!).toBeLessThan(2.5 / PREIS_ANHEBUNG);
   });
 });
 
@@ -77,7 +78,7 @@ describe("Arena: Nachfrage, Kasse, Dauerkarten", () => {
     const r = rechneHeimspiel({ ...basis, fanbasis: 20000 });
     expect(r.auslastung.steh).toBe(1);
     expect(r.zuschlag.steh).toBeCloseTo(0.25, 5);
-    expect(r.kasse.steh).toBeCloseTo(3000 * 0.00006 * 1.25, 5);
+    expect(r.kasse.steh).toBeCloseTo(3000 * 0.00006 * PREIS_ANHEBUNG * 1.25, 5);
   });
 
   it("Dauerkarten-Inhaber zaehlen als anwesend, die Tageskasse sinkt um ihren Anteil", () => {
@@ -89,7 +90,7 @@ describe("Arena: Nachfrage, Kasse, Dauerkarten", () => {
 
   it("Dauerkarten: 25 % Rabatt, Anteil 20/40/60 %", () => {
     const g = dauerkartenGeld(GRUND_PLAETZE, "normal", false, 10);
-    expect(g).toBeCloseTo(0.4 * 3.0 * 0.75, 2);
+    expect(g).toBeCloseTo(0.4 * 3.0 * PREIS_ANHEBUNG * 0.75, 2);
     expect(kiDauerkartenStufe(0.6, false)).toBe("viel");
     expect(kiDauerkartenStufe(0.9, false)).toBe("wenig");
     expect(kiDauerkartenStufe(0.75, true)).toBe("viel");

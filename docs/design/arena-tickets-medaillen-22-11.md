@@ -239,3 +239,23 @@ Endgültige Konstanten (F3, F4), Saison 3: Top-4 Liga 1 im Mittel **12.250 Plät
 
 - `npx tsc -p tsconfig.check.json --noEmit` sauber; `tests/arena-tickets-medaillen.test.ts` (26, davon fünf neue für das Fan-Modell).
 - Aufnahmen: `docs/design/arena-tickets-medaillen-22-11/app-arena-leer-1920x1080.png` und `-2560x1440.png` (Messlauf-Spielstand F3, Saison 3 nach Spieltag 20, Seitenscroll 0, keine JS-Fehler); die Karte „Fans & Heimspiele“ zeigt Fanlinie und Gründe, die abgeschnittene Zeile „Ausverkauft“ ist entfallen.
+
+### Ticketpreise + 30 % (Chris 23.11.: „Ticketpreise +30–50 % ist ok!“)
+
+**Gewählter Faktor: 1,30** (`PREIS_ANHEBUNG` in `lib/arena/arena-modell.ts`). Er gilt für Steh, Sitz, Loge und damit auch für die Dauerkarten (Rabatt 25 % auf denselben Preis) und für Liga 1 und 2 gleich; alle Rechenwege (Tageskasse, Dauerkarten, Ausbau-Vorschau, KI-Bewertung, Seite „Arena & Fans“) laufen über `preisJePlatz`, gezeigt = gebucht. Preise: Steh 0,078, Sitz 0,156, Loge 0,78 C je 1.000 Plätze und Heimspiel (Liga 2).
+
+Messung wie oben (`scripts/miss-teamfinanzen-saison.ts --seasons 3`, 32 KI-Teams, zwei Läufe a/b, danach `scripts/auswerte-arena-ki-saisons.ts`):
+
+| Saison | Lauf | Plätze Top-4 L1 | Ticket-Anteil Top-4 / alle | Teams GuV ≥ 0 | GuV-Abstand r8 − a8 | Kasse < 0 |
+|---|---|---:|---:|---:|---:|---:|
+| 1 | a | 8.750 | 9 % / 9 % | 31 | 13,3 | 0 |
+| 1 | b | 9.500 | 8 % / 9 % | 32 | 7,5 | 0 |
+| 2 | a | 12.250 | 14 % / 10 % | 32 | − 6,5 | 0 |
+| 2 | b | 9.500 | 12 % / 10 % | 31 | 7,0 | 0 |
+| 3 | a | 12.000 | 12 % / 10 % | 30 | − 0,8 | 0 |
+| 3 | b | 11.000 | 11 % / 10 % | 32 | 16,2 | 0 |
+| 3 | Mittel | 11.500 | **12 %** / 10 % | 31 | 7,7 | 0 |
+
+Saison 3 liegt mit 11 und 12 % (Mittel 12 %) im Ziel 10–14 %, die Top-4 stehen bei 11.000 bis 12.000 Plätzen (Spanne 10–14k), kein Team mit Kasse < 0, GuV-Abstand höchstens 16,2 (Tabelle aus #1719: bis 17,6). Weil 1,30 schon trifft, wurden 1,40 und 1,50 **nicht** zu Ende gemessen: der Lauf 1,40 a brach in Saison 3 an der Speichergrenze ab (drei Läufe zugleich), 1,40 b wurde nach der Entscheidung abgebrochen. Zwischenwerte 1,40 a: Saison 1 9 %, Saison 2 10 % (Top-4 11.250 Plätze), nicht aussagekräftiger als 1,30.
+
+**Stempel:** Preise stehen nicht im Regel-Stempel (`seasonState.arenaRegel` trägt nur an/aus); die Anhebung gilt deshalb **sofort** für einen laufenden Spielstand ab dem nächsten Heimspiel (bereits gebuchte Spieltage bleiben unverändert), für neue Spiele von Saison 1 an.

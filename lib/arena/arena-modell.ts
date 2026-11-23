@@ -12,8 +12,16 @@ export const HEIMSPIELE_REFERENZ = 10;
 /** Liga-1-Faktor auf die Ticketpreise. */
 export const LIGA1_PREISFAKTOR = 4 / 3;
 
-/** Preis in C je 1.000 Plaetze und Heimspiel in Liga 2 (g.2). */
-export const PREIS_JE_1000: Record<ArenaBereich, number> = { steh: 0.06, sitz: 0.12, loge: 0.6 };
+/** Grundpreis in C je 1.000 Plaetze und Heimspiel in Liga 2 (g.2). */
+const PREIS_GRUND_JE_1000: Record<ArenaBereich, number> = { steh: 0.06, sitz: 0.12, loge: 0.6 };
+/** Preisanhebung (Chris 23.11.: "Ticketpreise +30-50 % ist ok"): ein Faktor fuer Steh, Sitz, Loge und damit auch die Dauerkarten. */
+export const PREIS_ANHEBUNG = 1.3;
+/** Preis in C je 1.000 Plaetze und Heimspiel in Liga 2 (g.2 x Anhebung). */
+export const PREIS_JE_1000: Record<ArenaBereich, number> = {
+  steh: PREIS_GRUND_JE_1000.steh * PREIS_ANHEBUNG,
+  sitz: PREIS_GRUND_JE_1000.sitz * PREIS_ANHEBUNG,
+  loge: PREIS_GRUND_JE_1000.loge * PREIS_ANHEBUNG,
+};
 
 /** Die Grundarena: 4.000 Plaetze, davon 3.000 Steh und 1.000 Sitz, keine Logen. Kostet nichts und hat keinen Unterhalt. */
 export const GRUND_PLAETZE: ArenaPlaetze = { steh: 3000, sitz: 1000, loge: 0 };
