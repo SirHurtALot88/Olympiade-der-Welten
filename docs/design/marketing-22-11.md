@@ -536,3 +536,35 @@ Geprüft in Chromium unter `flock /tmp/oly-aufnahme.lock`: keine JS-Fehler, kein
 | 1 | Sicherheitsnetz bei 25 % des Gehalts (greift bei 7 von 261 Spielern), oder ganz ohne Netz? | **Mit Netz.** Ohne bringt ein billiger Spieler mit großer Persönlichkeit bis zu 60 % seines Gehalts zurück. |
 | 2 | Werbeklausel als dritte Zahl in jeder Vertragsverhandlung (drei Stufen), oder erst später mit einem Verhandlungs-Baustein? | **Gleich, als drei Stufen.** Sie ist die einzige Stelle, an der der Manager den Anteil selbst bewegt. |
 | 3 | Sollen neben der Farbe auch Vorlieben wachsen (Klasse des Aushängeschilds nach zwei Saisons)? | **Ja, klein halten:** ein Zugang je Team, nur Klassen. |
+
+## Runde 4: Werbeklausel und Aushängeschild (Mockup 23.11.)
+
+Mockup: `public/mockups/marketing-werbeklausel-aushaengeschild-23-11.html` (klickbar, gleiche Tokens und Bausteine wie `marketing-22-11.html`, Kopf-Reiter
+schalten die vier Ansichten). Spielernamen, Traits und Gehaltsforderungen sind echt; **Marketability, Moral, Restlaufzeit, aktuelle Klausel, Teamerfolg,
+Vorjahres-Gesicht und Ramonas Team sind Beispielwerte** und im Mockup so gekennzeichnet. Alle Zahlen rechnen live nach den Formeln aus 4.2 und 4.3.
+Gehalt und Werbegeld stehen groß je Saison, klein je Spieltag (20 Spieltage).
+
+| Ansicht | Zeigt |
+|---|---|
+| Verhandlung | Transfer-Angebot mit Gehalt, Laufzeit und neu der Werbeklausel. Drei Zeilen (−10 / 0 / +10 Punkte) nebeneinander mit Gehalt, Team-Anteil, Werbegeld ans Team, an ihn, **Saldo gegen Standard** und Reaktion; darunter die Summen über die Laufzeit, rechts die Zerlegung des Team-Anteils mit hervorgehobener Klausel-Zeile. Spieler zum Umschalten: Flora (neutral), Pooka (`Loyal`: ohne Aufschlag), Nira (`Diva`: Stufe grau, „lehnt ab“), Indicus (`Egomaniac`) |
+| Vertrag | Verlängerungsdialog über dem Kader: Laufzeit (+1 bis +3), Klausel, Vergleich Bisher / Neu / Änderung, Werbe-Rabatt aufs Gehalt, Reaktion und Zerlegung; rechts ein Regelblatt |
+| Marketing-Seite | Die sechs besten Spieler mit Marketability, Werbegeld und Team-Anteil jetzt und als Gesicht (+25 %, +8 Punkte), Änderung ans Team und Moral, Marken KI-WAHL und VORSAISON, Netz- und Grenz-Hinweise; Bestätigen sperrt die Zeile und die Wahl bis Saisonende; Kachel „Vorlieben wachsen“ (Zähler 1 von 2 / 2 von 2) |
+| Mehrspieler | Dieselbe Seite aus Sicht von Chris (Sponsor selbst) und Ramona (Sponsor an die KI): die KI-Wahl gilt, bis der Mensch überschreibt („Mensch überschreibt, KI respektiert das“), fremde Teams nur lesbar, Tabelle „wer sieht, wer wählt“ |
+
+Aufnahmen (1920×1080, 2560×1440, 1710×1112, je Ansicht) liegen unter `docs/design/marketing-werbeklausel-23-11/`; geprüft ohne Seitenscroll und ohne inneres Scrollen.
+
+**Was die Zahlen im Mockup zeigen (und was im Konzept nachzuziehen ist):**
+
+- „Team bekommt mehr“ lohnt sich selten. Die +10 Punkte bringen 10 % des Werbegelds, das 4 % Mehrgehalt kostet 4 % des Gehalts; erst ab Werbegeld über 40 % des Gehalts steht ein Plus da, und bei hohem Werbegeld greift schon das Sicherheitsnetz. Flora: +10 Punkte −0,28 C je Saison, „Spieler behält mehr“ +0,28 C. Für schwache Werber ist „Spieler behält mehr“ fast immer die bessere Wahl.
+- Das Netz entwertet auch das Aushängeschild: Bloodseeker (die KI-Wahl) bringt dem Team trotz +2,3 C Werbegeld +0,00 C, weil das Netz schon steht; Vixen (+0,77 C) oder Rocky (+0,61 C) bringen mehr. Bei Kadis stößt der Team-Anteil an die 65 %, die +8 wirken nicht.
+
+### Offene Fragen an Chris
+
+| # | Frage | Empfehlung |
+|---|---|---|
+| 1 | Soll die Klausel ihre Rechnung ehrlicher machen: Gehaltsverschiebung kleiner und das Netz wandert mit (z. B. ±2,5 % Gehalt, Netz 22 / 25 / 28 % je Stufe)? | **Ja.** Sonst ist „Team bekommt mehr“ fast nie, „Spieler behält mehr“ fast immer richtig. Das Mockup zeigt noch die Regel aus 4.2 (4 %, Netz 25 %). |
+| 2 | Aushängeschild: KI-Wahl nach Marketability (Konzept) oder nach dem höchsten Zusatzertrag fürs Team? | **Nach Zusatzertrag**, denn die höchste Marketability trifft oft das Netz. Für den Menschen zeigt die Tabelle den Ertrag schon. |
+| 3 | Sperre des Aushängeschilds: sofort mit „Bestätigen“, oder erst mit dem ersten Spieltag (davor änderbar)? Delegierte Teams: KI-Wahl gilt bis zum Überschreiben. | **Sofort beim Bestätigen**, bei Delegation bis zum ersten Spieltag überschreibbar, ohne Wahl gilt die KI-Regel. |
+| 4 | „Vorlieben wachsen“: ersetzt der neue Zugang einen früheren (ein Zugang je Team gleichzeitig) oder kommt er dazu? | **Ersetzt**, so bleibt das Fanprofil klein. |
+| 5 | Wer darf in Ramonas Team (Sponsor an die KI) überschreiben, nur sie oder auch Chris als Mitspieler? | **Nur der Manager des Teams** (Schreibprüfung am Team), andere Menschen lesen nur. |
+| 6 | Bereich Sponsor als eigener Delegationsbereich für die Klausel in Verhandlungen, oder zählt die Klausel zu „Käufe/Verträge“? | **Zu Käufe/Verträge**, das Aushängeschild bleibt im Bereich Sponsor. |
