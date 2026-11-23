@@ -166,7 +166,10 @@ async function neueSeite(breite = 1920, hoehe = 1080) {
   const ctx = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1 });
   const page = await ctx.newPage();
   const fehler: string[] = [];
-  page.on("pageerror", (e) => fehler.push(String(e).slice(0, 240)));
+  page.on("pageerror", (e) => fehler.push(`${String(e).slice(0, 240)} @ ${String((e as Error).stack ?? "").split("\n").slice(1, 4).join(" | ").slice(0, 400)}`));
+  page.on("response", (r) => {
+    if (r.status() >= 400) fehler.push(`http ${r.status()} ${r.url().slice(0, 200)}`);
+  });
   page.on("console", (m) => {
     if (m.type() === "error") fehler.push(`console: ${m.text().slice(0, 240)}`);
   });
@@ -464,6 +467,56 @@ async function bucheSeite(z: Zustand, seasonId: string, matchdayId: string, side
   }
 }
 
+
+/**
+ * Die Einsatzliste des MENSCHLICHEN Teams ohne Delegation (Bestandsspiel 23.11.): wie in der Oberflaeche „KI-Vorschlag
+ * uebernehmen“ (GET ai-preview) und „Speichern“ (PUT, Abgabe bestaetigt). Mit `mitFormkarte` zusaetzlich eine freie
+ * POSITIVE Formkarte auf D1 und D2 (Formkarten-Plan, wie die Einsatzliste). Liefert, was gesetzt wurde.
+ */
+async function menschAufstellen(z: Zustand, seasonId: string, matchdayId: string, mitFormkarte: boolean) {
+  const q = `saveId=${encodeURIComponent(z.saveId)}&seasonId=${encodeURIComponent(seasonId)}&matchdayId=${encodeURIComponent(matchdayId)}&teamId=${encodeURIComponent(z.teamId)}&source=sqlite`;
+  const get = async (route: string) => (await (await fetch(`${BASE}${route}?${q}`, { headers: { connection: "close" } })).json()) as Record<string, any>;
+  const vorschau = (await get("/api/lineups/legacy/ai-preview")).preview as Record<string, any> | undefined;
+  if (!vorschau) throw new Error("ai-preview fuer das Menschenteam liefert nichts");
+  const plan = vorschau.modifierPlan as Record<"d1" | "d2", Record<string, any>>;
+  const ctx = (await get("/api/lineups/legacy/lab-context")).context as Record<string, any>;
+  const frei = ((ctx?.formCards ?? []) as Array<{ id: string; playerId: string; value: number; isUsed: boolean }>).filter((c) => !c.isUsed && c.value > 0).sort((a, b) => b.value - a.value);
+  const eingesetzt = new Set((vorschau.entries as Array<{ playerId: string }>).map((e) => e.playerId));
+  const karten: Record<"d1" | "d2", string | null> = { d1: null, d2: null };
+  if (mitFormkarte) {
+    const genutzt = new Set<string>();
+    for (const seite of ["d1", "d2"] as const) {
+      const karte = frei.find((c) => !genutzt.has(c.id) && eingesetzt.has(c.playerId));
+      if (karte) {
+        karten[seite] = karte.id;
+        genutzt.add(karte.id);
+      }
+    }
+  }
+  const modifiers = Object.fromEntries(
+    (["d1", "d2"] as const).map((seite) => [seite, { intensity: plan[seite]?.intensity ?? "normal", primaryFormCardId: karten[seite], secondaryFormCardId: null, mutatorTrait1: null, mutatorTrait2: null, teamPowerId: null }]),
+  );
+  const res = await fetch(`${BASE}/api/lineups/legacy?${q}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", connection: "close" },
+    body: JSON.stringify({ entries: vorschau.entries, modifiers, confirmLock: true }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Menschen-Aufstellung PUT ${res.status}: ${text.slice(0, 300)}`);
+  // Formkarten-Plan je Seite (wie die Einsatzliste): ohne ihn zeigt die Oberflaeche die Karte nicht.
+  for (const seite of ["d1", "d2"] as const) {
+    if (!karten[seite]) continue;
+    const r = await fetch(`${BASE}/api/lineups/legacy/form-card-plan?${q}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", connection: "close" },
+      body: JSON.stringify({ disciplineSide: seite, disciplineId: (vorschau[seite] as Record<string, string>).disciplineId, primaryFormCardId: karten[seite], secondaryFormCardId: null }),
+    });
+    if (!r.ok) log(`Formkarten-Plan ${seite}: ${r.status} ${(await r.text()).slice(0, 200)}`);
+  }
+  log(`Menschen-Aufstellung gesetzt (${(vorschau.entries as unknown[]).length} Eintraege), Formkarten ${JSON.stringify(karten)}`);
+  return karten;
+}
+
 async function spieltage() {
   const z = ladeZustand();
   const bis = Number(process.argv[3] ?? "99");
@@ -486,6 +539,12 @@ async function spieltage() {
     const fehler: string[] = [];
     log(`--- ${seasonId} ${matchdayId} (Nr ${nr}) ---`);
     // Wie die Oberflaeche nach jedem Spieltag: KI-Aufstellungen im Hintergrund vorwaermen.
+    // Bestandsspiel (23.11.): ein menschliches Team OHNE Delegation setzt die Einsatzliste selbst (sonst `missing_manual_lineup`).
+    if (process.env.ABNAHME_MENSCH_AUFSTELLEN === "1") {
+      const zeile = gs(z.saveId).seasonState.lineupDrafts?.find((l) => l.seasonId === seasonId && l.matchdayId === matchdayId && l.teamId === z.teamId);
+      const mitKarte = (process.env.ABNAHME_FORMKARTE_NR ?? "").split(",").includes(String(nr));
+      if (!zeile) await menschAufstellen(z, seasonId, matchdayId, mitKarte);
+    }
     const pw = await post("/api/lineups/legacy/ai-batch-prewarm", {}, `?saveId=${encodeURIComponent(z.saveId)}&seasonId=${encodeURIComponent(seasonId)}&matchdayId=${encodeURIComponent(matchdayId)}`);
     if (pw.status >= 400) fehler.push(`prewarm ${pw.status} ${JSON.stringify(pw.json).slice(0, 200)}`);
     // Einsatzlisten pruefen, bevor gebucht wird.
@@ -630,6 +689,11 @@ async function saisonende() {
       });
       merke("Neue Saison starten", start.status, start.json.success === true, start.json.blockingReasons ?? start.json.error ?? "");
       if (start.json.success) break;
+    }
+    // Offene Verlaengerungs-/Freigabe-Entscheidungen des Menschen: erst entscheiden (wie im Finale), NICHT weiterschalten.
+    if (blocker.some((b) => b.startsWith("vertragsentscheidung_offen")) && versuch < 5) {
+      await vertraegeErledigen();
+      continue;
     }
     // Haengt die Kette noch in einer Saisonende-Station, schaltet das Cockpit sie weiter (Assistent „advance_step“).
     if (blocker.length) {
@@ -806,6 +870,9 @@ async function arena() {
   const md = g0.matchdayState?.matchdayId ?? "";
   const diszis = disziplinenVon(g0, md);
   log(`Arena ${g0.season.id}/${md}: ${diszis.join(" + ")}`);
+  if (process.env.ABNAHME_MENSCH_AUFSTELLEN === "1" && !g0.seasonState.lineupDrafts?.some((l) => l.seasonId === g0.season.id && l.matchdayId === md && l.teamId === z.teamId)) {
+    await menschAufstellen(z, g0.season.id, md, false);
+  }
   // Wie die Oberflaeche nach „Spieltag abschliessen“ (startAiLineupPrewarm): KI-Aufstellungen vorwaermen. Der Abschluss lief hier
   // ueber HTTP, also stoesst der Lauf das Vorwaermen selbst an.
   const pw = await post("/api/lineups/legacy/ai-batch-prewarm", {}, `?saveId=${encodeURIComponent(z.saveId)}&seasonId=${encodeURIComponent(g0.season.id)}&matchdayId=${encodeURIComponent(md)}`);
@@ -1231,7 +1298,136 @@ async function vertragsbilanz() {
   schreibeDaten(`vertragsbilanz-${sid}-${g.gamePhase}.json`, ergebnis);
 }
 
+// ------------------------------------------------------------------------------------------------ Bestandsspiel (23.11.)
+
+/**
+ * `bestand <saveId> <teamId>`: haengt die Phasen an einen BESTEHENDEN Spielstand (statt `anlegen`). Der Spielstand muss in
+ * der Wegwerf-SQLite liegen (Kopie des Server-Abbilds, siehe CLAUDE.md „An die Spielstaende kommen“).
+ */
+function bestand() {
+  const saveId = process.argv[3] ?? "";
+  const teamId = process.argv[4] ?? "";
+  if (!saveId || !teamId) throw new Error("bestand <saveId> <teamId>");
+  const g = gs(saveId);
+  schreibeZustand({ saveId, teamId, log: [`bestand ${new Date().toISOString()} ${saveId} ${teamId}`] });
+  log(`Bestandsspiel ${saveId}: ${g.season.id} ${g.matchdayState?.matchdayId} Phase ${g.gamePhase}`);
+}
+
+/** `laden`: Stempel und Eckwerte des geladenen Spielstands (Lade-Migration laeuft in `getSaveById`). */
+function laden() {
+  const z = ladeZustand();
+  const ab = Date.now();
+  const g = gs(z.saveId);
+  const ss = g.seasonState as unknown as Record<string, unknown>;
+  const stempel = Object.fromEntries(
+    ["wertungsSkalen", "formkartenRegel", "marketingRegel", "entwicklungsRegel", "kreditRegel", "ausruestungRegel", "trainingsVorlieben", "finanzenJeSpieltag", "hockeyTorwart", "basketballPuste", "breakingFormat", "battlefieldFormat", "climbingFormat", "saisonpause"].map((k) => [k, ss[k] ?? null]),
+  );
+  const groessen = g.teams.map((t) => kader(g, t.teamId).length);
+  const kassen = g.teams.map((t) => t.cash);
+  console.log(JSON.stringify({ ladeMs: Date.now() - ab, saison: g.season.id, md: g.matchdayState?.matchdayId, phase: g.gamePhase, kaderMin: Math.min(...groessen), kaderMax: Math.max(...groessen), unter8: g.teams.filter((t, i) => groessen[i]! < 8).map((t) => t.teamId), kasseMin: Math.min(...kassen), kasseMax: Math.max(...kassen), nanKassen: kassen.filter((c) => !Number.isFinite(c)).length, stempel }, null, 2));
+}
+
+/** `vertraege-erledigen`: die offenen Verlaengerungs-Entscheidungen des Menschen ueber `/api/contracts/renewal` (abwechselnd freigeben/verlaengern, 2 Jahre). */
+async function vertraegeErledigen() {
+  const z = ladeZustand();
+  const offen = () => gs(z.saveId).rosters.filter((r) => r.teamId === z.teamId && r.contractStatus === "renewal_pending");
+  const kasse = () => gs(z.saveId).teams.find((t) => t.teamId === z.teamId)!.cash;
+  log(`offen ${offen().length}, Kasse ${kasse()}`);
+  let n = 0;
+  for (const r of offen()) {
+    const action = n % 3 === 0 ? "release" : "renew";
+    const body = { saveId: z.saveId, teamId: z.teamId, playerId: r.playerId, action, contractLength: 2, source: "sqlite" };
+    const vorschau = await post<{ summary?: { confirmToken?: string; blockingReasons?: string[] } }>("/api/contracts/renewal", { ...body, dryRun: true });
+    const apply = await post<{ summary?: { applied?: boolean; blockingReasons?: string[] } }>("/api/contracts/renewal", { ...body, dryRun: false, confirmToken: vorschau.json.summary?.confirmToken });
+    log(`${action} ${r.playerId}: applied=${apply.json.summary?.applied} ${JSON.stringify(apply.json.summary?.blockingReasons ?? vorschau.json.summary?.blockingReasons ?? [])}`);
+    n += 1;
+  }
+  log(`offen danach ${offen().length}, Kasse ${kasse()}`);
+}
+
+/** `mensch-kaufen [ziel]`: das Menschenteam kauft ueber `/api/transfermarkt/buy` die besten bezahlbaren Spieler, bis der Kader `ziel` (Vorgabe 10) erreicht. */
+async function menschKaufen() {
+  const z = ladeZustand();
+  const ziel = Number(process.argv[3] ?? "10");
+  const g0 = gs(z.saveId);
+  const seasonId = g0.season.id;
+  for (let i = 0; i < 12; i += 1) {
+    const g = gs(z.saveId);
+    const n = kader(g, z.teamId).length;
+    if (n >= ziel) break;
+    const fa = await (await fetch(`${BASE}/api/transfermarkt/free-agents?saveId=${encodeURIComponent(z.saveId)}&seasonId=${encodeURIComponent(seasonId)}&teamId=${encodeURIComponent(z.teamId)}&limit=60`, { headers: { connection: "close" } })).json() as { items?: Array<{ playerId: string; marketValue?: number; affordabilityStatus?: string }> };
+    const kandidat = [...(fa.items ?? [])].filter((x) => x.affordabilityStatus !== "blocked").sort((a, b) => (b.marketValue ?? 0) - (a.marketValue ?? 0))[0];
+    if (!kandidat) {
+      log(`Kader ${n}: kein bezahlbarer Free Agent (${fa.items?.length ?? 0} Eintraege)`);
+      break;
+    }
+    const kauf = await post<{ success?: boolean; error?: string; blockingReasons?: string[] }>("/api/transfermarkt/buy", { saveId: z.saveId, seasonId, teamId: z.teamId, playerId: kandidat.playerId, dryRun: false });
+    log(`Kauf ${kandidat.playerId} (MW ${kandidat.marketValue}): ${kauf.status} success=${kauf.json.success} ${kauf.json.error ?? ""} ${(kauf.json.blockingReasons ?? []).join(",")}`);
+    if (!kauf.json.success) break;
+  }
+  const g = gs(z.saveId);
+  log(`Kader jetzt ${kader(g, z.teamId).length}, Kasse ${g.teams.find((t) => t.teamId === z.teamId)!.cash}`);
+}
+
+/**
+ * `pruefe [name]`: Plausibilitaet des gesamten Spielstands (Spielbarkeit 23.11.): nicht-endliche Zahlen irgendwo, Kader < 8,
+ * Kassenspanne, Kredite/Finanzbuchungen/Marketing/Entwicklung, Verletzte in gebuchten Einsatzlisten des letzten Spieltags.
+ */
+function pruefe() {
+  const z = ladeZustand();
+  const g = gs(z.saveId);
+  const nichtEndlich: string[] = [];
+  const geh = (o: unknown, pfad: string, tiefe: number) => {
+    if (tiefe > 7 || nichtEndlich.length > 20) return;
+    if (typeof o === "number") {
+      if (!Number.isFinite(o)) nichtEndlich.push(pfad);
+    } else if (Array.isArray(o)) {
+      if (o.length > 3000) return;
+      o.forEach((v, i) => geh(v, `${pfad}[${i}]`, tiefe + 1));
+    } else if (o && typeof o === "object") {
+      for (const [k, v] of Object.entries(o as Record<string, unknown>)) geh(v, `${pfad}.${k}`, tiefe + 1);
+    }
+  };
+  for (const t of g.teams) geh(t, `teams.${t.teamId}`, 0);
+  geh(g.rosters, "rosters", 0);
+  geh(g.seasonState.standings, "standings", 0);
+  geh(g.seasonState.spieltagFinanzen, "spieltagFinanzen", 0);
+  geh(g.seasonState.marketingStand, "marketingStand", 0);
+  geh(g.seasonState.loans ?? (g as unknown as { loans?: unknown }).loans, "loans", 0);
+  const groessen = g.teams.map((t) => ({ t: kuerzel(g, t.teamId), n: kader(g, t.teamId).length }));
+  const kassen = g.teams.map((t) => t.cash);
+  const sid = g.season.id;
+  const zeilen = (g.seasonState.spieltagFinanzen ?? []).filter((x) => x.seasonId === sid);
+  const jeSpieltag = zeilen.reduce<Record<string, number>>((m, x) => ({ ...m, [x.matchdayId]: (m[x.matchdayId] ?? 0) + 1 }), {});
+  const mensch = g.teams.find((t) => t.teamId === z.teamId)!;
+  const meineZeilen = zeilen.filter((x) => x.teamId === z.teamId);
+  const loans = ((g as unknown as { loans?: Array<{ status: string; principalOutstanding: number; borrowerTeamId: string; missedPayments: number }> }).loans ?? g.seasonState.loans ?? []) as Array<{ status: string; principalOutstanding: number; borrowerTeamId: string; missedPayments: number }>;
+  const stand = g.seasonState.marketingStand ?? {};
+  const aus = {
+    saison: sid,
+    phase: g.gamePhase,
+    md: g.matchdayState?.matchdayId,
+    nichtEndlich,
+    unter8: groessen.filter((x) => x.n < 8).map((x) => `${x.t}:${x.n}`),
+    kaderSpanne: [Math.min(...groessen.map((x) => x.n)), Math.max(...groessen.map((x) => x.n))],
+    kasse: { min: Math.min(...kassen), max: Math.max(...kassen), negativ: g.teams.filter((t) => t.cash < -0.01).map((t) => `${kuerzel(g, t.teamId)}:${t.cash}`) },
+    mensch: { kasse: mensch.cash, kader: kader(g, z.teamId).length },
+    spieltagFinanzen: { zeilen: zeilen.length, spieltage: Object.keys(jeSpieltag).length, teamsJeSpieltag: [...new Set(Object.values(jeSpieltag))], meine: meineZeilen.slice(-2).map((x) => ({ md: x.matchdayId, gehalt: x.gehalt, sponsor: x.sponsorBasis, geb: x.gebaeudeEinnahme - x.gebaeudeUnterhalt, rang: x.rangAbschlag, mkt: x.marketing, zins: x.kreditZins, tilg: x.kreditTilgung, delta: x.cashDelta })) },
+    kredite: { aktiv: loans.filter((l) => l.status === "active").length, verzug: loans.filter((l) => l.status === "defaulted" || l.missedPayments > 0).length, rest: r2(loans.filter((l) => l.status === "active").reduce((s, l) => s + l.principalOutstanding, 0)) },
+    marketing: { teamsMitStand: Object.keys(stand).length, ansKasse: quantil(Object.values(stand).map((x) => x.ansKasse), 0.5), max: Math.max(0, ...Object.values(stand).map((x) => x.ansKasse)) },
+    entwicklungsRegel: g.seasonState.entwicklungsRegel ?? null,
+    verletzte: (g.seasonState.playerAvailabilityState ?? []).length,
+  };
+  console.log(JSON.stringify(aus, null, 2));
+  schreibeDaten(`pruefe-${sid}-${g.matchdayState?.matchdayId ?? "x"}.json`, aus);
+}
+
 const befehle: Record<string, () => unknown> = {
+  pruefe,
+  "mensch-kaufen": menschKaufen,
+  "vertraege-erledigen": vertraegeErledigen,
+  bestand,
+  laden,
   vertragsbilanz,
   status,
   wertung,

@@ -66258,7 +66258,9 @@
   const tabs=[...document.querySelectorAll(".tab")];
   tabs.forEach(tb=>tb.addEventListener("click",()=>{
     tabs.forEach(o=>{const on=o===tb;o.setAttribute("aria-selected",on?"true":"false");
-      document.getElementById(o.getAttribute("aria-controls")).hidden=!on;});
+      // Spielbarkeit 23.11.: `.tab` ist eine allgemeine Klasse -- ein fremder Reiter ohne Panel (oder ein Panel, das die Huelle
+      // nicht fuehrt) liess hier `null.hidden` werfen und brach die Schleife fuer die uebrigen Reiter ab.
+      const panel=document.getElementById(o.getAttribute("aria-controls")||""); if(panel)panel.hidden=!on;});
     if(tb.id==="t2")reset();
   }));
   // TICKER/PROTOKOLL-REITER (Punkt 8, s. feed()): dasselbe Umschaltmuster wie die

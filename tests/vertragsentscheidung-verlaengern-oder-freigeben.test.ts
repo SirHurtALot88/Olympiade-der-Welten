@@ -22,6 +22,7 @@ import {
   istVertragsentscheidungNachzuholen,
   offeneVertragsentscheidungen,
   vertragsentscheidungSperrgruende,
+  darfVertragsentscheidungTrotzPhase,
 } from "@/lib/contracts/vertragsentscheidung";
 import type { GameState, Player, RosterEntry, Team } from "@/lib/data/olyDataTypes";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
@@ -268,9 +269,22 @@ describe("Altstand: Entscheidung in der laufenden Saison nachholen", () => {
     ]);
   });
 
+  it("Spielbarkeit 23.11.: eine offene Saisonende-Entscheidung bleibt in jeder Saisonende-Phase buchbar (keine Sackgasse bei next_season_ready)", () => {
+    for (const phase of ["season_end_management", "transfer_buy_phase", "lineup_setup", "next_season_ready"] as const) {
+      const g = stand({ phase, rosters: [vertrag(MENSCH, "m1", { contractLength: 0, contractEndSeasonNumber: 1, contractStatus: "renewal_pending" })] });
+      expect(offeneVertragsentscheidungen(g)).toHaveLength(1);
+      expect(darfVertragsentscheidungTrotzPhase(g.rosters[0]!, g)).toBe(true);
+    }
+    // Kein Freibrief: mitten in der Saison und ohne offene Entscheidung bleibt der Riegel.
+    const laufend = stand({ phase: "season_active", rosters: [vertrag(MENSCH, "m2", { contractLength: 2, contractEndSeasonNumber: 3 })] });
+    expect(darfVertragsentscheidungTrotzPhase(laufend.rosters[0]!, laufend)).toBe(false);
+    const entschieden = stand({ phase: "next_season_ready", rosters: [vertrag(MENSCH, "m3", { contractLength: 3, contractEndSeasonNumber: 3, contractStatus: "active" })] });
+    expect(darfVertragsentscheidungTrotzPhase(entschieden.rosters[0]!, entschieden)).toBe(false);
+  });
+
   it("die Vertragsroute lässt das Nachholen auch außerhalb des Saisonende-Fensters zu", () => {
     const route = readFileSync(join(process.cwd(), "app/api/contracts/renewal/route.ts"), "utf8");
-    expect(route).toContain("istVertragsentscheidungNachzuholen(eintrag, save.gameState)");
+    expect(route).toContain("darfVertragsentscheidungTrotzPhase(eintrag, save.gameState)");
     expect(route).toContain("vertragsentscheidung_nachgeholt");
   });
 });

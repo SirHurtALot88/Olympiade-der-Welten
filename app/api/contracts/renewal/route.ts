@@ -9,7 +9,7 @@ import {
 } from "@/lib/contracts/contract-renewal-service";
 import type { ContractShape } from "@/lib/data/olyDataTypes";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
-import { istVertragsentscheidungNachzuholen } from "@/lib/contracts/vertragsentscheidung";
+import { darfVertragsentscheidungTrotzPhase } from "@/lib/contracts/vertragsentscheidung";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { zieheVertragsalterungNach } from "@/lib/contracts/vertragsalterung-nachziehen";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     // freigegeben werden — sonst saesse der Spieler bis zum naechsten Saisonende ohne Vertrag im Kader.
     const eintrag = save.gameState.rosters.find((entry) => entry.teamId === teamId && entry.playerId === playerId) ?? null;
     const phaseGate =
-      !phaseGateRoh.allowed && eintrag && istVertragsentscheidungNachzuholen(eintrag, save.gameState)
+      !phaseGateRoh.allowed && eintrag && darfVertragsentscheidungTrotzPhase(eintrag, save.gameState)
         ? { ...phaseGateRoh, allowed: true, reason: null, warnings: [...phaseGateRoh.warnings, "vertragsentscheidung_nachgeholt"] }
         : phaseGateRoh;
     // Phase gate blocks only PRODUCTIVE writes. Dry-run previews pass through,
