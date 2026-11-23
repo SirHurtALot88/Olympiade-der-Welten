@@ -15,8 +15,8 @@ export type FanGrund = { id: string; label: string; delta: number };
 
 /** Alle Stellschrauben an einem Ort (Kalibrierung 23.11., siehe Doku). */
 export const FAN_KONFIG = {
-  /** Fanbasis eines Teams mit Beliebtheit 1 und Matrix-Beliebtheit 5,5 (neues Spiel). */
-  start: 5000,
+  /** Fanbasis eines Teams mit Beliebtheit 1 und Matrix-Beliebtheit 5,5 (neues Spiel); 23.11. von 5.000 auf 6.500 kalibriert (Messung 1: Spitze nach Saison 1 nur 6.900). */
+  start: 6500,
   /** Anteil der Matrix-Beliebtheit (TeamIdentity.popularity 1..10) am Start; der Rest ist der Beliebtheits-KPI. */
   startMatrixAnteil: 0.5,
   /** Matrix-Beliebtheit p (1..10) -> Faktor 0,45 + 0,12 x p (0,57 bis 1,65). */
@@ -33,10 +33,10 @@ export const FAN_KONFIG = {
   /** Anteil, mit dem der Anker am Saisonende der Fanbasis folgt. */
   ankerFolge: 0.4,
   /** Saisonende: Tabellenplatz von -platz bis +platz (Rang 1 = +platz). */
-  platz: 0.1,
+  platz: 0.12,
   /** Saisonende: Platz gegen die Erwartung der Kaderstaerke. */
-  erwartung: 0.1,
-  titel: 0.06,
+  erwartung: 0.12,
+  titel: 0.08,
   aufstieg: 0.08,
   abstieg: 0.08,
   /** Fans je Stern-Gewicht (Kauf/Verkauf). */

@@ -38,8 +38,8 @@ export const DAUERKARTEN_STUFEN: readonly DauerkartenStufe[] = ["wenig", "normal
 export const DAUERKARTEN_LABEL: Record<DauerkartenStufe, string> = { wenig: "Wenig", normal: "Normal", viel: "Viel" };
 
 /** Nachfrage (g.2): Fanbasis x (0,30 + 0,85 x Stimmung/100) x Ereignis; Aufteilung auf Stehen und Sitzen nach der Stimmung. */
-export const NACHFRAGE_GRUND = 0.3;
-export const NACHFRAGE_STIMMUNG = 0.85;
+export const NACHFRAGE_GRUND = 0.45;
+export const NACHFRAGE_STIMMUNG = 0.9;
 export const STEH_ANTEIL_GRUND = 0.35;
 export const STEH_ANTEIL_STIMMUNG = 0.3;
 /** Wer keinen Stehplatz bekommt, kauft zu 50 % einen Sitzplatz; wer keinen Sitzplatz bekommt, zu 80 % einen Stehplatz. */
