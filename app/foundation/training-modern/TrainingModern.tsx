@@ -634,6 +634,34 @@ function KaderTabelle({
       ...kopf("belastung", "Belastung · Risiko"),
       render: (z) => <Belastung fatigue={z.fatigue} naechste={z.verletzt ? undefined : belastungNachTraining(z.fatigue, z.modus)} />,
     },
+    ...(zeilen.some((z) => z.vorlieben)
+      ? [
+          {
+            key: "vorlieben",
+            breite: "minmax(0,1.5fr)",
+            ...kopf("vorlieben", "Vorlieben"),
+            render: (z: TrainingZeile) =>
+              z.vorlieben ? (
+                <span
+                  className="te-vorl"
+                  data-testid="training-kader-vorlieben"
+                  data-bc-tip={`Lieblinge: ${zielLabel(z.vorlieben.lieblinge[0])}, ${zielLabel(z.vorlieben.lieblinge[1])} (Budget ×1,30, Moral +3) · ungeliebt: ${zielLabel(z.vorlieben.ungeliebt)} (Budget ×0,50, Moral −6), jeweils solange es das Ziel ist. Gilt für diese Saison.`}
+                >
+                  {z.vorlieben.lieblinge.map((d) => (
+                    <b key={d} className={`te-vorl__l${z.ziel?.disziplinId === d ? " is-ziel" : ""}`}>
+                      ♥ {zielLabel(d).slice(0, 3).toUpperCase()}
+                    </b>
+                  ))}
+                  <b className={`te-vorl__u${z.ziel?.disziplinId === z.vorlieben.ungeliebt ? " is-ziel" : ""}`}>
+                    ✕ {zielLabel(z.vorlieben.ungeliebt).slice(0, 3).toUpperCase()}
+                  </b>
+                </span>
+              ) : (
+                <span className="bc-null">—</span>
+              ),
+          } satisfies BcTableColumn<TrainingZeile>,
+        ]
+      : []),
     {
       key: "wunsch",
       breite: "5.6em",

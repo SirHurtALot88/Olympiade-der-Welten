@@ -1244,3 +1244,26 @@
     display: none;
   }
 }
+
+/* Vorlieben im Reiter Kader (23.11.): zwei Lieblinge, eine ungeliebte Disziplin, kurz; das aktuelle Ziel ist hervorgehoben. */
+.te-vorl {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  white-space: nowrap;
+}
+.te-vorl b {
+  font: 700 var(--te-klein) var(--bc-zahl);
+  letter-spacing: 0.06em;
+  color: var(--bc-leise);
+}
+.te-vorl__l {
+  color: var(--bc-gut) !important;
+}
+.te-vorl__u {
+  color: var(--bc-warn, #ff6058) !important;
+}
+.te-vorl b.is-ziel {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
