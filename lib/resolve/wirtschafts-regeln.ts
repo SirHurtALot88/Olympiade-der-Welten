@@ -30,10 +30,12 @@ export type WirtschaftsRegelnStempel = {
   quote: WirtschaftsRegel;
   anker: WirtschaftsRegel;
   kernschutz: WirtschaftsRegel;
+  /** 23.11.: Toepfe + Quote nach Identitaets-Vertrauen schon in Saison 1 (Budget-Gespraech). Fehlt im Altstempel = "alt". */
+  toepfeS1?: WirtschaftsRegel;
   vorjahr?: Record<string, number>;
 };
 
-export type WirtschaftsRegelName = "quote" | "anker" | "kernschutz";
+export type WirtschaftsRegelName = "quote" | "anker" | "kernschutz" | "toepfeS1";
 
 function leseSchalter(wert: string | undefined): WirtschaftsRegel | null {
   const w = (wert ?? "").trim().toLowerCase();
@@ -50,6 +52,8 @@ function schalter(name: WirtschaftsRegelName): WirtschaftsRegel {
       return leseSchalter(process.env.NEXT_PUBLIC_OLY_BOARD_ERWARTUNG_ANKER) ?? leseSchalter(process.env.OLY_BOARD_ERWARTUNG_ANKER) ?? "neu";
     case "kernschutz":
       return leseSchalter(process.env.NEXT_PUBLIC_OLY_KI_KERNSCHUTZ) ?? leseSchalter(process.env.OLY_KI_KERNSCHUTZ) ?? "neu";
+    case "toepfeS1":
+      return leseSchalter(process.env.NEXT_PUBLIC_OLY_TOEPFE_AB_SAISON_1) ?? leseSchalter(process.env.OLY_TOEPFE_AB_SAISON_1) ?? "neu";
   }
 }
 
@@ -59,6 +63,7 @@ export function wirtschaftsRegelnFuerNeueSaison(seasonId: string, vorjahr?: Reco
     quote: schalter("quote"),
     anker: schalter("anker"),
     kernschutz: schalter("kernschutz"),
+    toepfeS1: schalter("toepfeS1"),
     ...(vorjahr && Object.keys(vorjahr).length > 0 ? { vorjahr } : {}),
   };
 }
@@ -78,6 +83,13 @@ export function gueltigeWirtschaftsRegeln(gameState: Quelle): WirtschaftsRegelnS
 /** Gilt die Regel in der laufenden Saison dieses Spielstands? Ohne gueltigen Stempel: "alt". */
 export function wirtschaftsRegel(gameState: Quelle, name: WirtschaftsRegelName): WirtschaftsRegel {
   return gueltigeWirtschaftsRegeln(gameState)?.[name] ?? "alt";
+}
+
+/** Gelten die zwei Toepfe samt Vorstands-Quote schon in Saison 1 (Budget-Gespraech 23.11.)? Ab Saison 2 immer; ohne Stempel in Saison 1 nein. */
+export function toepfeAbSaison1(gameState: Quelle & { season?: { id?: string } | null }): boolean {
+  const nr = /(\d+)\s*$/.exec(gameState?.season?.id ?? gameState?.seasonState?.seasonId ?? "")?.[1];
+  if (nr != null && Number(nr) >= 2) return true;
+  return wirtschaftsRegel(gameState, "toepfeS1") === "neu";
 }
 
 /** Setzt den Stempel beim ANLEGEN eines Spiels (idempotent). */

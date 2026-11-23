@@ -56,7 +56,7 @@ import {
   type KiRuecklageErgebnis,
 } from "@/lib/finance/ki-ruecklage";
 import { erwarteterSponsorFuerPlanung, istSponsorForecastAktiv } from "@/lib/finance/sponsor-erwartung";
-import { berechneVorstandBudgetStand, kaufRahmen, schaetzeFreigabeNaechsteSaison, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
+import { berechneVorstandBudgetStand, kaufRahmen, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 import {
   applyGmBiasToLaneAppetite,
   computeIdentityLaneAppetite,
@@ -637,19 +637,9 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   const feeCap = vorstand.gedeckelt ? vorstand.investition.frei : undefined;
   const salaryCap = vorstand.gedeckelt ? vorstand.gehalt.frei : undefined;
   const planCash = ctx.cash;
-  // Runde 2 / Chris 22.11. (Punkt 11, Saison 1): wer ab Saison 2 eine strenge Quote erwartet (niedriges Vertrauen laut Vorausschau),
-  // laesst im Draft Spielraum liegen — (1 - erwartete Quote) x halbe Kasse. Nur mit der neuen Quote-Regel (Stempel).
-  const spielraumS1 =
-    istSaisonEins(input.gameState) && wirtschaftsRegel(input.gameState, "quote") === "neu"
-      ? (1 -
-          schaetzeFreigabeNaechsteSaison(input.gameState, input.team.teamId, {
-            vertrauen: input.identity?.boardConfidence ?? null,
-            kasse: planCash,
-          }).anteil) *
-        0.5 *
-        Math.max(0, planCash)
-      : 0;
-  const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage) + spielraumS1;
+  // Budget-Gespraech (23.11.): kein eigener Saison-1-Puffer mehr (`spielraumS1`). Steht die Quote ab Saison 1 im Topf, gibt der Topf
+  // frei, was ausgegeben werden darf; der Rest ist gesperrt. Eine Vorausschau auf die naechste Quote braucht niemand.
+  const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage);
   const sponsorForecast =
     istSponsorForecastAktiv() && input.forecast?.sponsorIncome === undefined
       ? erwarteterSponsorFuerPlanung(input.gameState, input.team.teamId)
@@ -692,7 +682,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
     salaryCeiling,
     // Reserve is spendable while building from min→opt: keep only the flat solvency floor here so a
     // team actually reaches its target squad, then holds the full salary-scaled reserve above opt.
-    solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage) + spielraumS1,
+    solvencyFloor: Math.max(ORGANIC_CASH_BUFFER, ruecklage),
     // Ruecklage gilt auch beim Auffuellen bis zum Kader-Minimum (faellt auf Floor 0 zurueck, wenn das Minimum sonst
     // nicht erreichbar waere). Ohne Stufe 1 undefined => bit-gleich zu vorher.
     minFillFloor: ruecklage > 0 ? ruecklage : undefined,

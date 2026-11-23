@@ -1387,7 +1387,7 @@ export type TeamControlSettings = {
 };
 
 /** Die Bereiche, die ein menschlicher Manager selbst entscheidet oder an die KI abgibt. */
-export type DelegationBereich = "einsatzliste" | "draft" | "transfers" | "training" | "gebaeude" | "sponsor" | "ausruestung";
+export type DelegationBereich = "einsatzliste" | "draft" | "transfers" | "training" | "gebaeude" | "sponsor" | "ausruestung" | "vorstand";
 
 /** Die drei festen Stufen; Einzelschalter in `TeamDelegation.bereiche` gehen ihnen vor. */
 export type DelegationStufe = "voll_selbst" | "halbautomatik" | "voll_ki";
@@ -2334,6 +2334,34 @@ export type VorstandBudgetZustand = {
   stufenAnhebung?: number;
   /** Vorstandsgespraech: einmaliges Sonderbudget in C Jahresgehalt, aus dem Vorbehalt in den Gehaltstopf. */
   sonderGehalt?: number;
+  /** Budget-Gespraech (23.11.): Anzahl Quotenstufen, die der Vorstand fuer diese Saison senkt (0 oder 1; Ambition „Bescheiden“). */
+  stufenSenkung?: number;
+  /** Budget-Gespraech (23.11.): Zusage „Ruecklage voll halten“ — die volle Ruecklage gilt auch in Saison 1 / im ersten Fenster. */
+  ruecklageVoll?: boolean;
+  /** Budget-Gespraech (23.11.): Ambition „Bescheiden“ — zusaetzliches Rang-Ziel zwei Plaetze unter dem Ziel des Vorstands. */
+  zielTief?: { zielRang: number; basisRang: number } | null;
+};
+
+/**
+ * BUDGET-VEREINBARUNG (23.11., `lib/finance/vorstand-budget-gespraech.ts`): der Stempel des Budget-Gespraechs je Team und Saison.
+ * Gesetzt beim Unterschreiben (Mensch), sofort (KI/delegiert) oder beim Fristablauf (Vorschlag). Die Wirkung steht in
+ * `seasonState.vorstandBudget`; der Stempel ist das Protokoll und das Tor vor Draft bzw. Transferfenster.
+ */
+export type BudgetVereinbarungStempel = {
+  seasonId: string;
+  gefuehrtVon: "mensch" | "ki" | "vorschlag";
+  ownerId: string | null;
+  zeit: string;
+  vertrauenStart: number | null;
+  quoteBasis: number;
+  quote: number;
+  ambition: "tief" | "ziel" | "hoch" | "alles";
+  zielRang: number | null;
+  ruecklageStufe: "vorsichtig" | "normal" | "mutig";
+  umschichtung: number;
+  zusagen: string[];
+  transferTopf: number;
+  gehaltsTopf: number;
 };
 
 /** Eine Zusage des Spielers im Vorstandsgespraech. */
@@ -4231,6 +4259,8 @@ export type SeasonState = {
   boardConfidence?: Record<string, TeamBoardConfidenceRecord>;
   /** Finanzkonzept V2: Umschichten, Ruecklage anzapfen, "Alles auf eine Karte" je Team (siehe `VorstandBudgetZustand`). */
   vorstandBudget?: Record<string, VorstandBudgetZustand>;
+  /** Budget-Vereinbarung je Team in der laufenden Saison (23.11., `BudgetVereinbarungStempel`). */
+  budgetVereinbarung?: Record<string, BudgetVereinbarungStempel>;
   /** Vorstandsgespraeche je Team (Office 21.11). */
   vorstandGespraeche?: Record<string, VorstandGespraechZustand>;
   /** Praemienplaene je Team (Office 21.11). */
@@ -4298,6 +4328,8 @@ export type SeasonState = {
     quote: "alt" | "neu";
     anker: "alt" | "neu";
     kernschutz: "alt" | "neu";
+    /** 23.11.: Toepfe und Vorstands-Quote schon ab Saison 1, Startvertrauen aus der Identitaet (Budget-Gespraech). Fehlt = "alt". */
+    toepfeS1?: "alt" | "neu";
     vorjahr?: Record<string, number>;
   } | null;
   /**

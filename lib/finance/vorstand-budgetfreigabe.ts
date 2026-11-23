@@ -7,7 +7,9 @@
  *    Vertrauensquote 100/85/70/50 %, und `gehalt` (Jahresgehaelter) mit derselben Quote, aber **nie unter 75 %**.
  *  - Verkaufserloese (Abloese) unterliegen der Transfer-Quote: bei 70 % werden von 20 C nur 14 C frei. Das beim Verkauf
  *    frei werdende Gehalt dagegen fliesst zu 100 % ins Gehaltsbudget zurueck (die Gehaltssumme sinkt).
- *  - Saison 1: Quote 100 % fuer alle (Vertrauensquote erst ab Saison 2).
+ *  - Saison 1: Quote 100 % fuer alle (Vertrauensquote erst ab Saison 2). SEIT 23.11. (Budget-Gespraech, Chris 22.11.: „S1 auch mit
+ *    Vertrauen aus Identitaet, nicht 100 %“): ein Spiel mit dem Stempel `toepfeS1: "neu"` rechnet Quote und beide Toepfe schon
+ *    ab Saison 1, Startvertrauen = `TeamIdentity.boardConfidence` (1 bis 10). Ohne Stempel bleibt die laufende Saison 1 beim alten Weg.
  *  - Die Ruecklage nach Finanzwert (Stufe 1) bleibt weich; nur die Freigabe ist hart.
  *
  * Vertrauen = `seasonState.boardConfidence[teamId].value` (1 bis 10, Neutral 5; vorhandenes Board-System).
@@ -36,7 +38,7 @@
  *    `seasonState.vorstandBudget`, geschrieben ueber `lib/finance/vorstand-budget-aktionen.ts`.
  */
 
-import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
+import { toepfeAbSaison1, wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 import type { GameState, VorstandBudgetZustand } from "@/lib/data/olyDataTypes";
 import { spieltagBuchungenNochOffen, summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { projectSalaryAtPlannerTarget } from "@/lib/ai/salary-projection";
@@ -81,6 +83,14 @@ function saisonNummer(gameState: GameState): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** Startvertrauen in Saison 1 (23.11.): `TeamIdentity.boardConfidence`, normiert auf 1 bis 10 wie `normalizeBoardConfidence`. */
+export function startVertrauenAusIdentitaet(gameState: GameState, teamId: string): number | null {
+  const roh = gameState.teamIdentities?.find((i) => i.teamId === teamId)?.boardConfidence;
+  if (typeof roh !== "number" || !Number.isFinite(roh)) return null;
+  if (roh < 1) return 5;
+  return Math.round(Math.min(10, roh > 10 ? roh / 10 : roh) * 10) / 10;
+}
+
 /** Stufe und Anteil zu einem Vertrauenswert (reine Funktion). */
 export function stufeFuerVertrauen(vertrauen: number): { stufe: VorstandStufe; anteil: number } {
   for (const s of VORSTAND_STUFEN) {
@@ -94,10 +104,14 @@ export function resolveVorstandFreigabe(gameState: GameState, teamId: string): V
   if (!istVorstandBudgetfreigabeAktiv()) {
     return { teamId, stufe: "hoch", anteil: 1, vertrauen: null, grund: "abgeschaltet" };
   }
-  if ((saisonNummer(gameState) ?? 1) <= 1) {
+  if ((saisonNummer(gameState) ?? 1) <= 1 && !toepfeAbSaison1(gameState)) {
     return { teamId, stufe: "hoch", anteil: 1, vertrauen: null, grund: "saison_1" };
   }
-  const gespeichert = gameState.seasonState.boardConfidence?.[teamId]?.value;
+  let gespeichert = gameState.seasonState.boardConfidence?.[teamId]?.value;
+  if ((typeof gespeichert !== "number" || !Number.isFinite(gespeichert)) && (saisonNummer(gameState) ?? 1) <= 1) {
+    // Saison 1 ohne gespeichertes Vorstandsvertrauen (noch nicht berechnet): das Startvertrauen ist das der Team-Identitaet.
+    gespeichert = startVertrauenAusIdentitaet(gameState, teamId) ?? undefined;
+  }
   if (typeof gespeichert !== "number" || !Number.isFinite(gespeichert)) {
     return { teamId, stufe: "hoch", anteil: 1, vertrauen: null, grund: "ohne_vertrauenswert" };
   }
@@ -112,6 +126,12 @@ export function resolveVorstandFreigabe(gameState: GameState, teamId: string): V
     );
   const wert = gespeichert + (kostenImWert ? zustand!.vertrauensKosten ?? 0 : 0);
   const { stufe, anteil } = stufeFuerVertrauen(wert);
+  // Budget-Gespraech (23.11): Ambition „Bescheiden“ senkt die Quote um eine Stufe.
+  if (zustand && zustand.seasonId === gameState.season?.id && (zustand.stufenSenkung ?? 0) > 0) {
+    const tiefer = vorherigeQuote(anteil);
+    const neueStufe = VORSTAND_STUFEN.find((x) => Math.abs(x.anteil - tiefer) < 1e-9)?.stufe ?? stufe;
+    return { teamId, stufe: neueStufe, anteil: tiefer, vertrauen: wert, grund: "vertrauen" };
+  }
   // Vorstandsgespraech (Office 21.11): „Freigabe anheben" gilt fuer die Saison und hebt die Quote um eine Stufe.
   if (zustand && zustand.seasonId === gameState.season?.id && (zustand.stufenAnhebung ?? 0) > 0) {
     const hoeher = naechsteQuote(anteil);
@@ -253,6 +273,11 @@ export type VorstandBudgetStand = {
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const zahlText = (v: number) => (Math.round(v * 10) / 10).toString().replace(".", ",");
+
+function vorherigeQuote(q: number): number {
+  for (let i = QUOTEN_STUFEN.length - 1; i >= 0; i -= 1) if (QUOTEN_STUFEN[i]! < q - 1e-9) return QUOTEN_STUFEN[i]!;
+  return QUOTEN_STUFEN[0]!;
+}
 
 function naechsteQuote(q: number): number {
   for (const stufe of QUOTEN_STUFEN) if (stufe > q + 1e-9) return stufe;
@@ -454,12 +479,16 @@ export function berechneVorstandBudgetStand(gameState: GameState, teamId: string
     zielgehalt,
     saison: saisonNr,
   });
-  const gedeckelt = istVorstandBudgetfreigabeAktiv() && saisonNr >= 2;
+  const gedeckelt = istVorstandBudgetfreigabeAktiv() && (saisonNr >= 2 || toepfeAbSaison1(gameState));
   // Erstes Fenster (Saison 2): nur die halbe Ruecklage. In Saison 1 hat niemand eine gehalten (halbe Draft-Ruecklage, Chris 18.11.),
   // die volle Ruecklage im Topf wuerde den Kauf im ersten Fenster hart abwuergen (Messung 18.11.: Kaderstaerke -6 %).
-  const uebergang = saisonNr === 2 ? RUECKLAGE_ERSTES_FENSTER : 1;
+  // Seit 23.11. (Budget-Gespraech) steckt die halbe Ruecklage auch in Saison 1 IM Topf (kein eigener KI-Puffer mehr), Rücklage
+  // UND Gehaltspuffer zur Haelfte; „Ruecklage voll halten“ (Zusage im Gespraech) hebt beides auf voll.
+  const ruecklageVoll = zustand.ruecklageVoll === true;
+  const uebergang = saisonNr <= 2 && !ruecklageVoll ? RUECKLAGE_ERSTES_FENSTER : 1;
   const ruecklageZiel = gedeckelt ? ruecklageErg.ruecklage * uebergang : 0;
-  const gehaltspuffer = gedeckelt ? Math.max(0, KI_RUECKLAGE_GEHALTS_FAKTOR * gehaltBudget0 - ruecklageZiel) : 0;
+  const s1Faktor = saisonNr <= 1 && !ruecklageVoll ? 0.5 : 1;
+  const gehaltspuffer = gedeckelt ? Math.max(0, KI_RUECKLAGE_GEHALTS_FAKTOR * s1Faktor * gehaltBudget0 - ruecklageZiel) : 0;
 
   // Transfertopf.
   const q0 = freigabe.anteil;

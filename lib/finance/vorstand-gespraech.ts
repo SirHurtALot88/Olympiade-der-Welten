@@ -8,7 +8,7 @@
  *    laeuft in Runde 2 im selben Gespraech weiter. Fragen (die Einschaetzung) kostet nichts und kein Vertrauen.
  *  - Antwort ohne Wuerfel: Gewicht = Vertrauen x 2 + Summe der Zusagen (Wert je Charakter) gegen den Preis der Bitte.
  *  - Charakter aus der Sparneigung = Finanzwert - max(0, Ambition - 5): Antreiber (< 3,5), Kaufmann, Kassenwart (>= 7).
- *  - Ab Saison 2 (vorher ist alles freigegeben).
+ *  - Ab Saison 2 (vorher ist alles freigegeben) — ausser mit dem Stempel `toepfeS1` (23.11.): dann gilt es ab Saison 1.
  *  - Reine Funktionen auf dem GameState wie `vorstand-budget-aktionen`; die Route schreibt hinter `authorizeServerRoomWrite`.
  *
  * Die KI fuehrt keine Gespraeche; sie ruft weiter dieselben Wirkfunktionen direkt (`entscheideKiVorstandMassnahmen`).
@@ -69,6 +69,19 @@ export const BITTE_PREIS = { stufe: 14, sonder: 4, sonderSpanne: 10, anzapfJeVie
 const ANZAPF_FAKTOR: Record<GespraechCharakter, number> = { antreiber: 0.8, kaufmann: 1, kassenwart: 1.6 };
 /** Fehlt weniger als so viel, macht der Vorstand ein Gegenangebot, sonst lehnt er ab. */
 export const GEGENANGEBOT_SPANNE = 10;
+
+/**
+ * BUDGET-GESPRAECH (23.11., `vorstand-budget-gespraech.ts`): die zwei neuen Punktwerte des geführten Antrags (Startwerte, zum Messen).
+ *  - Zusage „Ruecklage voll halten“ je Charakter (Antreiber / Kaufmann / Kassenwart): 1 / 3 / 5.
+ *  - Zusage „Freigabe eine Stufe tiefer“ (zaehlt bei „Bescheiden“): 4 fuer alle.
+ *  - Bitte „Ziel senken“ (Bescheiden: Ziel zwei Plaetze tiefer): 16 / 10 / 6.
+ */
+export const BUDGET_ZUSAGE_WERT = {
+  ruecklageVoll: { antreiber: 1, kaufmann: 3, kassenwart: 5 } as Record<GespraechCharakter, number>,
+  stufeTiefer: { antreiber: 4, kaufmann: 4, kassenwart: 4 } as Record<GespraechCharakter, number>,
+};
+export const BUDGET_PREIS_ZIEL_SENKEN: Record<GespraechCharakter, number> = { antreiber: 16, kaufmann: 10, kassenwart: 6 };
+export { ANZAPF_FAKTOR };
 /** Hoechstens so viele Runden je Gespraech. */
 export const GESPRAECH_RUNDEN = 2;
 
@@ -119,7 +132,7 @@ export function gespraechCharakter(gameState: GameState, teamId: string): { char
   return { charakter: sparneigung < 3.5 ? "antreiber" : sparneigung < 7 ? "kaufmann" : "kassenwart", sparneigung: r1(sparneigung) };
 }
 
-function imFenster(gameState: GameState): boolean {
+export function imFenster(gameState: GameState): boolean {
   return evaluateGamePhaseAction(gameState, "credit_borrow").allowed;
 }
 
@@ -147,7 +160,7 @@ export function verbindlichesRangZiel(gameState: GameState, teamId: string): { o
 function bitteSperre(gameState: GameState, teamId: string, stand: VorstandBudgetStand, antrag: GespraechAntrag): string | null {
   const z = lesVorstandGespraech(gameState, teamId);
   const fenster = imFenster(gameState);
-  if (!stand.gedeckelt) return "Vor Saison 2 ist alles freigegeben: es gibt nichts zu verhandeln.";
+  if (!stand.gedeckelt) return "Vor dem Vorstands-Budget ist alles freigegeben: es gibt nichts zu verhandeln.";
   if (!z.offen && z.genutzt >= GESPRAECHE_JE_SAISON) return `Beide Gespräche dieser Saison sind verbraucht (${GESPRAECHE_JE_SAISON} von ${GESPRAECHE_JE_SAISON}).`;
   const deckel = z.zusagen.some((x) => x.art === "deckel");
   switch (antrag.bitte) {
@@ -366,7 +379,7 @@ function wende(
   }
 }
 
-function bindeZusagen(gameState: GameState, teamId: string, zusagen: VorstandZusageArt[]): GameState {
+export function bindeZusagen(gameState: GameState, teamId: string, zusagen: VorstandZusageArt[]): GameState {
   const z = lesVorstandGespraech(gameState, teamId);
   const seit = new Date().toISOString();
   const neu = zusagen

@@ -16,6 +16,7 @@ import {
   lesVorstandZustand,
   type VorstandBudgetStand,
 } from "@/lib/finance/vorstand-budgetfreigabe";
+import { fuehreKiBudgetGespraech } from "@/lib/finance/vorstand-budget-gespraech";
 import { lesVorstandGespraech } from "@/lib/finance/vorstand-gespraech-zustand";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
@@ -211,7 +212,7 @@ export function beantrageAlleAufEineKarte(
   };
 }
 
-export type KiVorstandMassnahme = { art: "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte"; text: string; betrag?: number };
+export type KiVorstandMassnahme = { art: "umschichten" | "ruecklage_anzapfen" | "alles_auf_eine_karte" | "budget_gespraech"; text: string; betrag?: number };
 
 /** Charakter der KI aus der Risikobereitschaft des Teams: vorsichtig < 4, normal 4 bis 7, aggressiv > 7. */
 export function kiCharakter(gameState: GameState, teamId: string): "vorsichtig" | "normal" | "aggressiv" {
@@ -234,8 +235,15 @@ export function entscheideKiVorstandMassnahmen(
 ): { gameState: GameState; massnahmen: KiVorstandMassnahme[] } {
   const massnahmen: KiVorstandMassnahme[] = [];
   let gs = gameState;
+  // BUDGET-GESPRAECH (23.11.): die KI fuehrt das Gespraech zuerst (dieselbe Regel, dieselben Funktionen), danach gelten die Toepfe
+  // dieser Vereinbarung. Fehlt schon der Stempel aus der Saison-1-Anlage, wird er hier nachgeholt (Saisonwechsel, Altstaende).
+  const gefuehrt = fuehreKiBudgetGespraech(gs, teamId);
+  if (gefuehrt !== gs) {
+    gs = gefuehrt;
+    massnahmen.push({ art: "budget_gespraech", text: "Budget-Gespräch mit dem Vorstand geführt." });
+  }
   const stand = berechneVorstandBudgetStand(gs, teamId);
-  if (!stand.gedeckelt || stand.alleAufEineKarte.aktiv || !fenster(gs)) return { gameState, massnahmen };
+  if (!stand.gedeckelt || stand.alleAufEineKarte.aktiv || !fenster(gs)) return { gameState: gs, massnahmen };
   const charakter = kiCharakter(gs, teamId);
   const identity = gs.teamIdentities?.find((i) => i.teamId === teamId);
   const ambition = typeof identity?.ambition === "number" ? (identity.ambition > 10 ? identity.ambition / 10 : identity.ambition) : 5;
