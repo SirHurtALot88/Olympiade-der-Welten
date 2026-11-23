@@ -27,15 +27,27 @@ import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
 
 export type TrainingsVorliebenRegelVersion = "aus" | "v1";
 
-export type TrainingsVorliebenStempel = { seasonId: string; regel: TrainingsVorliebenRegelVersion };
+export type TrainingsVorliebenStempel = {
+  seasonId: string;
+  regel: TrainingsVorliebenRegelVersion;
+};
 
 type Schalter = "an" | "aus" | "aus-sofort";
 
 function leseSchalter(wert: string | undefined): Schalter | null {
   const w = (wert ?? "").trim().toLowerCase();
   if (w === "") return null;
-  if (w === "aus-sofort" || w === "aus_sofort" || w === "notbremse") return "aus-sofort";
-  if (w === "aus" || w === "alt" || w === "0" || w === "false" || w === "nein" || w === "off") return "aus";
+  if (w === "aus-sofort" || w === "aus_sofort" || w === "notbremse")
+    return "aus-sofort";
+  if (
+    w === "aus" ||
+    w === "alt" ||
+    w === "0" ||
+    w === "false" ||
+    w === "nein" ||
+    w === "off"
+  )
+    return "aus";
   return "an";
 }
 
@@ -46,7 +58,11 @@ export function trainingsVorliebenSchalter(): Schalter {
 
 export type TrainingsVorliebenQuelle =
   | {
-      seasonState?: (Pick<SeasonState, "seasonId"> & { trainingsVorlieben?: TrainingsVorliebenStempel | null }) | null;
+      seasonState?:
+        | (Pick<SeasonState, "seasonId"> & {
+            trainingsVorlieben?: TrainingsVorliebenStempel | null;
+          })
+        | null;
       season?: { id?: string } | null;
       scenarioMeta?: { gameMode?: string | null } | null;
     }
@@ -58,36 +74,70 @@ function istBattle(gameState: TrainingsVorliebenQuelle): boolean {
 }
 
 /** Der Stempel fuer eine NEU beginnende Saison, aus dem Schalter. */
-export function trainingsVorliebenFuerNeueSaison(seasonId: string): TrainingsVorliebenStempel {
-  return { seasonId, regel: trainingsVorliebenSchalter() === "an" ? "v1" : "aus" };
+export function trainingsVorliebenFuerNeueSaison(
+  seasonId: string,
+): TrainingsVorliebenStempel {
+  return {
+    seasonId,
+    regel: trainingsVorliebenSchalter() === "an" ? "v1" : "aus",
+  };
 }
 
 /** Der Stempel eines neuen Saisonstands je Spielmodus: Battle bekommt ihn, Manager keinen. */
-export function trainingsVorliebenFuerSpielmodus(gameState: TrainingsVorliebenQuelle, seasonId: string): TrainingsVorliebenStempel | undefined {
-  return istBattle(gameState) ? trainingsVorliebenFuerNeueSaison(seasonId) : undefined;
+export function trainingsVorliebenFuerSpielmodus(
+  gameState: TrainingsVorliebenQuelle,
+  seasonId: string,
+): TrainingsVorliebenStempel | undefined {
+  return istBattle(gameState)
+    ? trainingsVorliebenFuerNeueSaison(seasonId)
+    : undefined;
 }
 
 /** Setzt den Stempel beim ANLEGEN eines Spiels. Idempotent: ein Stempel derselben Saison bleibt. */
-export function stempleTrainingsVorliebenBeimAnlegen(gameState: GameState): GameState {
+export function stempleTrainingsVorliebenBeimAnlegen(
+  gameState: GameState,
+): GameState {
   const seasonId = gameState.seasonState?.seasonId ?? gameState.season?.id;
   if (!seasonId || !istBattle(gameState)) return gameState;
-  if (gameState.seasonState?.trainingsVorlieben?.seasonId === seasonId) return gameState;
-  return { ...gameState, seasonState: { ...gameState.seasonState, trainingsVorlieben: trainingsVorliebenFuerNeueSaison(seasonId) } };
+  if (gameState.seasonState?.trainingsVorlieben?.seasonId === seasonId)
+    return gameState;
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      trainingsVorlieben: trainingsVorliebenFuerNeueSaison(seasonId),
+    },
+  };
 }
 
 /**
  * LADE-MIGRATION: ein Battle-Spielstand ohne gueltigen Stempel der laufenden Saison bekommt "aus" -- die Saison rechnet zu Ende wie
  * gespielt, ab dem naechsten Saisonwechsel gilt der Schalter. Rein und idempotent.
  */
-export function stempleTrainingsVorliebenNachLaden<T extends NonNullable<TrainingsVorliebenQuelle> & Pick<GameState, "seasonState">>(gameState: T): T {
+export function stempleTrainingsVorliebenNachLaden<
+  T extends NonNullable<TrainingsVorliebenQuelle> &
+    Pick<GameState, "seasonState">,
+>(gameState: T): T {
   if (!gameState?.seasonState || !istBattle(gameState)) return gameState;
   const seasonId = gameState.seasonState.seasonId;
-  if (!seasonId || gameState.seasonState.trainingsVorlieben?.seasonId === seasonId) return gameState;
-  return { ...gameState, seasonState: { ...gameState.seasonState, trainingsVorlieben: { seasonId, regel: "aus" as const } } };
+  if (
+    !seasonId ||
+    gameState.seasonState.trainingsVorlieben?.seasonId === seasonId
+  )
+    return gameState;
+  return {
+    ...gameState,
+    seasonState: {
+      ...gameState.seasonState,
+      trainingsVorlieben: { seasonId, regel: "aus" as const },
+    },
+  };
 }
 
 /** Die Vorliebenregel DIESER Saison. Notbremse, fehlender oder fremder Stempel: "aus". */
-export function trainingsVorliebenRegelFuer(gameState: TrainingsVorliebenQuelle): TrainingsVorliebenRegelVersion {
+export function trainingsVorliebenRegelFuer(
+  gameState: TrainingsVorliebenQuelle,
+): TrainingsVorliebenRegelVersion {
   if (trainingsVorliebenSchalter() === "aus-sofort") return "aus";
   const stempel = gameState?.seasonState?.trainingsVorlieben;
   const seasonId = gameState?.seasonState?.seasonId ?? gameState?.season?.id;
@@ -96,6 +146,8 @@ export function trainingsVorliebenRegelFuer(gameState: TrainingsVorliebenQuelle)
 }
 
 /** Kurzform fuer die Rechenwege: gelten in dieser Saison die Trainingsvorlieben? Ohne Spielstand: nein. */
-export function trainingsVorliebenAktivFuer(gameState: TrainingsVorliebenQuelle): boolean {
+export function trainingsVorliebenAktivFuer(
+  gameState: TrainingsVorliebenQuelle,
+): boolean {
   return trainingsVorliebenRegelFuer(gameState) === "v1";
 }

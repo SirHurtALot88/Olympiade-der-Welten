@@ -15,8 +15,18 @@
  *
  * Die Leistungs-Haelfte der Entwicklung (PP) und der Abbau sind hier bewusst nicht dabei: die Heatmap zeigt, WOHIN Training wirkt.
  */
-import type { GameState, Player, PlayerGeneratorAttributeName, PlayerTrainingsZiel } from "@/lib/data/olyDataTypes";
-import { disziplinFarbe, vorliebeArt, vorliebeFaktor, type VorliebeArt } from "@/lib/training/trainings-vorlieben";
+import type {
+  GameState,
+  Player,
+  PlayerGeneratorAttributeName,
+  PlayerTrainingsZiel,
+} from "@/lib/data/olyDataTypes";
+import {
+  disziplinFarbe,
+  vorliebeArt,
+  vorliebeFaktor,
+  type VorliebeArt,
+} from "@/lib/training/trainings-vorlieben";
 import { trainingsVorliebenAktivFuer } from "@/lib/resolve/trainings-vorlieben";
 import {
   officialDisciplineWeightLabels,
@@ -38,14 +48,24 @@ import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 export type HeatmapMass = "sp" | "eignung" | "luft";
 export type Bereich = "pow" | "spe" | "men" | "soc";
 
-export const BEREICHE: ReadonlyArray<{ id: Bereich; kurz: string; name: string; gegen: Bereich }> = [
+export const BEREICHE: ReadonlyArray<{
+  id: Bereich;
+  kurz: string;
+  name: string;
+  gegen: Bereich;
+}> = [
   { id: "pow", kurz: "POW", name: "Kraft", gegen: "men" },
   { id: "spe", kurz: "SPE", name: "Tempo", gegen: "soc" },
   { id: "men", kurz: "MEN", name: "Kopf", gegen: "pow" },
   { id: "soc", kurz: "SOC", name: "Auftritt", gegen: "spe" },
 ];
 
-const FARBE_ZU_BEREICH = { red: "pow", green: "spe", blue: "men", yellow: "soc" } as const;
+const FARBE_ZU_BEREICH = {
+  red: "pow",
+  green: "spe",
+  blue: "men",
+  yellow: "soc",
+} as const;
 
 /** Bereich (POW/SPE/MEN/SOC) einer Disziplin, aus ihrer Disziplinfarbe. */
 export function bereichVonDisziplin(disziplinId: string): Bereich | null {
@@ -109,18 +129,24 @@ export type ZielHeatmap = {
 };
 
 function modusVon(player: Player): PlayerTrainingMode {
-  return player.trainingMode === "leicht" || player.trainingMode === "hart" ? player.trainingMode : "mittel";
+  return player.trainingMode === "leicht" || player.trainingMode === "hart"
+    ? player.trainingMode
+    : "mittel";
 }
 
 /** Die Trainings-Spieltage ab dem naechsten, ohne Ausfall-Spieltage des Spielers (dieselbe Quelle wie die Buchung). */
-export function trainingsFenster(gameState: GameState, playerId: string): { ids: string[]; verletzt: number } {
+export function trainingsFenster(
+  gameState: GameState,
+  playerId: string,
+): { ids: string[]; verletzt: number } {
   const alle = gameState.season?.matchdayIds ?? [];
   const aktuell = gameState.matchdayState?.matchdayId ?? alle[0] ?? null;
   const ab = aktuell ? Math.max(0, alle.indexOf(aktuell)) : 0;
   const ids: string[] = [];
   let verletzt = 0;
   for (const id of alle.slice(ab)) {
-    if (bestimmeAusfallSpielerFuerSpieltag(gameState, id).has(playerId)) verletzt += 1;
+    if (bestimmeAusfallSpielerFuerSpieltag(gameState, id).has(playerId))
+      verletzt += 1;
     else ids.push(id);
   }
   return { ids, verletzt };
@@ -141,20 +167,36 @@ export function projiziereZelle(input: {
   let player = input.player;
   const profil = trainingsProfilFuerZiel(ziel);
   if (profil.length === 0 || !hatVollenAttributbogen(player)) return null;
-  const startStats = player.attributeSheetStats as NonNullable<Player["attributeSheetStats"]>;
+  const startStats = player.attributeSheetStats as NonNullable<
+    Player["attributeSheetStats"]
+  >;
   const summe: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   const bremst = new Set<PlayerGeneratorAttributeName>();
-  const deckel: Partial<Record<PlayerGeneratorAttributeName, number | null>> = {};
+  const deckel: Partial<Record<PlayerGeneratorAttributeName, number | null>> =
+    {};
   let sp = 0;
   let budgetFaktor = 1;
   for (let i = 0; i < input.trainings; i += 1) {
-    const schritt = berechneSpieltagsZuwachs({ gameState, player, ziel, quelle: "manager", modus });
+    const schritt = berechneSpieltagsZuwachs({
+      gameState,
+      player,
+      ziel,
+      quelle: "manager",
+      modus,
+    });
     if (!schritt) return null;
     if (i === 0) budgetFaktor = schritt.budgetFaktor;
     for (const a of schritt.deckeBremst) bremst.add(a);
-    for (const t of schritt.transparenz.attribute) if (!(t.attribute in deckel)) deckel[t.attribute] = t.deckel;
-    const stats = { ...(player.attributeSheetStats as NonNullable<Player["attributeSheetStats"]>) };
-    for (const [a, w] of Object.entries(schritt.zuwachs) as Array<[PlayerGeneratorAttributeName, number]>) {
+    for (const t of schritt.transparenz.attribute)
+      if (!(t.attribute in deckel)) deckel[t.attribute] = t.deckel;
+    const stats = {
+      ...(player.attributeSheetStats as NonNullable<
+        Player["attributeSheetStats"]
+      >),
+    };
+    for (const [a, w] of Object.entries(schritt.zuwachs) as Array<
+      [PlayerGeneratorAttributeName, number]
+    >) {
       stats[a] = Number(((stats[a] as number) + w).toFixed(3));
       summe[a] = Number(((summe[a] ?? 0) + w).toFixed(4));
       sp += w;
@@ -162,15 +204,28 @@ export function projiziereZelle(input: {
     player = { ...player, attributeSheetStats: stats };
   }
   const top = schwersteMatrixAttribute(ziel.disziplinId, 3);
-  const weg = Math.min(Math.max(0, Math.floor(ziel.weg ?? 0)), top.length - 1) as TrainingsWeg;
+  const weg = Math.min(
+    Math.max(0, Math.floor(ziel.weg ?? 0)),
+    top.length - 1,
+  ) as TrainingsWeg;
   const haupt = profil[0]!.attribute;
   let eignung = 0;
   for (const a of PROGRESSION_ATTRIBUTE_ORDER) {
     const z = summe[a] ?? 0;
-    if (z > 0) eignung += (z * (officialDisciplineWeightTable[a]?.[ziel.disziplinId as keyof (typeof officialDisciplineWeightTable)[typeof a]] ?? 0)) / 100;
+    if (z > 0)
+      eignung +=
+        (z *
+          (officialDisciplineWeightTable[a]?.[
+            ziel.disziplinId as keyof (typeof officialDisciplineWeightTable)[typeof a]
+          ] ?? 0)) /
+        100;
   }
   const hauptDeckel = deckel[haupt];
-  const luft = Math.max(0, (typeof hauptDeckel === "number" ? hauptDeckel : 99) - Number(startStats[haupt]));
+  const luft = Math.max(
+    0,
+    (typeof hauptDeckel === "number" ? hauptDeckel : 99) -
+      Number(startStats[haupt]),
+  );
   return {
     disziplinId: ziel.disziplinId,
     weg,
@@ -184,7 +239,10 @@ export function projiziereZelle(input: {
       anteil: e.anteil,
       matrixGewicht: e.matrixGewicht,
       vorher: Number(Number(startStats[e.attribute]).toFixed(2)),
-      deckel: typeof deckel[e.attribute] === "number" ? (deckel[e.attribute] as number) : null,
+      deckel:
+        typeof deckel[e.attribute] === "number"
+          ? (deckel[e.attribute] as number)
+          : null,
       zuwachs: Number((summe[e.attribute] ?? 0).toFixed(3)),
       bremst: bremst.has(e.attribute),
     })),
@@ -197,7 +255,11 @@ export function projiziereZelle(input: {
  * Die Heatmap eines Spielers fuer den Modus (Standard: sein aktueller). `null` ohne vollen Attributbogen. Die Rechnung ist teuer (60 Zellen x Spieltage),
  * der Aufrufer zwischenspeichert sie je (Spielstand, Spieler, Modus).
  */
-export function baueZielHeatmap(input: { gameState: GameState; playerId: string; modus?: PlayerTrainingMode }): ZielHeatmap | null {
+export function baueZielHeatmap(input: {
+  gameState: GameState;
+  playerId: string;
+  modus?: PlayerTrainingMode;
+}): ZielHeatmap | null {
   const { gameState } = input;
   const player = gameState.players.find((p) => p.id === input.playerId);
   if (!player || !hatVollenAttributbogen(player)) return null;
@@ -210,7 +272,13 @@ export function baueZielHeatmap(input: { gameState: GameState; playerId: string;
   for (const disziplinId of officialDisciplineWeightOrder) {
     const zellen: HeatmapZelle[] = [];
     for (const option of wegeFuerDisziplin(disziplinId)) {
-      const zelle = projiziereZelle({ gameState, player, ziel: { disziplinId, weg: option.weg }, modus, trainings: fenster.ids.length });
+      const zelle = projiziereZelle({
+        gameState,
+        player,
+        ziel: { disziplinId, weg: option.weg },
+        modus,
+        trainings: fenster.ids.length,
+      });
       if (zelle) zellen.push(zelle);
     }
     const eignung = player.disciplineRatings?.[disziplinId];
@@ -219,7 +287,10 @@ export function baueZielHeatmap(input: { gameState: GameState; playerId: string;
       disziplinId,
       label: officialDisciplineWeightLabels[disziplinId],
       bereich: bereichVonDisziplin(disziplinId),
-      eignungHeute: typeof eignung === "number" && Number.isFinite(eignung) ? eignung : null,
+      eignungHeute:
+        typeof eignung === "number" && Number.isFinite(eignung)
+          ? eignung
+          : null,
       vorliebe: art,
       vorliebeFaktor: vorliebeFaktor(art),
       zellen,
@@ -230,7 +301,9 @@ export function baueZielHeatmap(input: { gameState: GameState; playerId: string;
     modus,
     trainings: fenster.ids.length,
     spieltageVerletzt: fenster.verletzt,
-    ersterTrainingsSpieltag: ersterId ? { matchdayId: ersterId, nummer: alleIds.indexOf(ersterId) + 1 } : null,
+    ersterTrainingsSpieltag: ersterId
+      ? { matchdayId: ersterId, nummer: alleIds.indexOf(ersterId) + 1 }
+      : null,
     vorliebenAktiv: vorlieben,
     zeilen,
   };
@@ -238,13 +311,20 @@ export function baueZielHeatmap(input: { gameState: GameState; playerId: string;
 
 /** Wert einer Zelle im gewaehlten Mass. */
 export function zellenWert(zelle: HeatmapZelle, mass: HeatmapMass): number {
-  return mass === "sp" ? zelle.sp : mass === "eignung" ? zelle.eignung : zelle.luft;
+  return mass === "sp"
+    ? zelle.sp
+    : mass === "eignung"
+      ? zelle.eignung
+      : zelle.luft;
 }
 
 /**
  * Die beste Zelle im Mass: groesster Wert; bei gleichem Wert (SP) entscheidet der groessere Eignungszuwachs, dann Matrix-Reihenfolge. `null` ohne Zellen.
  */
-export function besteZelle(heatmap: ZielHeatmap, mass: HeatmapMass): HeatmapZelle | null {
+export function besteZelle(
+  heatmap: ZielHeatmap,
+  mass: HeatmapMass,
+): HeatmapZelle | null {
   let beste: HeatmapZelle | null = null;
   for (const zeile of heatmap.zeilen) {
     for (const zelle of zeile.zellen) {
@@ -253,14 +333,21 @@ export function besteZelle(heatmap: ZielHeatmap, mass: HeatmapMass): HeatmapZell
         continue;
       }
       const d = zellenWert(zelle, mass) - zellenWert(beste, mass);
-      if (d > 1e-9 || (Math.abs(d) <= 1e-9 && zelle.eignung > beste.eignung + 1e-9)) beste = zelle;
+      if (
+        d > 1e-9 ||
+        (Math.abs(d) <= 1e-9 && zelle.eignung > beste.eignung + 1e-9)
+      )
+        beste = zelle;
     }
   }
   return beste;
 }
 
 /** Kleinster und groesster Wert aller Zellen im Mass (fuer die Faerbung). */
-export function wertSpanne(heatmap: ZielHeatmap, mass: HeatmapMass): { min: number; max: number } {
+export function wertSpanne(
+  heatmap: ZielHeatmap,
+  mass: HeatmapMass,
+): { min: number; max: number } {
   let min = Infinity;
   let max = -Infinity;
   for (const zeile of heatmap.zeilen) {
@@ -307,33 +394,57 @@ export type SaisonFortschritt = {
 };
 
 /** Der Fortschritt dieser Saison je Attribut, aus dem Trainingsverlauf (`seasonTrainingAccumulator`): genau das, was gebucht wurde. */
-export function baueSaisonFortschritt(gameState: GameState, playerId: string): SaisonFortschritt | null {
+export function baueSaisonFortschritt(
+  gameState: GameState,
+  playerId: string,
+): SaisonFortschritt | null {
   const player = gameState.players.find((p) => p.id === playerId);
   const stats = player?.attributeSheetStats;
   if (!player || !stats) return null;
   const akku = player.seasonTrainingAccumulator;
   const gueltig = akku && akku.seasonId === gameState.season.id ? akku : null;
-  const start = (gueltig?.startAttribute ?? null) as Partial<Record<PlayerGeneratorAttributeName, number>> | null;
+  const start = (gueltig?.startAttribute ?? null) as Partial<
+    Record<PlayerGeneratorAttributeName, number>
+  > | null;
   const verlauf = (gueltig?.verlauf ?? []).filter((e) => e.s === "t" && !e.o);
   const ids = gameState.season?.matchdayIds ?? [];
-  const nettoJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
+  const nettoJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>> =
+    {};
   let trainingSp = 0;
   for (const e of verlauf) {
-    for (const [a, w] of Object.entries(e.z ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) {
+    for (const [a, w] of Object.entries(e.z ?? {}) as Array<
+      [PlayerGeneratorAttributeName, number]
+    >) {
       nettoJeAttribut[a] = (nettoJeAttribut[a] ?? 0) + w;
       trainingSp += w;
     }
-    for (const [a, w] of Object.entries(e.p ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) nettoJeAttribut[a] = (nettoJeAttribut[a] ?? 0) + w;
-    for (const [a, w] of Object.entries(e.a ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) nettoJeAttribut[a] = (nettoJeAttribut[a] ?? 0) - w;
+    for (const [a, w] of Object.entries(e.p ?? {}) as Array<
+      [PlayerGeneratorAttributeName, number]
+    >)
+      nettoJeAttribut[a] = (nettoJeAttribut[a] ?? 0) + w;
+    for (const [a, w] of Object.entries(e.a ?? {}) as Array<
+      [PlayerGeneratorAttributeName, number]
+    >)
+      nettoJeAttribut[a] = (nettoJeAttribut[a] ?? 0) - w;
   }
   const attribute = PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => {
     const jetzt = Number(stats[attribute]);
-    const s = start && typeof start[attribute] === "number" ? (start[attribute] as number) : null;
+    const s =
+      start && typeof start[attribute] === "number"
+        ? (start[attribute] as number)
+        : null;
     const delta = s != null ? jetzt - s : (nettoJeAttribut[attribute] ?? 0);
-    return { attribute, start: s, jetzt: Number(jetzt.toFixed(2)), delta: Number(delta.toFixed(2)) } satisfies SaisonFortschrittAttribut;
+    return {
+      attribute,
+      start: s,
+      jetzt: Number(jetzt.toFixed(2)),
+      delta: Number(delta.toFixed(2)),
+    } satisfies SaisonFortschrittAttribut;
   });
   let groesster: SaisonFortschrittAttribut | null = null;
-  for (const a of attribute) if (a.delta > 0.004 && (!groesster || a.delta > groesster.delta)) groesster = a;
+  for (const a of attribute)
+    if (a.delta > 0.004 && (!groesster || a.delta > groesster.delta))
+      groesster = a;
   const spieltage = verlauf.length
     ? {
         von: Math.max(1, ids.indexOf(verlauf[0]!.m) + 1),

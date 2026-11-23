@@ -46,6 +46,9 @@ import {
 } from "@/lib/training/training-mode-demand-service";
 import { getAttributesForAxis } from "@/lib/scouting/player-attribute-ceiling-service";
 import { DEVELOPMENT_MAX_ATTRIBUTE_VALUE } from "@/lib/training/training-levelup-service";
+import { trainingsVorliebenAktivFuer } from "@/lib/resolve/trainings-vorlieben";
+import { baueSaisonFortschritt, spBisSaisonende } from "@/lib/training/training-heatmap";
+import { leiteTrainingsVorliebenAb, vorliebeArt, type VorliebeArt } from "@/lib/training/trainings-vorlieben";
 import {
   ORGANIC_GAP_ACCEL_CAP,
   ORGANIC_GAP_ACCEL_NEUTRAL,
@@ -150,6 +153,19 @@ export type TrainingZeile = {
   wunsch: PlayerTrainingMode | null;
   /** Zahlen zum Wunsch (Moral, Spieltag), `null` ohne Wunsch. Quelle: `trainingDemand` der Zeile. */
   wunschDaten: WunschDaten | null;
+  /** Trainingsvorlieben (Runde 2): zwei Lieblings-Disziplinen und die ungeliebte; `null`, wenn die Regel der Saison aus ist. */
+  vorlieben: { lieblinge: [string, string]; ungeliebt: string } | null;
+  /** Art des aktuellen Ziels (1 Liebling, -1 ungeliebt, 0 neutral oder Regel aus). */
+  vorliebeAktuell: VorliebeArt;
+  /** Skillpunkte bis Saisonende mit dem aktuellen Plan (Ziel, Weg, Intensitaet): dieselbe Rechnung wie die Heatmap, Spieltag fuer Spieltag. */
+  sp: number;
+  /** Was er sich diese Saison schon gebucht hat (Summe der Trainings-Zuwaechse). */
+  spBisher: number;
+  /** Gespeicherte Moral (0..100) und Form (0..100), `null` ohne Eintrag. */
+  moral: number | null;
+  form: number | null;
+  rasse: string;
+  traits: string[];
 };
 
 export type WunschDaten = {
@@ -183,6 +199,9 @@ export function baueTrainingZeilen(input: {
   const spieler = new Map(gameState.players.map((p) => [p.id, p] as const));
   const spieltagIndex =
     gameState.seasonState?.disciplineSchedule?.find((e) => e.matchdayId === matchdayId)?.matchdayIndex ?? null;
+  const vorliebenAktiv = trainingsVorliebenAktivFuer(gameState);
+  const moralJeSpieler = new Map((gameState.playerMoraleState ?? []).map((m) => [m.playerId, m.morale] as const));
+  const formJeSpieler = new Map((gameState.playerFormState ?? []).map((f) => [f.playerId, f.form] as const));
   return input.rows.map((row) => {
     const player: Player | undefined = spieler.get(row.player.id);
     const bestimmt = player ? bestimmeTrainingsZiel(kontext, player) : null;
@@ -227,6 +246,14 @@ export function baueTrainingZeilen(input: {
         player && bestimmt && !verletzt
           ? (berechneSpieltagsZuwachs({ gameState, player, ziel: bestimmt.ziel, quelle: bestimmt.quelle, modus: row.mode })?.transparenz ?? null)
           : null,
+      vorlieben: vorliebenAktiv && player ? leiteTrainingsVorliebenAb(player) : null,
+      vorliebeAktuell: vorliebenAktiv && player && bestimmt ? vorliebeArt(player, bestimmt.ziel.disziplinId) : 0,
+      sp: player && bestimmt ? spBisSaisonende({ gameState, player, ziel: bestimmt.ziel, modus: row.mode }) : 0,
+      spBisher: baueSaisonFortschritt(gameState, row.player.id)?.trainingSp ?? 0,
+      moral: moralJeSpieler.get(row.player.id) ?? null,
+      form: formJeSpieler.get(row.player.id) ?? null,
+      rasse: player?.race ?? "",
+      traits: player ? [...(player.traitsPositive ?? []), ...(player.traitsNegative ?? [])] : [],
       wunsch: row.trainingDemand?.preferredMode ?? null,
       wunschDaten: row.trainingDemand
         ? {
@@ -243,7 +270,7 @@ export function baueTrainingZeilen(input: {
 /* ------------------------------------------------------------------ Sortierung (jede Tabelle) */
 
 export type SortRichtung = "auf" | "ab";
-export type KaderSortSchluessel = "name" | "wunsch" | "ziel" | "modus" | "netto" | "potenzial" | "belastung" | "risiko" | "gesamt";
+export type KaderSortSchluessel = "name" | "wunsch" | "ziel" | "modus" | "netto" | "potenzial" | "belastung" | "risiko" | "gesamt" | "vorlieben" | "sp";
 
 const MODUS_REIHE: Record<PlayerTrainingMode, number> = {
   leicht: 0,
@@ -277,6 +304,11 @@ function sortWert(z: TrainingZeile, schluessel: KaderSortSchluessel): number | s
       return z.risiko;
     case "gesamt":
       return z.gesamt ?? -1;
+    case "vorlieben":
+      // Auf dem aktuellen Ziel: Liebling (2) vor neutral (1) vor ungeliebt (0); ohne Regel alles gleich.
+      return z.vorliebeAktuell + 1;
+    case "sp":
+      return z.sp;
   }
 }
 
@@ -330,6 +362,12 @@ export type KaderKennzahlen = {
   /** Spieler mit Trainingswunsch, davon (noch) nicht erfüllt. */
   wuenscheGesamt: number;
   wuenscheOffen: number;
+  /** Skillpunkte des Kaders bis Saisonende (Summe von `sp`). */
+  spSumme: number;
+  /** Trainingsvorlieben: Spieler, deren Ziel eine Lieblings- bzw. die ungeliebte Disziplin ist; `vorliebenAktiv` false, wenn die Regel der Saison aus ist. */
+  vorliebenAktiv: boolean;
+  trainierenLiebling: number;
+  trainierenUngeliebt: number;
 };
 
 export function baueKaderKennzahlen(zeilen: readonly TrainingZeile[]): KaderKennzahlen {
@@ -343,6 +381,10 @@ export function baueKaderKennzahlen(zeilen: readonly TrainingZeile[]): KaderKenn
     anzahl,
     wuenscheGesamt: zeilen.filter((z) => z.wunsch).length,
     wuenscheOffen: zeilen.filter((z) => wunschOffen(z)).length,
+    spSumme: Math.round(summe((z) => z.sp) * 10) / 10,
+    vorliebenAktiv: zeilen.some((z) => z.vorlieben != null),
+    trainierenLiebling: zeilen.filter((z) => !z.verletzt && z.vorliebeAktuell > 0).length,
+    trainierenUngeliebt: zeilen.filter((z) => !z.verletzt && z.vorliebeAktuell < 0).length,
   };
 }
 

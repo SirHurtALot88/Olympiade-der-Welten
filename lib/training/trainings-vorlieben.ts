@@ -22,7 +22,10 @@ import { foundationSeedDisciplines } from "@/lib/data/dataAdapter";
 import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 import { GEGENFARBE } from "@/lib/lineups/formkarten-farbregel";
 import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
-import { SIGNATURE_ORGANIC_GROWTH_MULTIPLIER, WEAK_ORGANIC_GROWTH_MULTIPLIER } from "@/lib/training/organic-season-progression";
+import {
+  SIGNATURE_ORGANIC_GROWTH_MULTIPLIER,
+  WEAK_ORGANIC_GROWTH_MULTIPLIER,
+} from "@/lib/training/organic-season-progression";
 
 /** Trainingsbudget-Faktor einer Lieblings-/ungeliebten Disziplin: dieselben Zahlen wie die Attribut-Affinitaet (Chris, 22.11.). */
 export const VORLIEBE_FAKTOR_LIEBLING = SIGNATURE_ORGANIC_GROWTH_MULTIPLIER;
@@ -59,29 +62,44 @@ function hash01(text: string): number {
   return (h >>> 0) / 0xffffffff;
 }
 
-const KATEGORIE_ZU_FARBE: Record<string, "red" | "green" | "blue" | "yellow"> = { power: "red", speed: "green", mental: "blue", social: "yellow" };
+const KATEGORIE_ZU_FARBE: Record<string, "red" | "green" | "blue" | "yellow"> =
+  { power: "red", speed: "green", mental: "blue", social: "yellow" };
 
 /** Disziplinfarbe (Formkarten-Farbe der Kategorie): rot POW, gruen SPE, blau MEN, gelb SOC. */
-export function disziplinFarbe(disziplinId: string): "red" | "green" | "blue" | "yellow" | null {
-  const kategorie = foundationSeedDisciplines.find((d) => d.id === disziplinId)?.category;
+export function disziplinFarbe(
+  disziplinId: string,
+): "red" | "green" | "blue" | "yellow" | null {
+  const kategorie = foundationSeedDisciplines.find(
+    (d) => d.id === disziplinId,
+  )?.category;
   return kategorie ? (KATEGORIE_ZU_FARBE[kategorie] ?? null) : null;
 }
 
 const cache = new Map<string, TrainingsVorlieben>();
 
 /** Die Vorlieben eines Spielers. Rein; Ergebnis wird je (Id, Klassenfarbe) zwischengespeichert. */
-export function leiteTrainingsVorliebenAb(player: Pick<Player, "id" | "className">): TrainingsVorlieben {
+export function leiteTrainingsVorliebenAb(
+  player: Pick<Player, "id" | "className">,
+): TrainingsVorlieben {
   const klassenFarbe = getPlayerClassColor(player as Player);
   const schluessel = `${player.id}|${klassenFarbe ?? "-"}`;
   const vorhanden = cache.get(schluessel);
   if (vorhanden) return vorhanden;
   const gegenFarbe = klassenFarbe ? (GEGENFARBE[klassenFarbe] ?? null) : null;
   const ids = [...officialDisciplineWeightOrder] as string[];
-  const lieb = (d: string) => hash01(`${player.id}:lieb:${d}`) + (klassenFarbe && disziplinFarbe(d) === klassenFarbe ? VORLIEBE_TENDENZ : 0);
-  const unlieb = (d: string) => hash01(`${player.id}:unlieb:${d}`) + (gegenFarbe && disziplinFarbe(d) === gegenFarbe ? VORLIEBE_TENDENZ : 0);
-  const sortiert = [...ids].sort((a, b) => lieb(b) - lieb(a) || a.localeCompare(b));
+  const lieb = (d: string) =>
+    hash01(`${player.id}:lieb:${d}`) +
+    (klassenFarbe && disziplinFarbe(d) === klassenFarbe ? VORLIEBE_TENDENZ : 0);
+  const unlieb = (d: string) =>
+    hash01(`${player.id}:unlieb:${d}`) +
+    (gegenFarbe && disziplinFarbe(d) === gegenFarbe ? VORLIEBE_TENDENZ : 0);
+  const sortiert = [...ids].sort(
+    (a, b) => lieb(b) - lieb(a) || a.localeCompare(b),
+  );
   const lieblinge: [string, string] = [sortiert[0]!, sortiert[1]!];
-  const ungeliebt = [...ids].filter((d) => !lieblinge.includes(d)).sort((a, b) => unlieb(b) - unlieb(a) || a.localeCompare(b))[0]!;
+  const ungeliebt = [...ids]
+    .filter((d) => !lieblinge.includes(d))
+    .sort((a, b) => unlieb(b) - unlieb(a) || a.localeCompare(b))[0]!;
   const ergebnis = { lieblinge, ungeliebt } satisfies TrainingsVorlieben;
   if (cache.size > 5000) cache.clear();
   cache.set(schluessel, ergebnis);
@@ -89,7 +107,10 @@ export function leiteTrainingsVorliebenAb(player: Pick<Player, "id" | "className
 }
 
 /** 1 = Lieblings-Disziplin, -1 = ungeliebt, 0 = neutral. Ohne Disziplin: 0. */
-export function vorliebeArt(player: Pick<Player, "id" | "className">, disziplinId: string | null | undefined): VorliebeArt {
+export function vorliebeArt(
+  player: Pick<Player, "id" | "className">,
+  disziplinId: string | null | undefined,
+): VorliebeArt {
   if (!disziplinId) return 0;
   const v = leiteTrainingsVorliebenAb(player);
   if (v.lieblinge.includes(disziplinId)) return 1;
@@ -97,19 +118,31 @@ export function vorliebeArt(player: Pick<Player, "id" | "className">, disziplinI
 }
 
 export function vorliebeFaktor(art: VorliebeArt): number {
-  return art > 0 ? VORLIEBE_FAKTOR_LIEBLING : art < 0 ? VORLIEBE_FAKTOR_UNGELIEBT : 1;
+  return art > 0
+    ? VORLIEBE_FAKTOR_LIEBLING
+    : art < 0
+      ? VORLIEBE_FAKTOR_UNGELIEBT
+      : 1;
 }
 
 export function vorliebeMoral(art: VorliebeArt): number {
-  return art > 0 ? VORLIEBE_MORAL_LIEBLING : art < 0 ? VORLIEBE_MORAL_UNGELIEBT : 0;
+  return art > 0
+    ? VORLIEBE_MORAL_LIEBLING
+    : art < 0
+      ? VORLIEBE_MORAL_UNGELIEBT
+      : 0;
 }
 
 /**
  * Die Disziplin, auf die der Spieler gerade trainiert, soweit sie ohne den KI-Kontext bekannt ist: das gesetzte Ziel des Managers, sonst das Ziel
  * seines letzten gebuchten Trainingstags dieser Saison. Fuer die Moral (kein Zugriff auf den teuren KI-Vorschlag).
  */
-export function aktuellesTrainingsZielId(player: Pick<Player, "trainingsZiel" | "seasonTrainingAccumulator">, seasonId: string): string | null {
-  if (player.trainingsZiel?.disziplinId) return player.trainingsZiel.disziplinId;
+export function aktuellesTrainingsZielId(
+  player: Pick<Player, "trainingsZiel" | "seasonTrainingAccumulator">,
+  seasonId: string,
+): string | null {
+  if (player.trainingsZiel?.disziplinId)
+    return player.trainingsZiel.disziplinId;
   const akku = player.seasonTrainingAccumulator;
   if (!akku || akku.seasonId !== seasonId) return null;
   const verlauf = akku.verlauf ?? [];
