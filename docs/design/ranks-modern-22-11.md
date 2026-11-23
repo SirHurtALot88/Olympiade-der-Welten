@@ -143,3 +143,27 @@ der Spitze weichen vom Mockup ab, die Kopfzeile sagt „Rang 1 von 16 · 13/32�
 | Teamprofil-/Spielerprofil-Sprung | neu (Knopf im Profil-Kopf, die alte Seite öffnete das Teamprofil per Klick auf die Zeile) |
 | Podium der Vorsaison (alte Seite, Saisonstart) | fehlt hier bewusst: gehört auf die Historie-Seite (Offene Frage 3, Empfehlung Historie) |
 | Alte Radar-/Medianchips der Vorseite | entfallen, ersetzt durch die Matrix |
+
+### Nachbesserung 22.11. (Chris: „Ranks sind noch nicht so gut farblich in den Bereichen separiert“)
+
+Alle Bereichsfarben kommen aus den vier Tokens `--rk-pow/spe/men/soc` (Klassenfarben der App); eine Klasse `a-<bereich>` setzt `--ac`, alles Getönte liest nur das.
+
+| Stelle | Änderung |
+|---|---|
+| Rang-Matrix | Gruppenkopf über den Spalten („Gesamt und Bereiche“, POW Power, SPE Speed, MEN Mental, SOC Social) mit Tönung, Unterkante und Trenner; farbige Oberkante je Spalte; die Spalten Ges./POW/SPE/MEN/SOC tragen ihre Farbe als Schrift; Disziplin-Icons als Chip in Bereichsfarbe; Spalten laufen ohne Lücke und sind je Bereich getönt (9 %), 2 px Trenner zwischen den Bereichen, 3 px zwischen Bereichen und Disziplinen |
+| Rang-Ampel | bleibt lesbar: neutrale Zellen dunkel, Gold unverändert, grün und rot mit Rand und etwas mehr Deckkraft |
+| Profil (Team) | Bereichszeilen getönt mit Kante; die 20 Disziplinen **nach Bereich gruppiert** (senkrechtes Kürzel, Tönung), innerhalb nach Stärke-Rang |
+| Profil (Spieler) | Bereichszeilen getönt; Disziplinzeilen mit Bereichskante und Icon-Chip (Reihenfolge nach Eignung bleibt) |
+| Spieler-Sicht | Disziplin-Leiste in vier getönte Gruppen mit Kürzel; Spalten POW/SPE/MEN/SOC getönt, Werte in Bereichsfarbe |
+| Kopf | doppelter Titel behoben: die Dachzeile trägt „Ranks · Saison · Spieltag“ (wie Saisonstand), der Titel ist das Team |
+
+Abgleich (Bildpaare `ranks-modern-22-11/vergleich-<ansicht>-<größe>.png`, links Mockup, rechts App, Live-Abbild, Team D-P; 1920x1080, 2560x1440, 1710x1112, kein Seitenscroll):
+
+| Mockup-Merkmal | Stand |
+|---|---|
+| Matrix, Disziplin-Icons, Bereichsstrich | drin, jetzt mit Gruppenkopf und Tönung (über das Mockup hinaus) |
+| Titel „Ranks“ im Hero | angepasst: das Regieband der Shell nennt „Ranks“ bereits, der Hero trägt Team als Titel und „Ranks“ in der Dachzeile |
+| Spitzenreihenfolge, Werte im Profil | angepasst (kanonische Stärke, siehe oben) |
+| Mockup ohne Shell | die App steht in der Shell (Schiene, Regieband), die Matrix ist dadurch rund 10 % niedriger |
+| Profil: Disziplinen nach Stärke-Rang sortiert | angepasst: nach Bereich gruppiert, innerhalb nach Stärke-Rang |
+| Fehlt | nichts |

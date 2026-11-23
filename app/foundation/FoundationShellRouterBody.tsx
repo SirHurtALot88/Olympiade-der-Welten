@@ -135,7 +135,6 @@ import { zaehleUngelesenFuerTeams } from "@/lib/foundation/inbox-postfach";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { disziplinReihenfolgeAusSpielplan } from "@/lib/season/saisonstand-modern-logik";
-import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
 // `foundation-page-client-exports` barrel (or, for the last five, a direct

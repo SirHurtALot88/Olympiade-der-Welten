@@ -58,6 +58,9 @@ export type RanksModernProps = {
 };
 
 const ACHSE_FARBE: Record<RanksAchse, string> = { pow: "var(--rk-pow)", spe: "var(--rk-spe)", men: "var(--rk-men)", soc: "var(--rk-soc)" };
+const ACHSE_NAME: Record<RanksAchse, string> = { pow: "Power", spe: "Speed", men: "Mental", soc: "Social" };
+/** Bereichsklasse (setzt `--ac`): Farbe der Spalte, Tönung und Trenner hängen daran. "ges" = Gold. */
+const bk = (a: RanksAchse | "ges") => `a-${a}`;
 
 function z1(wert: number) {
   return (Math.round(wert * 10) / 10).toFixed(1).replace(".", ",");
@@ -195,6 +198,20 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
   const titelVon = (k: string) => (k === "ges" ? "Gesamt" : (RANKS_ACHSEN as readonly string[]).includes(k) ? RANKS_ACHSEN_LABEL[k as RanksAchse] : (discById.get(k)?.name ?? k));
   const kopfFarbe = (k: string) => (k === "ges" ? "var(--bc-gold)" : (RANKS_ACHSEN as readonly string[]).includes(k) ? ACHSE_FARBE[k as RanksAchse] : ACHSE_FARBE[discById.get(k)?.achse ?? "soc"]);
 
+  /* Bereich je Matrix-Spalte, Gruppen für den Gruppenkopf und Trenner zwischen den Bereichen */
+  const spaltenBereich = (k: string): RanksAchse | "ges" => (k === "ges" ? "ges" : (RANKS_ACHSEN as readonly string[]).includes(k) ? (k as RanksAchse) : (discById.get(k)?.achse ?? "soc"));
+  const grenze = (j: number) => j === 0 || j === 5 || (j > 5 && spaltenBereich(spalten[j]) !== spaltenBereich(spalten[j - 1]));
+  const gruppen = useMemo(() => {
+    const aus: Array<{ schluessel: string; achse: RanksAchse | null; n: number }> = [{ schluessel: "agg", achse: null, n: Math.min(5, spalten.length) }];
+    for (const k of spalten.slice(5)) {
+      const a = (discById.get(k)?.achse ?? "soc") as RanksAchse;
+      const letzte = aus[aus.length - 1];
+      if (letzte.achse === a) letzte.n += 1;
+      else aus.push({ schluessel: `${a}-${aus.length}`, achse: a, n: 1 });
+    }
+    return aus;
+  }, [spalten, discById]);
+
   /* ---------------- Kopf ---------------- */
   const eigeneLigaTeams = modell.teams.filter((t) => t.liga === eigeneLiga);
   const eigRangLiga = eigenesTeam ? vergibRaenge(eigeneLigaTeams.map((t) => ({ id: t.teamId, wert: teamWert(t, "ges", "staerke") }))).get(eigenesTeam.teamId) ?? null : null;
@@ -209,12 +226,17 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
       className="rk-hero"
       wappen={logoEigen}
       wappenAlt={eigenesTeam?.name ?? ""}
-      titel="Ranks"
+      dachzeile={
+        <>
+          Ranks · {gameState.season.id.replace("season-", "Saison ")} · {gebucht > 0 ? `nach Spieltag ${gebucht}` : "vor Spieltag 1"}
+        </>
+      }
+      titel={eigenesTeam?.name ?? "Ranks"}
       kulisseUrl={kulisse}
       untertitel={
         <>
-          <b>{eigenesTeam?.name ?? "Liga"}</b>
-          {eigeneLiga ? ` · Liga ${eigeneLiga}` : ""} · {gameState.season.id.replace("season-", "Saison ")} · {gebucht > 0 ? `nach Spieltag ${gebucht}` : "vor Spieltag 1"}
+          {eigeneLiga ? <b>Liga {eigeneLiga}</b> : null}
+          {eigeneLiga ? " · " : ""}Stärke, Ertrag und Spieler im Vergleich
         </>
       }
       mitte={
@@ -278,24 +300,40 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
           <LigaSeg liga={liga} setLiga={setLiga} eigeneLiga={eigeneLiga} onWechsel={() => setSelTeam(null)} />
         </div>
         <div className="rk-tl rk-mx">
-          <div className="rk-th">
-            <span className="m">#</span>
-            <Kopf k="team" so={soT} onSo={sortTeamsKlick} className="tm">
-              Team
-            </Kopf>
-            {spalten.map((k, j) => (
-              <Kopf
-                key={k}
-                k={k}
-                so={soT}
-                onSo={sortTeamsKlick}
-                className={`m${j === 5 ? " gr" : ""}${j > 17 ? " tipl" : j < 3 ? " tipll" : ""}`}
-                kc={kopfFarbe(k)}
-                tip={`${titelVon(k)}${k !== "ges" && !(RANKS_ACHSEN as readonly string[]).includes(k) && mass === "punkte" ? ` · ${modell.gespielt[k] ?? 0} von 2 gespielt` : ""}`}
-              >
-                {k === "ges" ? "Ges." : (RANKS_ACHSEN as readonly string[]).includes(k) ? RANKS_ACHSEN_LABEL[k as RanksAchse] : <DiszIcon id={k} name={titelVon(k)} />}
+          <div className="rk-thw">
+            <div className="rk-gk" aria-hidden="true">
+              <span className="leer2" />
+              {gruppen.map((g) => (
+                <span key={g.schluessel} className={`rk-gl ${bk(g.achse ?? "ges")}`} style={{ gridColumn: `span ${g.n}` }}>
+                  {g.achse ? (
+                    <>
+                      <b>{RANKS_ACHSEN_LABEL[g.achse]}</b> {ACHSE_NAME[g.achse]}
+                    </>
+                  ) : (
+                    <>Gesamt und Bereiche</>
+                  )}
+                </span>
+              ))}
+            </div>
+            <div className="rk-th">
+              <span className="m">#</span>
+              <Kopf k="team" so={soT} onSo={sortTeamsKlick} className="tm">
+                Team
               </Kopf>
-            ))}
+              {spalten.map((k, j) => (
+                <Kopf
+                  key={k}
+                  k={k}
+                  so={soT}
+                  onSo={sortTeamsKlick}
+                  className={`m rk-hc ${bk(spaltenBereich(k))}${grenze(j) ? (j === 5 ? " gs gr" : " gs") : ""}${k === "ges" || (RANKS_ACHSEN as readonly string[]).includes(k) ? " ach" : ""}${j > 17 ? " tipl" : j < 3 ? " tipll" : ""}`}
+                  kc={kopfFarbe(k)}
+                  tip={`${titelVon(k)}${k !== "ges" && !(RANKS_ACHSEN as readonly string[]).includes(k) && mass === "punkte" ? ` · ${modell.gespielt[k] ?? 0} von 2 gespielt` : ""}`}
+                >
+                  {k === "ges" ? "Ges." : (RANKS_ACHSEN as readonly string[]).includes(k) ? RANKS_ACHSEN_LABEL[k as RanksAchse] : <DiszIcon id={k} name={titelVon(k)} />}
+                </Kopf>
+              ))}
+            </div>
           </div>
           {liste.map((t) => {
             const fremd = t.teamId !== ownTeamId && modell.nebel && mass === "staerke";
@@ -315,23 +353,30 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
                   {liga !== "alle" && rAlle != null ? <small>{rAlle}/{modell.teams.length}</small> : null}
                 </span>
                 <TeamZelle team={t} />
-                {spalten.map((k) => {
+                {spalten.map((k, j) => {
                   const r = R[k]?.get(t.teamId) ?? null;
                   const v = teamWert(t, k, mass);
                   const sp = sortSchluessel === k ? " spalt" : "";
                   const tipp = `${titelVon(k)}: ${v == null ? "noch nicht gespielt" : fremd ? `Stufe ${stufenText(v, 5)}` : mass === "staerke" ? z1(v) : `${v} ${k === "ges" || (RANKS_ACHSEN as readonly string[]).includes(k) ? "Punkte" : "Ergebnispunkte"}`}${raengeAlle[mass][k]?.get(t.teamId) != null ? ` · ${raengeAlle[mass][k].get(t.teamId)}/${modell.teams.length}` : ""}`;
+                  const zc = `rk-zc ${bk(spaltenBereich(k))}${grenze(j) ? (j === 5 ? " gs gr" : " gs") : ""}`;
                   if (zeige === "rang") {
                     return (
-                      <span key={k} data-tip={tipp} className={`rk-zelle t ${zelleKlasse(r, n)}${sp}`}>
-                        {r == null ? "–" : r}
+                      <span key={k} className={zc}>
+                        <span data-tip={tipp} className={`rk-zelle t ${zelleKlasse(r, n)}${sp}`}>
+                          {r == null ? "–" : r}
+                        </span>
                       </span>
                     );
                   }
-                  return v == null ? (
-                    <span key={k} className="rk-zelle leer">–</span>
-                  ) : (
-                    <span key={k} data-tip={tipp} className={`rk-zelle w t ${fremd ? "neb" : zelleKlasse(r, n)}${sp}`}>
-                      {teamWertText(modell, t, k, mass)}
+                  return (
+                    <span key={k} className={zc}>
+                      {v == null ? (
+                        <span className="rk-zelle leer">–</span>
+                      ) : (
+                        <span data-tip={tipp} className={`rk-zelle w t ${fremd ? "neb" : zelleKlasse(r, n)}${sp}`}>
+                          {teamWertText(modell, t, k, mass)}
+                        </span>
+                      )}
                     </span>
                   );
                 })}
@@ -415,7 +460,7 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
               <span className="r">Ertrag</span>
             </div>
             {bereiche.map(([k, label, farbe]) => (
-              <div className="pz" key={k}>
+              <div className={`pz bz ${bk(k as RanksAchse | "ges")}`} key={k}>
                 <span className="ax" style={{ color: farbe }}>
                   {label}
                 </span>
@@ -446,17 +491,30 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
               <span className="m">Punkte</span>
               <span className="r">Ertrag</span>
             </div>
-            {dl.map(({ d, s, p }) => (
-              <div className="dz" key={d.id}>
-                <span>
-                  <DiszIcon id={d.id} name={d.name} />
-                </span>
-                <b style={{ color: ACHSE_FARBE[d.achse] }}>{d.name}</b>
-                <RangChip rang={s} n={nL} />
-                <RangChip rang={p} n={nL} />
-                <Diff s={s} p={p} />
-              </div>
-            ))}
+            {RANKS_ACHSEN.map((a) => {
+              const teil = dl.filter((x) => x.d.achse === a);
+              if (teil.length === 0) return null;
+              return (
+                <div className={`rk-dgr ${bk(a)}`} key={a}>
+                  <div className="dgk" title={ACHSE_NAME[a]}>
+                    <b>{RANKS_ACHSEN_LABEL[a]}</b>
+                  </div>
+                  <div className="dgb">
+                  {teil.map(({ d, s, p }) => (
+                    <div className="dz" key={d.id}>
+                      <span>
+                        <DiszIcon id={d.id} name={d.name} />
+                      </span>
+                      <b style={{ color: ACHSE_FARBE[d.achse] }}>{d.name}</b>
+                      <RangChip rang={s} n={nL} />
+                      <RangChip rang={p} n={nL} />
+                      <Diff s={s} p={p} />
+                    </div>
+                  ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
           {fremd ? (
             <div className="rk-nebel">
@@ -529,18 +587,30 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
           <button type="button" className="ges" aria-pressed={dId == null} style={{ "--kc": "var(--bc-gold)" } as React.CSSProperties} onClick={() => { setDId(null); setSoS({ k: "eig", d: -1 }); }}>
             Gesamt
           </button>
-          {modell.disziplinen.map((d, j) => (
-            <button
-              key={d.id}
-              type="button"
-              className={j > 15 ? "tipl" : j < 3 ? "tipll" : ""}
-              aria-pressed={dId === d.id}
-              style={{ "--kc": ACHSE_FARBE[d.achse] } as React.CSSProperties}
-              data-tip={`${d.name}${d.spielerJeTeam ? ` · ${d.spielerJeTeam} Spieler je Team` : ""}`}
-              onClick={() => { setDId(d.id); setSoS({ k: "eig", d: -1 }); }}
-            >
-              <DiszIcon id={d.id} name={d.name} />
-            </button>
+          {RANKS_ACHSEN.map((a) => (
+            <div className={`rk-dzg ${bk(a)}`} key={a} role="group" aria-label={`${RANKS_ACHSEN_LABEL[a]} ${ACHSE_NAME[a]}`}>
+              <span className="gl">
+                <b>{RANKS_ACHSEN_LABEL[a]}</b> {ACHSE_NAME[a]}
+              </span>
+              <span className="gb">
+                {modell.disziplinen
+                  .map((d, j) => ({ d, j }))
+                  .filter(({ d }) => d.achse === a)
+                  .map(({ d, j }) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      className={j > 15 ? "tipl" : j < 3 ? "tipll" : ""}
+                      aria-pressed={dId === d.id}
+                      style={{ "--kc": ACHSE_FARBE[d.achse] } as React.CSSProperties}
+                      data-tip={`${d.name}${d.spielerJeTeam ? ` · ${d.spielerJeTeam} Spieler je Team` : ""}`}
+                      onClick={() => { setDId(d.id); setSoS({ k: "eig", d: -1 }); }}
+                    >
+                      <DiszIcon id={d.id} name={d.name} />
+                    </button>
+                  ))}
+              </span>
+            </div>
           ))}
         </div>
         <div className="rk-tl rk-sl">
@@ -552,7 +622,7 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
             {H("team", "Team")}
             {H("ges", "Ges.", "r")}
             {RANKS_ACHSEN.map((a) => (
-              <Kopf key={a} k={a} so={so} onSo={(x) => sortSpielerKlick(x as SpielerSortSchluessel)} className="r">
+              <Kopf key={a} k={a} so={so} onSo={(x) => sortSpielerKlick(x as SpielerSortSchluessel)} className={`r rk-ah ${bk(a)}`}>
                 <span style={{ color: ACHSE_FARBE[a] }}>{RANKS_ACHSEN_LABEL[a]}</span>
               </Kopf>
             ))}
@@ -592,7 +662,7 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
                 <TeamZelle team={team} kurz />
                 <span className="r z t">{z.ges.text}</span>
                 {RANKS_ACHSEN.map((a) => (
-                  <span key={a} className={`r t${z.achsen[a].exakt ? "" : " stumm"}`} style={z.achsen[a].exakt ? undefined : { fontSize: ".86em" }}>
+                  <span key={a} className={`r t rk-aw ${bk(a)}${z.achsen[a].exakt ? "" : " stumm"}`} style={z.achsen[a].exakt ? undefined : { fontSize: ".86em" }}>
                     {z.achsen[a].text}
                   </span>
                 ))}
@@ -673,7 +743,7 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
             {p.bereiche.map((b) => {
               const farbeB = b.schluessel === "ges" ? "var(--bc-gold)" : ACHSE_FARBE[b.schluessel];
               return (
-                <div className="pz" key={b.schluessel} style={{ gridTemplateColumns: "3.2em minmax(0,1fr) 4.2em 3.6em" }}>
+                <div className={`pz bz ${bk(b.schluessel as RanksAchse | "ges")}`} key={b.schluessel} style={{ gridTemplateColumns: "3.2em minmax(0,1fr) 4.2em 3.6em" }}>
                   <span className="ax" style={{ color: farbeB }}>{b.schluessel === "ges" ? "Ges." : RANKS_ACHSEN_LABEL[b.schluessel]}</span>
                   <span className="rk-bk">
                     {b.sicht.exakt ? <i style={{ width: `${b.sicht.von}%`, ["--bf" as string]: farbeB }} /> : <i style={{ left: `${b.sicht.von}%`, width: `${b.sicht.bis - b.sicht.von}%`, ["--bf" as string]: "#9aa7ba" }} />}
@@ -698,7 +768,7 @@ export default function RanksModern({ gameState, ownTeamId: ownTeamIdProp, spiel
               <span className="r">PP</span>
             </div>
             {p.disziplinen.map((d) => (
-              <div className="dz" key={d.id} style={{ gridTemplateColumns: "1.6em minmax(0,1fr) 4.2em 3.4em 3em" }}>
+              <div className={`dz mk ${bk(d.achse)}`} key={d.id} style={{ gridTemplateColumns: "1.6em minmax(0,1fr) 4.2em 3.4em 3em" }}>
                 <span>
                   <DiszIcon id={d.id} name={d.name} />
                 </span>

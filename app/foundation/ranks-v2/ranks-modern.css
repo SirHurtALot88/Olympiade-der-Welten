@@ -10,6 +10,7 @@
   --rk-men: #62a6ec;
   --rk-soc: #f0c35a;
   --rk-silber: #c9d2de;
+  --rk-ges: var(--bc-gold);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -35,6 +36,12 @@
 .rk-frist small { display: block; font-size: 0.8em; color: var(--bc-stumm); font-weight: 500; }
 
 .rk-work { flex: 1; min-height: 0; display: grid; gap: 0.75em; padding: 0.75em 0.9em; grid-template-columns: minmax(0, 1fr) minmax(21em, 24em); }
+/* Bereichsfarbe: jede Klasse a-<bereich> setzt --ac, alles Getönte (Spalte, Gruppenkopf, Leiste, Profilzeile) liest nur --ac. */
+.rk .a-pow { --ac: var(--rk-pow); }
+.rk .a-spe { --ac: var(--rk-spe); }
+.rk .a-men { --ac: var(--rk-men); }
+.rk .a-soc { --ac: var(--rk-soc); }
+.rk .a-ges { --ac: var(--rk-ges); }
 .rk-pan { min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--bc-flaeche-1); border: 1px solid var(--bc-linie); border-radius: var(--bc-r); overflow: hidden; }
 .rk-pk { flex: none; display: flex; align-items: center; gap: 0.5em; padding: 0.5em 0.75em; border-bottom: 1px solid var(--bc-linie); min-height: 2.85em; }
 .rk-pk h2 { margin: 0; font: 400 1.2em/1 var(--bc-haus); color: var(--bc-creme); white-space: nowrap; }
@@ -102,34 +109,56 @@
 .rk .plus { color: var(--bc-gut); } .rk .minus { color: var(--bc-warn); } .rk .null { color: var(--bc-stumm); } .rk .gold { color: var(--bc-gold); } .rk .leise { color: var(--bc-leise); } .rk .stumm { color: var(--bc-stumm); }
 .rk .t { font-variant-numeric: tabular-nums; }
 
-/* Matrix */
-.rk-mx .rk-th, .rk-mx .rk-tz { grid-template-columns: 2.5em minmax(8.5em, 1.5fr) repeat(5, minmax(2.5em, 1fr)) repeat(20, minmax(1.9em, 1fr)); gap: 0.22em; padding: 0 0.6em; }
-.rk-mx .rk-th { height: 3.5em; align-items: end; padding-bottom: 0.3em; font-size: 0.72em; }
-.rk-mx .rk-th button { flex-direction: column; gap: 0.1em; justify-content: flex-end; width: 100%; height: auto; border-top: 3px solid var(--kc, transparent); padding-top: 0.25em; border-radius: 2px; }
-.rk-mx .rk-th button img { width: 2em; height: 2em; object-fit: contain; }
+/* Matrix: Spalten laufen ohne Lücke (die Zelle hat den Rand), damit die Tönung je Bereich als durchgehendes Band steht. */
+.rk-thw { flex: none; position: sticky; top: 0; z-index: 5; background: var(--bc-flaeche-2); border-bottom: 1px solid var(--bc-linie); }
+.rk-mx .rk-gk, .rk-mx .rk-th, .rk-mx .rk-tz { display: grid; grid-template-columns: 2.5em minmax(8.5em, 2.2fr) repeat(5, minmax(2.5em, 1fr)) repeat(20, minmax(1.9em, 1fr)); column-gap: 0; align-items: center; padding: 0 0.6em; width: 100%; }
+.rk-mx .rk-th { position: static; height: 3.5em; align-items: end; padding-bottom: 0; border-bottom: 0; font-size: 0.72em; }
+.rk-mx .rk-th > .m:first-child, .rk-mx .rk-tz > .rg { padding-right: 0.2em; }
+.rk-mx .rk-th button.tm, .rk-mx .rk-tz > .rk-team { padding-right: 0.5em; }
+.rk-gk { height: 1.9em; font-size: 0.78em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bc-leise); font-weight: 600; align-items: stretch !important; }
+.rk-gk .leer2 { grid-column: span 2; }
+.rk-gl { display: flex; align-items: center; justify-content: center; gap: 0.5em; white-space: nowrap; overflow: hidden; color: var(--ac); background: color-mix(in srgb, var(--ac) 17%, transparent); border-bottom: 2px solid var(--ac); border-left: 2px solid color-mix(in srgb, var(--ac) 70%, transparent); margin-top: 0.3em; border-radius: 4px 4px 0 0; }
+.rk-gl b { font-weight: 800; font-size: 1.1em; letter-spacing: 0.12em; }
+.rk-gl.a-ges { color: var(--bc-leise); background: rgba(255, 255, 255, 0.04); border-bottom-color: var(--bc-linie-2); border-left: 0; }
+.rk-mx .rk-th button { flex-direction: column; gap: 0.1em; justify-content: flex-end; width: 100%; height: 100%; border-top: 3px solid var(--ac, var(--kc, transparent)); padding-top: 0.25em; padding-bottom: 0.3em; border-radius: 0; background: color-mix(in srgb, var(--ac, transparent) 9%, transparent); }
+.rk-mx .rk-th button:hover { background: color-mix(in srgb, var(--ac, #fff) 18%, transparent); }
+.rk-mx .rk-th button img { width: 2em; height: 2em; object-fit: contain; box-sizing: border-box; padding: 0.18em; border-radius: 0.4em; background: color-mix(in srgb, var(--ac, #888) 24%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac, #888) 60%, transparent); }
+.rk-mx .rk-th button.ach { color: var(--ac); font-weight: 800; font-size: 1.12em; letter-spacing: 0.08em; }
+.rk-mx .rk-th button.ach.so .pf { color: var(--bc-gold); }
 .rk-mx .rk-th button .pf { line-height: 0.6; }
-.rk-mx .rk-th button.tm { flex-direction: row; justify-content: flex-start; border: 0; }
-.rk-mx .rk-th .gr { border-left: 1px solid var(--bc-linie-2); }
-.rk-zelle { height: 1.72em; border-radius: 4px; display: grid; place-items: center; font-weight: 700; font-size: 0.98em; background: rgba(255, 255, 255, 0.04); color: var(--bc-leise); min-width: 0; white-space: nowrap; overflow: hidden; }
+.rk-mx .rk-th button.tm { flex-direction: row; justify-content: flex-start; border: 0; background: none; align-self: end; height: auto; padding: 0 0 0.3em; }
+.rk-mx .rk-th .gs, .rk-mx .rk-tz .gs, .rk-gl.a-pow, .rk-gl.a-spe, .rk-gl.a-men, .rk-gl.a-soc { border-left: 2px solid color-mix(in srgb, var(--ac) 70%, transparent); }
+.rk-mx .rk-th .gr, .rk-mx .rk-tz .gr { border-left: 3px solid var(--bc-linie-2); }
+.rk-zc { align-self: stretch; display: grid; align-items: center; padding: 0 0.12em; background: color-mix(in srgb, var(--ac) 9%, transparent); min-width: 0; }
+.rk-mx .rk-tz { align-items: stretch; }
+.rk-mx .rk-tz > .rg, .rk-mx .rk-tz > .rk-team { align-self: center; }
+.rk-zelle { height: 1.72em; border-radius: 4px; display: grid; place-items: center; font-weight: 700; font-size: 0.98em; background: rgba(8, 10, 15, 0.55); color: var(--bc-tinte); min-width: 0; white-space: nowrap; overflow: hidden; }
 .rk-zelle.w { font-size: 0.82em; font-weight: 600; }
 .rk-zelle.r1 { background: linear-gradient(180deg, #f7d57f, #d9a633); color: #17120a; }
-.rk-zelle.o { background: rgba(98, 211, 148, 0.26); color: #b9f2d2; }
-.rk-zelle.u { background: rgba(255, 96, 88, 0.2); color: #ffb1ac; }
+.rk-zelle.o { background: rgba(98, 211, 148, 0.34); color: #c9f7de; box-shadow: inset 0 0 0 1px rgba(98, 211, 148, 0.5); }
+.rk-zelle.u { background: rgba(255, 96, 88, 0.3); color: #ffc2be; box-shadow: inset 0 0 0 1px rgba(255, 96, 88, 0.5); }
 .rk-zelle.leer { background: none; color: var(--bc-stumm); font-weight: 500; }
-.rk-zelle.neb { background: repeating-linear-gradient(135deg, rgba(154, 167, 186, 0.12) 0 4px, rgba(154, 167, 186, 0.04) 4px 8px); color: var(--bc-leise); }
+.rk-zelle.neb { background: repeating-linear-gradient(135deg, rgba(154, 167, 186, 0.2) 0 4px, rgba(154, 167, 186, 0.08) 4px 8px); color: var(--bc-leise); }
 .rk-mx .rk-tz .spalt { box-shadow: 0 0 0 1px var(--bc-gold); }
 
 /* Spielerliste */
 .rk-sl .rk-th, .rk-sl .rk-tz { grid-template-columns: 3em minmax(10em, 1.2fr) minmax(7em, 0.7fr) 5.5em 4.6em 4.2em repeat(4, 3.6em) minmax(11em, 1.7fr) 3.6em; gap: 0.55em; }
 .rk-sl .rk-tz { flex: none; height: 2.3em; max-height: none; }
+.rk-sl .rk-th .rk-ah { color: var(--ac); font-weight: 800; border-bottom: 2px solid var(--ac); background: color-mix(in srgb, var(--ac) 14%, transparent); padding: 0 0.35em; }
+.rk-sl .rk-aw { color: color-mix(in srgb, var(--ac) 80%, #fff); background: color-mix(in srgb, var(--ac) 9%, transparent); align-self: stretch; display: flex; align-items: center; justify-content: flex-end; padding: 0 0.35em; }
 .rk-eig { display: grid; grid-template-columns: 3.6em minmax(0, 1fr); gap: 0.5em; align-items: center; }
 .rk-eig b { text-align: right; font-size: 1.08em; }
-.rk-dzw { flex: none; display: flex; gap: 0.25em; padding: 0.45em 0.6em; border-bottom: 1px solid var(--bc-linie); overflow: hidden; }
-.rk-dzw button { flex: 1 1 0; min-width: 0; height: 2.6em; border-radius: 6px; border: 1px solid var(--bc-linie); display: grid; place-items: center; background: var(--bc-flaeche-2); border-top: 3px solid var(--kc, var(--bc-linie-2)); cursor: pointer; color: inherit; padding: 0; }
-.rk-dzw button img { width: 1.7em; height: 1.7em; object-fit: contain; }
-.rk-dzw button.ges { flex: 1.6 1 0; font-weight: 700; font-size: 0.82em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bc-leise); font-family: inherit; }
+.rk-dzw { flex: none; display: flex; gap: 0.35em; padding: 0.45em 0.6em; border-bottom: 1px solid var(--bc-linie); overflow: hidden; align-items: stretch; }
+.rk-dzw > button { flex: 1.1 1 0; min-width: 0; border-radius: 6px; border: 1px solid var(--bc-linie); display: grid; place-items: center; background: var(--bc-flaeche-2); border-top: 3px solid var(--bc-gold); cursor: pointer; color: inherit; padding: 0; }
+.rk-dzw > button.ges { font-weight: 700; font-size: 0.82em; letter-spacing: 0.08em; text-transform: uppercase; color: var(--bc-leise); font-family: inherit; }
+.rk-dzg { flex: 5 1 0; min-width: 0; display: flex; flex-direction: column; border-radius: 7px; border: 1px solid color-mix(in srgb, var(--ac) 45%, transparent); border-top: 3px solid var(--ac); background: color-mix(in srgb, var(--ac) 11%, transparent); overflow: hidden; }
+.rk-dzg .gl { flex: none; text-align: center; font-size: 0.68em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ac); font-weight: 600; line-height: 1; padding: 0.35em 0 0.15em; white-space: nowrap; }
+.rk-dzg .gl b { font-weight: 800; }
+.rk-dzg .gb { flex: 1; display: flex; gap: 0.2em; padding: 0.15em 0.25em 0.3em; }
+.rk-dzg button { flex: 1 1 0; min-width: 0; height: 2.1em; border-radius: 5px; border: 1px solid color-mix(in srgb, var(--kc) 28%, transparent); display: grid; place-items: center; background: rgba(8, 10, 15, 0.45); cursor: pointer; color: inherit; padding: 0; }
+.rk-dzg button img { width: 1.55em; height: 1.55em; object-fit: contain; }
 .rk-dzw button:hover { background: var(--bc-flaeche-3); }
-.rk-dzw button[aria-pressed="true"] { border-color: var(--bc-gold); background: rgba(240, 195, 90, 0.16); color: var(--bc-gold); }
+.rk-dzw button[aria-pressed="true"] { border-color: var(--bc-gold); background: rgba(240, 195, 90, 0.2); color: var(--bc-gold); box-shadow: 0 0 0 1px var(--bc-gold); }
 .rk-fchip { display: inline-flex; gap: 0.25em; }
 .rk-fchip button { height: 1.9em; padding: 0 0.55em; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--kf) 50%, transparent); color: var(--kf); font: 700 0.82em var(--bc-zahl); letter-spacing: 0.06em; background: none; cursor: pointer; }
 .rk-fchip button[aria-pressed="true"] { background: var(--kf); color: #0b0d12; }
@@ -151,6 +180,14 @@
 .rk-dli { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; gap: 0.22em; overflow: hidden; }
 .rk-dli .dz { flex: 1 1 0; min-height: 1.2em; max-height: 2.3em; font-size: 0.94em; display: grid; grid-template-columns: 1.6em minmax(0, 1fr) 3.2em 3.2em 3.4em; gap: 0.45em; align-items: center; }
 .rk-dli .rgc { height: 1.4em; }
+.rk-pap .pz.bz { border-left: 3px solid var(--ac); background: color-mix(in srgb, var(--ac) 11%, transparent); padding: 0.12em 0.4em 0.12em 0.45em; border-radius: 0 4px 4px 0; }
+.rk-dgr { flex: 1 1 0; min-height: 0; display: flex; gap: 0.3em; border-left: 3px solid var(--ac); background: color-mix(in srgb, var(--ac) 9%, transparent); border-radius: 0 5px 5px 0; padding: 0.1em 0.3em 0.1em 0; }
+.rk-dgr + .rk-dgr { margin-top: 0.14em; }
+.rk-dgr .dgb { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1em; }
+.rk-dgr .dgk { flex: none; width: 1.5em; display: grid; place-items: center; font-size: 0.7em; letter-spacing: 0.12em; color: var(--ac); background: color-mix(in srgb, var(--ac) 16%, transparent); writing-mode: vertical-rl; transform: rotate(180deg); border-radius: 0 4px 4px 0; }
+.rk-dgr .dgk b { font-weight: 800; }
+.rk-dli .dz.mk { border-left: 3px solid var(--ac); background: color-mix(in srgb, var(--ac) 9%, transparent); padding-left: 0.3em; border-radius: 0 4px 4px 0; }
+.rk-dli .dz img.rk-dzi, .rk-dgr .dz img.rk-dzi { box-sizing: border-box; padding: 0.1em; border-radius: 0.3em; background: color-mix(in srgb, var(--ac) 24%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac) 55%, transparent); }
 .rk-dli .dz b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rk-dli .dz.kp { flex: none; min-height: 0; font-size: 0.72em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--bc-stumm); font-weight: 600; }
 .rk-diff { font-weight: 700; text-align: right; white-space: nowrap; }
