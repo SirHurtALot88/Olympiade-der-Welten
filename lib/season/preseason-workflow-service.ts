@@ -5,6 +5,7 @@ import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentsch
 import { vorjahrAnteileFuerSaisonwechsel, wirtschaftsRegelnFuerNeueSaison } from "@/lib/resolve/wirtschafts-regeln";
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
+import { ausruestungRegelFuerNeueSaison } from "@/lib/ausruestung/ausruestung-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
 import { finanzenJeSpieltagFuerNeueSaison } from "@/lib/finance/finanzen-je-spieltag";
 import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
@@ -683,6 +684,9 @@ function buildNextSeasonGameState(
     // (Kader und Erfolg der abgelaufenen Saison), der Verlauf wird fortgeschrieben. Rueckweg OLY_MARKETING=aus.
     marketingRegel: marketingStempelFuerSaisonwechsel(save.gameState, save.gameState.season.id, nextSeasonId),
     marketingAushaengeschild: null,
+    // AUSRUESTUNGS-REGEL (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste der neuen Saison, ab Saisonbeginn nach dem
+    // Schalter OLY_AUSRUESTUNG (Phase 1a: nur Besitz). Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel.
+    ausruestungRegel: ausruestungRegelFuerNeueSaison(save.gameState, nextSeasonId),
     // BELASTUNGSREGEL (21.11., lib/fatigue/belastung-regel-stempel.ts): Chris: ab der FOLGENDEN Saison
     // gilt Belastung/Resistenz mit Pause nach Spieltag 10 — der Saisonwechsel ist der Ort, an dem ein
     // bestehender Spielstand umschaltet. Nur Battle-Doppelsaisons; die Pause der alten Saison verfaellt.

@@ -364,7 +364,7 @@ export default function FormBoardPanel({
         habe ich noch, und für wie viele Spieltage muss es reichen?"
 
         Die Team-Power-Kachel stand hier bis zuletzt daneben, konnte aber gar nichts
-        planen: Powers werden am Spieltag in der Einsatzliste aktiviert, ein
+        planen: Powers werden am Spieltag in der Taktik aktiviert, ein
         Zukunfts-Plan existiert für sie im Datenmodell nicht. Sie ist ersetzt durch
         die Intensität — die IST pro Spieltag planbar (`plannedIntensity` am
         Formkarten-Plan) und ist die eigentliche Vorausplanungs-Entscheidung neben
@@ -416,7 +416,7 @@ export default function FormBoardPanel({
             {captainSeasonUsedWithDraft}/{captainSeasonLimit} Saison verplant · heute noch {captainDraftRemaining} möglich
           </small>
           <p className="legacy-lineup-form-resource-note">
-            Captain wird am Spieltag in der Einsatzliste gesetzt — keine Vorausplanung pro Spieltag.
+            Captain wird am Spieltag in der Taktik gesetzt — keine Vorausplanung pro Spieltag.
           </p>
         </article>
         <article className="legacy-lineup-form-resource is-intensity">
@@ -458,7 +458,7 @@ export default function FormBoardPanel({
           </div>
           <p className="legacy-lineup-form-resource-note">
             Push kostet Fatigue und Strain — grob vorplanen, wo es sich lohnt. Am Spieltag selbst bleibt die
-            Einsatzliste die letzte Instanz.
+            Taktik die letzte Instanz.
           </p>
         </article>
       </div>

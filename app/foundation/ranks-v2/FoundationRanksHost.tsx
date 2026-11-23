@@ -1,9 +1,9 @@
 "use client";
 
-import FoundationRanksPanel, { type FoundationRanksPanelProps } from "@/app/foundation/ranks-v2/FoundationRanksPanel";
+import RanksModern, { type RanksModernProps } from "@/app/foundation/ranks-v2/RanksModern";
 
-export type FoundationRanksHostProps = FoundationRanksPanelProps;
+export type FoundationRanksHostProps = RanksModernProps;
 
 export default function FoundationRanksHost(props: FoundationRanksHostProps) {
-  return <FoundationRanksPanel {...props} />;
+  return <RanksModern {...props} />;
 }

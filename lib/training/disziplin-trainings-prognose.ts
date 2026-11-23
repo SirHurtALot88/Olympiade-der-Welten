@@ -14,7 +14,7 @@
  * (`lib/foundation/player-discipline-training-forecast.ts`). Die Anzeige muss das benennen.
  */
 import type { GameState, Player, PlayerGeneratorAttributeName, PlayerGeneratorAttributes, PlayerTrainingsZiel } from "@/lib/data/olyDataTypes";
-import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
+import { berechneEignungNachAttributen, type EignungsModus } from "@/lib/training/eignung-aus-attributen";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
 import {
   baueTrainingsZielKontext,
@@ -31,7 +31,7 @@ export type DisziplinTrainingsPrognoseZeile = {
   heute: number;
   /** Disziplinwert mit den projizierten Attributen (andere Spieler unveraendert). */
   prognose: number;
-  /** `prognose - heute`, eine Nachkommastelle. */
+  /** `prognose - heute`, zwei Nachkommastellen. */
   delta: number;
   /** Platz im eigenen Kader heute / mit Prognose (1 = bester), `null` ohne Kader. */
   kaderRangHeute: number | null;
@@ -55,6 +55,12 @@ export type DisziplinTrainingsPrognose = {
   /** Je Disziplin, groesstes Delta zuerst. */
   zeilen: DisziplinTrainingsPrognoseZeile[];
   annahme: "andere_spieler_unveraendert";
+  /** Wie die Eignung gerechnet wurde: exakt mit der ganzen Liga oder geschätzt (Browser ohne fremde Attributbögen). */
+  eignungsModus: EignungsModus;
+  /** Erster Spieltag des Fensters, an dem der Spieler wieder trainiert (Verletzte: Rückkehr), sonst `null`. */
+  ersterTrainingsSpieltag: { matchdayId: string; nummer: number } | null;
+  /** Ist der Spieler am nächsten Spieltag verletzt (Training ruht, die Prognose gilt ab der Rückkehr)? */
+  verletztJetzt: boolean;
 };
 
 function attributeVon(player: Player): PlayerGeneratorAttributes | null {
@@ -114,11 +120,13 @@ export function prognostiziereDisziplinTraining(input: {
   const zuwachsJeAttribut: Partial<Record<PlayerGeneratorAttributeName, number>> = {};
   let trainiert = 0;
   let verletzt = 0;
+  let ersterTrainingsSpieltag: DisziplinTrainingsPrognose["ersterTrainingsSpieltag"] = null;
   for (const matchdayId of fenster) {
     if (bestimmeAusfallSpielerFuerSpieltag(gameState, matchdayId).has(original.id)) {
       verletzt += 1;
       continue;
     }
+    if (!ersterTrainingsSpieltag) ersterTrainingsSpieltag = { matchdayId, nummer: ids.indexOf(matchdayId) + 1 };
     if (!bestimmt) continue;
     const schritt = berechneSpieltagsZuwachs({ gameState, player, ziel: bestimmt.ziel, quelle: bestimmt.quelle, modus });
     if (!schritt) continue;
@@ -132,9 +140,12 @@ export function prognostiziereDisziplinTraining(input: {
   }
 
   const projiziert = attributeVon(player)!;
-  const heute = buildLeagueDisciplineRatingsWithAttributeOverrides(gameState.players, {}).get(original.id) ?? {};
-  const nachher =
-    buildLeagueDisciplineRatingsWithAttributeOverrides(gameState.players, { [original.id]: projiziert }).get(original.id) ?? {};
+  // Bezugspunkt ist der gespeicherte Wert (wie die Plan-Kacheln); das Delta kommt exakt aus der Engine, sobald die
+  // ganze Liga im Speicher ist, sonst aus der Matrix-Rohsumme geschätzt (`eignung-aus-attributen.ts`).
+  const eignung = berechneEignungNachAttributen({ players: gameState.players, playerId: original.id, neueAttribute: projiziert });
+  if (!eignung) return null;
+  const heute = eignung.heute;
+  const nachher = eignung.nachher;
   const zeilen: DisziplinTrainingsPrognoseZeile[] = Object.keys(heute).map((disziplinId) => {
     const h = heute[disziplinId] ?? 0;
     const p = nachher[disziplinId] ?? h;
@@ -142,9 +153,9 @@ export function prognostiziereDisziplinTraining(input: {
       disziplinId,
       heute: h,
       prognose: p,
-      delta: Number((p - h).toFixed(1)),
-      kaderRangHeute: rangImKader(gameState, original.id, disziplinId, original.disciplineRatings?.[disziplinId] ?? h),
-      kaderRangPrognose: rangImKader(gameState, original.id, disziplinId, (original.disciplineRatings?.[disziplinId] ?? h) + (p - h)),
+      delta: Number((p - h).toFixed(2)),
+      kaderRangHeute: rangImKader(gameState, original.id, disziplinId, h),
+      kaderRangPrognose: rangImKader(gameState, original.id, disziplinId, p),
       istZiel: bestimmt?.ziel.disziplinId === disziplinId,
     };
   });
@@ -161,5 +172,8 @@ export function prognostiziereDisziplinTraining(input: {
     zuwachsJeAttribut,
     zeilen,
     annahme: "andere_spieler_unveraendert",
+    eignungsModus: eignung.modus,
+    ersterTrainingsSpieltag,
+    verletztJetzt: Boolean(fenster[0] && bestimmeAusfallSpielerFuerSpieltag(gameState, fenster[0]).has(original.id)),
   };
 }

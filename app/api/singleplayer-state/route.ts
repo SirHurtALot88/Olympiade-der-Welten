@@ -47,6 +47,7 @@ import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/spon
 import { kickoffLeagueSetupDraft } from "@/lib/game/league-setup-draft-service";
 import { resolveAuthoritativeWriteOwnerId, resolveSessionOwnerId } from "@/lib/auth/session";
 import { koopSchreibkonfliktAntwort } from "@/lib/persistence/koop-schreibkonflikt-antwort";
+import { spielstandFuerBrowser, uebernehmeServerAusruestung } from "@/lib/ausruestung/ausruestung-sicht";
 
 /**
  * Room-write context a caller may attach to a team-scoped gameplay action so it can be
@@ -308,7 +309,8 @@ function loadSqliteResponse(
   return NextResponse.json({
     save: serializeSave({
       ...save,
-      gameState: compactInitial ? compactFoundationInitialGameState(gameState) : gameState,
+      // Ausruestung: fremde Lager, Ruhm und die Saat verlassen den Server nicht (lib/ausruestung/ausruestung-sicht.ts).
+      gameState: spielstandFuerBrowser(compactInitial ? compactFoundationInitialGameState(gameState) : gameState, ownerId),
     }),
     saves: finalResponseModeSaves.map(serializeSaveSummary),
     _meta: {
@@ -401,7 +403,8 @@ export async function PUT(request: Request) {
     );
   }
 
-  const rehydratedGameState = rehydrateGameStateAfterCompactPut(existing.gameState, body.gameState);
+  // Der Browser kennt nur die eigenen Lager: der Besitz des Servers gilt, nie der des Clients (lib/ausruestung/ausruestung-sicht.ts).
+  const rehydratedGameState = uebernehmeServerAusruestung(rehydrateGameStateAfterCompactPut(existing.gameState, body.gameState), existing.gameState);
   const nextGameState = withNormalizedLocalTeamSettings(rehydratedGameState);
   const preparedGameState = body.materializeSeasonDerivations
     ? withPersistedSeasonDerivations(nextGameState)

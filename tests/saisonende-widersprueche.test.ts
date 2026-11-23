@@ -55,7 +55,8 @@ describe("B5 · Die Liga-Wertung kennt drei Zustände, nicht zwei", () => {
      */
     const stellen = [
       "app/foundation/season-v2/SeasonStandingsNewLook.tsx",
-      "app/foundation/FoundationShellRouterBody.tsx",
+      // Die alte Ranks-Matrix im Shell-Router trug die zweite Kopie; sie ist mit RanksModern (22.11.) entfallen,
+      // die neue Seite zeigt keine Liga-Wertungs-Kopfzeile (nur "nach Spieltag N"). Kein getippter Text bleibt.
     ];
     for (const stelle of stellen) {
       const quelle = readFileSync(join(root, stelle), "utf8");

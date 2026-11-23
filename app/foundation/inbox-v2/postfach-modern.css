@@ -213,6 +213,7 @@
 .ibx .ibx-ml.ibx-neu .ibx-pkt {background:var(--gold);box-shadow:0 0 calc(.45 * var(--ibx-u)) rgba(240,195,90,.8)}
 .ibx .ibx-ml .ibx-av {position:relative;width:calc(2.6 * var(--ibx-u));height:calc(2.6 * var(--ibx-u));border-radius:calc(.45 * var(--ibx-u));overflow:hidden;border:1px solid var(--linie-2);background:var(--flaeche-3);display:grid;place-items:center;font-size:calc(1.25 * var(--ibx-u));color:var(--leise);margin-top:calc(.1 * var(--ibx-u))}
 .ibx .ibx-ml .ibx-av img {width:100%;height:100%;object-fit:cover;object-position:center 18%}
+.ibx .ibx-ml .ibx-av img.ibx-wappen,.ibx .ibx-bk .ibx-gr2 img.ibx-wappen {object-fit:contain;object-position:center;padding:6%;box-sizing:border-box}
 .ibx .ibx-ml .ibx-av.ibx-rund {border-radius:50%}
 .ibx .ibx-ml.ibx-s-k .ibx-av {border-color:var(--warn)}
 .ibx .ibx-ml.ibx-s-k .ibx-av svg {color:var(--warn)}

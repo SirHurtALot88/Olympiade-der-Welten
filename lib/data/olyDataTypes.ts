@@ -1,3 +1,4 @@
+import type { AusruestungRegelStempel, AusruestungSpielstand } from "@/lib/ausruestung/ausruestung-typen";
 import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import type { LeagueTier } from "@/lib/season/league-split";
@@ -1361,7 +1362,7 @@ export type TeamControlSettings = {
 };
 
 /** Die Bereiche, die ein menschlicher Manager selbst entscheidet oder an die KI abgibt. */
-export type DelegationBereich = "einsatzliste" | "draft" | "transfers" | "training" | "gebaeude" | "sponsor";
+export type DelegationBereich = "einsatzliste" | "draft" | "transfers" | "training" | "gebaeude" | "sponsor" | "ausruestung";
 
 /** Die drei festen Stufen; Einzelschalter in `TeamDelegation.bereiche` gehen ihnen vor. */
 export type DelegationStufe = "voll_selbst" | "halbautomatik" | "voll_ki";
@@ -4303,6 +4304,11 @@ export type SeasonState = {
    */
   breakingFormat?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "gauntlet" | "tagteam" }> } | null;
   /**
+   * AUSRUESTUNGS-REGEL DIESER SAISON (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste (Besitz, Wirkung, Schmiede, Effekte)
+   * je Spieltag, gesetzt beim Laden. Gebuchte Spieltage behalten ihre Stufe. Phase 1a: nur Besitz, Wirkung "keine".
+   */
+  ausruestungRegel?: AusruestungRegelStempel | null;
+  /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.
    *
@@ -4675,6 +4681,11 @@ export type GameState = {
   playerMoraleState?: PlayerMoraleState[];
   /** Spieler-Form, nur mit `OLY_FORM_MORAL=1` gepflegt (s. `PlayerFormState`). */
   playerFormState?: PlayerFormState[];
+  /**
+   * AUSRUESTUNG (22.11., lib/ausruestung/*): Besitz je Team (Lager, Materialien, Teile, Ruhm, Truhen). BEWUSST AUF DER OBERSTEN
+   * EBENE (ueberlebt den Saisonwechsel). Fremde Teams stehen NICHT in der Nutzlast an den Browser (`ausruestung-sicht.ts`).
+   */
+  ausruestung?: AusruestungSpielstand | null;
   playerRelationshipEvents?: PlayerRelationshipEventRecord[];
   playerDemands?: PlayerDemandRecord[];
   teamCaptains?: TeamCaptainRecord[];

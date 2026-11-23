@@ -889,7 +889,7 @@ async function main() {
         await page.getByTestId("foundation-lineup").waitFor({ state: "visible", timeout: viewTimeoutMs });
         await selectFirstUsableTeam(page);
         const text = await pageText(page);
-        assertStep(step, text.includes("Einsatzliste"), "Einsatzliste lädt.");
+        assertStep(step, hasAny(text, ["Taktik", "Einsatzliste"]), "Taktik (Einsatzliste) lädt.");
         assertStep(step, hasAny(text, ["Done: Player Drawer", "Spieler", "Keine", "Empty"]), "Echte Spieler oder klare Empty-State-Warning sichtbar.");
         assertStep(step, hasAny(text, ["Formkarten", "Formkarte", "Form"]), "Formkarten/Modifier-Hinweise sichtbar.");
         assertStep(step, hasAny(text, ["Arena", "Matchday Arena"]), "Arena-Link oder Arena-Hinweis sichtbar.");
@@ -975,7 +975,7 @@ async function main() {
           laneOrEmptyVisible ||
             // "Spieltagsergebnis" ist raus — die Ueberschrift der mit #247 entfernten
             // Sektion. Die uebrigen Alternativen bleiben unangetastet.
-            hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste"]),
+            hasAny(text, ["Team-Lanes", "Noch keine", "Arena-Kontext", "Scoreboard", "Fokus-Team", "Teams", "Reveal", "Einsatzliste", "Taktik"]),
           "Lanes oder sauberer Empty-State sichtbar.",
         );
         // Fehlt die Einsatzliste, kann der Spieltag nicht starten — die Arena zeigt dann

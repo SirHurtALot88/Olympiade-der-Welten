@@ -107,6 +107,7 @@ describe("Team-Zuordnung mit drei Menschen", () => {
       training: "ki",
       gebaeude: "ki",
       sponsor: "ki",
+      ausruestung: "ki",
     });
     expect(resolveTeamDelegation(settings[chris]).stufe).toBe("voll_selbst");
     expect(resolveTeamDelegation(settings[franky]).stufe).toBe("voll_selbst");

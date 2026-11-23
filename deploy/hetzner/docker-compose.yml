@@ -137,6 +137,10 @@ services:
       # Gang mit zwei Phasen, verdeckter Wechsel, Waffe frei waehlbar), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten
       # Spieltag wieder der Gauntlet; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.
       OLY_BREAKING_FORMAT: ${OLY_BREAKING_FORMAT:-}
+      # Ausruestung (22.11., docs/design/ausruestung-phase1a-22-11.md): leer = Besitz (Lager, Truhen, Ruhm; Phase 1a beruehrt die Wertung
+      # nicht), "aus" = ab dem naechsten gewerteten Spieltag aus (der Besitz bleibt im Spielstand liegen), "aus-sofort" = Notbremse.
+      # Nur Server (kein NEXT_PUBLIC): die Regel steht im Spielstand, seasonState.ausruestungRegel. Siehe deploy/hetzner/.env.example.
+      OLY_AUSRUESTUNG: ${OLY_AUSRUESTUNG:-}
       # Liga-Draft (Draft-Seite, #1619/#1623, docs/design/draft-neubau-kern-18-11.md): DIESELBE Falle wie oben -- ohne diese
       # Durchreichung erreicht ein Wert aus deploy/hetzner/.env den Container NIE (gefunden in der Abnahme 19.11.,
       # docs/design/abnahme-saison-19-11.md). Leer = Code-Standard (seit 19.11.: neuer Draft mit Draft-Seite); "block" = Rueckweg

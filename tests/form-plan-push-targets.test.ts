@@ -34,7 +34,7 @@ describe("Formplan-Panel: Team-Power raus, Push-Ziele rein", () => {
     expect(panel).not.toContain("teamPowerBudget");
     expect(panel).not.toContain("getTeamPowerCategoryLabel");
     // Auch der Hinweistext, der die Kachel als reine Anzeige entschuldigt hat.
-    expect(panel).not.toContain("Team-Power wird am Spieltag in der Einsatzliste aktiviert");
+    expect(panel).not.toContain("Team-Power wird am Spieltag in der Taktik aktiviert");
   });
 
   it("fuehrt die drei Stufen in einer Quelle und in fester Reihenfolge", () => {
