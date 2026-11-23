@@ -20,7 +20,7 @@ Marketability im Transfermarkt). Stadion, Tickets, Medaillen und Kredite folgen 
 | Marktspalte „Mkt“ mit Nebel (serverseitig nur Stufe 10er/5er/exakt) | `lib/marketing/marketing-markt.ts`, `transfermarkt-local-service.ts`, `TransfermarktModern.tsx` |
 | Tests | `tests/marketing-bau.test.ts`, `tests/marketing-seite.test.tsx` |
 
-Entscheidungen des PM: Teammarke 4,0 C in beiden Ligen; Spieler-Anteil geht nie in die Kasse (hebt die Moral); Fans mögen/meiden nur echte
+Entscheidungen des PM (Teammarke danach nach der Scheren-Messung geändert, siehe unten): Spieler-Anteil geht nie in die Kasse (hebt die Moral); Fans mögen/meiden nur echte
 Rassen, Klassen, Traits; Mensch und KI gleiche Regeln.
 
 ## Annahmen, die das Konzept offen ließ
@@ -48,8 +48,58 @@ Rohausgabe: `docs/design/marketing-bau-22-11/messung-s1.txt`; Skripte `scripts/m
 | mittlere Kader-Moral | 50,3 | 51,3 (je Team −4,2 bis +5,4; Zuschlag im Mittel 1,1 Punkte) |
 
 Lesart: Marketing bringt 5 Teams über die Null. Die Schere nach Budget öffnet sich leicht (Marketing nach Budget: reiche 8 ⌀ 9,8 C, arme 8 ⌀ 4,8 C;
-Einnahmenverhältnis 1,23 → 1,27, über dem Zielwert 1,20 des Finanzpapiers). Stellschrauben: Höchstwert Liga 1 senken. Marketing liegt knapp unter
+Einnahmenverhältnis 1,23 → 1,27). Das war zu viel, siehe Nachbesserung unten. Marketing liegt knapp unter
 der Konzeptrechnung (≈ 234 C bei acht Spielern je Team), weil die KI-Kader wenige Spieler mit Kante haben.
+
+## Nachbesserung 1: Schere reich/arm (Vorgabe: darf nicht wachsen)
+
+Vorgabe des PM: Einnahmenverhältnis L1/L2 steigt nicht über den Wert ohne Marketing, der GuV-Abstand nach Budget (reiche 8 minus arme 8) wächst höchstens um 1 C.
+Messung: 3 Saaten (je 32 KI-Teams, derselbe Lauf mit `OLY_MARKETING=aus`; weil Marketing den Spielverlauf nicht ändert, ist "mit" = GuV ohne + Marketing,
+`scripts/auswerte-marketing-schere.ts`). Varianten rechnen offline auf denselben Läufen (`scripts/vergleiche-marketing-varianten.mjs`, alle Zeilen in
+`docs/design/marketing-bau-22-11/messung-schere-varianten-s1.txt`).
+
+**Der Vorschlag des PM wirkt nicht.** Teammarke nach Finanzwert (4 + 0,4 x (5,1 − Finanzwert), 2 bis 6 C) und der Deckel von 12 C ändern die Schere kaum
+(Delta des GuV-Abstands +3,8 gegen +3,9 beim pauschalen Sockel; Verhältnis 1,25 → 1,27). Gründe: (1) der Finanzwert der Team-Matrix hängt kaum am Budget,
+nach dem "reich/arm" gemessen wird; (2) der Deckel greift nie (größte Team-Anteile je Team liegen unter 12 C, `Deckel` = 0 Teams); (3) die Liga-Schere
+kommt aus dem niedrigeren Werbe-Höchstwert der Liga 2, den ein gleicher Sockel nicht ausgleicht.
+
+**Umgesetzt (Variante L):** Teammarke = Liga-Basis (Liga 1: 3,0 C, Liga 2: 5,0 C, Ligamittel 4,0 C) + 0,5 C je Platz Abstand von der Ligamitte nach **Budget-Rang**
+im Ligakreis (reichstes Team zahlt am wenigsten, 0 bis 9 C), `teammarkeAusRang`. Der Deckel von 12 C je Team und Saison bleibt (Rest geht als Moral an die
+Spieler), er greift in den Messungen bei keinem Team.
+
+| Saat (Saison 1) | Marketing Summe (L1 / L2 je Team) | Teams GuV ≥ 0 ohne → mit | Einnahmen L1 : L2 ohne → mit | GuV-Abstand reiche 8 − arme 8 ohne → mit | Marketing reiche 8 / arme 8 | Moral je Spieler |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 225,0 (7,6 / 6,5) | 16 → 18 | 1,25 → 1,24 | 4,1 → 2,1 (−2,0) | 6,4 / 8,4 | +1,09 |
+| 2 | 217,6 (7,1 / 6,4) | 19 → 24 | 1,25 → 1,24 | 11,4 → 9,5 (−1,9) | 6,4 / 8,3 | +0,98 |
+| 3 | 217,2 (7,4 / 6,2) | 18 → 21 | 1,24 → 1,23 | 11,9 → 10,4 (−1,6) | 6,4 / 8,0 | +0,91 |
+| Mittel | 219,9 | 17,7 → 21,0 | 1,25 → 1,24 | 9,1 → 7,3 (−1,8) | | |
+
+**Saison 2** (dieselben drei Läufe, Teamerfolg der Vorsaison wirkt; die Fanfarbe driftet im Lauf mit `OLY_MARKETING=aus` nicht, Rohdaten `messung-schere-s2.txt`):
+
+| Saat (Saison 2) | Marketing Summe (L1 / L2 je Team) | Teams GuV ≥ 0 ohne → mit | Einnahmen L1 : L2 ohne → mit | GuV-Abstand reiche 8 − arme 8 ohne → mit | Marketing reiche 8 / arme 8 | Moral je Spieler |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 224,0 (7,2 / 6,8) | 26 → 28 | 1,25 → 1,24 | −5,0 → −7,7 (−2,8) | 6,1 / 8,9 | +0,84 |
+| 2 | 224,0 (7,2 / 6,8) | 28 → 28 | 1,23 → 1,22 | −15,3 → −16,7 (−1,4) | 7,2 / 8,5 | +0,77 |
+| 3 | 211,3 (6,6 / 6,6) | 27 → 29 | 1,38 → 1,35 | 0,2 → −1,5 (−1,7) | 6,3 / 8,0 | +0,65 |
+
+Ziel erreicht: das Verhältnis steigt in keiner Saat, der Abstand wächst nirgends (er schrumpft um 1,6 bis 2,0 C). Nebenwirkung: die Schere dreht leicht (arme
+Teams bekommen im Mittel mehr Marketing als reiche, 8,2 gegen 6,4 C); `teammarkeRangSteigung` 0,5 → 0,35 halbiert das, wenn das nicht gewollt ist.
+Der Wert "ohne Marketing" liegt hier (anderer Draft, drei neue Saaten) bei 1,24 bis 1,25 statt 1,23 der ersten Messung.
+
+## Nachbesserung 2: Dauer der Spieltagsbuchung
+
+Team-Anteile und Moral werden nicht mehr je Spieltag für alle Teams gerechnet, sondern einmal je Saison und Kaderstand (`dauerCache`,
+Schlüssel aus Saison, Team, Liga, Fanfarbe, Aushängeschild-Wahl, Budget-Rang und einem Hash des Kaders aus Spieler, Restlaufzeit, Klausel, Rating, Gehalt). Je Spieltag
+wird nur 1/N gebucht. Folge: die Moral im Team-Anteil und die Verletzung wirken nicht mehr je Spieltag (Verletzte zählen nicht mehr zur Hälfte);
+Kauf, Verkauf, Verlängerung und Klausel rechnen neu. Der Moral-Zuschlag liest dieselbe gecachte, gedeckelte Zeile (gezeigt = gebucht).
+
+Messung `scripts/miss-spieltagsbuchung-dauer.ts` (`bucheSpieltagFinanzen` für alle 32 Teams, 364 Spieler, neues GameState-Objekt je Spieltag, Rechner unter Last):
+
+| | Spieltag 1 (kalt) | Spieltag 2 bis 4 |
+|---|---:|---:|
+| ohne Marketing (`aus-sofort`) | 133 ms | 95 bis 124 ms |
+| Marketing vorher | 828 ms | 516 bis 583 ms |
+| Marketing nachher (Cache) | 734 ms | 84 bis 86 ms |
 
 ## Abgleich Mockup – App (Aufnahmen `docs/design/marketing-bau-22-11/`, Team D-P, Live-Abbild-Kopie)
 
