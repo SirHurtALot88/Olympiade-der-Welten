@@ -431,3 +431,14 @@
 .spr-dr-gehalt small { font-size: 0.82em; color: var(--bc-leise); }
 .spr-dr-ab .spr-zeile.is-aktiv { background: rgba(240, 195, 90, 0.08); }
 .spr-dr-ab .spr-zeile.is-bremse > span small { color: var(--bc-warn); }
+
+/* Belastungsverlauf (Sparkline) */
+.spr-belast { display: grid; gap: 0.2em; padding: 0.4em 0.2em 0; }
+.spr-belast svg { width: 100%; height: 3.2em; display: block; overflow: visible; }
+.spr-belast__linie { fill: none; stroke: var(--bc-gold); stroke-width: 1.6; vector-effect: non-scaling-stroke; }
+.spr-belast__punkt { fill: var(--bc-gold); }
+.spr-belast__punkt.is-rot { fill: var(--bc-warn); }
+.spr-belast__zone { stroke: var(--bc-linie); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+.spr-belast__zone.is-rot { stroke: rgba(255, 96, 88, 0.55); }
+.spr-belast small { color: var(--bc-stumm); font-size: 0.82em; }
+.spr-belast--leer { color: var(--bc-stumm); font-size: 0.85em; }

@@ -17,6 +17,7 @@ import {
 } from "@/lib/foundation/spielerprofil-modell";
 import {
   FigurBuehne,
+  BelastungsSparkline,
   NebelBand,
   PpBalken,
   Tafel,
@@ -193,6 +194,7 @@ export function EinsatzKarte({ data, modell }: { data: PlayerDetailDrawerData; m
         <b>{zahl(data.availability.injuryRiskPercent, 0)} %</b>
       </div>
       <div className="spr-zk__fuss">{data.availability.injuryRiskLabel}</div>
+      <BelastungsSparkline verlauf={data.fatigueVerlauf} />
     </section>
   );
 }

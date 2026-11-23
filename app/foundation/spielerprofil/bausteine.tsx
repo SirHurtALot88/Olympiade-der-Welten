@@ -310,3 +310,48 @@ export function RangZeile({ rang, nebel }: { rang: DisziplinRang | undefined; ne
 }
 
 export { ACHSEN };
+
+/* ------------------------------------------------------------------ Belastungsverlauf */
+
+/**
+ * Kleine Kurve der Belastung (Erschöpfung 0..100) vor jedem Einsatz der laufenden Saison. Quelle: die gespeicherten Verletzungswürfe,
+ * nichts Neues. Linien bei 40 und 65 = dieselben Zonen wie die Zahl in der Einsatzkarte.
+ */
+export function BelastungsSparkline({ verlauf, jetzt }: { verlauf: PlayerDetailDrawerData["fatigueVerlauf"]; jetzt?: number | null }) {
+  if (verlauf.length === 0) {
+    return (
+      <div className="spr-belast spr-belast--leer" data-testid="spielerprofil-belastungsverlauf">
+        Noch kein Einsatz in dieser Saison: der Belastungsverlauf entsteht mit dem ersten Spieltag.
+      </div>
+    );
+  }
+  const B = 220;
+  const H = 46;
+  const x = (i: number) => (verlauf.length === 1 ? B / 2 : 6 + (i * (B - 12)) / (verlauf.length - 1));
+  const y = (w: number) => H - 4 - (Math.max(0, Math.min(100, w)) / 100) * (H - 8);
+  const punkte = verlauf.map((p, i) => `${x(i).toFixed(1)},${y(p.wert).toFixed(1)}`).join(" ");
+  const letzte = verlauf[verlauf.length - 1]!;
+  return (
+    <div className="spr-belast" data-testid="spielerprofil-belastungsverlauf">
+      <span className="spr-gk">Belastung je Spieltag</span>
+      <svg viewBox={`0 0 ${B} ${H}`} preserveAspectRatio="none" role="img" aria-label="Belastung vor jedem Einsatz dieser Saison">
+        <line x1={0} x2={B} y1={y(65)} y2={y(65)} className="spr-belast__zone is-rot" />
+        <line x1={0} x2={B} y1={y(40)} y2={y(40)} className="spr-belast__zone" />
+        {verlauf.length > 1 ? <polyline points={punkte} className="spr-belast__linie" /> : null}
+        {verlauf.map((p, i) => (
+          <circle key={p.matchdayId} cx={x(i)} cy={y(p.wert)} r={2.4} className={`spr-belast__punkt${p.wert >= 65 ? " is-rot" : ""}`}>
+            <title>{`${p.spieltag != null ? `Spieltag ${p.spieltag}` : p.matchdayId}: ${zahl(p.wert, 0)}`}</title>
+          </circle>
+        ))}
+      </svg>
+      <small>
+        {verlauf.length} {verlauf.length === 1 ? "Einsatz" : "Einsätze"} · zuletzt <b className="spr-t">{zahl(letzte.wert, 0)}</b>
+        {jetzt != null ? (
+          <>
+            {" "}· jetzt <b className="spr-t">{zahl(jetzt, 0)}</b>
+          </>
+        ) : null}
+      </small>
+    </div>
+  );
+}
