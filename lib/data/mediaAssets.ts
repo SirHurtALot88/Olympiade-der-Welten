@@ -68,6 +68,12 @@ export function getStaticPortraitUrl(playerId: string): string | null {
     if (bySlug) {
       return `${PORTRAIT_STATIC_DIR}/${bySlug}`;
     }
+    // Doppelnamen: Spieler-Id "columbra-and-dovian", Datei "columbra-dovian.jpg".
+    const ohneUnd = slugMatch[1].replace(/-and-/g, "-");
+    const byOhneUnd = ohneUnd !== slugMatch[1] ? portraitFileByKey.get(ohneUnd) : undefined;
+    if (byOhneUnd) {
+      return `${PORTRAIT_STATIC_DIR}/${byOhneUnd}`;
+    }
   }
 
   return null;
