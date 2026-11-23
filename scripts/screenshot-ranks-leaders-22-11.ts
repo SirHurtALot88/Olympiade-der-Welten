@@ -70,8 +70,8 @@ async function inApp(page: Page, zustand: string) {
       await page.waitForTimeout(500);
     }
   } else {
-    if (zustand === "teams") await page.getByRole("tab", { name: /Teams/ }).click();
-    if (zustand === "medaillen") await page.getByRole("tab", { name: /Medaillen/ }).click();
+    if (zustand === "teams") await page.locator(".bc-reiter").nth(1).click();
+    if (zustand === "medaillen") await page.locator(".bc-reiter").nth(2).click();
     if (zustand === "spieltag") await page.getByTestId("leaders-zeit-spieltag").click().catch(() => undefined);
     await page.waitForTimeout(700);
   }

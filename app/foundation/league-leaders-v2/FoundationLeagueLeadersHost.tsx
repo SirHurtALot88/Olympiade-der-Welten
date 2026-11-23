@@ -1,9 +1,9 @@
 "use client";
 
-import LeagueLeadersClient, { type LeagueLeadersClientProps } from "@/app/foundation/league-leaders-v2/LeagueLeadersClient";
+import LeadersModern, { type LeadersModernProps } from "@/app/foundation/league-leaders-v2/LeadersModern";
 
-export type FoundationLeagueLeadersHostProps = LeagueLeadersClientProps;
+export type FoundationLeagueLeadersHostProps = LeadersModernProps;
 
 export default function FoundationLeagueLeadersHost(props: FoundationLeagueLeadersHostProps) {
-  return <LeagueLeadersClient {...props} />;
+  return <LeadersModern {...props} />;
 }
