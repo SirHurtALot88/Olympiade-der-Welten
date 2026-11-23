@@ -309,7 +309,7 @@ function buildPreseasonSteps(gameState: GameState, activeTeamId: string | null):
     step({
       stepId: "start_matchday_1",
       label: "Ersten Spieltag starten",
-      cta: "Weiter: Einsatzliste vorbereiten",
+      cta: "Weiter: Taktik vorbereiten",
       status: gamePhase === "season_active" ? "completed" : "ready",
       targetView: "lineup",
       teamId: activeTeamId,

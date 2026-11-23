@@ -66,7 +66,7 @@ const EMPTY_HOME_NEXT_MATCHDAY_STATUS: HomeNextMatchdayStatus = {
   hasFormCards: false,
   hasFormCardPool: false,
   formCardBlocker: null,
-  statusLabel: "Einsatzliste offen",
+  statusLabel: "Taktik offen",
 };
 
 const EMPTY_MATCHDAY_SUMMARY: MatchdaySummary = {
@@ -282,8 +282,8 @@ export function useFoundationCrossTabMatchdayLineup(input: {
           : requiredSlots > 0 && filledSlots >= requiredSlots
             ? "Arena bereit"
             : filledSlots > 0
-              ? "Einsatzliste unvollständig"
-              : "Einsatzliste offen",
+              ? "Taktik unvollständig"
+              : "Taktik offen",
     };
   }, [
     activeManagerLineupSubmitted,

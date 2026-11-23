@@ -219,7 +219,7 @@ describe("game phase action policy", () => {
   });
 
   it("keeps the core UI language centralized", () => {
-    expect(GAME_LANGUAGE.screens.lineup).toBe("Einsatzliste");
+    expect(GAME_LANGUAGE.screens.lineup).toBe("Taktik");
     expect(GAME_LANGUAGE.actions.ready).toBe("Bereit");
     expect(GAME_LANGUAGE.actions.submit).toBe(GAME_LANGUAGE.actions.confirm);
   });

@@ -1,6 +1,6 @@
 const GAME_FLOW_BLOCKER_LABELS: Record<string, string> = {
-  missing_manual_lineup: "Mindestens ein manuell gesteuertes Team hat noch keine gespeicherte Einsatzliste.",
-  passive_missing_lineup: "Mindestens ein passives Team hat noch keine gespeicherte Einsatzliste.",
+  missing_manual_lineup: "Mindestens ein manuell gesteuertes Team hat noch keine gespeicherte Taktik.",
+  passive_missing_lineup: "Mindestens ein passives Team hat noch keine gespeicherte Taktik.",
   result_apply_missing_for_current_matchday: "Result Apply fehlt noch für diesen Spieltag.",
   // Beide Schluessel stehen fuer denselben Zustand (D1 gebucht, D2 offen) -- einmal aus dem
   // Server-Check (matchday-progress-service.ts), einmal aus dem Client-Flow-Schritt
@@ -33,11 +33,11 @@ const GAME_FLOW_BLOCKER_LABELS: Record<string, string> = {
   formcards_assignment_optional: "Formkarten-Pool ist bereit — Zuweisung ist optional.",
   sponsor_objective_source_missing: "Sponsor-Ziel kann gerade nicht sauber gelesen werden.",
   source_missing: "Eine Quelle für diese Bewertung fehlt noch.",
-  lineup_not_submitted: "Einsatzliste noch nicht bestätigt — Slots sind voll, bitte in der Einsatzliste abschliessen.",
+  lineup_not_submitted: "Taktik noch nicht bestätigt — Slots sind voll, bitte in der Taktik abschliessen.",
   missing_formcard_selections: "Formkarten sind optional — ohne Auswahl spielst du ohne Bonus/Malus.",
-  missing_formcard_pool: "Formkarten-Pool für diese Saison fehlt noch — bitte in der Einsatzliste erzeugen.",
-  missing_lineup: "Einsatzliste ist noch nicht vollständig.",
-  incomplete_lineup: "Einsatzliste noch nicht spielbereit — alle Slots füllen oder den gesamten Kader einsetzen.",
+  missing_formcard_pool: "Formkarten-Pool für diese Saison fehlt noch — bitte in der Taktik erzeugen.",
+  missing_lineup: "Taktik ist noch nicht vollständig.",
+  incomplete_lineup: "Taktik noch nicht spielbereit — alle Slots füllen oder den gesamten Kader einsetzen.",
   training_missing: "Training für alle Kaderspieler muss zuerst gesetzt werden.",
   captain_recommended: "Noch kein Saison-Kapitän benannt — vor der ersten Disziplin einen aus deinen Spielern wählen.",
   no_active_team: "Kein aktives Team ausgewählt.",
@@ -49,8 +49,8 @@ const GAME_FLOW_BLOCKER_LABELS: Record<string, string> = {
   // Sponsor-Stack verzerren. Ohne dieses Label fiele die Warnung auf den Rohcode zurueck.
   battle_mode_invalid_league_assignment_ignored:
     "Die eigene Liga-1/2-Aufteilung ergab nicht 16/16 — es wurde stattdessen automatisch nach Budget zugeteilt. Bitte die Zuordnung im Liga-Picker so anpassen, dass jede Liga genau 16 Teams hat.",
-  "resolve_status:incomplete_lineups": "Mindestens eine Einsatzliste ist noch unvollständig.",
-  "resolve_status:missing_lineups": "Mindestens eine Einsatzliste fehlt noch komplett.",
+  "resolve_status:incomplete_lineups": "Mindestens eine Taktik ist noch unvollständig.",
+  "resolve_status:missing_lineups": "Mindestens eine Taktik fehlt noch komplett.",
   "resolve_status:missing_scores": "Mindestens ein Team hat noch fehlende Score-Quellen.",
   "resolve_status:missing_sources": "Mindestens eine Resolve-Quelle ist noch unvollständig.",
   "resolve_status:blocked": "Resolve Preview ist aktuell blockiert.",

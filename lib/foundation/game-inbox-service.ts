@@ -673,8 +673,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           // Anzeigename statt rohem Bezeichner („season-2-matchday-1") — gleiche Regel wie bei
           // den Ergebnis-Meldungen (`resolveMatchdayDisplayLabel`).
           description: lineupSet
-            ? `${team.shortCode}: Einsatzliste für ${resolveMatchdayDisplayLabel(input.gameState, input.gameState.matchdayState.matchdayId)} ist gesetzt.`
-            : `${team.shortCode}: Einsatzliste für ${resolveMatchdayDisplayLabel(input.gameState, input.gameState.matchdayState.matchdayId)} ist noch leer.`,
+            ? `${team.shortCode}: Taktik für ${resolveMatchdayDisplayLabel(input.gameState, input.gameState.matchdayState.matchdayId)} ist gesetzt.`
+            : `${team.shortCode}: Taktik für ${resolveMatchdayDisplayLabel(input.gameState, input.gameState.matchdayState.matchdayId)} ist noch leer.`,
           targetView: "lineup",
           targetParams: { team: team.teamId },
           ctaLabel: "Lineup öffnen",
@@ -699,8 +699,8 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           status: lineupSubmitted ? "done" : "open",
           title: lineupSubmitted ? "Lineup bestätigt" : "Lineup bestätigen",
           description: lineupSubmitted
-            ? `${team.shortCode}: Einsatzliste ist bestätigt.`
-            : `${team.shortCode}: Einsatzliste ist voll, aber noch nicht bestätigt.`,
+            ? `${team.shortCode}: Taktik ist bestätigt.`
+            : `${team.shortCode}: Taktik ist voll, aber noch nicht bestätigt.`,
           targetView: "lineup",
           targetParams: { team: team.teamId },
           ctaLabel: "Lineup bestätigen",
@@ -725,7 +725,7 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           title: formCardsReady ? "Formkarten-Pool erstellt" : "Formkarten-Pool fehlt",
           description: formCardsReady
             ? `${team.shortCode}: Formkarten für diese Saison sind erzeugt.`
-            : `${team.shortCode}: Formkarten für diese Saison müssen noch in der Einsatzliste erzeugt werden.`,
+            : `${team.shortCode}: Formkarten für diese Saison müssen noch in der Taktik erzeugt werden.`,
           targetView: "lineup",
           targetParams: { team: team.teamId, panel: "formcards" },
           ctaLabel: "Formkarten erzeugen",
@@ -1367,7 +1367,7 @@ function buildNews(input: BuildGameInboxInput, visibleTeamIds: Set<string>, crea
         severity: "info",
         title: "Saisonpause: alle Spieler erholen sich",
         description: formatSaisonpauseBericht(bericht),
-        ctaLabel: "Zur Einsatzliste",
+        ctaLabel: "Zur Taktik",
         targetView: "lineup",
         targetParams: { team: team.teamId },
         source: "saisonpause",

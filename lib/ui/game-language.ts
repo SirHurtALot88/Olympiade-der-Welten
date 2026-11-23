@@ -1,6 +1,6 @@
 export const GAME_LANGUAGE = {
   screens: {
-    lineup: "Einsatzliste",
+    lineup: "Taktik",
     formBoard: "Form Board",
     transferMarket: "Transfermarkt",
     training: "Training & Gebäude",
@@ -14,11 +14,11 @@ export const GAME_LANGUAGE = {
     continue: "Weiter",
   },
   flow: {
-    setLineupLabel: "Einsatzliste setzen",
-    setLineupCta: "Weiter: Einsatzliste setzen",
-    confirmLineupLabel: "Einsatzliste bestätigen",
-    confirmLineupCta: "Weiter: Einsatzliste bestätigen",
-    lineupMissing: "Einsatzliste fehlt",
+    setLineupLabel: "Taktik setzen",
+    setLineupCta: "Weiter: Taktik setzen",
+    confirmLineupLabel: "Taktik bestätigen",
+    confirmLineupCta: "Weiter: Taktik bestätigen",
+    lineupMissing: "Taktik fehlt",
     formCardPoolLabel: "Formkarten-Pool prüfen",
     formCardPoolCta: "Weiter: Formkarten-Pool",
     formCardPoolReadyHint: "Pool bereit — Zuweisung optional",

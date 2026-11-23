@@ -94,15 +94,15 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
           kicker: "Hauptaktion",
           title:
             input.activeManagerArenaBlockerReason === "lineup_not_submitted"
-              ? "Einsatzliste bestätigen"
-              : "Erst Einsatzliste schließen",
+              ? "Taktik bestätigen"
+              : "Erst Taktik schließen",
           detail:
             input.activeManagerArenaBlockerReason != null
               ? formatCockpitReason(input.activeManagerArenaBlockerReason)
               : "Die Arena ist lesbar, aber der Spieltag ist noch nicht sauber vorbereitet.",
           status: "blockiert",
           buttonLabel:
-            input.activeManagerArenaBlockerReason === "lineup_not_submitted" ? "Lineup bestätigen" : "Zur Einsatzliste",
+            input.activeManagerArenaBlockerReason === "lineup_not_submitted" ? "Lineup bestätigen" : "Zur Taktik",
           onClick: () => input.setFoundationView("lineup", input.setActiveView),
         };
       }
@@ -168,7 +168,7 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
         title: "Kader aus Einsatzsicht prüfen",
         detail: "Von hier aus entweder den nächsten Engpass schließen oder direkt Training und Markt nachschärfen.",
         status: input.isSelectedTeamManagementLocked ? "optional" : "bereit",
-        buttonLabel: input.isSelectedTeamManagementLocked ? "Nur ansehen" : "Einsatzliste öffnen",
+        buttonLabel: input.isSelectedTeamManagementLocked ? "Nur ansehen" : "Taktik öffnen",
         onClick: () => {
           if (!input.isSelectedTeamManagementLocked) {
             input.setFoundationView("lineup", input.setActiveView);
@@ -187,7 +187,7 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
         title: "Entwicklung in Einsatz übersetzen",
         detail: "Training ist kein Selbstzweck. Danach sofort prüfen, ob Slots, Captain oder Markt jetzt besser aussehen.",
         status: input.selectedTeamCanManage ? "bereit" : "optional",
-        buttonLabel: input.selectedTeamCanManage ? "Zur Einsatzliste" : "Nur ansehen",
+        buttonLabel: input.selectedTeamCanManage ? "Zur Taktik" : "Nur ansehen",
         onClick: () => {
           if (input.selectedTeamCanManage) {
             input.setFoundationView("lineup", input.setActiveView);
@@ -235,12 +235,12 @@ export function useFoundationCrossTabScreenPrimaryAction(input: {
     if (input.activeView === "teamSettings") {
       return {
         kicker: "Hauptaktion",
-        title: input.selectedTeamHasUnsavedChanges ? "Teamprofil sichern" : "Danach in die Einsatzliste",
+        title: input.selectedTeamHasUnsavedChanges ? "Teamprofil sichern" : "Danach in die Taktik",
         detail: input.selectedTeamHasUnsavedChanges
-          ? "Kontrolle, Identität und Strategie erst speichern, damit Markt, HQ und Einsatzliste mit denselben Annahmen arbeiten."
+          ? "Kontrolle, Identität und Strategie erst speichern, damit Markt, HQ und Taktik mit denselben Annahmen arbeiten."
           : "Wenn Team-DNA und Steuerung passen, wird sie erst im Matchday-Flow wirklich relevant.",
         status: input.selectedTeamHasUnsavedChanges ? "offen" : "bereit",
-        buttonLabel: input.selectedTeamHasUnsavedChanges ? "Änderungen prüfen" : "Einsatzliste öffnen",
+        buttonLabel: input.selectedTeamHasUnsavedChanges ? "Änderungen prüfen" : "Taktik öffnen",
         onClick: () => {
           if (!input.selectedTeamHasUnsavedChanges) {
             input.setFoundationView("lineup", input.setActiveView);

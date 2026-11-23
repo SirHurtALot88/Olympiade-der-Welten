@@ -73,7 +73,7 @@ const EMPTY_FEATURE_AUDIT_MATRIX: FeatureAuditMatrix = {
 
 export const COCKPIT_QUICK_LINKS: Array<{ id: FoundationView; label: string }> = [
   { id: "season", label: "Saisonstand" },
-  { id: "lineup", label: "Einsatzliste" },
+  { id: "lineup", label: "Taktik" },
   { id: "marketV2", label: "Transfermarkt" },
   { id: "prize", label: "Sponsoren" },
 ];

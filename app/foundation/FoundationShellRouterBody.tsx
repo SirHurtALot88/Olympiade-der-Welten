@@ -191,7 +191,7 @@ const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGenera
 });
 const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel"), {
   ssr: false,
-  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Taktik wird geladen…" />,
 });
 const FoundationSeasonFinalePanel = dynamic(
   () => import("@/app/foundation/season-v2/FoundationSeasonFinalePanel"),
@@ -251,6 +251,10 @@ const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/Fou
 const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/FoundationFinancesHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
+});
+const FoundationAusruestungHost = dynamic(() => import("@/app/foundation/ausruestung/FoundationAusruestungHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Ausrüstung wird geladen…" />,
 });
 const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-arena/FoundationBattleArenaHost"), {
   ssr: false,
@@ -492,6 +496,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   orderedDisciplines,
   originateLoanForActiveTeam,
   vorstandBudgetAktion,
+  ausruestungAktion,
   kannVerwaltenAktivesTeam,
   repayLoanEarlyForActiveTeam,
   persistenceError,
@@ -1189,7 +1194,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={[
-                { id: "lineup", label: "Einsatzliste" },
+                { id: "lineup", label: "Taktik" },
                 { id: "formBoard", label: "Formplan" },
               ]}
               activeId={lineupDraftBoardViewRequest ?? lineupDraftBoardView}
@@ -1216,6 +1221,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               items={[
                 { id: "overview", label: "Übersicht" },
                 { id: "reports", label: "Scouting Report" },
+                { id: "merkliste", label: "Merkliste" },
               ]}
               activeId={scoutingCenterTab}
               onSelect={(id) => {
@@ -2189,7 +2195,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           </section>
 
           <section className={`panel foundation-scouting-center-v2-panel${getViewClass("scoutingCenterV2")}`}>
-            {activeView === "scoutingCenterV2" ? (
+            {activeView === "scoutingCenterV2" && scoutingCenterTab === "merkliste" ? (
+              <FoundationMerklisteHost {...foundationMerklisteHostProps} />
+            ) : activeView === "scoutingCenterV2" ? (
               <ScoutingCenterV2Client
                 activeTab={scoutingCenterTab}
                 onActiveTabChange={setScoutingCenterTab}
@@ -2558,7 +2566,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${effectiveActiveOwnerId}`}
             teamTooltip={
               selectedTeam
-                ? `${selectedTeam.name}: Einsatzliste mit Focus Mode — Slots, Kandidaten und Preview.`
+                ? `${selectedTeam.name}: Taktik mit Focus Mode — Slots, Kandidaten und Preview.`
                 : "Matchday Room für Teamwahl, Slots und Preview."
             }
             client={{
@@ -3198,8 +3206,6 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
           {activeView === "seasonArchive" ? <FoundationSeasonArchiveHost {...foundationSeasonArchiveHostProps} /> : null}
 
-          {activeView === "merkliste" ? <FoundationMerklisteHost {...foundationMerklisteHostProps} /> : null}
-
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
           {/* S4/A4 (Audit Spieltag): Der frühere Standalone-View `disciplineStage` ist
               entfallen — die Bühne rendert jetzt im `matchdayArena`-View (siehe oben).
@@ -3291,6 +3297,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
               onVorstandAktion={vorstandBudgetAktion}
               onOpenOffice={() => navigateHomeTab("office")}
+              kannVerwalten={kannVerwaltenAktivesTeam}
+            />
+          ) : null}
+
+          {activeView === "ausruestung" ? (
+            <FoundationAusruestungHost
+              gameState={gameState}
+              teamId={activeManagerTeamId}
+              onAktion={ausruestungAktion}
               kannVerwalten={kannVerwaltenAktivesTeam}
             />
           ) : null}

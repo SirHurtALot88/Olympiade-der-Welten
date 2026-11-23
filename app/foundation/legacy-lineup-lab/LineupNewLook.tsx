@@ -1587,7 +1587,7 @@ export default function LineupNewLook({
     return (
       <div className="nl-lineup-root" data-testid="lineup-new-look">
         <div className="nl-lineup-empty" role="alert" data-testid="lineup-context-unavailable">
-          <p className="nl-lineup-empty__title">Die Einsatzliste liess sich fuer diesen Spieltag nicht aufbauen.</p>
+          <p className="nl-lineup-empty__title">Die Taktik liess sich fuer diesen Spieltag nicht aufbauen.</p>
           {errors.length > 0 ? (
             <ul className="nl-lineup-empty__reasons">
               {uebersetzeLineupFehlerListe(errors).map((reason) => (
@@ -2466,7 +2466,7 @@ export default function LineupNewLook({
             ready={lineupReadyToSave}
           />
           <div className="nl-lineup-hud-copy">
-            <span className="nl-lineup-eyebrow">Einsatzliste</span>
+            <span className="nl-lineup-eyebrow">Taktik</span>
             <strong>
               {context.team?.name ?? "Team"} · Spieltag {context.matchday?.index ?? "—"}
             </strong>
@@ -2640,7 +2640,7 @@ export default function LineupNewLook({
               type="button"
               className={`nl-lineup-btn is-arena${arenaReady ? " is-ready" : ""}`}
               disabled={!arenaReady || isBusy || isReadOnly}
-              title={arenaReady ? "Einsatzliste gespeichert — zur Arena" : "Erst speichern und Blocker lösen, dann Arena"}
+              title={arenaReady ? "Taktik gespeichert — zur Arena" : "Erst speichern und Blocker lösen, dann Arena"}
               onClick={() => arenaReady && onNavigateArena()}
             >
               Zur Arena →

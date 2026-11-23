@@ -462,7 +462,7 @@ export default function FoundationCockpitHost(props: FoundationCockpitHostProps)
     if (lineupStatusSummary.missingTeams > 0) {
       return {
         status: "warning" as const,
-        message: `${lineupStatusSummary.missingTeams} Teams ohne gespeicherte Einsatzliste.`,
+        message: `${lineupStatusSummary.missingTeams} Teams ohne gespeicherte Taktik.`,
       };
     }
     if (lineupStatusSummary.incompleteTeams > 0) {

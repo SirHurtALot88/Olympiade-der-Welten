@@ -46,7 +46,6 @@ const PFADE: Partial<Record<FoundationViewId, ReactNode>> = {
       <path d="M4 21c0-4.5 3.5-7 8-7s8 2.5 8 7" />
     </>
   ),
-  merkliste: <path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 16.8 6.6 19.7l1.1-6.1L3.2 9.4l6.1-.8z" />,
   trainingCompact: <path d="M3 9v6M6 6v12M18 6v12M21 9v6M6 12h12" />,
   trainingV2: (
     <>
@@ -78,6 +77,13 @@ const PFADE: Partial<Record<FoundationViewId, ReactNode>> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M15 9c-1-1.5-5-1.5-5 .8 0 2.6 5 1.4 5 4.2 0 2.2-4.2 2.2-5.4.4M12 6v12" />
+    </>
+  ),
+  // Ausruestung (22.11.): ein Schild mit Kreuzband, im Strich der uebrigen Symbole.
+  ausruestung: (
+    <>
+      <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
+      <path d="M12 8v8M8.5 11.5h7" />
     </>
   ),
   ranks: <path d="M5 21V12h4v9M10 21V5h4v16M15 21v-7h4v7M3 21h18" />,

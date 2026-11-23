@@ -3018,17 +3018,17 @@ export default function DisciplineStageArena({
           <div className="arena-prematch-hero-state">
             <span className={`arena-prematch-statuspill${ownLineupComplete ? " is-ready" : ""}`}>
               <span className="arena-prematch-statusdot" aria-hidden="true" />
-              {ownLineupComplete ? "Deine Einsatzliste steht" : "Noch nicht startklar"}
+              {ownLineupComplete ? "Deine Taktik steht" : "Noch nicht startklar"}
             </span>
             <h2 className="nl-tnum">
               {ownLineupComplete
                 ? `Warten auf die Liga — ${leagueLineupReadiness.readyCount} von ${leagueLineupReadiness.totalCount} Teams bereit`
                 : totalRequired > 0
-                  ? `Deine Einsatzliste: ${filledTotal} von ${totalRequired} Plätzen besetzt`
-                  : "Deine Einsatzliste ist noch offen"}
+                  ? `Deine Taktik: ${filledTotal} von ${totalRequired} Plätzen besetzt`
+                  : "Deine Taktik ist noch offen"}
             </h2>
             <p>
-              Der Spieltag startet, sobald alle {leagueLineupReadiness.totalCount} Teams ihre Einsatzliste
+              Der Spieltag startet, sobald alle {leagueLineupReadiness.totalCount} Teams ihre Taktik
               gespeichert und die Formkarten geklärt haben.
               {/* Die fehlenden Teams standen bisher klein unter den leeren Medaillenkreisen. Der
                   Block ist weg, die Information nicht — sie gehoert zum Wartestatus, also hierher. */}
@@ -3038,7 +3038,7 @@ export default function DisciplineStageArena({
               {missingRosterSlots > 0
                 ? ` Dein Kader hat ${ownRosterCount} Spieler für ${totalRequired} Plätze — ${missingRosterSlots === 1 ? "ein Platz bleibt" : `${missingRosterSlots} Plätze bleiben`} leer und ${missingRosterSlots === 1 ? "bringt" : "bringen"} keine Punkte.`
                 : ""}
-              {formCardsBlocked ? " Deine Formkarten sind noch offen — sie werden im Einsatzlisten-Editor geklärt." : ""}
+              {formCardsBlocked ? " Deine Formkarten sind noch offen — sie werden im Taktik-Editor geklärt." : ""}
             </p>
             {/* Siehe `kaufphaseSchliesstMitDiesemSpieltag` oben: die Regel bleibt, wie Chris sie
                 gesetzt hat — hier steht nur die Ansage vor der Tür, die zufällt.
@@ -3085,11 +3085,11 @@ export default function DisciplineStageArena({
             {onOpenLineup ? (
               ownLineupComplete ? (
                 <button type="button" className="arena-prematch-ghost" onClick={() => onOpenLineup()}>
-                  Einsatzliste prüfen
+                  Taktik prüfen
                 </button>
               ) : (
                 <button type="button" className="arena-prematch-cta" onClick={() => onOpenLineup()} data-testid="arena-prematch-lineup-cta">
-                  Einsatzliste öffnen →
+                  Taktik öffnen →
                   {totalRequired > 0 ? <small className="nl-tnum">{totalRequired - filledTotal} von {totalRequired} Plätzen offen</small> : null}
                 </button>
               )
@@ -3177,7 +3177,7 @@ export default function DisciplineStageArena({
                       <>
                         {" "}
                         <button type="button" className="arena-prematch-inlinelink" onClick={() => onOpenLineup()}>
-                          Einsatzliste öffnen
+                          Taktik öffnen
                         </button>
                       </>
                     ) : null}
@@ -3664,7 +3664,7 @@ export default function DisciplineStageArena({
               ? "✓ Engine-echt"
               : previewState === "loading"
                 ? "Engine lädt …"
-                : "Vereinfacht (keine Einsatzliste)"}
+                : "Vereinfacht (keine Taktik)"}
           </span>
         ) : null}
         {mode === "random" ? (
@@ -3858,7 +3858,7 @@ export default function DisciplineStageArena({
             eyebrow="Spieltags-Wertung"
             title="Wertung folgt"
             note="Die Wertung aller Teams erscheint mit dem ersten gewerteten Ergebnis — beide Disziplinen gemeinsam, Rang vor → nach dem Spieltag. Bis dahin steht hier bewusst keine Reihenfolge."
-            meta={`${leagueLineupReadiness.totalCount} Teams gemeldet · ${leagueLineupReadiness.readyCount} Einsatzlisten bereit`}
+            meta={`${leagueLineupReadiness.totalCount} Teams gemeldet · ${leagueLineupReadiness.readyCount} Taktiken bereit`}
             data-testid="arena-stage-pending-ranking"
           />
         </div>
