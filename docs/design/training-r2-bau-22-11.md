@@ -39,7 +39,22 @@ Stufen wie in Konzept 3.4: eigenes Team alle drei, unbekannt nichts, beobachtet 
 
 Werkzeug `scripts/miss-entwicklung.ts` (32 KI-Teams von Anfang an, zwei getrennt angelegte Spiele = zwei Saaten, zwei Saisons, echte Arena-Spieltage), neu: `--vorlieben an|aus` setzt den Stempel je Saison, die Kennzahlen enthalten `vorlieben` (Anteil Trainingstage mit Ziel = Liebling / ungeliebt, Moral-Mittel der Kaderspieler vor dem Abschluss).
 
-MESSUNG_PLATZHALTER
+**Ausgleich.** Der Erstlauf mit Faktor 1,0 (nur Saison 1, zwei Saaten) ergab: KI-Teams trainieren an 15,4 % / 17,8 % der Trainingstage ihre Lieblingsdisziplin (zufällig wären 10 %), an 2,1 % / 1,3 % die ungeliebte. Daraus folgt ein Mehr an Trainingsbudget von 1 + 0,15 x 0,154 - 0,20 x 0,021 = +1,9 % und 1 + 0,15 x 0,178 - 0,20 x 0,013 = +2,4 %; der direkte Vergleich der Trainingserträge mit gegen ohne Regel lag bei +0,8 % und +3,4 % (Rauschen der Läufe). Das ist weniger als die im Konzept angenommenen 4,4 %, weil die KI nach Kaderlücke wählt und die Vorlieben nur gewichtet. **`TRAININGS_VORLIEBEN_AUSGLEICH = 0,979`** (1 / 1,021): Faktor auf das Trainingsbudget je Spieltag, nur solange der Stempel `v1` ist (der Rückweg `aus` liefert exakt den Stand vor Runde 2). Der Konzeptsatz „Grundrate -4,4 %“ gilt nur für 35 % Lieblings-Ziele; gemessen sind es 17 %.
+
+**Endlauf** mit Ausgleich 0,979, je Saat und Saison gegen den Lauf ohne Regel (`OLY_TRAINING_VORLIEBEN=aus`, derselbe Ausgangsstand; Trainingsertrag = mittlere Summe der gebuchten Trainingszuwächse je Spieler):
+
+| Saat | Saison | Training ohne | Training mit | Unterschied | Liebling % | Ungeliebt % | Liga-Mittel Netto ohne / mit | Moral ohne / mit |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 1 | 3,68 | 3,63 | -1,4 % | 15,4 | 2,1 | -0,49 / -0,52 | 51,5 / 51,7 |
+| 1 | 2 | 3,64 | 3,68 | +1,1 % | 17,8 | 0,9 | -0,40 / -0,35 | 54,7 / 55,2 |
+| 2 | 1 | 3,86 | 3,86 | 0,0 % | 17,8 | 1,3 | -0,49 / -0,51 | 50,8 / 51,3 |
+| 2 | 2 | 3,53 | 3,55 | +0,6 % | 16,5 | 1,6 | -0,43 / -0,22 | 52,2 / 52,8 |
+| **Mittel** | | **3,68** | **3,68** | **+0,1 %** | **16,9** | **1,5** | **-0,45 / -0,40** | **52,3 / 52,8** |
+
+Ergebnis: das Liga-Mittel des Trainingsertrags bleibt innerhalb ±1 % (gepoolt +0,1 %, Einzelwerte -1,4 bis +1,1 %, das ist Laufrauschen). Moral im Mittel +0,5 Punkte (Lieblings-Ziele +3 wiegen mehr als die seltene ungeliebte).
+
+**Soll aus #1696 (Verteilung, Liga-Mittel der Netto-Summe aller zwölf Attribute), ohne / mit Regel, Mittel über die vier Läufe:** Liga-Mittel -0,45 / -0,40 (Soll -1 bis +1); deutlich besser (Summe >= +8) 4,4 % / 4,9 % (Soll 5-8, je Lauf 2,9-5,6 bzw. 4,4-5,6); deutlich schlechter (<= -8) 7,0 % / 6,1 %; kaum verändert (|Summe| <= 2) 50,7 % / 49,8 % (Soll 50-60); Trainingsanteil 63,8 % / 63,6 % (Soll 60). Die Verteilung verschiebt sich durch die Vorlieben nicht über das Rauschen hinaus; die Abweichungen vom Soll (Saison 2 mit wenigen Stark-Besseren) bestehen auch ohne die Regel und sind nicht Gegenstand dieser Runde.
+
 
 ## 3. Abgleich mit dem Mockup
 
@@ -76,5 +91,5 @@ Korrekturschleife (Funde beim Ansehen der Aufnahmen): SVG-Grundregeln fehlten (r
 
 - Compose- und `.env.example`-Zeile (siehe 1.2) fehlen absichtlich; ohne sie gilt auf dem Server der Standard (an).
 - Der Kader-Reiter zeigt die Vorlieben noch nicht als Spalte (nur der Plan).
-- Menschen wählen ihr Ziel gezielter als die KI; ist der Lieblings-Anteil bei ihnen deutlich höher als bei der KI (hier gemessen), liegt ihr Trainingsertrag leicht über dem Ligamittel. Beobachten, ggf. `TRAININGS_VORLIEBEN_AUSGLEICH` nachziehen.
+- Menschen wählen ihr Ziel gezielter als die KI; ist der Lieblings-Anteil bei ihnen deutlich höher als bei der KI (KI gemessen: 17 %), liegt ihr Trainingsertrag leicht über dem Ligamittel. Beobachten, ggf. `TRAININGS_VORLIEBEN_AUSGLEICH` nachziehen.
 - Zwei Saaten und zwei Saisons ergeben ein Messrauschen von rund 1 bis 2 % im Trainingsertrag zwischen zwei Läufen (Verletzungen und Aufstellungen laufen auseinander); der Ausgleich ist deshalb zusätzlich aus dem Anteil der Lieblings- und Ungeliebt-Tage hergeleitet (Abschnitt 2).
