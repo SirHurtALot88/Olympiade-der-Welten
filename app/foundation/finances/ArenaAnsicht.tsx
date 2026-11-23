@@ -181,7 +181,6 @@ export default function ArenaAnsicht({ gameState, teamId, onAktion, kannSchreibe
             <div className="fin-rek"><span>Kostet <small>{ARENA_BEREICHE.filter((b) => plan[b] > 0).map((b) => `${plan[b]} × ${b === "steh" ? "Steh" : b === "sitz" ? "Sitz" : "Loge"}`).join(" · ") || "Schritte wählen · Investitionstopf"}</small></span><b className="bc-t minus">{geplant ? `−${zahl(vorschau.kosten)} C` : "–"}</b></div>
             <div className="fin-rek"><span>Bringt ca. <small>wenn die Fans kommen · volles Haus {geplant ? `+${zahl(vorschau.nettoVoll)} C` : "–"}</small></span><b className="bc-t plus">{geplant ? `${vorschau.nettoErwartet >= 0 ? "+" : "−"}${zahl(Math.abs(vorschau.nettoErwartet))} C je Saison` : "–"}</b></div>
             <div className="fin-rek"><span>Bezahlt nach <small>{geplant ? `volles Haus ${saisons(vorschau.bezahltVoll)}` : "erwartet / volles Haus"}</small></span><b className="bc-t">{geplant ? (vorschau.bezahltErwartet == null ? "nie" : `rund ${zahl(vorschau.bezahltErwartet, 1)} Saisons`) : "–"}</b></div>
-            <div className="fin-rek arena-nachfrage"><span>Nachfrage <small>Steh {ganz(nachfrageSchnitt.steh)} · Sitz {ganz(nachfrageSchnitt.sitz)} · Loge {ganz(nachfrageSchnitt.loge)}</small></span><b className="bc-t">Fanbasis {ganz(stand.fanbasis)} · Max. {ganz(fanMaximum(stand.plaetze))}{geplant ? ` → ${ganz(vorschau.fanMaximumNachher)}` : ""}</b></div>
           </div>
           <div className="fin-fuss arena-fuss">
             <span className="fin-txt" data-testid="arena-hinweis">

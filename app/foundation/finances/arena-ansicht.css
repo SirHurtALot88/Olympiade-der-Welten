@@ -32,5 +32,4 @@
 .arena-tab tr.is-su td { color: var(--bc-creme); font-weight: 600; }
 @media (max-width: 1500px) { .arena-zeile { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-/* Nachfrage und Fan-Maximum stehen ab 1250 px Hoehe in der Karte, darunter im Tooltip des Balkens (wie im Mockup). */
-@media (max-height: 1250px) { .arena-nachfrage { display: none; } }
+/* Nachfrage steht im Tooltip des Balkens, Fanbasis und Maximum im Kopf der Seite; die Karte braucht keine eigene Zeile dafuer. */

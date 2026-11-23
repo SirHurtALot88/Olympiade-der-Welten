@@ -327,11 +327,13 @@ export function ausbauVorschau(input: {
   heimspiele?: number;
   /** Fanbasis NACH dem Ausbau (Wachstum bis zum neuen Fan-Maximum); ohne Angabe die von heute. Nur die KI rechnet damit. */
   fanbasisNachher?: number;
+  /** Fanbasis OHNE den Ausbau (Wachstum bis zum heutigen Fan-Maximum), damit der Gewinn nur den Ausbau zaehlt; ohne Angabe die von heute. Nur die KI rechnet damit. */
+  fanbasisOhneAusbau?: number;
 }): AusbauVorschau {
   const n = input.heimspiele ?? HEIMSPIELE_REFERENZ;
   const nachher = plaetzeNachSchritten(input.plaetze, input.schritte);
   const basis = { fanbasis: input.fanbasis, stimmung: input.stimmung, liga1: input.liga1, sponsorStufe: input.sponsorStufe, tabellenAnteil: input.tabellenAnteil };
-  const alt = rechneHeimspiel({ ...basis, plaetze: input.plaetze });
+  const alt = rechneHeimspiel({ ...basis, fanbasis: input.fanbasisOhneAusbau ?? input.fanbasis, plaetze: input.plaetze });
   const neu = rechneHeimspiel({ ...basis, fanbasis: input.fanbasisNachher ?? input.fanbasis, plaetze: nachher });
   const zeilen: AusbauZeile[] = ARENA_BEREICHE.map((b) => {
     const gewuenscht = Math.max(0, Math.round(input.schritte[b] ?? 0));

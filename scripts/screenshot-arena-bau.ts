@@ -14,6 +14,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { chromium, type Browser, type Page } from "@playwright/test";
 
 import { stempleFinanzenJeSpieltagBeimAnlegen } from "@/lib/finance/finanzen-je-spieltag";
+import { buildTeamControlSettingsMap } from "@/lib/foundation/team-control-settings";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 
 const PORT = process.env.SCREENSHOT_PORT ?? "3216";
@@ -39,7 +40,16 @@ async function bereiteKopieVor(): Promise<{ saveId: string; teamId: string }> {
   if (!gewaehlt) throw new Error(`Kein Spielstand mit Team ${TEAM} im Abbild.`);
   let g = gewaehlt.gameState;
   // Mitte der Saison zeigen: die Phase auf "season_active" (nur Anzeige der Kopie), das Team als Mensch-Team mit eigenem Besitz.
-  g = { ...g, gamePhase: "season_active", teams: g.teams.map((t) => (t.teamId === TEAM ? { ...t, humanControlled: true } : t)) };
+  // Das Team gehoert dem Dev-Benutzer (Besitz "user_local", Modus manuell): sonst lehnt der Server die Schreibaufrufe der Seite (Flow-Schritt) mit 403 ab,
+  // und das Next.js-Overlay zeigt "1 Issue" im Bild.
+  const einst = buildTeamControlSettingsMap(g.teams, g.seasonState.teamControlSettings);
+  einst[TEAM] = { ...einst[TEAM]!, controlMode: "manual", ownerId: "user_local", ownerSlot: "user", displayLabel: "Chris" };
+  g = {
+    ...g,
+    gamePhase: "season_active",
+    teams: g.teams.map((t) => (t.teamId === TEAM ? { ...t, humanControlled: true } : t)),
+    seasonState: { ...g.seasonState, teamControlSettings: einst },
+  };
   persistence.saveSingleplayerState(gewaehlt.saveId, g);
   console.log(`[aufnahme] Save ${gewaehlt.saveId}, Saison ${g.season.id}, Spieltag ${g.season.currentMatchday}, Arena an`);
   return { saveId: gewaehlt.saveId, teamId: TEAM };
@@ -97,6 +107,7 @@ async function main() {
           const page = await ctx.newPage();
           const fehler: string[] = [];
           page.on("pageerror", (e) => fehler.push(String(e)));
+          page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") console.log(`[konsole ${m.type()}] ${datei}: ${m.text().slice(0, 600)}`); });
           const url = new URL("/foundation", BASE_URL);
           url.searchParams.set("view", ansicht);
           url.searchParams.set("saveId", saveId);

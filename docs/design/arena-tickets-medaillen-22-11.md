@@ -79,13 +79,58 @@ Lesart:
   rechnerisch erreichbar (volle Arena Liga 1 37,6 C gegen rund 100 C Sponsor = 27 %), nach zwei Saisons aber nicht erreicht (Ticket-Anteil der Spitze 4 %), weil die Fanbasis nur 22 % je Saison wächst und die KI höchstens drei Schritte je Bereich baut.
 - Ticket-Einnahmen Liga 1 : Liga 2 = 1,45 (Preisfaktor 4/3 plus größere Fanbasis); der absolute Abstand beträgt 1,5 C je Team. Die Einnahmen-Schere ändert sich damit nicht nennenswert
   (1,19 bis 1,40 in Saison 2, Streuung der Saat größer als der Effekt). Die Konzept-Zahl „Steh und Sitz zahlen sich in Liga 2 in 1,5 bis 2,5 Saisons“ ist im Test geprüft.
-- Offen: Messung über mehr als zwei Saisons und ein A/B-Lauf ohne Arena für die Schere (nicht gemessen).
+- Messung über drei Saisons: siehe Abschnitt „KI baut schneller“. Offen: ein A/B-Lauf ohne Arena für die Schere (nicht gemessen).
+
+## KI baut schneller (Chris, 23.11.) und Messung über drei Saisons
+
+Änderung in `lib/arena/arena-ki-bewertung.ts` (alt → neu):
+
+| Regel | alt | neu |
+|---|---|---|
+| Schritte je Bereich und Saison (`KI_MAX_SCHRITTE_JE_BEREICH_UND_SAISON`) | 3 | 6 |
+| Amortisation mit „Erwartet“ (`KI_MAX_BEZAHLT_SAISONS`) | höchstens 4 Saisons | höchstens 8 |
+| Empfehlung ab Auslastung der letzten drei Heimspiele (`KI_EMPFEHLUNG_AUSLASTUNG`) | 90 % | 85 % |
+| Schritte nach Überhang der Nachfrage | von heute | der nächsten Saison (× `KI_VORAUS_FAKTOR` = 1,22) |
+| Fanbasis in der Bewertung | nur am Fan-Maximum +22 % | bei vollem Haus (Steh + Sitz ≥ 85 %) immer bis +22 %, gedeckelt am Fan-Maximum der Plätze; der Gewinn zählt nur den Ausbau (`fanbasisOhneAusbau` in `ausbauVorschau`, die Seite des Menschen rechnet unverändert) |
+
+Dieselben Regeln gelten für Mensch und KI: `bauArenaAus` prüft Kasse, Obergrenzen und die harte Vorstands-Freigabe aus dem Investitionstopf, die Rücklage nach Finanzwert bleibt
+(`freiesGeldNachRuecklage`). Kein Team baut sich in die Pleite: ein Schritt kostet 0,9 bis 2,4 C bei 0,1 bis 0,2 C Unterhalt.
+
+Messung: 32 KI-Teams von Anfang an, `scripts/auswerte-arena-ki-saisons.ts` über Läufe von `scripts/miss-teamfinanzen-saison.ts --seasons 3`. Top-4 = die vier Teams der Liga mit der höchsten Fanbasis.
+„alt“ = Stand vor der Änderung, „Stufe 1“ = nur Grenzen (6 Schritte, 8 Saisons, 85 %, Vorausnachfrage), „neu“ = zusätzlich die Fanbasis-Prognose.
+Die Messung ist **kleiner als verlangt**: ein Lauf je Stand; „neu“ liegt nur für zwei Saisons vor (der Lauf ist in Saison 3 vom Speicherdruck anderer Prozesse abgebrochen worden, der Wiederholungslauf an einer vollen Platte).
+
+| Saison | Stand | Plätze Ø Liga 1 / 2 | Plätze Top-4 Liga 1 / 2 | Ticket-Anteil Top-4 / alle | Teams GuV ≥ 0 | GuV-Abstand reich 8 − arm 8 | Kasse < 0 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| 1 | alt | 5.000 / 4.313 | 5.500 / 5.250 | 5 % / 4 % | 26 | 7,5 | 0 |
+| 1 | Stufe 1 | 5.250 / 4.688 | 5.500 / 6.500 | 5 % / 4 % | 26 | 17,6 | 0 |
+| 1 | neu | 5.438 / 5.250 | 6.000 / 6.000 | 7 % / 5 % | 23 | −1,2 | 0 |
+| 2 | alt | 5.375 / 4.625 | 5.250 / 5.500 | 5 % / 5 % | 30 | −7,5 | 0 |
+| 2 | Stufe 1 | 5.250 / 4.938 | 5.250 / 5.500 | 6 % / 5 % | 28 | −9,5 | 1 |
+| 2 | neu | 5.938 / 5.313 | 6.250 / 6.000 | 6 % / 5 % | 29 | 2,4 | 0 |
+| 3 | alt | 6.000 / 5.250 | 6.750 / 6.250 | 6 % / 5 % | 30 | 0,4 | 1 |
+| 3 | Stufe 1 | 5.438 / 5.250 | 6.500 / 6.000 | 6 % / 5 % | 31 | 9,6 | 1 |
+
+Lesart, ehrlich:
+- Die Lockerung bringt etwas (Saison 2: Liga 1 im Mittel 5.375 → 5.938, Top-4 5.250 → 6.250), aber **nicht** die Größenordnung des Richtwerts (Top-4 Liga 1 nach drei Saisons 12.000 bis 18.000 Plätze).
+  Der Richtwert ist mit dem heutigen Fan-Modell nicht erreichbar, auch nicht mit einer KI, die beliebig schnell baut:
+  die Fanbasis wächst nur bei mindestens 90 % Auslastung mit +2 % je Heimspiel (höchstens +22 % je Saison) und wuchs in der Messung bei den Spitzenteams um rund 5 bis 12 % je Saison
+  (6.700 → 7.000 → 8.500 in drei Saisons). Die Nachfrage beträgt nur etwa das 0,7-fache der Fanbasis (Stimmung 40 bis 60). Wer mehr Plätze baut, als die Nachfrage füllt, fällt unter 90 %,
+  und die Fanbasis wächst nicht mehr. Plätze folgen deshalb der Fanbasis, nicht umgekehrt: für 12.000 Plätze wären rund 15.000 Fans nötig.
+- Ticket-Anteil der Spitze bleibt bei 5 bis 7 %, das Konzeptziel „volle Top-Arena ≈ ein Viertel der Einnahmen“ ist damit nach drei Saisons nicht erreicht.
+- Wer bauen will, scheiterte vor allem an „zahlt sich nicht aus“ (Messlog: Sitzplätze, Stufe 1), weil bei Fanbasis unter dem Maximum zusätzliche Plätze rechnerisch nichts bringen; die Prognose (Fanbasis wächst bis zum Maximum) behebt das.
+- Pleiten: höchstens ein Team mit negativer Kasse am Saisonende, in allen Ständen gleich; der Anteil Teams mit GuV ≥ 0 liegt bei 23 bis 31 (Streuung der Saat).
+- **Entscheidung für Chris/PM:** soll die Top-Arena nach zwei bis drei Saisons wirklich bei 12.000 bis 18.000 Plätzen stehen, muss das Fan-Modell angefasst werden (Wachstum je Heimspiel, Schwelle 90 %,
+  Nachfrage je Fan), nicht die KI. Das ist eine Änderung der Wirtschaftsmechanik und hier bewusst nicht ohne Freigabe gemacht.
 
 ## Prüfungen
 
 - `npx tsc -p tsconfig.check.json --noEmit` sauber.
 - vitest `tests/finan*`, `guv-*`, `spieltag*`, `saisonende*`, `gebaeude*`, `stadion*`, `sponsor*`, `morale*`, `leaders*`, `marketing*`: 837 grün (2 Dateien übersprungen wie vorher); `tests/arena-tickets-medaillen.test.ts` 22 grün.
 - Wertungs-Fingerabdruck: **GESAMT fe1dc086d68d** (unverändert; Arena und Medaillen wirken nur auf Geld und Moral).
+
+- Nach Merge mit main und KI-Änderung (23.11.): vitest `arena-tickets-medaillen*`, `kredit*`, `entwicklung*`, `finan*`, `guv-*`, `spieltag*`, `saisonende*`, `new-game*`, `save-repository-cold*`, `preseason*`, `foundation-nav*`, `foundation-icon-schiene*`, `marketing-bau*`, `sponsor*`: 997 grün, 22 übersprungen; Fingerabdruck GESAMT fe1dc086d68d.
+- Aufnahmen 23.11. neu: das Overlay „1 Issue“ kam aus einem 403 der Seite beim Speichern des Flow-Schritts (das Aufnahme-Team gehörte nicht dem Dev-Benutzer); `scripts/screenshot-arena-bau.ts` setzt jetzt Besitz `user_local`, Modus manuell und loggt Konsolenfehler. Die Zeile „Nachfrage“ am Fuß der Karte „Arena · Ausbau von Hand“ (abgeschnitten) ist entfallen (Nachfrage steht im Tooltip des Balkens, Fanbasis/Maximum im Kopf).
 
 ## Abgleich Mockup – App (Aufnahmen: `docs/design/arena-tickets-medaillen-22-11/`)
 
