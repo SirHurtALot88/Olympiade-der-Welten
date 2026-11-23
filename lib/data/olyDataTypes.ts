@@ -1,4 +1,6 @@
 import type { AusruestungRegelStempel, AusruestungSpielstand } from "@/lib/ausruestung/ausruestung-typen";
+import type { ArenaRegelStempel, ArenaTeamStand } from "@/lib/arena/arena-typen";
+import type { MedaillenRegelStempel, MedaillenVergabe } from "@/lib/medaillen/medaillen-typen";
 import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import type { LeagueTier } from "@/lib/season/league-split";
@@ -1992,7 +1994,14 @@ export type SpieltagFinanzBuchung = {
    * zu 1/N je Spieltag, immer >= 0 und in `cashDelta` enthalten. Fehlt in Zeilen ohne Marketing (dann 0).
    */
   marketing?: number;
-  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number; marketing?: number };
+  /**
+   * TICKETS (22.11., docs/design/arena-tickets-medaillen-22-11.md, Stempel `seasonState.arenaRegel`): die Tageskasse dieses Heimspiels
+   * (Steh, Sitz, Loge) in C, immer >= 0 und in `cashDelta` enthalten. Fehlt in Zeilen ohne Arena-Regel und an Auswaertsspieltagen (dann 0).
+   */
+  tickets?: number;
+  /** DAUERKARTEN: das Geld, das an diesem Spieltag gutgeschrieben wurde (nur Spieltag 1, wenn vorher nicht gewaehlt wurde). In `cashDelta` enthalten. */
+  dauerkarten?: number;
+  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number; marketing?: number; tickets?: number };
   createdAt: string;
 };
 
@@ -4318,6 +4327,20 @@ export type SeasonState = {
   > | null;
   /** Manager-Wahl des Aushaengeschilds je Team und Saison (optional; ohne Eintrag gilt die KI-Regel). */
   marketingAushaengeschild?: Record<string, { seasonId: string; playerId: string }> | null;
+  /**
+   * ARENA-REGEL DIESER SAISON (22.11., lib/arena/arena-regel.ts): "an" = Platzarten, Tickets, Dauerkarten, Ausbau von Hand; "aus" = das alte
+   * Gebaeude "Arena Upgrade". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison.
+   */
+  arenaRegel?: ArenaRegelStempel | null;
+  /** ARENA-STAND JE TEAM (22.11., lib/arena/arena-stand.ts): Plaetze, Fanbasis, Stimmung, Dauerkarten, Heimspiele. Nur der Server schreibt. */
+  arena?: Record<string, ArenaTeamStand> | null;
+  /**
+   * MEDAILLEN-REGEL DIESER SAISON (22.11., lib/medaillen/medaillen-regel.ts): Disziplin-Medaillen und Farb-Meister am Saisonende, bezahlt aus
+   * dem Rangpraemien-Topf. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel.
+   */
+  medaillenRegel?: MedaillenRegelStempel | null;
+  /** DIE VERGABE der abgelaufenen Saison (Medaillen, Farb-Meister, Geld, Moral): wird am Saisonende gebucht und beim Wechsel ins Archiv-Stempel der neuen Saison uebernommen. */
+  medaillenVergabe?: MedaillenVergabe | null;
   /**
    * BASKETBALL-PUSTE-REGEL DIESER SAISON (22.11., lib/resolve/basketball-puste.ts): Wechselliste "alt"/"neu" je Spieltag,
    * gesetzt beim Laden. Gebuchte Spieltage behalten ihre Regel.

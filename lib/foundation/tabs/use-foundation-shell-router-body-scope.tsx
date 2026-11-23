@@ -811,6 +811,7 @@ import {
 } from "@/lib/foundation/tabs/use-cockpit-panel-derivations";
 import type { VorstandAktionEingabe } from "@/lib/finance/vorstand-aktion-typen";
 import type { AusruestungAktion } from "@/lib/ausruestung/ausruestung-aktionen";
+import type { ArenaAktionEingabe } from "@/lib/arena/arena-aktion-typen";
 import {
   HISTORY_ALL_SEASONS_FILTER,
   TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE,
@@ -6368,6 +6369,39 @@ export function useFoundationShellRouterBodyScope({
     }
     try {
       const response = await fetch("/api/ausruestung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          ...input,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null; meldung?: string };
+      if (response.ok && payload.ok) await loadSave(activeSaveId);
+      return { ok: Boolean(response.ok && payload.ok), reason: payload.reason ?? null, meldung: payload.meldung ?? "" };
+    } catch {
+      return { ok: false, reason: "network_error", meldung: "Keine Verbindung zum Server." };
+    }
+  }
+
+  /**
+   * Arena (22.11.): Ausbau von Hand und Dauerkarten-Wahl. Gleiches Muster wie die Vorstand-Aktion: POST, dann den Spielstand neu laden.
+   * Immer das aktive Team des Managers, nie ein fremdes; der Server prueft den Besitz ueber `authorizeServerRoomWrite` und liest frisch.
+   */
+  async function arenaAktion(input: ArenaAktionEingabe): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available", meldung: "Nur lesbar." };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available", meldung: "Dieses Team gehoert dir nicht." };
+    }
+    try {
+      const response = await fetch("/api/arena", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(withRoomBody({
@@ -13458,6 +13492,7 @@ export function useFoundationShellRouterBodyScope({
     originateLoanForActiveTeam,
     vorstandBudgetAktion,
     ausruestungAktion,
+    arenaAktion,
     kannVerwaltenAktivesTeam: Boolean(activeManagerTeamId && canManageTeamId(activeManagerTeamId)),
     repayLoanEarlyForActiveTeam,
     ownerQuickSwitchTeams,

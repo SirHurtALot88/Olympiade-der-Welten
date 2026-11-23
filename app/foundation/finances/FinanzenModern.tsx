@@ -28,6 +28,9 @@ import { sponsorWappenPfadFuer } from "@/lib/sponsor/sponsor-wappen";
 import { SponsorWappen } from "@/components/foundation/sponsor/SponsorWappen";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
+import ArenaAnsicht from "./ArenaAnsicht";
+import type { ArenaAktionFn } from "@/lib/arena/arena-aktion-typen";
+
 import "./finanzen-modern.css";
 
 export type { VorstandAktionFn } from "@/lib/finance/vorstand-aktion-typen";
@@ -42,6 +45,8 @@ export type FinanzenModernProps = {
   onOpenTeam?: (teamId: string) => void;
   /** Schreibweg (laeuft serverseitig durch den Raum-Schreibschutz). Fehlt er oder darf der Manager nicht, ist die Seite nur lesbar. */
   onVorstandAktion?: VorstandAktionFn;
+  /** Arena (22.11.): Ausbau von Hand und Dauerkarten (Server-Schreibweg `/api/arena`). */
+  onArenaAktion?: ArenaAktionFn;
   /** Springt ins Office (Reiter Gespräch): dort laufen Rücklage anzapfen und „Alles auf eine Karte“ jetzt. */
   onOpenOffice?: () => void;
   kannVerwalten?: boolean;
@@ -50,7 +55,7 @@ export type FinanzenModernProps = {
   startKontext?: FinanzenKontextReiter;
 };
 
-export type FinanzenAnsicht = "uebersicht" | "kontoauszug" | "budgets" | "sponsor" | "guv" | "apron";
+export type FinanzenAnsicht = "uebersicht" | "kontoauszug" | "budgets" | "sponsor" | "guv" | "apron" | "arena";
 type Ansicht = FinanzenAnsicht;
 export type FinanzenKontextReiter = "lage" | "quelle" | "liga";
 type KontextReiter = FinanzenKontextReiter;
@@ -1317,6 +1322,7 @@ export default function FinanzenModern({
   salaryFactorOutlook,
   onOpenTeam,
   onVorstandAktion,
+  onArenaAktion,
   onOpenOffice,
   kannVerwalten = false,
   startAnsicht = "uebersicht",
@@ -1355,6 +1361,7 @@ export default function FinanzenModern({
     ["sponsor", "Sponsor"],
     ["guv", "GuV"],
     ["apron", "Apron"],
+    ["arena", "Arena & Fans"],
   ];
   const titel: Record<Ansicht, [string, string]> = {
     uebersicht: ["Kassenverlauf", "Klick auf eine Station öffnet ihre Buchungen"],
@@ -1363,6 +1370,7 @@ export default function FinanzenModern({
     sponsor: ["Sponsor", "Der Vertrag trägt das Gehaltsbudget"],
     guv: ["Gewinn und Verlust", "Alle Posten der Saison, gezeigt = gebucht"],
     apron: ["Apron", "Wer wegen hoher Gehälter zahlt und wer ausgeschüttet bekommt"],
+    arena: ["Arena & Fans", "Tickets, Dauerkarten, Ausbau von Hand und Medaillen"],
   };
   const spieltagText = m.spieltag <= 0 ? "VOR SPIELTAG 1" : `NACH SPIELTAG ${m.spieltag} VON ${m.spieltageGesamt}`;
 
@@ -1457,6 +1465,7 @@ export default function FinanzenModern({
             ) : null}
             {ansicht === "sponsor" ? <SponsorAnsicht m={m} gameState={gameState} /> : null}
             {ansicht === "guv" ? <GuvAnsicht m={m} salaryFactorOutlook={salaryFactorOutlook} /> : null}
+            {ansicht === "arena" ? <ArenaAnsicht gameState={gameState} teamId={teamId} onAktion={onArenaAktion} kannSchreiben={kannVerwalten} /> : null}
             {ansicht === "apron" ? <ApronAnsicht m={m} eigene={teamId} onOpenTeam={onOpenTeam} /> : null}
           </div>
           <div className="fin-kf">

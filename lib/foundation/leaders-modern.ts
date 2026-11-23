@@ -333,49 +333,85 @@ export function baueTeamZeilen(m: LeadersModell, zeit: LeadersZeit, spielerZeile
 export type MedaillenZeile = { teamId: string; gold: number; silber: number; bronze: number; praemie: number; disziplinen: Array<{ disziplinId: string; platz: 0 | 1 | 2 }> };
 export type PodiumEintrag = { teamId: string; wert: number; verhaeltnis: number };
 
+export type MedaillenTabellenZeile = { teamId: string; name: string; wert: number; vh: number; pp: number };
+
+/** Summe der Wertung je Team und Disziplin (Saison): Duell die eigenen Ergebnispunkte, Pod das Verhaeltnis; dazu PP-Summe der Disziplin. */
+export function medaillenSummen(m: LeadersModell, disziplinId: string): { summe: Map<string, { wert: number; vh: number }>; pp: Map<string, number>; einsaetze: number } {
+  const summe = new Map<string, { wert: number; vh: number }>();
+  const zaehler = new Map<string, number>();
+  for (const x of m.einsaetze) {
+    if (x.disziplinId !== disziplinId) continue;
+    const alt = summe.get(x.teamId) ?? { wert: 0, vh: 0 };
+    summe.set(x.teamId, { wert: alt.wert + x.wertung, vh: alt.vh + x.verhaeltnis });
+    zaehler.set(x.teamId, (zaehler.get(x.teamId) ?? 0) + 1);
+  }
+  const teamVon = new Map(m.spieler.map((s) => [s.id, s.teamId] as const));
+  const pp = new Map<string, number>();
+  for (const b of m.buchungen) {
+    if (b.disziplinId !== disziplinId) continue;
+    const t = teamVon.get(b.playerId);
+    if (t) pp.set(t, (pp.get(t) ?? 0) + b.pp);
+  }
+  let max = 0;
+  for (const c of zaehler.values()) max = Math.max(max, c);
+  return { summe, pp, einsaetze: max };
+}
+
+/**
+ * DIE EINE MEDAILLEN-TABELLE: alle Teams einer Liga in einer Disziplin, geordnet nach Summe der Wertung, dann Verhaeltnis, dann
+ * PP-Summe der Disziplin, zuletzt nach Name. Anzeige (Hochrechnung) UND Buchung am Saisonende lesen genau diese Reihenfolge.
+ */
+export function medaillenTabelle(m: LeadersModell, disziplinId: string, liga: 1 | 2): MedaillenTabellenZeile[] {
+  const { summe, pp } = medaillenSummen(m, disziplinId);
+  return m.teams
+    .filter((t) => t.liga === liga && summe.has(t.teamId))
+    .map((t) => ({ teamId: t.teamId, name: t.name, wert: summe.get(t.teamId)!.wert, vh: summe.get(t.teamId)!.vh, pp: pp.get(t.teamId) ?? 0 }))
+    .sort((a, b) => b.wert - a.wert || b.vh - a.vh || b.pp - a.pp || a.name.localeCompare(b.name, "de"));
+}
+
+const r4 = (w: number) => Math.round(w * 10000) / 10000;
+const gleichauf = (a: MedaillenTabellenZeile, b: MedaillenTabellenZeile) => r4(a.wert) === r4(b.wert) && r4(a.vh) === r4(b.vh) && r4(a.pp) === r4(b.pp);
+
+export type MedaillenPlatz = { teamId: string; platz: 1 | 2 | 3; geteilt: boolean; wert: number; vh: number; praemie: number };
+
+/**
+ * Wer bekommt welche Medaille? Wettkampf-Rang (Gleichstand in Summe, Verhaeltnis UND PP teilt den Rang). Eine geteilte Medaille
+ * bekommen alle Gleichauf, das Geld der belegten Plaetze (Gold, Silber, Bronze) wird durch ihre Zahl geteilt.
+ */
+export function medaillenPlaetze(tabelle: readonly MedaillenTabellenZeile[], praemie: readonly [number, number, number]): MedaillenPlatz[] {
+  const aus: MedaillenPlatz[] = [];
+  let i = 0;
+  while (i < tabelle.length && i < 3) {
+    let j = i + 1;
+    while (j < tabelle.length && gleichauf(tabelle[i]!, tabelle[j]!)) j += 1;
+    const gruppe = tabelle.slice(i, j);
+    const geld = praemie.slice(i, Math.min(3, j)).reduce((s, v) => s + v, 0) / gruppe.length;
+    for (const z of gruppe) aus.push({ teamId: z.teamId, platz: (i + 1) as 1 | 2 | 3, geteilt: gruppe.length > 1, wert: z.wert, vh: z.vh, praemie: geld });
+    i = j;
+  }
+  return aus;
+}
+
 /** Die Hochrechnung: je Liga und Disziplin die ersten drei nach Ergebnispunkten (Saison, nicht je Spieltag). */
 export function baueMedaillen(m: LeadersModell): { jeTeam: Map<string, MedaillenZeile>; podien: Map<string, PodiumEintrag[]>; gespielt: Record<string, number> } {
   const jeTeam = new Map<string, MedaillenZeile>(m.teams.map((t) => [t.teamId, { teamId: t.teamId, gold: 0, silber: 0, bronze: 0, praemie: 0, disziplinen: [] }] as const));
   const podien = new Map<string, PodiumEintrag[]>();
   const gespielt: Record<string, number> = {};
-  const ppJeTeamDisz = new Map<string, number>();
-  const teamVon = new Map(m.spieler.map((s) => [s.id, s.teamId] as const));
-  for (const b of m.buchungen) {
-    const t = teamVon.get(b.playerId);
-    if (t) ppJeTeamDisz.set(`${t}|${b.disziplinId}`, (ppJeTeamDisz.get(`${t}|${b.disziplinId}`) ?? 0) + b.pp);
-  }
   for (const d of m.disziplinen) {
-    const summe = new Map<string, { wert: number; vh: number }>();
-    let maxEinsaetze = 0;
-    const zaehler = new Map<string, number>();
-    for (const x of m.einsaetze) {
-      if (x.disziplinId !== d.id) continue;
-      const alt = summe.get(x.teamId) ?? { wert: 0, vh: 0 };
-      summe.set(x.teamId, { wert: alt.wert + x.wertung, vh: alt.vh + x.verhaeltnis });
-      zaehler.set(x.teamId, (zaehler.get(x.teamId) ?? 0) + 1);
-    }
-    for (const c of zaehler.values()) maxEinsaetze = Math.max(maxEinsaetze, c);
-    gespielt[d.id] = maxEinsaetze;
-    if (maxEinsaetze === 0) continue;
+    const { einsaetze } = medaillenSummen(m, d.id);
+    gespielt[d.id] = einsaetze;
+    if (einsaetze === 0) continue;
     for (const liga of [1, 2] as const) {
-      const lt = m.teams.filter((t) => t.liga === liga);
-      const reihe = lt
-        .filter((t) => summe.has(t.teamId))
-        .sort((a, b) => {
-          const sa = summe.get(a.teamId)!;
-          const sb = summe.get(b.teamId)!;
-          return sb.wert - sa.wert || sb.vh - sa.vh || (ppJeTeamDisz.get(`${b.teamId}|${d.id}`) ?? 0) - (ppJeTeamDisz.get(`${a.teamId}|${d.id}`) ?? 0) || a.name.localeCompare(b.name, "de");
-        })
-        .slice(0, 3);
-      podien.set(`${liga}:${d.id}`, reihe.map((t) => ({ teamId: t.teamId, wert: rund(summe.get(t.teamId)!.wert, 1), verhaeltnis: rund(summe.get(t.teamId)!.vh, 1) })));
-      reihe.forEach((t, k) => {
-        const z = jeTeam.get(t.teamId)!;
-        if (k === 0) z.gold += 1;
-        else if (k === 1) z.silber += 1;
+      const tabelle = medaillenTabelle(m, d.id, liga);
+      podien.set(`${liga}:${d.id}`, tabelle.slice(0, 3).map((t) => ({ teamId: t.teamId, wert: rund(t.wert, 1), verhaeltnis: rund(t.vh, 1) })));
+      for (const p of medaillenPlaetze(tabelle, LEADERS_PRAEMIE[liga])) {
+        const z = jeTeam.get(p.teamId)!;
+        if (p.platz === 1) z.gold += 1;
+        else if (p.platz === 2) z.silber += 1;
         else z.bronze += 1;
-        z.praemie += LEADERS_PRAEMIE[liga][k]!;
-        z.disziplinen.push({ disziplinId: d.id, platz: k as 0 | 1 | 2 });
-      });
+        z.praemie += p.praemie;
+        z.disziplinen.push({ disziplinId: d.id, platz: (p.platz - 1) as 0 | 1 | 2 });
+      }
     }
   }
   return { jeTeam, podien, gespielt };

@@ -37,6 +37,10 @@ export type SpieltagTeilsummen = {
   rangAbschlag: number;
   /** Marketing: Teammarke + Team-Anteile am Werbegeld (22.11.), immer >= 0. */
   marketing: number;
+  /** Ticket-Einnahmen (Tageskasse der Heimspiele, 22.11.), immer >= 0. */
+  tickets: number;
+  /** Dauerkarten-Geld, das mit dem Spieltag-Abschluss gutgeschrieben wurde (22.11.; Wahl vor Spieltag 1 steht im Arena-Stand). */
+  dauerkarten: number;
   cashDelta: number;
   /** Anzahl gebuchter Spieltage dieses Teams in der Saison. */
   anzahl: number;
@@ -107,7 +111,7 @@ export function summeSpieltagBuchungen(
   teamId: string,
   seasonId?: string,
 ): SpieltagTeilsummen {
-  const out: SpieltagTeilsummen = { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, rangAbschlag: 0, marketing: 0, cashDelta: 0, anzahl: 0 };
+  const out: SpieltagTeilsummen = { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, rangAbschlag: 0, marketing: 0, tickets: 0, dauerkarten: 0, cashDelta: 0, anzahl: 0 };
   for (const b of spieltagBuchungenDerSaison(gameState, teamId, seasonId)) {
     out.gehalt += b.gehalt;
     out.sponsorBasis += b.sponsorBasis;
@@ -115,6 +119,8 @@ export function summeSpieltagBuchungen(
     out.gebaeudeUnterhalt += b.gebaeudeUnterhalt;
     out.rangAbschlag += b.rangAbschlag ?? 0;
     out.marketing += b.marketing ?? 0;
+    out.tickets += b.tickets ?? 0;
+    out.dauerkarten += b.dauerkarten ?? 0;
     out.cashDelta += b.cashDelta;
     out.anzahl += 1;
   }
@@ -125,6 +131,8 @@ export function summeSpieltagBuchungen(
     gebaeudeUnterhalt: runde1(out.gebaeudeUnterhalt),
     rangAbschlag: runde1(out.rangAbschlag),
     marketing: runde1(out.marketing),
+    tickets: runde1(out.tickets),
+    dauerkarten: runde1(out.dauerkarten),
     cashDelta: runde1(out.cashDelta),
     anzahl: out.anzahl,
   };

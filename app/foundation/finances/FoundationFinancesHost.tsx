@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import FinanzenModern, { type VorstandAktionFn } from "@/app/foundation/finances/FinanzenModern";
+import type { ArenaAktionFn } from "@/lib/arena/arena-aktion-typen";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { buildSalaryFactorOutlook } from "@/lib/foundation/finances/salary-factor-outlook";
 import { useFinancesViewModel } from "@/lib/foundation/finances/use-finances-view-model";
@@ -22,6 +23,8 @@ export type FoundationFinancesHostProps = {
   onOpenTeam?: (teamId: string) => void;
   /** Schreibweg der Vorstand-Entscheidungen (Umschichten, Rücklage anzapfen, „Alles auf eine Karte“). */
   onVorstandAktion?: VorstandAktionFn;
+  /** Schreibweg der Arena (Ausbau, Dauerkarten). */
+  onArenaAktion?: ArenaAktionFn;
   /** Sprung ins Office (Vorstandsgespräch). */
   onOpenOffice?: () => void;
   /** Darf der aktive Manager dieses Team verwalten? Sonst ist die Seite nur lesbar. */
@@ -33,7 +36,7 @@ export type FoundationFinancesHostProps = {
  * Ausnahme von "keine Callbacks": der Sprung ins Teamprofil aus der
  * Liga-Tabelle, der nichts verändert, sondern nur navigiert.
  */
-export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam, onVorstandAktion, onOpenOffice, kannVerwalten }: FoundationFinancesHostProps) {
+export default function FoundationFinancesHost({ gameState, teamId, saveId, onOpenTeam, onVorstandAktion, onArenaAktion, onOpenOffice, kannVerwalten }: FoundationFinancesHostProps) {
   const model = useFinancesViewModel(gameState, teamId);
   // Liga-weite Finanzübersicht (#Finanzen-Liga-Tabelle) — bewusst getrennt
   // vom Fog-of-War-gesperrten `model` oben, siehe `use-finances-league-table.ts`.
@@ -59,6 +62,7 @@ export default function FoundationFinancesHost({ gameState, teamId, saveId, onOp
       salaryFactorOutlook={salaryFactorOutlook}
       onOpenTeam={onOpenTeam}
       onVorstandAktion={onVorstandAktion}
+      onArenaAktion={onArenaAktion}
       onOpenOffice={onOpenOffice}
       kannVerwalten={kannVerwalten}
     />

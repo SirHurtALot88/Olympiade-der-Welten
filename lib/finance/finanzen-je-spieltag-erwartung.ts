@@ -6,6 +6,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { computeFacilitySeasonCash } from "@/lib/finance/season-end-guv";
 import { kaderJahresgehaltAmSpieltag, spieltageDerSaison } from "@/lib/finance/finanzen-je-spieltag";
+import { ticketsErwartungJeSpieltag } from "@/lib/arena/arena-guv";
 import { marketingJahresbetrag } from "@/lib/marketing/marketing-team";
 import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
 
@@ -18,6 +19,8 @@ export type ErwarteteSpieltagBuchung = {
   rangAbschlag: number;
   /** Marketing: Teammarke + Team-Anteile (22.11.), 0 ohne gueltige Regel. */
   marketing: number;
+  /** Ticket-Einnahmen je Spieltag im Mittel (Heimspiele / N), 0 ohne Arena-Regel (22.11.). */
+  tickets: number;
   netto: number;
 };
 
@@ -33,8 +36,9 @@ export function erwarteteSpieltagBuchung(gameState: GameState, teamId: string): 
   // Offene Spieltage laufen mit dem aktuellen Platz weiter (gleiche Rechnung wie die Buchung).
   const rangAbschlag = sponsorRangAbschlag(gameState, teamId, sponsorRangFuerAbschlag(gameState, teamId), n).abschlag;
   const marketing = teil(marketingJahresbetrag(gameState, teamId));
+  const tickets = ticketsErwartungJeSpieltag(gameState, teamId);
   return {
-    gehalt, sponsorBasis, gebaeudeEinnahme, gebaeudeUnterhalt, rangAbschlag, marketing,
-    netto: gehalt + sponsorBasis + gebaeudeEinnahme + gebaeudeUnterhalt + rangAbschlag + marketing,
+    gehalt, sponsorBasis, gebaeudeEinnahme, gebaeudeUnterhalt, rangAbschlag, marketing, tickets,
+    netto: gehalt + sponsorBasis + gebaeudeEinnahme + gebaeudeUnterhalt + rangAbschlag + marketing + tickets,
   };
 }

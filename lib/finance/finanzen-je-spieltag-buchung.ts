@@ -21,6 +21,7 @@ import {
   spieltageDerSaison,
   teileJahresbetrag,
 } from "@/lib/finance/finanzen-je-spieltag";
+import { bereiteArenaBuchung } from "@/lib/arena/arena-stand";
 import { aktualisiereMarketingStand, marketingJahresbetrag } from "@/lib/marketing/marketing-team";
 import type { MoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
@@ -61,6 +62,9 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
   // MARKETING (22.11.): der Server schreibt den Marketing-Stand (erster Spieltag, geaenderter Kader) und spiegelt die Notbremse in den
   // Stempel, BEVOR gelesen wird; die Buchung bucht damit nie eine Vorschau.
   gameState = aktualisiereMarketingStand(gameState, index);
+  // ARENA (22.11., docs/design/arena-tickets-medaillen-22-11.md): Tageskasse je Heimspiel, Dauerkarten-Standard am ersten Spieltag und
+  // Fortschreibung von Stimmung und Fanbasis. `null` ohne gueltige Arena-Regel. Der Arena-Stand wird nach der Schleife geschrieben.
+  const arena = bereiteArenaBuchung(gameState, matchdayId, index);
 
   const ledger = gameState.seasonState.spieltagFinanzen ?? [];
   const jeTeam = new Map<string, SpieltagFinanzBuchung[]>();
@@ -76,7 +80,7 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
     if (bisher.some((zeile) => zeile.matchdayId === matchdayId)) continue;
     // Rundungsrest der letzten frueheren Buchung dieser Saison (Reihenfolge nach Spieltag, nicht nach Schreibzeit).
     const vorher = bisher.filter((zeile) => zeile.matchdayIndex < index).sort((a, b) => b.matchdayIndex - a.matchdayIndex)[0];
-    const rest0 = vorher?.rest ?? { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, marketing: 0 };
+    const rest0 = vorher?.rest ?? { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, marketing: 0, tickets: 0 };
     const j = jahresbetraegeEinesTeams(gameState, team.teamId, index);
     const gehalt = teileJahresbetrag(j.gehalt, n, rest0.gehalt);
     const sponsor = teileJahresbetrag(j.sponsorBasis, n, rest0.sponsorBasis);
@@ -88,7 +92,13 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
     // Saisonende bucht Endrang-Praemie minus Summe der Abschlaege. Ohne Sponsorvertrag 0.
     const rang = sponsorRangFuerAbschlag(gameState, team.teamId);
     const rangAbschlag = sponsorRangAbschlag(gameState, team.teamId, rang, n).abschlag;
-    const delta = runde1(-gehalt.betrag + sponsor.betrag + einnahme.betrag - unterhalt.betrag + rangAbschlag + marketing.betrag);
+    // TICKETS (22.11.): die Tageskasse dieses Heimspiels, auf 0,1 gerundet, der Rundungsrest geht in die naechste Buchung.
+    const arenaTeil = arena?.team(team.teamId) ?? null;
+    const ticketsRoh = (arenaTeil?.tickets ?? 0) + (rest0.tickets ?? 0);
+    const ticketsBetrag = arena ? runde1(ticketsRoh) : 0;
+    const ticketsRest = arena ? ticketsRoh - ticketsBetrag : (rest0.tickets ?? 0);
+    const dauerkarten = arenaTeil?.dauerkarten ?? 0;
+    const delta = runde1(-gehalt.betrag + sponsor.betrag + einnahme.betrag - unterhalt.betrag + rangAbschlag + marketing.betrag + ticketsBetrag + dauerkarten);
     neue.push({
       id: spieltagBuchungsId(seasonId, matchdayId, team.teamId),
       seasonId,
@@ -103,6 +113,8 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
       rangAbschlag,
       rang: rangAbschlag === 0 ? null : rang,
       ...(j.marketing > 0 || marketing.betrag !== 0 ? { marketing: marketing.betrag } : {}),
+      ...(ticketsBetrag !== 0 ? { tickets: ticketsBetrag } : {}),
+      ...(dauerkarten !== 0 ? { dauerkarten } : {}),
       cashDelta: delta,
       rest: {
         gehalt: gehalt.rest,
@@ -110,6 +122,7 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
         gebaeudeEinnahme: einnahme.rest,
         gebaeudeUnterhalt: unterhalt.rest,
         ...(j.marketing > 0 || marketing.betrag !== 0 ? { marketing: marketing.rest } : {}),
+        ...(arena ? { tickets: ticketsRest } : {}),
       },
       createdAt: jetzt,
     });
@@ -117,7 +130,7 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
   }
   if (neue.length === 0) return urspruenglich;
 
-  return {
+  const gebucht: GameState = {
     ...gameState,
     teams: gameState.teams.map((team) => {
       const delta = cashDelta.get(team.teamId);
@@ -128,4 +141,5 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
       spieltagFinanzen: [...ledger, ...neue],
     },
   };
+  return arena ? arena.ergebnis(gebucht) : gebucht;
 }

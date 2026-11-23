@@ -1,3 +1,7 @@
+import { arenaRegelFuerNeueSaison } from "@/lib/arena/arena-regel";
+import { arenaStaendeFuerSaisonwechsel } from "@/lib/arena/arena-stand";
+import { medaillenRegelFuerNeueSaison } from "@/lib/medaillen/medaillen-regel";
+import { moralFuerSaisonwechsel } from "@/lib/medaillen/medaillen-modell";
 import { marketingStempelFuerSaisonwechsel } from "@/lib/marketing/marketing-team";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -685,6 +689,13 @@ function buildNextSeasonGameState(
     marketingRegel: marketingStempelFuerSaisonwechsel(save.gameState, save.gameState.season.id, nextSeasonId),
     marketingAushaengeschild: null,
     marketingStand: null,
+    // ARENA-REGEL (22.11., lib/arena/arena-regel.ts): gilt ab der FOLGENDEN Saison; ein bestehender Spielstand stellt hier von "Arena Upgrade"
+    // auf Platzarten um (Stempel `umstieg`, Abbildung in der Doku). Plaetze, Fanbasis und Stimmung ruecken nach (Rueckweg OLY_ARENA=aus).
+    arenaRegel: arenaRegelFuerNeueSaison(nextSeasonId, save.gameState.seasonState.arenaRegel),
+    arena: arenaStaendeFuerSaisonwechsel(save.gameState, nextSeasonId),
+    // MEDAILLEN-REGEL (22.11., lib/medaillen/medaillen-regel.ts): Medaillen und Farb-Meister am Saisonende, aus dem Rangpraemien-Topf; der
+    // Moral-Zuschlag der abgelaufenen Vergabe wirkt in der neuen Saison weiter. Rueckweg OLY_MEDAILLEN=aus.
+    medaillenRegel: medaillenRegelFuerNeueSaison(nextSeasonId, moralFuerSaisonwechsel(save.gameState)),
     // AUSRUESTUNGS-REGEL (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste der neuen Saison, ab Saisonbeginn nach dem
     // Schalter OLY_AUSRUESTUNG (Phase 1a: nur Besitz). Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel.
     ausruestungRegel: ausruestungRegelFuerNeueSaison(save.gameState, nextSeasonId),

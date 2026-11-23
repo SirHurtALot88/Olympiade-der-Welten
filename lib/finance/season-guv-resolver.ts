@@ -14,6 +14,8 @@
  * (`standingsByTeamId`), nicht über einen eigenen Aufruf.
  */
 
+import { ticketsSaisonbetrag } from "@/lib/arena/arena-guv";
+import { medaillenGeldDerSaison } from "@/lib/medaillen/medaillen-modell";
 import { marketingSaisonbetrag } from "@/lib/marketing/marketing-team";
 import { marketingAktiv } from "@/lib/marketing/marketing-regel";
 import { buildMoraleLookupIndex } from "@/lib/morale/player-morale-service";
@@ -108,6 +110,8 @@ export function resolveSeasonGuvPartsByTeam(
       sponsorEventCount: sponsorEventCash.anzahlByTeamId.get(team.teamId) ?? 0,
       facilityIncome: facilities.income,
       marketingCash: marketingSaisonbetrag(gameState, team.teamId, moralIndex),
+      ticketsCash: ticketsSaisonbetrag(gameState, team.teamId),
+      medaillenCash: medaillenGeldDerSaison(gameState, team.teamId).gesamt,
       facilityUpkeep: facilities.paidUpkeep,
       apronNetto: apronCash.gebucht ? (apronCash.byTeamId.get(team.teamId) ?? 0) : (apronRow?.nettoDelta ?? 0),
       apronRank: apronRow?.rank ?? null,

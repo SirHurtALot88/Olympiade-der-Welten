@@ -133,6 +133,13 @@ services:
       # Moral-Zuschlag), "aus" = Rueckweg (neue Saisons ohne), "aus-sofort" = Notbremse (keine Buchung, kein Zuschlag, auch mitten in der
       # Saison). Nur Server (kein NEXT_PUBLIC): die Regel steht im Spielstand (seasonState.marketingRegel). Siehe deploy/hetzner/.env.example.
       OLY_MARKETING: ${OLY_MARKETING:-}
+      # Kreditraten je Spieltag (22.11., lib/finance/kredit-raten.ts): leer = je Spieltag (neues Spiel ab Saison 1, bestehender Spielstand ab dem
+      # naechsten Saisonwechsel), "aus" = Rueckweg (neue Saisons zahlen wieder am Saisonende). Nur Server: die Regel steht im Spielstand (seasonState.kreditRegel).
+      OLY_KREDIT_RATEN: ${OLY_KREDIT_RATEN:-}
+      # Arena und Medaillen (22.11., docs/design/arena-tickets-medaillen-22-11.md): leer = an. "aus" = neue Saisons ohne; "aus-sofort" = Notbremse.
+      # Nur Server (kein NEXT_PUBLIC): die Regeln stehen im Spielstand (seasonState.arenaRegel, seasonState.medaillenRegel).
+      OLY_ARENA: ${OLY_ARENA:-}
+      OLY_MEDAILLEN: ${OLY_MEDAILLEN:-}
       # Breaking-Format (22.11., docs/design/breaking-tagteam-22-11.md): leer = Tag-Team (6 gegen 6, je Team einer im Ring,
       # Gang mit zwei Phasen, verdeckter Wechsel, Waffe frei waehlbar), "alt" = Abschalt-Schalter (ab dem naechsten gewerteten
       # Spieltag wieder der Gauntlet; gebuchte Spieltage bleiben). Siehe deploy/hetzner/.env.example.

@@ -1,5 +1,7 @@
 "use client";
 
+import { ticketsSaisonbetrag } from "@/lib/arena/arena-guv";
+import { medaillenGeldDerSaison } from "@/lib/medaillen/medaillen-modell";
 import { marketingSaisonbetrag } from "@/lib/marketing/marketing-team";
 import { baueBuchungsKontext, bucheTransferEintrag, istKaderaufbauSaison } from "@/lib/season/transferbilanz-buchung";
 import { useMemo } from "react";
@@ -461,6 +463,8 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     sponsorEventCount: sponsorEventCash.anzahlByTeamId.get(teamId) ?? 0,
     facilityIncome: facilityIncome?.total ?? 0,
     marketingCash: marketingSaisonbetrag(gameState, teamId),
+    ticketsCash: ticketsSaisonbetrag(gameState, teamId),
+    medaillenCash: medaillenGeldDerSaison(gameState, teamId).gesamt,
     facilityUpkeep: facilityUpkeepTotal,
     apronNetto: apronNettoDelta?.nettoDelta ?? 0,
     apronRank: apronNettoDelta?.rank ?? null,

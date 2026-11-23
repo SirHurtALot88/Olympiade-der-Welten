@@ -19,6 +19,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { getLeagueOf, isLeagueSplitActive } from "@/lib/season/league-split";
 import { istJeSpieltagSaison, ungebuchterAnteil } from "@/lib/finance/finanzen-je-spieltag";
+import { arenaUnterhaltDerSaison, ohneAltesArenaGebaeude } from "@/lib/arena/arena-gebaeude";
 
 export type FacilitySeasonEndFinanceFacilityRow = {
   facilityId: FacilityId;
@@ -170,7 +171,8 @@ function buildRows(
  * Ein Gebaeude, dessen Unterhalt diese Saison schon abgebucht ist (`lastPaidSeasonId`), zaehlt nicht noch einmal.
  */
 export function berechneGebaeudeSaisonbetraege(gameState: GameState, teamId: string): { income: number; upkeep: number } {
-  const teamFacilities = getTeamFacilityState(gameState, teamId);
+  // ARENA (22.11.): mit der Arena-Regel zahlt "Arena Upgrade" nichts und kostet nichts; stattdessen der Unterhalt der Ausbau-Schritte.
+  const teamFacilities = ohneAltesArenaGebaeude(gameState, getTeamFacilityState(gameState, teamId));
   const rows = buildRows(
     teamFacilities,
     null,
@@ -180,7 +182,7 @@ export function berechneGebaeudeSaisonbetraege(gameState: GameState, teamId: str
   );
   return {
     income: roundValue(rows.reduce((sum, row) => sum + row.income, 0)),
-    upkeep: roundValue(rows.filter((row) => row.status === "paid").reduce((sum, row) => sum + row.upkeep, 0)),
+    upkeep: roundValue(rows.filter((row) => row.status === "paid").reduce((sum, row) => sum + row.upkeep, 0) + arenaUnterhaltDerSaison(gameState, teamId)),
   };
 }
 
@@ -199,7 +201,7 @@ export function previewFacilitySeasonEndFinance(
 ): FacilitySeasonEndFinancePreview {
   const gameState = save.gameState;
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
-  const teamFacilities = getTeamFacilityState(gameState, teamId);
+  const teamFacilities = ohneAltesArenaGebaeude(gameState, getTeamFacilityState(gameState, teamId));
   const cashBeforeFacilities = team?.cash ?? null;
   // Beliebtheit skaliert die Arena-Einnahme (real cash). Läuft für Menschen- UND
   // KI-Teams; fehlt der Team-/Kontext, liefert die Funktion neutral 1.0.

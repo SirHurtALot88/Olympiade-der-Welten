@@ -1,6 +1,7 @@
 import { advancePlayerFormState, isFormMoralEnabled } from "@/lib/morale/form-moral-modifikator";
 import type { Fixture, GameLogEntry, GameState, LineupDraft, MatchdayAdvanceLogRecord, PlayerMoraleState } from "@/lib/data/olyDataTypes";
 import { bauKiRehaBeiSpieltagsabschluss } from "@/lib/ai/ai-reha-bau-service";
+import { bauKiArenaBeiSpieltagsabschluss } from "@/lib/arena/arena-ki";
 import { fuehreKiVerlaengerungenInSaisonAus } from "@/lib/contracts/ki-verlaengerung-in-saison";
 import { reevaluateAiTrainingModesForMatchday } from "@/lib/ai/ai-training-mode-reevaluation-service";
 import { ueberlastungsAbzuegeFuerSpieltag } from "@/lib/training/spieltag-training";
@@ -438,6 +439,13 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
     // (und jedes Menschen-Team mit delegiertem Bereich Gebaeude) hoechstens EINE Recovery-Center-Stufe je Spieltag.
     try {
       bauKiRehaBeiSpieltagsabschluss({ saveId: save.saveId, persistence });
+    } catch {
+      // Wie oben: ein Fehlschlag kippt den bereits persistierten Spieltagswechsel nicht.
+    }
+    // KI-ARENA-AUSBAU (22.11., docs/design/arena-tickets-medaillen-22-11.md): wo der Schnitt der letzten drei Heimspiele bei 90 % liegt und sich der Ausbau
+    // in vier Saisons bezahlt, baut die KI nach denselben Regeln wie der Mensch (Kasse, Obergrenze, harte Vorstands-Freigabe).
+    try {
+      bauKiArenaBeiSpieltagsabschluss({ saveId: save.saveId, persistence });
     } catch {
       // Wie oben: ein Fehlschlag kippt den bereits persistierten Spieltagswechsel nicht.
     }
