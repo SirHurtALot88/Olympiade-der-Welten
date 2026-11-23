@@ -5,12 +5,13 @@ import { getRecoveryTrainingFatigueReductionPct, getTeamFacilityState } from "@/
 import { buildLeagueDisciplineRatingsWithAttributeOverrides } from "@/lib/player-formulas/discipline-rating-engine";
 import { buildCoreStatsFromDisciplineRatings } from "@/lib/training/season-end-progression-preview";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
-import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
+import { trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
 import {
   fuehreTagZusammen,
   leistungFuerTag,
   nettoDesEintrags,
+  ppHashFuerTag,
   ppTagesIndex,
   type AttributWerte,
 } from "@/lib/training/entwicklung-tag";
@@ -131,7 +132,7 @@ export function accumulateMatchdayTrainingProgress(input: {
   const now = new Date().toISOString();
   // TRAINING JE SPIELTAG (Chris, 18.11., `lib/training/spieltag-training.ts`). Schalter aus: exakt der
   // bisherige Ablauf (nur Modus zaehlen + Trainingslast), Zuwachs am Saisonende.
-  const jeSpieltag = isTrainingJeSpieltagAktiv();
+  const jeSpieltag = trainingJeSpieltagFuer(gameState);
   const mitZuwachs = jeSpieltag && input.mitZuwachs !== false;
   // ENTWICKLUNG NEU, Runde 2: je Spieltag Training + Leistung (PP gegen den Liga-Median) - Abbau, gebucht und im Verlauf gezeigt.
   const entwicklungNeu = mitZuwachs && entwicklungNeuFuer(gameState);
@@ -201,9 +202,17 @@ export function accumulateMatchdayTrainingProgress(input: {
     // wird nicht neu gebucht (auch wenn das Ziel inzwischen gewechselt hat — der Wechsel wirkt ab
     // dem naechsten Spieltag). Ein Alt-Spieltag (vor dem Umstieg gezaehlt, ohne Verlaufseintrag)
     // bleibt Alt-Spieltag und wird am Saisonende gebucht.
+    // Entwicklung neu: hat sich die PP-Grundlage des Spieltags geaendert (forceReplace mit korrigiertem Ergebnis), gilt der Eintrag auch bei
+    // gleichem Modus nicht als unveraendert -- sonst bliebe ein veraltetes L stehen. Offene Eintraege (`o`) rechnet der Abschluss-Commit.
+    const leistungVeraltet =
+      ppIndex != null &&
+      !verletzt &&
+      priorEintrag?.s === "t" &&
+      priorEintrag.o !== true &&
+      (priorEintrag.h ?? "") !== ppHashFuerTag(ppIndex, matchdayId, player.id);
     const unveraendert = verletzt
       ? priorEintrag?.s === "v" && priorMode == null
-      : priorMode === mode && (priorEintrag == null || priorEintrag.s === "t");
+      : priorMode === mode && (priorEintrag == null || priorEintrag.s === "t") && !leistungVeraltet;
     if (unveraendert && previousAccumulator) {
       const relayered = clampFatigue((player.fatigue ?? 0) + previousAccumulator.accumulatedTrainingFatigue);
       // Abschluss-Commit nach einer Teilbuchung: der beim D1-Commit festgelegte Zuwachs (`o: true`)
@@ -279,9 +288,14 @@ export function accumulateMatchdayTrainingProgress(input: {
           l: roundValue(fatigueShare, 3),
         };
         if (entwicklungNeu && zuwachs && attributeSheetStats) {
+          const einheiten = new Map<string, number>();
           const leistung: AttributWerte = ppIndex
-            ? leistungFuerTag({ index: ppIndex, matchdayId, player: spielerJetzt, verlauf })
+            ? leistungFuerTag({ index: ppIndex, matchdayId, player: spielerJetzt, verlauf, einheiten })
             : {};
+          if (ppIndex) {
+            if (einheiten.size > 0) eintrag.y = Object.fromEntries([...einheiten].map(([id, e]) => [id, Math.round(e * 1000) / 1000]));
+            eintrag.h = ppHashFuerTag(ppIndex, matchdayId, player.id);
+          }
           const tag = fuehreTagZusammen({
             vorher: pickAttributes(attributeSheetStats),
             deckel: zuwachs.deckel,
@@ -417,13 +431,17 @@ function schliesseOffeneZuwaechseEinesSpielers(
       for (const [attribute, wert] of Object.entries(record?.hiddenAttributeCeiling ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) {
         if (typeof wert === "number") deckel[attribute] = Math.min(99, wert);
       }
-      const l = leistungFuerTag({ index: ppTagesIndex(input.gameState), matchdayId: e.m, player, verlauf: alle.slice(0, position) });
+      const einheiten = new Map<string, number>();
+      const index = ppTagesIndex(input.gameState);
+      const l = leistungFuerTag({ index, matchdayId: e.m, player, verlauf: alle.slice(0, position), einheiten });
       const tag = fuehreTagZusammen({ vorher: pickAttributes(stats), deckel, t: e.z ?? {}, a: e.a ?? {}, l });
       const fertig: TrainingsSpieltagEintrag = { ...e };
       delete fertig.o;
       delete fertig.z;
       delete fertig.p;
       delete fertig.a;
+      if (einheiten.size > 0) fertig.y = Object.fromEntries([...einheiten].map(([id, einheit]) => [id, Math.round(einheit * 1000) / 1000]));
+      fertig.h = ppHashFuerTag(index, e.m, player.id);
       if (Object.keys(tag.t).length > 0) fertig.z = tag.t;
       if (Object.keys(tag.p).length > 0) fertig.p = tag.p;
       if (Object.keys(tag.a).length > 0) fertig.a = tag.a;

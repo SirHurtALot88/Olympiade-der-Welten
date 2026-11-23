@@ -18,7 +18,9 @@ type TrainingModeDemandPlayer = Pick<
 };
 
 const LEICHT_BIAS_TRAITS = new Set(["lazy", "relaxed", "fainthearted", "timid", "caring", "paranoid"]);
-const HART_BIAS_TRAITS = new Set(["ambitious", "motivated", "diligent", "disciplined", "firedup", "egomaniac", "obsessive", "feisty"]);
+// "diligent" steht bewusst NICHT hier (PM-Entscheidung 22.11.): der Trait wirkt ueber das Gewicht 75 / 25 der Entwicklung, nicht ueber eine
+// Neigung der KI zum haertesten Modus. Den Modus waehlt die KI fuer alle nach denselben Regeln (Belastung, Form).
+const HART_BIAS_TRAITS = new Set(["ambitious", "motivated", "disciplined", "firedup", "egomaniac", "obsessive", "feisty"]);
 const LOW_MAINTENANCE_TRAITS = new Set(["loyal", "flexible", "fair"]);
 
 function normalizeTrait(value: string | null | undefined) {

@@ -371,6 +371,13 @@ export type TrainingsSpieltagEintrag = {
    */
   p?: Partial<Record<PlayerGeneratorAttributeName, number>>;
   a?: Partial<Record<PlayerGeneratorAttributeName, number>>;
+  /**
+   * Entwicklung neu (22.11.): Leistungseinheit je Einsatz-Disziplin dieses Spieltags (roh, mit Vorzeichen, vor Gewicht/Schwung/Kappung). Daraus
+   * entsteht beim Saisonwechsel die Leistungs-Erwartung fuer die Folgesaison (`Player.leistungsErwartung`).
+   */
+  y?: Record<string, number>;
+  /** PP-Fingerabdruck dieses Spieltags beim Buchen (`ppHashFuerTag`): weicht er beim erneuten Buchen ab, wird L neu gerechnet. */
+  h?: string;
   /** Ligafaktor, mit dem der Abbau `a` dieses Spieltags gebucht wurde (`ligaAbbauFaktor`); fehlt = 1. */
   f?: number;
   /** Trainingslast dieses Spieltags (Fatigue-Anteil, nach Reha-Rabatt). */
@@ -1153,6 +1160,12 @@ export type Player = {
     /** Disziplinwerte vor dem ersten je-Spieltag gebuchten Zuwachs dieser Saison (Saisonend-Delta). */
     startDisziplinwerte?: Record<string, number>;
   } | null;
+  /**
+   * Entwicklung neu (22.11.): Leistungs-Erwartung aus der VORSAISON fuer die Prognose zu Saisonbeginn (statt L = 0). `jeDisziplin` summiert die
+   * Leistungseinheiten (z) der Einsaetze je Disziplin, `n` zaehlt sie; `tage` sind die Trainingstage der Saison. Wird beim Saisonwechsel aus
+   * dem Verlauf gebaut (`baueLeistungsErwartung`); nur Prognose, nie gebucht.
+   */
+  leistungsErwartung?: { seasonId: string; tage: number; jeDisziplin: Record<string, { n: number; summe: number }> } | null;
   /**
    * Ziel-Disziplin + Weg (Regel A, Chris 18.11.). Vom Manager gesetzt; fehlt es, trainiert der Spieler
    * auf den Vorschlag der KI-Logik (fuer Mensch und KI dieselbe). Wirkt ab dem naechsten Spieltag.

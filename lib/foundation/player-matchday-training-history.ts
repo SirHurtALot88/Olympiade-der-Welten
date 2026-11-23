@@ -13,7 +13,7 @@ import {
 } from "@/lib/training/organic-season-progression";
 import { resolveSeasonTotalMatchdays } from "@/lib/training/matchday-training-accumulator";
 import { getMatchdayBookedTrainingIds } from "@/lib/training/organic-season-progression";
-import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
+import { trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
 
 /**
@@ -55,8 +55,9 @@ export type PlayerSeasonTrainingForecastCell = {
   /** Gegenposten (Alterung/Marktwertdruck) — immer ≤ 0. */
   regression: number;
   /**
-   * Davon festgelegter, aber noch NICHT gebuchter Trainingszuwachs (Spieltag erst halb gewertet, `o` im
-   * Verlauf). Steckt in `training`/`cumulative`, steht aber noch nicht auf dem Attribut.
+   * Festgelegter, aber noch NICHT gebuchter Zuwachs (Spieltag erst halb gewertet, `o` im Verlauf). Alte Regel: Teil von
+   * `training`/`cumulative`. Entwicklung neu: netto (Training - Abbau) und NUR hier, nicht in `training`/`regression`; `cumulative`
+   * enthaelt ihn, damit die Summe stimmt.
    */
   offen: number;
 };
@@ -84,7 +85,7 @@ export type PlayerSeasonTrainingForecast = {
   spilloverTotal: number;
   performanceTotal: number;
   regressionTotal: number;
-  /** Teil von `trainingTotal`, der festgelegt, aber noch offen ist (s. `PlayerSeasonTrainingForecastCell.offen`). */
+  /** Festgelegter, aber noch offener Zuwachs (s. `PlayerSeasonTrainingForecastCell.offen`). */
   offenTotal: number;
   attributes: PlayerSeasonTrainingForecastCell[];
 };
@@ -112,7 +113,7 @@ export function buildPlayerSeasonTrainingForecast(input: {
   const totalMatchdays = resolveSeasonTotalMatchdays(gameState);
   // ENTWICKLUNG NEU, Runde 2: alles ist je Spieltag gebucht (Training z, Leistung p, Abbau a) -- die Historie summiert genau diese
   // Eintraege (gezeigt = gebucht) und rechnet nichts hoch. Kein abgeschnittener Spielstand je Spieler (S4).
-  if (entwicklungNeuFuer(gameState) && isTrainingJeSpieltagAktiv()) {
+  if (entwicklungNeuFuer(gameState)) {
     return baueNeuHistorie({ gameState, player, seasonId, totalMatchdays, matchdaysPlayed: playedMatchdayIds.length });
   }
   const lastCanonicalIndex =
@@ -141,7 +142,7 @@ export function buildPlayerSeasonTrainingForecast(input: {
   // — exakt dieselbe Ableitung wie im Saisonende-Apply.
   // Training je Spieltag (18.11.): gebuchte Spieltage stecken schon in den Attributen; ihr Zuwachs kommt
   // exakt aus dem Verlauf (gezeigt = gebucht), die Projektion rechnet nur noch die ungebuchten.
-  const jeSpieltag = isTrainingJeSpieltagAktiv();
+  const jeSpieltag = trainingJeSpieltagFuer(gameState);
   // Ein OFFENER Zuwachs (`o`, Arena-Teilbuchung nach D1) ist schon festgelegt, aber noch nicht auf den
   // Attributen: er geht mit seinen exakten Zahlen in die Prognose ein (nicht noch einmal ueber das
   // Budget) und wird als `offen` ausgewiesen statt als gebucht.
@@ -279,17 +280,21 @@ function baueNeuHistorie(input: {
   for (const e of accumulator.verlauf ?? []) {
     if (e.s !== "t") continue;
     for (const attribute of PROGRESSION_ATTRIBUTE_ORDER) {
-      const z = e.z?.[attribute] ?? 0;
-      training[attribute] += z;
+      // Ein OFFENER Spieltag (`o`, erst halb gewertet) steht noch nicht auf den Attributen: sein Training und Abbau erscheinen NUR unter "offen"
+      // (netto), nicht in den gebuchten Spalten -- gezeigt = gebucht. Dieselben Zahlen zaehlt die Prognose zum Rest (`offenerAnteil`).
+      if (e.o) {
+        offen[attribute] += (e.z?.[attribute] ?? 0) - (e.a?.[attribute] ?? 0);
+        continue;
+      }
+      training[attribute] += e.z?.[attribute] ?? 0;
       leistung[attribute] += e.p?.[attribute] ?? 0;
       abbau[attribute] += e.a?.[attribute] ?? 0;
-      if (e.o) offen[attribute] += z;
     }
   }
   const baseline = accumulator.startAttribute ?? input.player.attributeSheetStats ?? null;
   let netCumulative = 0;
   const attributes = PROGRESSION_ATTRIBUTE_ORDER.map((attribute) => {
-    const cumulative = round1(training[attribute] + leistung[attribute] - abbau[attribute]);
+    const cumulative = round1(training[attribute] + leistung[attribute] - abbau[attribute] + offen[attribute]);
     netCumulative += cumulative;
     const baseValue = baseline?.[attribute];
     return {

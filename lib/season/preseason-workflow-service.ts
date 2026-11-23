@@ -1,3 +1,4 @@
+import { baueLeistungsErwartung } from "@/lib/training/entwicklung-tag";
 import { createHash, randomUUID } from "node:crypto";
 
 import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
@@ -320,6 +321,8 @@ export function applySeasonBaselineProgression(
       // Anti-cheese Teil B (B.4): clear the per-matchday training accumulator alongside trainingMode /
       // fatigue so the new season starts a fresh mode-count/fatigue tally.
       seasonTrainingAccumulator: null,
+      // Entwicklung neu: aus dem Verlauf der ausgehenden Saison die Leistungs-Erwartung fuer die Prognose der naechsten (nur Prognose).
+      leistungsErwartung: baueLeistungsErwartung(player.seasonTrainingAccumulator),
       // Fatigue an der Saisongrenze für ALLE Spieler auf 0 zurücksetzen — konsistent mit dem geleerten
       // seasonTrainingAccumulator. player.fatigue ist zusammengesetzt aus Match-Fatigue + der
       // aufgelaufenen Trainings-Fatigue-Schicht (siehe matchday-training-accumulator). Wird der
@@ -361,6 +364,7 @@ export function applySeasonBoundaryPlayerResets(gameState: GameState): GameState
       ...player,
       trainingMode: null,
       seasonTrainingAccumulator: null,
+      leistungsErwartung: baueLeistungsErwartung(player.seasonTrainingAccumulator),
       fatigue: 0,
     })),
     playerMoraleState: advancePlayerMoraleCarryState(gameState),

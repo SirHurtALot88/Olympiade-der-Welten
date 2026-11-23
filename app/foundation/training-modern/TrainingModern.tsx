@@ -1020,7 +1020,7 @@ function SpielerAnsicht({
       render: (a) => <span className={`bc-t ${ton(a.training)}`}>{a.training ? vz(a.training, 1) : "–"}</span>,
     },
     {
-      ...kopfA("leistung", "Leistung"),
+      ...kopfA("leistung", "Leistung (Erwartung)"),
       render: (a) => <span className={`bc-t ${ton(a.performance)}`}>{a.performance ? vz(a.performance, 1) : "–"}</span>,
     },
     {

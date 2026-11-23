@@ -4,9 +4,11 @@
  * Je Spieltag und Attribut: Delta = T (Training) + L (Leistung, mit Vorzeichen) - A (Abbau). Dieses Modul rechnet L und
  * fuehrt die drei Teile zusammen; T und A liefert die Engine (`buildOrganicSeasonProgression`, Modus `nurTraining`).
  *
- * LEISTUNG (L): PP des Spielers an diesem Spieltag gegen den Median derselben Liga (nur wer an dem Spieltag antrat), in
- * Einheiten (`ppEinheit`), ueber dem Median `z^gamma`, darunter `beta * z`; verteilt auf die Attribute nach dem Matrixgewicht
- * der gespielten Disziplin(en) (Matrix nur gelesen). Wer nicht eingesetzt war: L = 0, keine zusaetzliche Strafe. Der Schwung
+ * LEISTUNG (L): JE EINSATZ -- die PP des Spielers in einer Disziplin an diesem Spieltag gegen den Median derselben Liga UND derselben
+ * Disziplin (nur wer in ihr antrat), in Einheiten (`ppEinheit`), ueber dem Median `z^gamma`, darunter `beta * z`; die Einheiten der
+ * Einsaetze eines Tages werden summiert und je Disziplin nach deren Matrixgewicht auf die Attribute verteilt (Matrix nur gelesen).
+ * Wer nur eine Disziplin spielt, steht nicht schlechter da als wer zwei spielt (Review 22.11.: vorher Summe ueber D1+D2 gegen den
+ * Median der Tagessummen). Wer nicht eingesetzt war: L = 0, keine zusaetzliche Strafe. Der Schwung
  * (`schwungFaktor`: geht die Saison bisher in die Richtung der heutigen Leistung, zaehlt sie mehr) verstaerkt -- die wenigen starken
  * Entwicklungen und Einbrueche entstehen hier, je Spieltag, nicht als Rueckbuchung am Saisonende.
  *
@@ -28,7 +30,8 @@ export function istDiligent(player: Pick<Player, "traitsPositive">): boolean {
   return alle.some((trait) => typeof trait === "string" && trait.trim().toLowerCase() === "diligent");
 }
 
-type TagesSpieler = { pp: number; jeDisziplin: Map<string, number>; liga: string };
+/** Ein Spieler an einem Spieltag: Liga und PP je Disziplin (ein Einsatz je Disziplin). */
+type TagesSpieler = { liga: string; jeDisziplin: Map<string, number> };
 type TagesEintrag = { median: Map<string, number>; spieler: Map<string, TagesSpieler> };
 export type PpTagesIndex = { seasonId: string; tage: Map<string, TagesEintrag> };
 
@@ -41,7 +44,12 @@ function median(werte: number[]): number {
   return sortiert.length % 2 ? sortiert[mitte]! : (sortiert[mitte - 1]! + sortiert[mitte]!) / 2;
 }
 
-/** PP je Spieler und Spieltag der laufenden Saison, dazu der Median je Liga. Einmal je `seasonState`. */
+/** Schluessel des Medians: Liga und Disziplin (am selben Spieltag). */
+export function medianSchluessel(liga: string, disziplinId: string): string {
+  return `${liga}|${disziplinId}`;
+}
+
+/** PP je Spieler, Disziplin und Spieltag der laufenden Saison, dazu der Median je (Liga, Disziplin, Spieltag). Einmal je `seasonState`. */
 export function ppTagesIndex(gameState: GameState): PpTagesIndex {
   const schluessel = gameState.seasonState as object;
   const gemerkt = indexCache.get(schluessel);
@@ -53,19 +61,21 @@ export function ppTagesIndex(gameState: GameState): PpTagesIndex {
     const tag = tage.get(e.matchdayId) ?? { median: new Map<string, number>(), spieler: new Map<string, TagesSpieler>() };
     tage.set(e.matchdayId, tag);
     const liga = getLeagueOf(gameState, e.teamId) ?? "all";
-    const z = tag.spieler.get(e.playerId) ?? { pp: 0, jeDisziplin: new Map<string, number>(), liga };
-    z.pp += e.points;
+    const z = tag.spieler.get(e.playerId) ?? { liga, jeDisziplin: new Map<string, number>() };
     z.jeDisziplin.set(e.disciplineId, (z.jeDisziplin.get(e.disciplineId) ?? 0) + e.points);
     tag.spieler.set(e.playerId, z);
   }
   for (const tag of tage.values()) {
-    const jeLiga = new Map<string, number[]>();
+    const jeGruppe = new Map<string, number[]>();
     for (const z of tag.spieler.values()) {
-      const liste = jeLiga.get(z.liga) ?? [];
-      liste.push(z.pp);
-      jeLiga.set(z.liga, liste);
+      for (const [disziplinId, pp] of z.jeDisziplin) {
+        const key = medianSchluessel(z.liga, disziplinId);
+        const liste = jeGruppe.get(key) ?? [];
+        liste.push(pp);
+        jeGruppe.set(key, liste);
+      }
     }
-    for (const [liga, liste] of jeLiga) tag.median.set(liga, median(liste));
+    for (const [key, liste] of jeGruppe) tag.median.set(key, median(liste));
   }
   const index = { seasonId: gameState.season.id, tage };
   indexCache.set(schluessel, index);
@@ -77,7 +87,19 @@ export function istSpieltagGewertet(index: PpTagesIndex, matchdayId: string): bo
   return index.tage.has(matchdayId);
 }
 
-/** Leistung des Spielers an einem Spieltag in Einheiten (mit Vorzeichen), `null` ohne Einsatz. */
+/** PP-Abstand eines Einsatzes zum Median seiner (Liga, Disziplin, Spieltag); `null` ohne Einsatz in dieser Disziplin. */
+export function ppAbstandFuerEinsatz(index: PpTagesIndex, matchdayId: string, playerId: string, disziplinId: string): number | null {
+  const tag = index.tage.get(matchdayId);
+  const z = tag?.spieler.get(playerId);
+  const pp = z?.jeDisziplin.get(disziplinId);
+  if (!tag || !z || pp == null) return null;
+  return pp - (tag.median.get(medianSchluessel(z.liga, disziplinId)) ?? 0);
+}
+
+/**
+ * Leistung des Spielers an einem Spieltag in Einheiten (mit Vorzeichen): `einheit` = Summe der Einsatz-Einheiten, `jeDisziplin` = die
+ * Einheit je Disziplin (jeder Einsatz fuer sich gegen den Median seiner Disziplin). `null` ohne Einsatz.
+ */
 export function leistungsEinheitFuerTag(
   index: PpTagesIndex,
   matchdayId: string,
@@ -86,8 +108,14 @@ export function leistungsEinheitFuerTag(
   const tag = index.tage.get(matchdayId);
   const z = tag?.spieler.get(playerId);
   if (!tag || !z) return null;
-  const abstand = z.pp - (tag.median.get(z.liga) ?? 0);
-  return { einheit: leistungsEinheit(abstand), jeDisziplin: z.jeDisziplin };
+  const jeDisziplin = new Map<string, number>();
+  let einheit = 0;
+  for (const [disziplinId, pp] of z.jeDisziplin) {
+    const e = leistungsEinheit(pp - (tag.median.get(medianSchluessel(z.liga, disziplinId)) ?? 0));
+    jeDisziplin.set(disziplinId, e);
+    einheit += e;
+  }
+  return { einheit, jeDisziplin };
 }
 
 const matrixSummeCache = new Map<string, number>();
@@ -101,20 +129,17 @@ function matrixSumme(disziplinId: string): number {
   return summe;
 }
 
-/** Verteilt eine Leistungssumme auf die zwoelf Attribute nach dem Matrixgewicht der gespielten Disziplinen (nach PP-Anteil). */
-export function verteileLeistung(summe: number, jeDisziplin: ReadonlyMap<string, number>): AttributWerte {
+/** Verteilt die Einheit je Disziplin (mit Vorzeichen) nach dem Matrixgewicht der jeweiligen Disziplin auf die zwoelf Attribute und summiert. */
+export function verteileLeistung(jeDisziplinEinheit: ReadonlyMap<string, number>, faktor = 1): AttributWerte {
   const ergebnis: AttributWerte = {};
-  if (summe === 0 || jeDisziplin.size === 0) return ergebnis;
-  const ppSumme = [...jeDisziplin.values()].reduce((a, b) => a + Math.max(0, b), 0);
-  for (const attribute of ATTRIBUTE) {
-    let anteil = 0;
-    for (const [disziplinId, pp] of jeDisziplin) {
-      const anteilDisziplin = ppSumme > 0 ? Math.max(0, pp) / ppSumme : 1 / jeDisziplin.size;
-      const gesamt = matrixSumme(disziplinId);
+  for (const [disziplinId, einheit] of jeDisziplinEinheit) {
+    if (einheit === 0) continue;
+    const gesamt = matrixSumme(disziplinId);
+    if (gesamt <= 0) continue;
+    for (const attribute of ATTRIBUTE) {
       const gewicht = (officialDisciplineWeightTable[attribute] as Record<string, number>)[disziplinId] ?? 0;
-      if (gesamt > 0) anteil += anteilDisziplin * (gewicht / gesamt);
+      if (gewicht > 0) ergebnis[attribute] = (ergebnis[attribute] ?? 0) + einheit * faktor * (gewicht / gesamt);
     }
-    if (anteil > 0) ergebnis[attribute] = summe * anteil;
   }
   return ergebnis;
 }
@@ -127,6 +152,16 @@ export function nettoBisher(verlauf: readonly VerlaufEintrag[] | undefined, ohne
   for (const e of verlauf ?? []) {
     if (e.m === ohneSpieltag || e.s !== "t") continue;
     for (const wert of Object.values(nettoDesEintrags(e))) summe += wert ?? 0;
+  }
+  return summe;
+}
+
+/** Bisher gebuchter NEGATIVER Leistungsanteil der Saison (Betrag, Summe ueber Attribute und Spieltage ohne `ohneSpieltag`). */
+export function negativeLeistungBisher(verlauf: readonly VerlaufEintrag[] | undefined, ohneSpieltag?: string): number {
+  let summe = 0;
+  for (const e of verlauf ?? []) {
+    if (e.m === ohneSpieltag || e.s !== "t") continue;
+    for (const wert of Object.values(e.p ?? {})) if ((wert ?? 0) < 0) summe -= wert ?? 0;
   }
   return summe;
 }
@@ -147,23 +182,106 @@ export function fokusDominanz(verlauf: readonly VerlaufEintrag[] | undefined, ak
   return Math.max(...jeZiel.values()) / gesamt;
 }
 
-/** Leistung eines gewerteten Spieltags fuer einen Spieler, skaliert (Gewicht, Eichung, Serie), noch ohne Ertrags-Kappung. */
+/**
+ * Leistung eines gewerteten Spieltags fuer einen Spieler, skaliert (Gewicht, Eichung, Schwung), noch ohne Ertrags-Kappung.
+ * Der negative Teil hat eine Saisongrenze (`negativSaisonGrenze`): was die Saison an negativer Leistung schon gebucht hat, zaehlt davon ab.
+ * `einheiten` (optional) bekommt die rohen Einheiten je Disziplin dieses Tages (fuer den Verlaufseintrag und die Erwartung der Folgesaison).
+ */
 export function leistungFuerTag(input: {
   index: PpTagesIndex;
   matchdayId: string;
   player: Player;
   verlauf: readonly VerlaufEintrag[] | undefined;
+  einheiten?: Map<string, number>;
 }): AttributWerte {
   const roh = leistungsEinheitFuerTag(input.index, input.matchdayId, input.player.id);
-  if (!roh || roh.einheit === 0) return {};
-  const skaliert =
-    roh.einheit *
-    leistungsFaktor(istDiligent(input.player)) *
-    schwungFaktor(nettoBisher(input.verlauf, input.matchdayId), roh.einheit);
-  return verteileLeistung(skaliert, roh.jeDisziplin);
+  if (!roh) return {};
+  if (input.einheiten) for (const [disziplinId, einheit] of roh.jeDisziplin) input.einheiten.set(disziplinId, einheit);
+  if (roh.einheit === 0) return {};
+  const p = entwicklungsParameter();
+  const faktor = leistungsFaktor(istDiligent(input.player)) * schwungFaktor(nettoBisher(input.verlauf, input.matchdayId), roh.einheit);
+  const verteilt = verteileLeistung(roh.jeDisziplin, faktor);
+  // Saisongrenze fuer den negativen Anteil: nur die negativen Attributteile dieses Tages zaehlen gegen den Rest der Grenze.
+  let negativHeute = 0;
+  for (const wert of Object.values(verteilt)) if ((wert ?? 0) < 0) negativHeute -= wert ?? 0;
+  if (negativHeute > 0) {
+    const rest = Math.max(0, p.negativSaisonGrenze - negativeLeistungBisher(input.verlauf, input.matchdayId));
+    if (negativHeute > rest) {
+      const skala = rest / negativHeute;
+      for (const attribute of ATTRIBUTE) {
+        const wert = verteilt[attribute];
+        if (typeof wert === "number" && wert < 0) verteilt[attribute] = wert * skala;
+      }
+    }
+  }
+  return verteilt;
 }
 
 const r3 = (wert: number) => Math.round(wert * 1000) / 1000;
+
+/**
+ * Fingerabdruck der PP-Grundlage eines Spielers an einem Spieltag (je Disziplin: PP und Median seiner Liga). Steht im Verlaufseintrag (`h`);
+ * ein erneutes Buchen desselben Spieltags (`forceReplace`) rechnet L neu, wenn er sich geaendert hat (Review 22.11.).
+ */
+export function ppHashFuerTag(index: PpTagesIndex, matchdayId: string, playerId: string): string {
+  const tag = index.tage.get(matchdayId);
+  const z = tag?.spieler.get(playerId);
+  if (!tag || !z) return "";
+  return [...z.jeDisziplin.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([disziplinId, pp]) => `${disziplinId}:${r3(pp)}:${r3(tag.median.get(medianSchluessel(z.liga, disziplinId)) ?? 0)}`)
+    .join("|");
+}
+
+type ErwartungsQuelle = NonNullable<Player["leistungsErwartung"]>;
+
+/**
+ * Die Leistungs-Erwartung fuer die FOLGESAISON aus dem Verlauf der ausgehenden: Spieltage mit Einsatz, Einsaetze und die Summe der
+ * Einheiten je Disziplin (`y` im Eintrag). `null`, wenn die Saison keine Leistungsdaten hat (nichts gebucht, nie eingesetzt, alte Eintraege).
+ */
+export function baueLeistungsErwartung(
+  accumulator: Player["seasonTrainingAccumulator"] | null | undefined,
+): ErwartungsQuelle | null {
+  if (!accumulator) return null;
+  const trainiert = (accumulator.verlauf ?? []).filter((e) => e.s === "t");
+  if (trainiert.length === 0) return null;
+  const jeDisziplin: Record<string, { n: number; summe: number }> = {};
+  for (const e of trainiert) {
+    for (const [disziplinId, einheit] of Object.entries(e.y ?? {})) {
+      const z = (jeDisziplin[disziplinId] ??= { n: 0, summe: 0 });
+      z.n += 1;
+      z.summe += einheit;
+    }
+  }
+  if (Object.keys(jeDisziplin).length === 0) return null;
+  for (const z of Object.values(jeDisziplin)) z.summe = r3(z.summe);
+  return { seasonId: accumulator.seasonId, tage: trainiert.length, jeDisziplin };
+}
+
+/** Mittleres z (Leistungseinheit) je Einsatz aus der Vorsaison; `null` ohne Daten. */
+export function mittleresZJeEinsatz(erwartung: Player["leistungsErwartung"] | null | undefined): number | null {
+  if (!erwartung) return null;
+  let n = 0;
+  let summe = 0;
+  for (const z of Object.values(erwartung.jeDisziplin)) {
+    n += z.n;
+    summe += z.summe;
+  }
+  return n > 0 ? summe / n : null;
+}
+
+/**
+ * Erwartete Leistung (L, mit Vorzeichen, je Attribut) JE SPIELTAG aus der Vorsaison: das mittlere z je Einsatz, mit der Einsatzquote
+ * (Einsaetze je Trainingstag) und dem Leistungsfaktor, nach Matrixgewicht der gespielten Disziplinen verteilt. Ohne Schwung (neutral).
+ * `null` ohne Vorsaison-Daten (dann Erwartung 0).
+ */
+export function leistungsErwartungJeTag(player: Pick<Player, "leistungsErwartung" | "traitsPositive">): AttributWerte | null {
+  const e = player.leistungsErwartung;
+  if (!e || e.tage <= 0) return null;
+  const jeDisziplin = new Map<string, number>();
+  for (const [disziplinId, z] of Object.entries(e.jeDisziplin)) jeDisziplin.set(disziplinId, z.summe / e.tage);
+  return verteileLeistung(jeDisziplin, leistungsFaktor(istDiligent(player)));
+}
 
 const abbauFaktorCache = new WeakMap<object, Map<string, { seasonId: string; wert: number }>>();
 
@@ -217,9 +335,45 @@ export function ligaAbbauFaktor(gameState: GameState, ohneSpieltag?: string | nu
     const basisGesamt = (abbauBasis * gesamtTage) / tage.size;
     const rest = basisGesamt - abbauBasis;
     wert = Math.max(0.6, Math.min(1.6, rest > 0 ? (gleichgewicht * basisGesamt - abbauGebucht) / rest : gleichgewicht));
+    // Der Faktor ist ein Thermostat, kein Sprung: gegenueber dem Faktor des zuletzt gebuchten Spieltags aendert er sich je Spieltag
+    // um hoechstens `ligaFaktorSchritt` (Review 22.11.: sonst reisst eine Liga-Stichprobe den Abbau von einem Tag zum naechsten).
+    const schritt = entwicklungsParameter().ligaFaktorSchritt;
+    const vorher = letzterLigaFaktor(gameState, tage, ohneSpieltag);
+    wert = Math.max(vorher - schritt, Math.min(vorher + schritt, wert));
   }
   jeSpieltag.set(merk, { seasonId: gameState.season.id, wert });
   return wert;
+}
+
+/** Der im Verlauf gebuchte Ligafaktor (`f`) des letzten gebuchten Spieltags vor `ohneSpieltag`; 1, wenn keiner gebucht ist. */
+function letzterLigaFaktor(gameState: GameState, gebuchteTage: ReadonlySet<string>, ohneSpieltag?: string | null): number {
+  let ids: readonly string[] = gameState.season.matchdayIds ?? [];
+  if (ids.length === 0) {
+    // Ohne Spieltagsliste: die Reihenfolge, in der der Verlauf eines Spielers gebucht wurde (chronologisch angehaengt).
+    for (const player of gameState.players) {
+      const akku = player.seasonTrainingAccumulator;
+      if (akku && akku.seasonId === gameState.season.id && (akku.verlauf ?? []).length > 0) {
+        ids = (akku.verlauf ?? []).map((e) => e.m);
+        break;
+      }
+    }
+  }
+  const reihenfolge = new Map(ids.map((id, i) => [id, i] as const));
+  const grenze = ohneSpieltag != null ? reihenfolge.get(ohneSpieltag) ?? Infinity : Infinity;
+  let letzter: string | null = null;
+  for (const id of gebuchteTage) {
+    const pos = reihenfolge.get(id);
+    if (pos == null || pos >= grenze) continue;
+    if (letzter == null || pos > (reihenfolge.get(letzter) ?? -1)) letzter = id;
+  }
+  if (letzter == null) return 1;
+  for (const player of gameState.players) {
+    const akku = player.seasonTrainingAccumulator;
+    if (!akku || akku.seasonId !== gameState.season.id) continue;
+    const e = (akku.verlauf ?? []).find((x) => x.m === letzter && x.s === "t" && !x.o && x.a);
+    if (e) return e.f && e.f > 0 ? e.f : 1;
+  }
+  return 1;
 }
 
 /**

@@ -1113,8 +1113,9 @@ export function applySeasonEndPotentialUpdates(input: {
   }));
   // Entwicklung neu: der Liga-Schnitt der Ausblick-Verschiebungen wird abgezogen, damit die Drift der Decken den Mittelwert nicht
   // verschiebt, egal wie die Ausblicke gerade verteilt sind (nur Spieler mit Attribut-Decken zaehlen).
+  const mitDecken = insights.filter((e) => Object.keys(e.record.hiddenAttributeCeiling ?? {}).length > 0);
   const driftZentrum = entwicklungNeuFuer(input.gameState)
-    ? insights.reduce((summe, e) => summe + entwicklungNeuDriftVerschiebung(e.outlook), 0) / Math.max(1, insights.length)
+    ? mitDecken.reduce((summe, e) => summe + entwicklungNeuDriftVerschiebung(e.outlook), 0) / Math.max(1, mitDecken.length)
     : 0;
   return insights.map(({ player, record, outlook }) =>
     applySeasonEndPotentialUpdate({

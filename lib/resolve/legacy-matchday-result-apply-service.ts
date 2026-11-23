@@ -35,7 +35,7 @@ import { db } from "@/src/server/db";
 import { applyFatigueAndInjuryAfterMatchday, attachMatchdayInjuryPerformanceToContexts, buildMatchdayInjuryRollMap } from "@/lib/fatigue/fatigue-injury-service";
 import { accumulateMatchdayTrainingProgress } from "@/lib/training/matchday-training-accumulator";
 import { bestimmeAusfallSpielerFuerSpieltag } from "@/lib/training/spieltag-training";
-import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
+import { trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-service";
 import { persistGameStateWithMaterializedDerivations } from "@/lib/foundation/materialize-season-derivations";
 import {
@@ -990,7 +990,7 @@ export class LegacyMatchdayResultApplyService {
     // Regel B (Training je Spieltag): wer an diesem Spieltag verletzt ausfaellt, trainiert nicht. Auf dem
     // Stand VOR der Verletzungsbuchung gefragt — danach steht der letzte Sperr-Spieltag schon auf
     // "recovering" und der Spieler saehe gesund aus.
-    const ausfallSpielerIds = isTrainingJeSpieltagAktiv()
+    const ausfallSpielerIds = trainingJeSpieltagFuer(nextGameStateMitBeleg)
       ? bestimmeAusfallSpielerFuerSpieltag(nextGameStateMitBeleg, params.matchdayId)
       : null;
     const injuryRollMap = buildMatchdayInjuryRollMap({

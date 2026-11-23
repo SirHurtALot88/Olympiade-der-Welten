@@ -11,6 +11,7 @@
  * Optionen: --saisons N (Standard 1), --spieltage N (je Saison, Standard alle), --keep, --nur-abschluss (Saison ist schon
  * gespielt: nur Abschluss + Kette, mit --start-json <datei> fuer den Saisonstart), --stop-vor-abschluss (spielt die Saison und
  * haelt vor dem Abschluss an; SQLite + Start-JSON bleiben fuer wiederholte Abschluesse liegen).
+ * Parameter fuer einen Lauf ueberschreiben: OLY_ENT_PARAMS='{"negativSaisonGrenze":6}' (nur dieses Skript, nie das Spiel).
  * Schwellen der Verteilung: STARK = Summe >= +8 bzw. <= -8, KAUM = |Summe| <= 2 (Begruendung in der Doku).
  */
 import fs from "node:fs";
@@ -34,7 +35,18 @@ import { runLocalSeasonCompletion, SEASON_COMPLETION_CONFIRM_TOKEN } from "@/lib
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { PROGRESSION_ATTRIBUTE_ORDER } from "@/lib/training/class-progression-config";
-import { ppTagesIndex } from "@/lib/training/entwicklung-tag";
+import { ppAbstandFuerEinsatz, ppTagesIndex } from "@/lib/training/entwicklung-tag";
+import { buildOrganicSeasonProgression, buildProjectedSeasonTrainingAccumulatorOverrides } from "@/lib/training/organic-season-progression";
+import { setzeEntwicklungsParameterFuerMessung, type EntwicklungsParameter } from "@/lib/training/entwicklung-neu";
+
+// Messhebel: einzelne Parameter fuer diesen Lauf ueberschreiben (JSON in OLY_ENT_PARAMS). Das Spiel liest die Variable nie.
+if (process.env.OLY_ENT_PARAMS) {
+  try {
+    setzeEntwicklungsParameterFuerMessung(JSON.parse(process.env.OLY_ENT_PARAMS) as Partial<EntwicklungsParameter>);
+  } catch {
+    throw new Error("OLY_ENT_PARAMS ist kein gueltiges JSON");
+  }
+}
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -176,11 +188,36 @@ function leistungsDaten(gs: GameState) {
   return { pp, einsaetze, verlauf };
 }
 
+/** Prognose zu Saisonbeginn (so ruft die Trainingsseite die Engine): Netto, Training T, Leistungs-Erwartung L und Abbau A je Kaderspieler. */
+function prognoseZuBeginn(gs: GameState) {
+  const ids = new Set(gs.rosters.map((r) => r.playerId));
+  const netto: number[] = [];
+  let t = 0, l = 0, a = 0, mitErwartung = 0;
+  for (const p of gs.players) {
+    if (!ids.has(p.id)) continue;
+    const r = buildOrganicSeasonProgression({ gameState: gs, player: p, ...buildProjectedSeasonTrainingAccumulatorOverrides({ gameState: gs, player: p, draftMode: "mittel" }) });
+    netto.push(r.netSetpoints);
+    for (const e of r.attributeBreakdown) { t += e.training + e.spillover; l += e.performance; a += e.regression; }
+    if (p.leistungsErwartung) mitErwartung += 1;
+  }
+  const n = Math.max(1, netto.length);
+  return { n: netto.length, mitErwartung, mittel: r2(netto.reduce((x, y) => x + y, 0) / n), p1: r2(perzentil(netto, 0.01)), p99: r2(perzentil(netto, 0.99)), minimum: r2(Math.min(0, ...netto)), maximum: r2(Math.max(0, ...netto)), tMittel: r2(t / n), lErwartungMittel: r2(l / n), aMittel: r2(a / n) };
+}
+
 function median(a: number[]): number | null {
   if (!a.length) return null;
   const s = [...a].sort((x, y) => x - y);
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+}
+
+function perzentil(werte: number[], q: number): number {
+  if (!werte.length) return 0;
+  const s = [...werte].sort((a, b) => a - b);
+  const pos = (s.length - 1) * q;
+  const lo = Math.floor(pos);
+  const hi = Math.ceil(pos);
+  return s[lo]! + (s[hi]! - s[lo]!) * (pos - lo);
 }
 
 function kennzahlen(zeilen: Zeile[]) {
@@ -193,6 +230,30 @@ function kennzahlen(zeilen: Zeile[]) {
   return {
     spieler: n,
     mittel: r2(zeilen.reduce((a, z) => a + z.netto, 0) / Math.max(1, n)),
+    p1: r2(perzentil(zeilen.map((z) => z.netto), 0.01)),
+    p99: r2(perzentil(zeilen.map((z) => z.netto), 0.99)),
+    minimum: r2(Math.min(0, ...zeilen.map((z) => z.netto))),
+    maximum: r2(Math.max(0, ...zeilen.map((z) => z.netto))),
+    // L je Einsatz-Gruppe: wenig eingesetzt (<= 8 Einsaetze) gegen den Rest (Mittel der gebuchten Leistung je Spieler).
+    leistungWenigEinsaetze: r2(zeilen.filter((z) => z.einsaetze <= 8).reduce((a, z) => a + z.sumP, 0) / Math.max(1, zeilen.filter((z) => z.einsaetze <= 8).length)),
+    wenigEinsaetzeN: zeilen.filter((z) => z.einsaetze <= 8).length,
+    leistungRest: r2(zeilen.filter((z) => z.einsaetze > 8).reduce((a, z) => a + z.sumP, 0) / Math.max(1, zeilen.filter((z) => z.einsaetze > 8).length)),
+    nettoWenigEinsaetze: r2(zeilen.filter((z) => z.einsaetze <= 8).reduce((a, z) => a + z.netto, 0) / Math.max(1, zeilen.filter((z) => z.einsaetze <= 8).length)),
+    nettoRest: r2(zeilen.filter((z) => z.einsaetze > 8).reduce((a, z) => a + z.netto, 0) / Math.max(1, zeilen.filter((z) => z.einsaetze > 8).length)),
+    korrelationStartNetto: (() => {
+      const x = zeilen.map((z) => z.start);
+      const y = zeilen.map((z) => z.netto);
+      const mx = x.reduce((a, b) => a + b, 0) / Math.max(1, n);
+      const my = y.reduce((a, b) => a + b, 0) / Math.max(1, n);
+      let sxy = 0, sxx = 0, syy = 0;
+      for (let i = 0; i < n; i += 1) { sxy += (x[i]! - mx) * (y[i]! - my); sxx += (x[i]! - mx) ** 2; syy += (y[i]! - my) ** 2; }
+      return sxx > 0 && syy > 0 ? Math.round((sxy / Math.sqrt(sxx * syy)) * 100) / 100 : 0;
+    })(),
+    diligentN: zeilen.filter((z) => z.diligent).length,
+    diligentVorsprung: r2(
+      zeilen.filter((z) => z.diligent).reduce((a, z) => a + z.netto, 0) / Math.max(1, zeilen.filter((z) => z.diligent).length) -
+        zeilen.filter((z) => !z.diligent).reduce((a, z) => a + z.netto, 0) / Math.max(1, zeilen.filter((z) => !z.diligent).length),
+    ),
     median: r2(median(zeilen.map((z) => z.netto)) ?? 0),
     starkBesserPct: anteil((z) => z.netto >= STARK),
     starkSchlechterPct: anteil((z) => z.netto <= -STARK),
@@ -266,7 +327,7 @@ async function main() {
     persistence.saveSingleplayerState(saveId, { ...gs0, rosters: neueRoster });
     log(`Bank: ${bankIds.size} Zusatzspieler bei ${teamIds.length} Teams`);
   }
-  const ergebnis: { saveId: string; schalter: Record<string, string | undefined>; saisons: Array<{ saison: string; kennzahlen: ReturnType<typeof kennzahlen> & { ertragNachAbstand?: Record<string, { n: number; mittel: number }> }; zeilen: Zeile[] }> } = {
+  const ergebnis: { saveId: string; schalter: Record<string, string | undefined>; saisons: Array<{ saison: string; prognoseBeginn?: unknown; kennzahlen: ReturnType<typeof kennzahlen> & { ertragNachAbstand?: Record<string, { n: number; mittel: number }> }; zeilen: Zeile[] }> } = {
     saveId,
     schalter: { OLY_ENTWICKLUNG: process.env.OLY_ENTWICKLUNG, OLY_TRAINING_JE_SPIELTAG_FAKTOR: process.env.OLY_TRAINING_JE_SPIELTAG_FAKTOR },
     saisons: [],
@@ -288,6 +349,13 @@ async function main() {
     else {
       start = startSnapshot(get().gameState);
       if (START_JSON) fs.writeFileSync(START_JSON, JSON.stringify(start));
+    }
+    let prognoseBeginn: ReturnType<typeof prognoseZuBeginn> | null = null;
+    try {
+      prognoseBeginn = prognoseZuBeginn(get().gameState);
+      log(`${sid} Prognose zu Saisonbeginn: ${JSON.stringify(prognoseBeginn)}`);
+    } catch (e) {
+      log(`Prognose zu Saisonbeginn nicht berechnet: ${String(e)}`);
     }
     if (!flag("nur-abschluss")) {
       const md = get().gameState.season.matchdayIds.length;
@@ -399,10 +467,13 @@ async function main() {
                 tagZ: tagIds.map((m) => Math.round(Object.values(jeTag.get(m)?.z ?? {}).reduce((a, b) => a + (b as number), 0) * 1000) / 1000),
                 tagA: tagIds.map((m) => Math.round(Object.values(jeTag.get(m)?.a ?? {}).reduce((a, b) => a + (b as number), 0) * 1000) / 1000),
                 tagVerletzt: tagIds.map((m) => jeTag.get(m)?.s === "v"),
+                // Summe der PP-Abstaende der Einsaetze (je Einsatz gegen den Median der eigenen Liga und Disziplin); null = kein Einsatz.
                 tagAbstand: tagIds.map((m) => {
-                  const t = tagesIndex.tage.get(m);
-                  const z = t?.spieler.get(id);
-                  return z && t ? r2(z.pp - (t.median.get(z.liga) ?? 0)) : null;
+                  const z = tagesIndex.tage.get(m)?.spieler.get(id);
+                  if (!z) return null;
+                  let summe = 0;
+                  for (const disziplinId of z.jeDisziplin.keys()) summe += ppAbstandFuerEinsatz(tagesIndex, m, id, disziplinId) ?? 0;
+                  return r2(summe);
                 }),
               };
             })()
@@ -410,7 +481,7 @@ async function main() {
       });
     }
     const kz = { ...kennzahlen(zeilen), ertragNachAbstand: Object.fromEntries(Object.entries(abstandsTabelle).sort().map(([k, v]) => [k, { n: v.n, mittel: r2(v.summe / v.n) }])) };
-    ergebnis.saisons.push({ saison: sid, kennzahlen: kz, zeilen });
+    ergebnis.saisons.push({ saison: sid, kennzahlen: kz, prognoseBeginn, zeilen } as (typeof ergebnis.saisons)[number]);
     schreibe();
     log(`${sid}: ${JSON.stringify(kz)}`);
     if (k + 1 < SAISONS) {

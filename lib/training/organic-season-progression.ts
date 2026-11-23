@@ -13,9 +13,8 @@ import { entwicklungsParameter, ertragsFaktor, trainingsBudgetFaktor } from "@/l
 import {
   fokusDominanz,
   istDiligent,
-  leistungFuerTag,
   ligaAbbauFaktor,
-  ppTagesIndex,
+  leistungsErwartungJeTag,
   type AttributWerte,
 } from "@/lib/training/entwicklung-tag";
 import {
@@ -67,7 +66,7 @@ import {
   getTrainingSetpointsJeSpieltag,
   TRAINING_SETPOINTS_BY_MODE,
 } from "@/lib/training/training-mode-presentation";
-import { isTrainingJeSpieltagAktiv } from "@/lib/training/training-je-spieltag-schalter";
+import { trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 import {
   DEVELOPMENT_ROUTE_BONUS_BASE_PCT,
   getDevelopmentRouteBonusMultiplier,
@@ -430,7 +429,7 @@ export function buildProjectedSeasonTrainingAccumulatorOverrides(input: {
   draftMode: PlayerTrainingMode;
 }): { accumulatedBaseTrainingBudget?: number; performanceWeightMultiplier?: number } {
   const totalMatchdays = resolveSeasonTotalMatchdaysForProgression(input.gameState);
-  if (isTrainingJeSpieltagAktiv()) {
+  if (trainingJeSpieltagFuer(input.gameState)) {
     // Training je Spieltag: was schon gebucht ist, steckt bereits in den Attributen und darf hier
     // nicht noch einmal auftauchen. Prognose = ungebuchte Alt-Spieltage (Saisonend-Satz) + offene
     // Spieltage zum Satz JE SPIELTAG im aktuell gewaehlten Modus. Verteilt wird hier weiter nach
@@ -816,17 +815,18 @@ function getPerformanceRecords(gameState: GameState, playerId: string): PlayerDi
 }
 
 /**
- * ENTWICKLUNG NEU, RUNDE 2: was von der Saison noch NICHT je Spieltag gebucht ist (Prognose und Saisonende).
- *  - Training je Spieltag AN: nur Spieltage, die noch nicht gespielt sind (`zukunft`); alles Gespielte ist gebucht.
- *  - Training je Spieltag AUS: alles Ungebuchte der Saison; schon gespielte Spieltage mit ihrer echten Leistung, die
- *    uebrigen mit dem bisherigen Schnitt (ohne Einsaetze: Median, also neutral) -- das Saisonende rechnet dieselbe
- *    Formel in einem Rutsch.
+ * ENTWICKLUNG NEU, RUNDE 2: was von der Saison noch NICHT je Spieltag gebucht ist (Prognose; das Saisonende bucht nichts mehr nach).
+ * Mit dem Stempel "neu" wird IMMER je Spieltag gebucht (`trainingJeSpieltagFuer`): es gibt keinen "Rutsch" am Saisonende mehr, also
+ * auch keine Gefahr, dass ein Wechsel der Betriebsart mitten in der Saison dasselbe Training zweimal bucht (Review 22.11.).
+ *  - `zukunft`: Spieltage, die noch nicht gespielt sind.
+ *  - `offen`: Spieltage mit festgelegtem, aber noch nicht gebuchtem Zuwachs (`o`, Arena-Teilbuchung nach D1): ihr T und A stehen fest und
+ *    zaehlen mit dem Rest, ihre Leistung ist noch unbekannt (Erwartung).
  */
 type EntwicklungsRest = {
   total: number;
   restAnzahl: number;
   zukunft: number;
-  gespielteUngebucht: string[];
+  offen: Array<NonNullable<NonNullable<Player["seasonTrainingAccumulator"]>["verlauf"]>[number]>;
   verlauf: NonNullable<NonNullable<Player["seasonTrainingAccumulator"]>["verlauf"]>;
 };
 
@@ -838,34 +838,46 @@ function bestimmeEntwicklungsRest(gameState: GameState, player: Player): Entwick
   const gespielt = new Set<string>(Object.keys(akku?.modeByMatchday ?? {}));
   for (const e of verlauf) gespielt.add(e.m);
   for (const r of gameState.seasonState.matchdayResults ?? []) if ((r.seasonId ?? seasonId) === seasonId) gespielt.add(r.matchdayId);
-  if (isTrainingJeSpieltagAktiv()) {
-    const zukunft = Math.max(0, total - gespielt.size);
-    return { total, restAnzahl: zukunft, zukunft, gespielteUngebucht: [], verlauf };
-  }
-  const gebucht = new Set(verlauf.map((e) => e.m));
-  const gespielteUngebucht = [...gespielt].filter((id) => !gebucht.has(id));
   const zukunft = Math.max(0, total - gespielt.size);
-  return { total, restAnzahl: gespielteUngebucht.length + zukunft, zukunft, gespielteUngebucht, verlauf };
+  const offen = verlauf.filter((e) => e.s === "t" && e.o === true);
+  return { total, restAnzahl: zukunft, zukunft, offen, verlauf };
 }
 
-/** Leistung (mit Vorzeichen) fuer den Rest der Saison, je Attribut, ohne Ertrags-Kappung. */
-function restLeistung(gameState: GameState, player: Player, rest: EntwicklungsRest): AttributWerte {
+/** Offener, noch nicht gebuchter Trainings- und Abbauanteil (je Attribut, >= 0). */
+function offenerAnteil(rest: EntwicklungsRest): { z: AttributWerte; a: AttributWerte } {
+  const z: AttributWerte = {};
+  const a: AttributWerte = {};
+  for (const e of rest.offen) {
+    for (const [attribute, wert] of Object.entries(e.z ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) z[attribute] = (z[attribute] ?? 0) + wert;
+    for (const [attribute, wert] of Object.entries(e.a ?? {}) as Array<[PlayerGeneratorAttributeName, number]>) a[attribute] = (a[attribute] ?? 0) + wert;
+  }
+  return { z, a };
+}
+
+/**
+ * Leistung (mit Vorzeichen) fuer den Rest der Saison, je Attribut, ohne Ertrags-Kappung. EINE ERWARTUNG, keine Buchung: sie bleibt in der
+ * Anzeige von T und A getrennt ("Leistung (Erwartung)").
+ *  - Mit gebuchten Spieltagen: der bisherige Schnitt je gebuchtem Spieltag, bis zu `erwartungGewichtTage` Spieltage lang mit der Erwartung
+ *    aus der Vorsaison (mittleres z je Einsatz, `player.leistungsErwartung`) gemischt, damit die Prognose nach einem Tag nicht springt.
+ *  - Ohne gebuchten Spieltag: die Erwartung aus der Vorsaison; ohne Vorsaison 0.
+ * Offene Spieltage (`o`) zaehlen mit ihrem erwarteten L zum Rest.
+ */
+function restLeistung(player: Player, rest: EntwicklungsRest): AttributWerte {
   const summe: AttributWerte = {};
   const addiere = (werte: AttributWerte, faktor = 1) => {
     for (const [attribute, wert] of Object.entries(werte) as Array<[PlayerGeneratorAttributeName, number]>) {
       summe[attribute] = (summe[attribute] ?? 0) + wert * faktor;
     }
   };
-  if (rest.gespielteUngebucht.length > 0) {
-    const index = ppTagesIndex(gameState);
-    for (const id of rest.gespielteUngebucht) addiere(leistungFuerTag({ index, matchdayId: id, player, verlauf: undefined }));
-  }
-  if (rest.zukunft > 0) {
-    const trainiert = rest.verlauf.filter((e) => e.s === "t");
-    if (trainiert.length > 0) {
-      for (const e of trainiert) addiere(e.p ?? {}, rest.zukunft / trainiert.length);
-    }
-  }
+  const tage = rest.zukunft + rest.offen.length;
+  if (tage <= 0) return summe;
+  const gebucht = rest.verlauf.filter((e) => e.s === "t" && !e.o);
+  const erwartung = leistungsErwartungJeTag(player);
+  const gewicht = erwartung ? entwicklungsParameter().erwartungGewichtTage : 0;
+  const nenner = gebucht.length + gewicht;
+  if (nenner <= 0) return summe;
+  for (const e of gebucht) addiere(e.p ?? {}, tage / nenner);
+  if (erwartung) addiere(erwartung, (tage * gewicht) / nenner);
   return summe;
 }
 
@@ -1305,23 +1317,18 @@ export function buildOrganicSeasonProgression(input: {
   const entNeu = entwicklungNeuFuer(input.gameState);
   const entP = entwicklungsParameter();
   const entRest = entNeu && !input.nurTraining ? bestimmeEntwicklungsRest(input.gameState, input.player) : null;
-  const entLeistungRest = entRest ? restLeistung(input.gameState, input.player, entRest) : null;
+  const entLeistungRest = entRest ? restLeistung(input.player, entRest) : null;
+  const entOffen = entRest ? offenerAnteil(entRest) : null;
   const entAbbauFaktor = entRest ? ligaAbbauFaktor(input.gameState) : 1;
   const entBudgetFaktor = entRest
     ? trainingsBudgetFaktor(istDiligent(input.player), fokusDominanz(entRest.verlauf), entP)
     : 1;
-  // Ohne Training je Spieltag (Rutsch am Saisonende) kommt das Budget im alten Saisonsatz; die Eichung der Regel "neu" gilt
-  // dem Satz je Spieltag (20 x 0,226 statt 3,47): auf ihn umrechnen, damit beide Wege dieselbe Entwicklung ergeben.
-  const entSatzRatio =
-    entRest && !isTrainingJeSpieltagAktiv()
-      ? (getTrainingSetpointsJeSpieltag(trainingMode) * entRest.total) / Math.max(0.0001, TRAINING_SETPOINTS_BY_MODE[trainingMode])
-      : 1;
   const baseTrainingBudgetRoh =
     input.accumulatedBaseTrainingBudget != null && Number.isFinite(input.accumulatedBaseTrainingBudget)
-      ? input.accumulatedBaseTrainingBudget * entSatzRatio
-      : entRest && isTrainingJeSpieltagAktiv()
+      ? input.accumulatedBaseTrainingBudget
+      : entRest
         ? entRest.zukunft * getTrainingSetpointsJeSpieltag(trainingMode)
-        : TRAINING_SETPOINTS_BY_MODE[trainingMode] * entSatzRatio;
+        : TRAINING_SETPOINTS_BY_MODE[trainingMode];
   const baseTrainingBudget = baseTrainingBudgetRoh * entBudgetFaktor;
   const performanceWeightMultiplier =
     input.performanceWeightMultiplier != null && Number.isFinite(input.performanceWeightMultiplier)
@@ -1440,9 +1447,11 @@ export function buildOrganicSeasonProgression(input: {
     const regression = nurTraining
       ? 0
       : entNeu
-        ? -abbauJeSpieltag * (entRest?.restAnzahl ?? 0) * entAbbauFaktor
+        ? -abbauJeSpieltag * (entRest?.restAnzahl ?? 0) * entAbbauFaktor - (entOffen?.a[attribute] ?? 0)
         : -(ORGANIC_BASE_REGRESSION_PER_ATTRIBUTE + marketValuePressurePerAttribute) * regressionHeadroomMultiplier * regressionScale;
-    const training = applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier);
+    const training =
+      applyTrainingGrowthMultiplier(primaryTrainingDeltas[attribute] + secondaryTrainingDeltas[attribute], trainingMultiplier) +
+      (nurTraining ? 0 : (entOffen?.z[attribute] ?? 0));
     const performanceDelta = nurTraining
       ? 0
       : entNeu

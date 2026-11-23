@@ -10,7 +10,8 @@
  * (`lib/resolve/entwicklung-regel.ts`); jeder Aufrufer fragt `entwicklungNeuFuer(gameState)`.
  *
  * Die Zahlen sind an einem Messlauf geeicht (32 KI-Teams von Anfang an, `scripts/miss-entwicklung.ts`); die Doku nennt
- * Vorher/Nachher je Saison. `OLY_ENT_PARAMS` (JSON) ueberschreibt einzelne Werte NUR fuer Messlaeufe -- im Spiel nie gesetzt.
+ * Vorher/Nachher je Saison. Einzelne Werte ueberschreibt NUR ein Messlauf, und zwar ausdruecklich ueber
+ * `setzeEntwicklungsParameterFuerMessung` (`scripts/miss-entwicklung.ts`); die Umgebung wird im Spiel nie gelesen.
  */
 
 export type EntwicklungsParameter = {
@@ -46,6 +47,17 @@ export type EntwicklungsParameter = {
   schwungSumme: number;
   schwungExponent: number;
   schwungMax: number;
+  /**
+   * Obergrenze des NEGATIVEN Schwungs (gleiche Rolle wie `schwungMax`, aber fuer Einbrueche): Formkarten-Minus, Moral und Form duerfen
+   * nicht ueber den Schwung zu dauerhaften Attributverlusten werden (Review 22.11.: ab Netto -5,7 galt durchgehend x10).
+   */
+  schwungMaxNegativ: number;
+  /** Saisongrenze fuer den negativen Leistungsanteil (Summe der negativen `p` ueber alle Attribute und Spieltage, als Betrag). */
+  negativSaisonGrenze: number;
+  /** Der Ligafaktor des Abbaus darf sich je Spieltag um hoechstens so viel aendern. */
+  ligaFaktorSchritt: number;
+  /** Gewicht (in Spieltagen) der Leistungs-Erwartung aus der Vorsaison in der Prognose; mit jedem gebuchten Spieltag zaehlt die echte Saison mehr. */
+  erwartungGewichtTage: number;
   /** Fokus: wer sein Trainingsziel haelt, bekommt bis zu +fokusStaerke, wer es dauernd wechselt bis zu -fokusStaerke auf das Training. */
   fokusStaerke: number;
   /** Ab so vielen Trainingstagen mit Ziel zaehlt der Fokus (davor neutral). */
@@ -67,28 +79,33 @@ export const ENTWICKLUNGS_PARAMETER_STANDARD: EntwicklungsParameter = {
   gamma: 1.35,
   beta: 1.65,
   betaExponent: 1,
-  schwungStaerke: 3,
+  schwungStaerke: 3.3,
   schwungSumme: 3.8,
   schwungExponent: 2.75,
   schwungMax: 3,
+  schwungMaxNegativ: 0.8,
+  negativSaisonGrenze: 10,
+  ligaFaktorSchritt: 0.1,
+  erwartungGewichtTage: 4,
   fokusStaerke: 0.5,
   fokusMinTage: 5,
 };
 
 let parameterCache: EntwicklungsParameter | null = null;
+let messUeberschreibung: Partial<EntwicklungsParameter> = {};
+
+/**
+ * NUR MESSLAEUFE (`scripts/miss-entwicklung.ts`): ueberschreibt einzelne Parameter fuer den laufenden Prozess. Das Spiel ruft das nie auf
+ * und liest keine Umgebungsvariable dafuer -- die Eichung ist Code, kein Betriebs-Schalter (Review 22.11.).
+ */
+export function setzeEntwicklungsParameterFuerMessung(ueberschreibung: Partial<EntwicklungsParameter> | null): void {
+  messUeberschreibung = ueberschreibung ?? {};
+  parameterCache = null;
+}
 
 export function entwicklungsParameter(): EntwicklungsParameter {
   if (parameterCache) return parameterCache;
-  let ueberschrieben: Partial<EntwicklungsParameter> = {};
-  const roh = typeof process !== "undefined" ? process.env?.OLY_ENT_PARAMS : undefined;
-  if (roh) {
-    try {
-      ueberschrieben = JSON.parse(roh) as Partial<EntwicklungsParameter>;
-    } catch {
-      ueberschrieben = {};
-    }
-  }
-  parameterCache = { ...ENTWICKLUNGS_PARAMETER_STANDARD, ...ueberschrieben };
+  parameterCache = { ...ENTWICKLUNGS_PARAMETER_STANDARD, ...messUeberschreibung };
   return parameterCache;
 }
 
@@ -128,10 +145,14 @@ export function leistungsEinheit(ppAbstand: number, p: EntwicklungsParameter = e
   return z >= 0 ? Math.pow(z, p.gamma) : -p.beta * Math.pow(-z, p.betaExponent);
 }
 
-/** Schwung-Multiplikator: `nettoBisher` = bisherige Netto-Entwicklung der Saison (Summe ueber die Attribute), `leistung` = heutige Leistung. */
+/**
+ * Schwung-Multiplikator: `nettoBisher` = bisherige Netto-Entwicklung der Saison (Summe ueber die Attribute), `leistung` = heutige Leistung.
+ * Der positive Schwung ist bis `schwungMax`, der negative nur bis `schwungMaxNegativ` offen.
+ */
 export function schwungFaktor(nettoBisher: number, leistung: number, p: EntwicklungsParameter = entwicklungsParameter()): number {
   if (leistung === 0 || nettoBisher === 0 || Math.sign(nettoBisher) !== Math.sign(leistung)) return 1;
-  return 1 + p.schwungStaerke * Math.min(p.schwungMax, Math.pow(Math.abs(nettoBisher) / p.schwungSumme, p.schwungExponent));
+  const obergrenze = leistung < 0 ? p.schwungMaxNegativ : p.schwungMax;
+  return 1 + p.schwungStaerke * Math.min(obergrenze, Math.pow(Math.abs(nettoBisher) / p.schwungSumme, p.schwungExponent));
 }
 
 /** Faktor auf die Leistung eines Spieltags: Eichung x (Gewicht / 0,4). Der Schwung kommt je Spieltag dazu (`schwungFaktor`). */

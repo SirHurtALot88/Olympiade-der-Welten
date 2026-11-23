@@ -105,7 +105,10 @@ describe("Bausteine: Gewichte 60/40, Diligent 75/25, Leistung und Schwung", () =
     expect(schwungFaktor(-10, 1)).toBe(1);
     // In ihre Richtung: je weiter vorn, desto mehr, aber hoechstens 1 + staerke * max; wer kaum Netto hat, wird kaum verstaerkt.
     expect(schwungFaktor(6, 1)).toBeGreaterThan(schwungFaktor(3, 1));
-    expect(schwungFaktor(-6, -1)).toBeCloseTo(schwungFaktor(6, 1), 8);
+    // Der negative Schwung hat eine eigene, kleinere Obergrenze (Review 22.11.: ab Netto -5,7 galt durchgehend x10).
+    expect(schwungFaktor(-6, -1)).toBeLessThan(schwungFaktor(6, 1));
+    expect(schwungFaktor(-1000, -1)).toBeCloseTo(1 + P.schwungStaerke * P.schwungMaxNegativ, 8);
+    expect(schwungFaktor(-1000, -1)).toBeLessThan(schwungFaktor(1000, 1) / 2);
     expect(schwungFaktor(1000, 1)).toBeCloseTo(1 + P.schwungStaerke * P.schwungMax, 8);
     expect(schwungFaktor(1, 1)).toBeLessThan(1.15);
     expect(fokusFaktor(1)).toBeCloseTo(1.5, 8);
@@ -113,31 +116,34 @@ describe("Bausteine: Gewichte 60/40, Diligent 75/25, Leistung und Schwung", () =
     expect(trainingsBudgetFaktor(false, null)).toBeCloseTo(P.trainingsSkala, 8);
   });
 
-  it("verteileLeistung: nach Matrixgewicht der gespielten Disziplin, Summe bleibt erhalten, Matrix nur gelesen", () => {
-    const verteilt = verteileLeistung(10, new Map([["gewichtheben", 4]]));
+  it("verteileLeistung: nach Matrixgewicht JEDER gespielten Disziplin, Summe bleibt erhalten, Vorzeichen bleiben, Matrix nur gelesen", () => {
+    const verteilt = verteileLeistung(new Map([["gewichtheben", 10]]));
     const summe = Object.values(verteilt).reduce((a, b) => a + (b ?? 0), 0);
     expect(summe).toBeCloseTo(10, 6);
     const gesamt = playerGeneratorAttributeKeys.reduce((s, a) => s + officialDisciplineWeightTable[a].gewichtheben, 0);
     for (const a of playerGeneratorAttributeKeys) {
       expect(verteilt[a] ?? 0).toBeCloseTo((10 * officialDisciplineWeightTable[a].gewichtheben) / gesamt, 6);
     }
-    // Zwei Disziplinen: nach PP-Anteil gemischt.
-    const gemischt = verteileLeistung(10, new Map([["gewichtheben", 3], ["tennis", 1]]));
-    expect(Object.values(gemischt).reduce((a, b) => a + (b ?? 0), 0)).toBeCloseTo(10, 6);
+    // Zwei Einsaetze mit verschiedenem Vorzeichen: jeder nach seiner Disziplin, die Summe ist die Summe der Einheiten.
+    const gemischt = verteileLeistung(new Map([["gewichtheben", 6], ["tennis", -2]]));
+    expect(Object.values(gemischt).reduce((a, b) => a + (b ?? 0), 0)).toBeCloseTo(4, 6);
+    expect(verteileLeistung(new Map([["gewichtheben", 3]]), 2)).toEqual(
+      Object.fromEntries(Object.entries(verteileLeistung(new Map([["gewichtheben", 6]]))).map(([k, v]) => [k, v])),
+    );
   });
 
-  it("Leistung eines Spieltags: nur wer antrat, gegen den Median SEINER Liga; ohne Einsatz 0", () => {
+  it("Leistung eines Spieltags: nur wer antrat, jeder Einsatz gegen den Median SEINER Liga und Disziplin; ohne Einsatz 0", () => {
     const index: PpTagesIndex = {
       seasonId: "season-1",
       tage: new Map([
         [
           "md-1",
           {
-            median: new Map([["liga1", 2], ["liga2", 4]]),
+            median: new Map([["liga1|gewichtheben", 2], ["liga2|gewichtheben", 4]]),
             spieler: new Map([
-              ["gut", { pp: 4, jeDisziplin: new Map([["gewichtheben", 4]]), liga: "liga1" }],
-              ["gleich", { pp: 4, jeDisziplin: new Map([["gewichtheben", 4]]), liga: "liga2" }],
-              ["schwach", { pp: 0.5, jeDisziplin: new Map([["gewichtheben", 0.5]]), liga: "liga1" }],
+              ["gut", { jeDisziplin: new Map([["gewichtheben", 4]]), liga: "liga1" }],
+              ["gleich", { jeDisziplin: new Map([["gewichtheben", 4]]), liga: "liga2" }],
+              ["schwach", { jeDisziplin: new Map([["gewichtheben", 0.5]]), liga: "liga1" }],
             ]),
           },
         ],
@@ -200,15 +206,25 @@ describe("Ligafaktor auf den Abbau (Thermostat fuer das Liga-Mittel)", () => {
   it("bis zum dritten Spieltag 1; danach so, dass der Abbau der ganzen Saison das Gleichgewicht (Zuwaechse - negative Leistung) trifft, begrenzt auf 0,6 bis 1,6", () => {
     expect(ligaAbbauFaktor(liga(2, 1, 1))).toBe(1);
     expect(ligaAbbauFaktor(liga(5, 1, 1))).toBeCloseTo(1, 8);
-    expect(ligaAbbauFaktor(liga(5, 1.2, 1))).toBeCloseTo(19 / 15, 8);
-    expect(ligaAbbauFaktor(liga(5, 1, 1, undefined, -0.2))).toBeCloseTo(11 / 15, 8);
-    expect(ligaAbbauFaktor(liga(5, 9, 1))).toBe(1.6);
-    expect(ligaAbbauFaktor(liga(5, 0.1, 1))).toBe(0.6);
+    // Ohne den Schritt-Deckel waeren es 19/15, 11/15, 1,6 und 0,6; je Spieltag aendert sich der Faktor aber hoechstens um 0,1 (Review 22.11.).
+    expect(ligaAbbauFaktor(liga(5, 1.2, 1))).toBeCloseTo(1.1, 8);
+    expect(ligaAbbauFaktor(liga(5, 1, 1, undefined, -0.2))).toBeCloseTo(0.9, 8);
+    expect(ligaAbbauFaktor(liga(5, 9, 1))).toBeCloseTo(1.1, 8);
+    expect(ligaAbbauFaktor(liga(5, 0.1, 1))).toBeCloseTo(0.9, 8);
+  });
+
+  it("der Faktor folgt dem Gleichgewicht in Schritten von hoechstens 0,1 je Spieltag, vom zuletzt gebuchten Faktor aus, und bleibt in 0,6 bis 1,6", () => {
+    // Der letzte gebuchte Spieltag (md-5) trug f = 1,5; das Gleichgewicht liegt bei 1,6 -> hoechstens 1,6, nicht mehr als 1,5 + 0,1.
+    expect(ligaAbbauFaktor(liga(5, 9, 1, 1.5))).toBeCloseTo(1.6, 8);
+    // Vom Faktor 0,7 aus wird nach unten nur bis 0,6 gegangen (Untergrenze) und nach oben nur bis 0,8.
+    expect(ligaAbbauFaktor(liga(5, 0.1, 1, 0.7))).toBeCloseTo(0.6, 8);
+    expect(ligaAbbauFaktor(liga(5, 9, 1, 0.7))).toBeCloseTo(0.8, 8);
   });
 
   it("rechnet mit dem Abbau OHNE den damals angewendeten Faktor und laesst den eigenen Spieltag aus", () => {
     // Gebucht wurde a = 1,2 mit f = 1,2 (also Basis 1,0) und z = 1,2: Gleichgewicht bei Faktor 1,2.
     expect(ligaAbbauFaktor(liga(5, 1.2, 1.2, 1.2))).toBeCloseTo(1.2, 8);
+    expect(ligaAbbauFaktor(liga(5, 1.2, 1.2, 1.2))).not.toBeCloseTo(1.3, 3);
     expect(ligaAbbauFaktor(liga(5, 1, 1), "md-5")).toBeCloseTo(1, 8);
   });
 });
@@ -284,11 +300,11 @@ describe("Prognose und Saisonende nehmen nichts zurueck", () => {
     expect(Math.min(...werte)).toBeGreaterThan(-6);
   });
 
-  it("Rueckweg OLY_TRAINING_JE_SPIELTAG=aus: dieselbe Formel am Saisonende in einem Rutsch, Prognose zu Saisonbeginn gleich", () => {
+  it("OLY_TRAINING_JE_SPIELTAG=aus aendert in einer \"neu\"-Saison nichts (nur der Stempel entscheidet), Prognose bleibt gleich", () => {
     const aktiv = prognose(BASIS).map((e) => e.netSetpoints);
     process.env.OLY_TRAINING_JE_SPIELTAG = "aus";
     const aus = prognose(BASIS).map((e) => e.netSetpoints);
-    for (let i = 0; i < aktiv.length; i += 1) expect(Math.abs(aus[i]! - aktiv[i]!)).toBeLessThan(0.25);
+    expect(aus).toEqual(aktiv);
   });
 
   it("nach 20 gebuchten Spieltagen bucht das Saisonende nichts mehr: Training zeigt keinen negativen Anteil, Netto 0", () => {

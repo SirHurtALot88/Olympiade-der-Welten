@@ -62,7 +62,7 @@ import { entwicklungsParameter, trainingsBudgetFaktor } from "@/lib/training/ent
 import { fokusDominanz, istDiligent, ligaAbbauFaktor } from "@/lib/training/entwicklung-tag";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
 
-import { isTrainingJeSpieltagAktiv, resolveTrainingJeSpieltagFaktor } from "@/lib/training/training-je-spieltag-schalter";
+import { isTrainingJeSpieltagAktiv, resolveTrainingJeSpieltagFaktor, trainingJeSpieltagFuer } from "@/lib/training/training-je-spieltag-schalter";
 
 export { isTrainingJeSpieltagAktiv, resolveTrainingJeSpieltagFaktor };
 
@@ -678,7 +678,7 @@ export function ueberlastungsAbzug(modus: PlayerTrainingMode, gesamtBelastung: n
  */
 export function ueberlastungsAbzuegeFuerSpieltag(gameState: GameState, matchdayId: string): Map<string, number> {
   const abzuege = new Map<string, number>();
-  if (!isTrainingJeSpieltagAktiv()) return abzuege;
+  if (!trainingJeSpieltagFuer(gameState)) return abzuege;
   const seasonId = gameState.season.id;
   const imKader = new Set(gameState.rosters.map((eintrag) => eintrag.playerId));
   for (const player of gameState.players) {

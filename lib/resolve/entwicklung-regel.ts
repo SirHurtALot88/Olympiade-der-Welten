@@ -21,6 +21,7 @@
  * SCHALTER `OLY_ENTWICKLUNG` (nur Server, deploy/hetzner/docker-compose.yml):
  *   nicht gesetzt | "neu" | "an"   neue Saisons bekommen "neu" (Standard)
  *   "alt" | "aus" | "0"            Rueckweg: neue Saisons bekommen "alt"; gestempelte Saisons rechnen weiter wie gestempelt
+ *   (`OLY_TRAINING_JE_SPIELTAG=aus` wirkt wie `OLY_ENTWICKLUNG=alt`, solange `OLY_ENTWICKLUNG` nicht gesetzt ist)
  * Nur Battle-Spielstaende bekommen einen Stempel; der Manager-Modus bleibt "alt".
  */
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
@@ -36,9 +37,15 @@ function leseSchalter(wert: string | undefined): EntwicklungsRegelVersion | null
   return "neu";
 }
 
-/** Nur Server-Variable: der Stempel wird auf dem Server gesetzt, der Browser liest ihn aus dem Spielstand. */
+/**
+ * Nur Server-Variable: der Stempel wird auf dem Server gesetzt, der Browser liest ihn aus dem Spielstand.
+ * `OLY_TRAINING_JE_SPIELTAG=aus` (der Schalter des 18.11.) ist KEIN eigener Weg mehr: er setzt hier fuer neue Saisons den Stempel "alt",
+ * damit es genau einen Rueckweg gibt und nichts mitten in der Saison umschaltet. Ist `OLY_ENTWICKLUNG` gesetzt, gilt sie.
+ */
 export function entwicklungsRegelSchalter(): EntwicklungsRegelVersion {
-  return leseSchalter(process.env.OLY_ENTWICKLUNG) ?? "neu";
+  const ausdruecklich = leseSchalter(process.env.OLY_ENTWICKLUNG);
+  if (ausdruecklich) return ausdruecklich;
+  return leseSchalter(process.env.OLY_TRAINING_JE_SPIELTAG) === "alt" ? "alt" : "neu";
 }
 
 export type EntwicklungsRegelQuelle =
