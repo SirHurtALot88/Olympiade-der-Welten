@@ -1296,25 +1296,16 @@ export default function TrainingModern(props: TrainingModernProps) {
               <div data-testid="training-kennzahl-sp">
                 <em>SP Kader</em>
                 <strong className={`bc-t ${ton(kenn.spSumme)}`}>{vz(kenn.spSumme, 1)}</strong>
-                <small>Training bis Saisonende</small>
+                <small>bis Saisonende</small>
               </div>
               {kenn.vorliebenAktiv ? (
-                <>
-                  <div data-testid="training-kennzahl-lieblinge">
-                    <em>Liebling</em>
-                    <strong className="bc-t">
-                      {kenn.trainierenLiebling} / {kenn.anzahl}
-                    </strong>
-                    <small>trainieren ihren Liebling</small>
-                  </div>
-                  <div className={kenn.trainierenUngeliebt > 0 ? "is-warn" : ""} data-testid="training-kennzahl-ungeliebt">
-                    <em>Ungeliebt</em>
-                    <strong className="bc-t">
-                      {kenn.trainierenUngeliebt} / {kenn.anzahl}
-                    </strong>
-                    <small>trainieren Ungeliebtes</small>
-                  </div>
-                </>
+                <div className={kenn.trainierenUngeliebt > 0 ? "is-warn" : ""} data-testid="training-kennzahl-vorlieben">
+                  <em>Vorlieben</em>
+                  <strong className="bc-t">
+                    {kenn.trainierenLiebling} · {kenn.trainierenUngeliebt}
+                  </strong>
+                  <small>Lieb. · Ungel.</small>
+                </div>
               ) : null}
               <div>
                 <em>Belastung Ø</em>

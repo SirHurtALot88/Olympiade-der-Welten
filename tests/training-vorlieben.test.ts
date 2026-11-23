@@ -263,6 +263,18 @@ describe("Heatmap: dieselbe Rechnung wie die Buchung", () => {
     expect(aus.zeilen.every((z) => z.vorliebe === 0)).toBe(true);
   });
 
+  it("Rang in der Liga je Disziplin: 1 = bester, gezaehlt unter den Kaderspielern der eigenen Liga", () => {
+    const heat = baueZielHeatmap({ gameState: BASIS, playerId: SPIELER.id })!;
+    const kader = BASIS.rosters.map((r) => BASIS.players.find((p) => p.id === r.playerId)!);
+    for (const zeile of heat.zeilen.slice(0, 5)) {
+      const eigener = SPIELER.disciplineRatings?.[zeile.disziplinId];
+      if (typeof eigener !== "number") continue;
+      const besser = kader.filter((p) => p.id !== SPIELER.id && (p.disciplineRatings?.[zeile.disziplinId] ?? -1) > eigener).length;
+      expect(zeile.rangLiga).toBe(besser + 1);
+      expect(zeile.ligaGroesse).toBe(kader.length);
+    }
+  });
+
   it("Verletzte: Ausfall-Spieltage zaehlen nicht, die Prognose gilt ab der Rueckkehr", () => {
     const fenster = trainingsFenster(BASIS, SPIELER.id);
     expect(fenster.ids).toHaveLength(9);

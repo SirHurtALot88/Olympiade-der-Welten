@@ -5,7 +5,7 @@
  * Schrift: RaniraSeason fuer Ueberschriften und Namen, Barlow Condensed fuer Zahlen und Fliesstext (Tokens --bc-haus / --bc-zahl, lokal).
  */
 .tr2 {
-  --u: clamp(10px, min(0.8333vw, 1.4815vh), 34px);
+  --u: clamp(9px, min(0.8333vw, 1.36vh), 30px);
   --pow: #e2574c;
   --spe: #5fc27a;
   --men: #5aa2e6;
@@ -52,6 +52,8 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
+.tr2 svg.i {width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em;flex:none}
+.tr2 svg.f {width:1em;height:1em;fill:currentColor;vertical-align:-.14em;flex:none}
 .tr2 .t {font-variant-numeric:tabular-nums}
 .tr2 .gk {font-size:calc(var(--u)*.72);letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
 .tr2 .plus {color:var(--gut)}
@@ -188,7 +190,7 @@
 .tr2 .fa.top {outline:1px solid var(--gold);outline-offset:calc(var(--u)*.12);border-radius:calc(var(--u)*.2)}
 .tr2 .fa.top b {color:var(--gold)}
 .tr2 .hmf .p i {width:calc(var(--u)*.5);height:calc(var(--u)*.5);border-radius:50%;background:#fff;display:inline-block}
-.tr2 .vs {flex:1;min-height:0;display:flex;flex-direction:column;gap:calc(var(--u)*.6);padding:calc(var(--u)*.65) calc(var(--u)*.8) calc(var(--u)*.7)}
+.tr2 .vs {flex:1;min-height:0;display:flex;flex-direction:column;gap:calc(var(--u)*.45);padding:calc(var(--u)*.6) calc(var(--u)*.8) calc(var(--u)*.5)}
 .tr2 .sk {display:grid;grid-template-columns:calc(var(--u)*4.1) minmax(0,1fr) auto;gap:calc(var(--u)*.7);align-items:center;flex:none}
 .tr2 .sk .po {width:calc(var(--u)*4.1);height:calc(var(--u)*4.1);border-radius:calc(var(--u)*.5);overflow:hidden;border:2px solid var(--c)}
 .tr2 .sk .po img {width:100%;height:100%;object-fit:cover;object-position:center 18%}
@@ -199,7 +201,7 @@
 .tr2 .mo {display:flex;flex-direction:column;align-items:flex-end;gap:calc(var(--u)*.2);font-size:calc(var(--u)*.82);color:var(--leise);white-space:nowrap}
 .tr2 .mo b {font-size:calc(var(--u)*1.2);color:#fff}
 .tr2 .mo svg {width:calc(var(--u)*1.4);height:calc(var(--u)*1.4);vertical-align:calc(var(--u)*-.3)}
-.tr2 .kasten {flex:none;border:1px solid var(--linie);border-radius:calc(var(--u)*.45);background:var(--flaeche-2);padding:calc(var(--u)*.5) calc(var(--u)*.65)}
+.tr2 .kasten {flex:none;border:1px solid var(--linie);border-radius:calc(var(--u)*.45);background:var(--flaeche-2);padding:calc(var(--u)*.4) calc(var(--u)*.6)}
 .tr2 .kasten.vor {border-color:rgba(255,127,163,.45);background:linear-gradient(180deg,rgba(255,127,163,.09),var(--flaeche-2))}
 .tr2 .kasten h4 {margin:0 0 calc(var(--u)*.35);display:flex;align-items:center;gap:calc(var(--u)*.4);font-size:calc(var(--u)*.72);letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:700;white-space:nowrap}
 .tr2 .kasten h4 .sp {flex:1}
@@ -226,7 +228,7 @@
 .tr2 .fk span.s {border-color:rgba(255,96,88,.55);color:var(--warn)}
 .tr2 .fk span.l {border-color:rgba(255,127,163,.6);color:var(--lieb)}
 .tr2 .fk span.u {border-color:rgba(157,140,255,.6);color:var(--unlieb)}
-.tr2 .ar {display:grid;grid-template-columns:calc(var(--u)*2.4) calc(var(--u)*2.5) minmax(0,1fr) calc(var(--u)*3);gap:calc(var(--u)*.5);align-items:center;height:calc(var(--u)*1.45);font-size:calc(var(--u)*.9)}
+.tr2 .ar {display:grid;grid-template-columns:calc(var(--u)*2.4) calc(var(--u)*2.5) minmax(0,1fr) calc(var(--u)*3);gap:calc(var(--u)*.5);align-items:center;height:calc(var(--u)*1.3);font-size:calc(var(--u)*.9)}
 .tr2 .ar .ab {font-weight:700;color:var(--c)}
 .tr2 .ar .an2 {color:var(--leise);font-size:calc(var(--u)*.8)}
 .tr2 .ar .ba {position:relative;height:calc(var(--u)*.55);border-radius:calc(var(--u)*.3);background:#0a0e15;overflow:hidden}
@@ -318,4 +320,15 @@
   background: var(--flaeche-2);
   color: var(--tinte);
   font: 600 calc(var(--u) * 0.84) var(--bc-zahl);
+}
+.tr2 .vs {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.tr2 .kn-wrap {
+  flex: none;
+  padding: 0 calc(var(--u) * 0.8) calc(var(--u) * 0.7);
+}
+.tr2 .kn-wrap .kn {
+  margin-top: 0;
 }

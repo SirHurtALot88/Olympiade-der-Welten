@@ -111,6 +111,9 @@ export type HeatmapZeile = {
   bereich: Bereich | null;
   /** Eignung des Spielers in dieser Disziplin (Engine-Wert), `null` ohne Wert. */
   eignungHeute: number | null;
+  /** Rang in der eigenen Liga in dieser Disziplin (1 = bester) und Zahl der Spieler der Liga; `null` ohne Wert oder Liga. */
+  rangLiga: number | null;
+  ligaGroesse: number | null;
   vorliebe: VorliebeArt;
   vorliebeFaktor: number;
   zellen: HeatmapZelle[];
@@ -251,6 +254,37 @@ export function projiziereZelle(input: {
   };
 }
 
+/** Spieler der Liga des Spielers (Kader aller Teams derselben Liga); ohne Ligazuordnung alle Kaderspieler. */
+function ligaMitspieler(gameState: GameState, playerId: string): Player[] {
+  const teamId = gameState.rosters.find((r) => r.playerId === playerId)?.teamId ?? null;
+  const ligen = gameState.seasonState?.leagueByTeamId;
+  const meineLiga = teamId && ligen ? ligen[teamId] : null;
+  const spieler = new Map(gameState.players.map((p) => [p.id, p] as const));
+  const ergebnis: Player[] = [];
+  for (const r of gameState.rosters) {
+    if (meineLiga && ligen && ligen[r.teamId] !== meineLiga) continue;
+    const p = spieler.get(r.playerId);
+    if (p) ergebnis.push(p);
+  }
+  return ergebnis;
+}
+
+function ligaRang(
+  liga: Player[],
+  playerId: string,
+  disziplinId: string,
+  eigener: number | undefined,
+): { rangLiga: number | null; ligaGroesse: number | null } {
+  if (typeof eigener !== "number" || !Number.isFinite(eigener) || liga.length === 0) return { rangLiga: null, ligaGroesse: null };
+  let besser = 0;
+  for (const p of liga) {
+    if (p.id === playerId) continue;
+    const w = p.disciplineRatings?.[disziplinId];
+    if (typeof w === "number" && w > eigener) besser += 1;
+  }
+  return { rangLiga: besser + 1, ligaGroesse: liga.length };
+}
+
 /**
  * Die Heatmap eines Spielers fuer den Modus (Standard: sein aktueller). `null` ohne vollen Attributbogen. Die Rechnung ist teuer (60 Zellen x Spieltage),
  * der Aufrufer zwischenspeichert sie je (Spielstand, Spieler, Modus).
@@ -269,6 +303,7 @@ export function baueZielHeatmap(input: {
   const ersterId = fenster.ids[0] ?? null;
   const vorlieben = trainingsVorliebenAktivFuer(gameState);
   const zeilen: HeatmapZeile[] = [];
+  const liga = ligaMitspieler(gameState, player.id);
   for (const disziplinId of officialDisciplineWeightOrder) {
     const zellen: HeatmapZelle[] = [];
     for (const option of wegeFuerDisziplin(disziplinId)) {
@@ -291,6 +326,7 @@ export function baueZielHeatmap(input: {
         typeof eignung === "number" && Number.isFinite(eignung)
           ? eignung
           : null,
+      ...ligaRang(liga, player.id, disziplinId, eignung),
       vorliebe: art,
       vorliebeFaktor: vorliebeFaktor(art),
       zellen,

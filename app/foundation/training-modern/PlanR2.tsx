@@ -47,7 +47,6 @@ import {
 import {
   bremseKurz,
   bremsGrundText,
-  belastungsZone,
   naechsteSortierung,
   sortiereZeilen,
   wuenscheErfuellen,
@@ -691,7 +690,7 @@ function HeatmapTafel({
                 </span>
               </div>
               <div className="sph">
-                <span>Disziplin · Eignung · Rang Liga</span>
+                <span>Disziplin · Eignung · Liga</span>
                 <span>Primärweg</span>
                 <span>Nebenweg</span>
                 <span>Nebenweg</span>
@@ -741,6 +740,12 @@ function HeatmapTafel({
                         </b>
                         <span>
                           <b className="t">{zahl(z.eignungHeute, 1)}</b>
+                          {z.rangLiga != null ? (
+                            <>
+                              {" "}
+                              · Rang {z.rangLiga}/{z.ligaGroesse}
+                            </>
+                          ) : null}
                         </span>
                       </span>
                       {z.zellen.map((c) => {
@@ -933,7 +938,7 @@ function Vorschau({
         playerId,
         bisher: { ziel: planZiel, modus: zeile.modus },
         neu: { ziel: aktZiel, modus: aktModus },
-        anzahl: 6,
+        anzahl: 20,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -1055,17 +1060,12 @@ function Vorschau({
         </div>
         {zeile.verletzt ? (
           <div className="ruht" data-testid="training-vorschau-ruht">
-            <b>Nicht einsetzbar.</b> Das Training ruht, Ziel und Intensität
-            gelten ab der Rückkehr
-            {ruhtBis ? ` (Spieltag ${ruhtBis.nummer})` : ""}.{" "}
+            <b>Nicht einsetzbar.</b> Training ruht, Ziel und Intensität gelten
+            ab Spieltag {ruhtBis?.nummer ?? "—"}.{" "}
             {heatmap ? (
               <>
-                Gerechnet werden{" "}
-                <b>
-                  {heatmap.trainings} statt{" "}
-                  {heatmap.trainings + heatmap.spieltageVerletzt}
-                </b>{" "}
-                Trainings; keine Trainingslast, solange er fehlt.
+                Gerechnet: <b>{heatmap.trainings} statt {heatmap.trainings + heatmap.spieltageVerletzt}</b>{" "}
+                Trainings, keine Trainingslast.
               </>
             ) : null}
           </div>
@@ -1151,7 +1151,7 @@ function Vorschau({
                 {pm(fortschritt?.trainingSp ?? 0, 1)} SP
               </b>
               {fortschritt?.spieltage
-                ? ` · Spieltag ${fortschritt.spieltage.von}–${fortschritt.spieltage.bis}`
+                ? ` · ST ${fortschritt.spieltage.von}–${fortschritt.spieltage.bis}`
                 : " · noch kein Spieltag gebucht"}
             </em>
           </h4>
@@ -1351,7 +1351,7 @@ function Vorschau({
           </h4>
           {wirkung && wirkung.zeilen.length > 0 ? (
             <div className="an6">
-              {wirkung.zeilen.map((d) => (
+              {wirkung.zeilen.slice(0, 6).map((d) => (
                 <div
                   key={d.disziplinId}
                   className={`a6 c-${bereichVonDisziplin(d.disziplinId) ?? "bal"}${d.istZiel ? " zielz" : ""}`}
@@ -1413,16 +1413,13 @@ function Vorschau({
                   </span>
                 ))}
               </div>
-              <p className="vtx" style={{ marginTop: "calc(var(--u)*.3)" }}>
-                Einsatz an jedem Spieltag angenommen,{" "}
-                {belastungsZone(zeile.fatigue).name}. Ab {RISIKO_SCHWELLE}{" "}
-                Verletzungsrisiko.
-              </p>
             </>
           ) : (
             <p className="vtx">Keine Prognose.</p>
           )}
         </div>
+      </div>
+      <div className="kn-wrap">
         <div className="kn">
           <button
             type="button"

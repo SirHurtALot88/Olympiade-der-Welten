@@ -36,6 +36,15 @@ const ANSICHTEN: Ansicht[] = [
   { name: "heatmap-eignung-zyra", spieler: "Zyra", mass: "Eignung" },
   { name: "heatmap-zynara-verletzt", spieler: "Zynara" },
   { name: "heatmap-luft-conan", spieler: "Conan", mass: "Luft bis Decke" },
+  {
+    name: "nebel-fremdes-team",
+    spieler: "Maru",
+    aktion: async (page) => {
+      await page.getByTestId("training-fremdes-team-knopf").click();
+      await page.waitForTimeout(1500);
+      await page.mouse.move(960, 1070);
+    },
+  },
 ];
 
 function startServer(): ChildProcess {
@@ -106,14 +115,15 @@ async function aufnehmen() {
       await page.getByRole("tab", { name: /^Plan/ }).click();
       await page.getByTestId("training-plan").waitFor({ state: "visible", timeout: 120_000 });
       await page.waitForTimeout(2500);
+      await page.screenshot({ path: path.join(OUTPUT_DIR, `${PREFIX}-00-start-${groesse.breite}x${groesse.hoehe}.png`) });
       for (const ansicht of ANSICHTEN) {
         if (NUR.length > 0 && !NUR.includes(ansicht.name)) continue;
-        await page.getByTestId("training-plan-kaderzeile").filter({ hasText: ansicht.spieler }).first().click();
+        await page.getByTestId("training-plan-kaderzeile").filter({ hasText: ansicht.spieler }).first().click({ timeout: 15_000, force: true });
         await page.waitForTimeout(2500);
         const massName = ansicht.mass ?? "Skillpunkte";
         await page.getByTestId("training-heat-mass").getByRole("button", { name: massName }).click();
         await page.waitForTimeout(800);
-        await page.mouse.move(2, 2);
+        await page.mouse.move(960, 1070);
         if (ansicht.aktion) await ansicht.aktion(page);
         const datei = path.join(OUTPUT_DIR, `${PREFIX}-${ansicht.name}-${groesse.breite}x${groesse.hoehe}.png`);
         await page.screenshot({ path: datei });
