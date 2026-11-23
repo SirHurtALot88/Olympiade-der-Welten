@@ -9,7 +9,6 @@ import {
   istKaderDuenn,
   istTauschEignungsverlustKlein,
   KI_PUSH_DECKEL_SEITEN_FATIGUE,
-  kiMindestKaderFuerRotation,
   resolveSpitzenbedarf,
   type KiRehaEingabe,
 } from "@/lib/ai/ki-schonung-reha-regeln";
@@ -499,19 +498,23 @@ describe("KI-Schonung R4: Reha-Bau im laufenden Spiel", () => {
 // ---------------------------------------------------------------------------------------------
 // R5: Kader auffuellen
 // ---------------------------------------------------------------------------------------------
-describe("KI-Schonung R5: Teams unter 10 Spielern werden bevorzugt aufgefuellt", () => {
-  it("hebt das Planer-Ziel auf Spitzenbedarf minus 2, aber nie ueber das Kadermaximum", () => {
-    const gameState = rehaSpielstand({ teams: [{ id: "KI-D", modus: "ai", kader: 9, cash: 40 }] });
-    expect(kiMindestKaderFuerRotation(12)).toBe(10);
-    expect(resolveSpitzenbedarf(gameState)).toBe(12);
-    const ziele = resolvePlannerRosterTargets(gameState, "KI-D");
-    expect(ziele.playerOpt).toBe(10);
-    expect(ziele.playerMin).toBe(8);
+describe("Kaderziel der KI = Team-OPT, keine R5-Anhebung mehr (Chris 22.11.)", () => {
+  // Begruendung: R5 (#1689) hob das Ziel bei Spitzenbedarf 12 auf mindestens 13 und hebelte damit das OPT 9..14 aus der Identitaet aus.
+  it("laesst das Planer-Ziel bei Spitzenbedarf 12 auf dem Team-OPT (9 bzw. 11)", () => {
+    for (const opt of [9, 11]) {
+      const gameState = rehaSpielstand({ teams: [{ id: "KI-D", modus: "ai", kader: 8, cash: 40 }] });
+      gameState.teamIdentities[0]!.playerOpt = opt;
+      expect(resolveSpitzenbedarf(gameState)).toBe(12);
+      const ziele = resolvePlannerRosterTargets(gameState, "KI-D");
+      expect(ziele.playerOpt).toBe(opt);
+      expect(ziele.playerMin).toBe(8);
+      expect(ziele.playerMax).toBe(14);
+    }
   });
 
   it("laesst groessere Ziele unangetastet", () => {
     const gameState = rehaSpielstand({ teams: [{ id: "KI-D", modus: "ai", kader: 9, cash: 40 }] });
-    gameState.teamIdentities[0]!.playerOpt = 12;
-    expect(resolvePlannerRosterTargets(gameState, "KI-D").playerOpt).toBe(12);
+    gameState.teamIdentities[0]!.playerOpt = 14;
+    expect(resolvePlannerRosterTargets(gameState, "KI-D").playerOpt).toBe(14);
   });
 });

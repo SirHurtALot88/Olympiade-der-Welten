@@ -135,7 +135,6 @@ import { zaehleUngelesenFuerTeams } from "@/lib/foundation/inbox-postfach";
 import { canAdvanceMatchdayFromStep } from "@/lib/foundation/resolve-game-flow-action-step";
 import { getSeasonDisciplineSchedule } from "@/lib/season/season-discipline-schedule";
 import { disziplinReihenfolgeAusSpielplan } from "@/lib/season/saisonstand-modern-logik";
-import { resolveLigaWertungKopfzeile } from "@/lib/foundation/liga-wertung-kopfzeile";
 
 // Perf/DX (#57): these view panels used to come in eagerly through the
 // `foundation-page-client-exports` barrel (or, for the last five, a direct
@@ -191,7 +190,7 @@ const PlayerGeneratorPanel = dynamic(() => import("@/app/foundation/PlayerGenera
 });
 const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel"), {
   ssr: false,
-  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Taktik wird geladen…" />,
 });
 const FoundationSeasonFinalePanel = dynamic(
   () => import("@/app/foundation/season-v2/FoundationSeasonFinalePanel"),
@@ -251,6 +250,10 @@ const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/Fou
 const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/FoundationFinancesHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
+});
+const FoundationAusruestungHost = dynamic(() => import("@/app/foundation/ausruestung/FoundationAusruestungHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Ausrüstung wird geladen…" />,
 });
 const FoundationBattleArenaHost = dynamic(() => import("@/app/foundation/battle-arena/FoundationBattleArenaHost"), {
   ssr: false,
@@ -492,6 +495,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   orderedDisciplines,
   originateLoanForActiveTeam,
   vorstandBudgetAktion,
+  ausruestungAktion,
   kannVerwaltenAktivesTeam,
   repayLoanEarlyForActiveTeam,
   persistenceError,
@@ -1189,7 +1193,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             <FoundationSubNav
               className="foundation-shell-subnav"
               items={[
-                { id: "lineup", label: "Einsatzliste" },
+                { id: "lineup", label: "Taktik" },
                 { id: "formBoard", label: "Formplan" },
               ]}
               activeId={lineupDraftBoardViewRequest ?? lineupDraftBoardView}
@@ -1216,6 +1220,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               items={[
                 { id: "overview", label: "Übersicht" },
                 { id: "reports", label: "Scouting Report" },
+                { id: "merkliste", label: "Merkliste" },
               ]}
               activeId={scoutingCenterTab}
               onSelect={(id) => {
@@ -2189,7 +2194,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           </section>
 
           <section className={`panel foundation-scouting-center-v2-panel${getViewClass("scoutingCenterV2")}`}>
-            {activeView === "scoutingCenterV2" ? (
+            {activeView === "scoutingCenterV2" && scoutingCenterTab === "merkliste" ? (
+              <FoundationMerklisteHost {...foundationMerklisteHostProps} />
+            ) : activeView === "scoutingCenterV2" ? (
               <ScoutingCenterV2Client
                 activeTab={scoutingCenterTab}
                 onActiveTabChange={setScoutingCenterTab}
@@ -2558,7 +2565,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             clientKey={`lineup-${activeSaveId}-${gameState.season.id}-${gameState.matchdayState.matchdayId}-${effectiveActiveOwnerId}`}
             teamTooltip={
               selectedTeam
-                ? `${selectedTeam.name}: Einsatzliste mit Focus Mode — Slots, Kandidaten und Preview.`
+                ? `${selectedTeam.name}: Taktik mit Focus Mode — Slots, Kandidaten und Preview.`
                 : "Matchday Room für Teamwahl, Slots und Preview."
             }
             client={{
@@ -2808,397 +2815,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             />
           ) : null}
 
-          {activeView === "ranks" ? (
-          <>
-          <section className="panel" id="discipline-ranks">
-            <div className="panel-header ranks-panel-header">
-              <div className="ranks-panel-heading">
-                <TooltipHeading
-                  as="h2"
-                  tooltip="Retool-Logik: Pro Team zaehlen je Disziplin die Top 6 aktiven Spieler, ihre Werte werden summiert und ligaweit gerankt. TOT / POW / SPE / MEN / SOC zeigen die aggregierten Teamranks derselben Quelle."
-                >
-                  Ranks - Teamstärke pro Diszi
-                </TooltipHeading>
-                <div className="ranks-season-toolbar">
-                  <label className="filter-field ranks-season-select">
-                    <span>Saison</span>
-                    <select
-                      className="input"
-                      value={seasonOverviewSeasonId}
-                      onChange={(event) => setSeasonOverviewSeasonId(event.target.value)}
-                    >
-                      {(seasonOverviewOptions ?? []).map((option: SeasonOverviewOption) => (
-                        <option key={option.seasonId} value={option.seasonId}>
-                          {option.seasonName} {option.status === "active" ? "(aktiv)" : "(Archiv)"}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {/* LIGA-FILTER (Chris, Screenshot „Ranks – Teamstärke pro Diszi"): „bei den
-                      ranks muss man liga 1/2 filtern können und in der komplettansicht müssen
-                      die ranks dann auch von 1-32 gehen". "Beide Ligen" rankt jetzt echt 1-32
-                      (`rankMode:"combined"` im Rang-Engine), Liga 1/2 bleibt bei der bisherigen
-                      liga-lokalen 1-16-Rechnung. Nur sichtbar, wenn der Split ueberhaupt aktiv
-                      ist — ohne Split gibt es nur einen 1-32-Raum, ein Filter waere hier sinnlos. */}
-                  {isLeagueSplitActiveForRanks ? (
-                    <div
-                      className="ranks-league-filter"
-                      role="group"
-                      aria-label="Nach Liga filtern"
-                      data-testid="ranks-league-filter"
-                    >
-                      {(
-                        [
-                          { id: "alle" as const, label: "Beide Ligen" },
-                          { id: "liga1" as const, label: "Liga 1" },
-                          { id: "liga2" as const, label: "Liga 2" },
-                        ]
-                      ).map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          className={joinClassNames(
-                            "ranks-league-filter-toggle",
-                            rankLeagueFilter === option.id && "is-active",
-                          )}
-                          aria-pressed={rankLeagueFilter === option.id}
-                          onClick={() => setRankLeagueFilter(option.id)}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  {/* Wie auf dem Saisonstand (G5): Klartext statt der halbenglischen
-                      Status-Flag-Reihe „Live · Aktive Season · lokale Results" — die
-                      technische Quelle bleibt als Tooltip erreichbar. */}
-                  <span
-                    className={`pill ${isViewingArchivedRanksSeason ? "is-warning" : "is-ready"}`}
-                    title={seasonOverviewSourceLabel}
-                  >
-                    {resolveLigaWertungKopfzeile({
-                      istArchiv: isViewingArchivedRanksSeason,
-                      istAbgeschlossen: isSeasonEndPhase(gameState.gamePhase),
-                    })}
-                  </span>
-                  {ranksArchiveMissing ? (
-                    <span className="pill is-warning">Rang-Archiv fehlt — es zählt der laufende Stand</span>
-                  ) : null}
-                  {/* W1-Befund 7: Zustand und Aktion trennen — "alles gefüllt"
-                      ist ein Status (Pill), nur "nachpicken" ist ein Button. */}
-                  {!readMeta.readOnly && readMeta.source !== "prisma" && runBulkAiTeamsRefill ? (
-                    !bulkAiPicksRefillBusy && (underFilledAiTeamIds?.length ?? 0) === 0 ? (
-                      <span className="pill is-ready" title="Alle KI-Teams sind gefüllt — nichts zu tun">
-                        KI-Teams gefüllt
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="secondary-button inline-button"
-                        disabled={bulkAiPicksRefillBusy}
-                        title="Alle nicht befüllten KI-Teams automatisch nachpicken"
-                        onClick={() => void runBulkAiTeamsRefill()}
-                      >
-                        {bulkAiPicksRefillBusy
-                          ? bulkAiPicksProgress
-                            ? `Draftet… ${bulkAiPicksProgress.done}/${bulkAiPicksProgress.total}`
-                            : "Wirbt an…"
-                          : `KI-Teams nachpicken (${underFilledAiTeamIds?.length ?? 0})`}
-                      </button>
-                    )
-                  ) : null}
-                  {bulkAiPicksRefillBusy && bulkAiPicksProgress ? (
-                    <span className="pill is-running ranks-draft-progress" title="KI-Draft läuft — Teams werden nacheinander besetzt">
-                      <span className="ranks-draft-progress-count">
-                        <strong>{bulkAiPicksProgress.done}</strong>
-                        <span className="muted"> / {bulkAiPicksProgress.total} Teams gepickt</span>
-                      </span>
-                      <span className="ranks-draft-progress-bar" aria-hidden="true">
-                        <span
-                          style={{
-                            width: `${
-                              bulkAiPicksProgress.total > 0
-                                ? Math.round((bulkAiPicksProgress.done / bulkAiPicksProgress.total) * 100)
-                                : 0
-                            }%`,
-                          }}
-                        />
-                      </span>
-                    </span>
-                  ) : null}
-                  {!bulkAiPicksRefillBusy && bulkAiPicksRefillMessage ? (
-                    <span
-                      className={`pill ${bulkAiPicksRefillMessage.tone === "success" ? "is-ready" : "is-warning"}`}
-                      title={bulkAiPicksRefillMessage.text}
-                    >
-                      {bulkAiPicksRefillMessage.text}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              {/* W1 (Chris' Entscheidung): Achsen-Gruppen statt px-Spalten-Manager.
-                  Je Gruppe ein Schalter, der alle Disziplin-Spalten der Achse
-                  ein-/ausblendet; "Standard" setzt das Tabellen-Layout zurück. */}
-              <div className="ranks-axis-groups" role="group" aria-label="Achsen-Gruppen ein- oder ausblenden" data-testid="ranks-axis-groups">
-                <span className="ranks-axis-groups-label">Achsen-Gruppen</span>
-                {ranksAxisGroups.map((group) => (
-                  <button
-                    key={group.category}
-                    type="button"
-                    className={joinClassNames(
-                      "ranks-axis-group-toggle",
-                      `is-${group.category}`,
-                      group.anyVisible && "is-active",
-                    )}
-                    aria-pressed={group.anyVisible}
-                    title={
-                      group.anyVisible
-                        ? `${group.label}-Disziplinen ausblenden (${group.columns.length} Spalten)`
-                        : `${group.label}-Disziplinen einblenden (${group.columns.length} Spalten)`
-                    }
-                    onClick={() =>
-                      group.columns.forEach((column) =>
-                        setTableColumnVisible("disciplineRanksTable", column.id, !group.anyVisible),
-                      )
-                    }
-                  >
-                    <span className="ranks-axis-group-dot" aria-hidden="true" />
-                    {group.label}
-                    <small className="nl-tnum">{group.columns.length}</small>
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="ghost-button ranks-axis-groups-reset"
-                  onClick={() => resetTableLayout("disciplineRanksTable", disciplineRanksColumns)}
-                  title="Alle Spalten, Reihenfolge und Breiten auf den Standard zurücksetzen"
-                >
-                  Standard
-                </button>
-              </div>
-            </div>
-            <section className="ranks-leader-grid" aria-label="Aktuelle Teamstärke Leader">
-              {rankLeaderCards.map((entry: FoundationDisciplineLeaderEntry) => (
-                <article key={`rank-leader-${entry.id}`} className={`ranks-leader-card is-${entry.tone}`}>
-                  <span>{entry.label}</span>
-                  <strong>{entry.row?.team.name ?? "—"}</strong>
-                  {/* „Stärke", nicht „Punkte": der Wert ist der Teamstärke-Score der Rank-Matrix
-                      (scorePack — Summe der Top-6-Disziplin-Ratings der Kader, team-discipline-
-                      rank-engine.ts), keine erspielte Größe. „Punkte" meint auf derselben Seite
-                      bereits die PPs des Saison-Rankings — ein Wort pro Größe. */}
-                  <small title="Teamstärke-Score aus den Disziplin-Ratings der Kader (Rank-Matrix) — nicht die erspielten PPs des Saison-Rankings">
-                    {entry.row ? `#1 · Stärke ${formatLocalePoints(entry.row.scorePack[entry.scoreKey], 1)}` : "keine Werte"}
-                  </small>
-                </article>
-              ))}
-            </section>
-            {/* W1: Legende trennt die zwei Farbsysteme — Zellenfarbe = Rang,
-                Achsenfarbe lebt nur noch im Gruppenband über den Spalten. */}
-            <div className="ranks-color-legend" role="note" aria-label="Farb-Legende der Rank-Matrix" data-testid="ranks-color-legend">
-              <span className="ranks-color-legend-item">
-                <b>Zellenfarbe = Rang:</b>
-                <span className="ranks-heatstrip" role="img" aria-label="Heat-Skala: Rang 1 bis 3 grün, 4 bis 6 gelb, 7 bis 10 rot, ab 11 ruhig">
-                  <i className="rank-strong" />
-                  <i className="rank-mid" />
-                  <i className="rank-weak" />
-                  <i className="rank-muted" />
-                </span>
-                <span className="nl-tnum">1–3 · 4–6 · 7–10 · ab 11 ruhig</span>
-              </span>
-              <span className="ranks-color-legend-item">
-                <b>Farbband oben = Achse</b> (Power · Speed · Mental · Social) — Kürzel hovern zeigt den vollen Disziplinnamen.
-              </span>
-              <span className="ranks-color-legend-item is-scrollhint">Weitere Disziplinen rechts — die Tabelle scrollt, die Team-Spalte bleibt stehen.</span>
-            </div>
-            <div className="ranks-table-scrollwrap">
-            <div className="table-shell">
-              <table className="team-table ranks-table">
-                <colgroup>
-                  {visibleDisciplineRanksColumns.map((column: FoundationTableColumn) => (
-                    <col key={column.id} style={{ width: `${getTableColumnWidth("disciplineRanksTable", column)}px` }} />
-                  ))}
-                </colgroup>
-                <thead>
-                  {/* W1: Gruppenband — die EINZIGE Stelle mit Achsenfarbe. */}
-                  <tr className="ranks-group-row" data-testid="ranks-axis-group-row">
-                    {ranksHeaderGroups.map((group) => (
-                      <th
-                        key={group.key}
-                        colSpan={group.span}
-                        scope="colgroup"
-                        className={joinClassNames(
-                          "ranks-group-cell",
-                          `is-${group.category}`,
-                          group.category === "team" && "ranks-sticky-team",
-                        )}
-                      >
-                        {group.label}
-                      </th>
-                    ))}
-                  </tr>
-                  <tr>
-                    {visibleDisciplineRanksColumns.map((column: FoundationTableColumn, columnIndex: number) => {
-                      const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
-                      const previousDiscipline = [...visibleDisciplineRanksColumns.slice(0, columnIndex)]
-                        .reverse()
-                        .map((entry: FoundationTableColumn) => orderedDisciplines.find((disciplineEntry: Discipline) => disciplineEntry.id === entry.id))
-                        .find(Boolean);
-                      const startsDisciplineGroup = Boolean(discipline && previousDiscipline?.category !== discipline.category);
-                      return (
-                        <th
-                          key={column.id}
-                          {...getTableHeaderDragProps("disciplineRanksTable", column, visibleDisciplineRanksColumns)}
-                          className={joinClassNames(
-                            column.id === "team" ? "ranks-sticky-team" : "",
-                            getRanksMetricToneClass(column.id, "head"),
-                            discipline ? `season-standings-cell-discipline ranks-head-discipline ranks-head-discipline-${discipline.category}` : "",
-                            startsDisciplineGroup && "ranks-discipline-group-start",
-                          )}
-                          style={{ width: `${getTableColumnWidth("disciplineRanksTable", column)}px`, minWidth: `${column.minWidth}px` }}
-                        >
-                          <div className="resizable-header-cell">
-                            <SortableHeader
-                              label={column.label}
-                              tableId="disciplineRanks"
-                              columnKey={column.dataKey}
-                              sortState={tableSorts.disciplineRanks}
-                              onToggle={toggleTableSort}
-                              tooltip={
-                                discipline
-                                  ? `${discipline.name} — Teamstärke-Rang in dieser Disziplin (Top-6-Spieler je Team). Klick sortiert.`
-                                  : (RANKS_AGGREGATE_COLUMN_TOOLTIPS[column.id] ?? null)
-                              }
-                            />
-                            <span className="column-resizer" draggable={false} role="separator" aria-orientation="vertical" aria-label={`${column.label} Breite anpassen`} onMouseDown={(event) => startTableColumnResize("disciplineRanksTable", column, event)} onDoubleClick={() => resetTableColumnWidth("disciplineRanksTable", column)} />
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedDisciplineRankRows.map((row: FoundationDisciplineRankRow) => (
-                    <tr
-                      key={row.team.teamId}
-                      className={joinClassNames(
-                        "ranks-row-clickable",
-                        row.team.teamId === activeManagerTeamId && "is-active-team-row",
-                        activeTeamRivalIds.has(row.team.teamId) && "is-rival",
-                        getOwnerTeamHighlightClass(resolvedTeamControlSettings[row.team.teamId]),
-                      )}
-                      onClick={() => openTeamProfileById(row.team.teamId)}
-                      title={`${row.team.name} — Teamprofil öffnen`}
-                    >
-                      {visibleDisciplineRanksColumns.map((column: FoundationTableColumn, columnIndex: number) => {
-                        if (column.id === "team") {
-                          return (
-                            <td key={column.id} className="ranks-sticky-team">
-                              <span className="ranks-team-name-wrap">
-                                {/* Liga-Badge nur in der kombinierten Ansicht — bei Liga-1/2-Filter
-                                    ist die Liga schon durch den Filter selbst klar (Chris' Ask). */}
-                                {isLeagueSplitActiveForRanks && rankLeagueFilter === "alle" && row.league ? (
-                                  <span
-                                    className={joinClassNames(
-                                      "ranks-league-badge",
-                                      row.league === "liga1" ? "is-liga1" : "is-liga2",
-                                    )}
-                                    title={row.league === "liga1" ? "Liga 1" : "Liga 2"}
-                                  >
-                                    {row.league === "liga1" ? "L1" : "L2"}
-                                  </span>
-                                ) : null}
-                                {row.team.name}
-                                {row.team.teamId === activeManagerTeamId ? (
-                                  <span className="ranks-own-tag">Dein Team</span>
-                                ) : null}
-                                {activeTeamRivalIds.has(row.team.teamId) ? <RivalTag /> : null}
-                              </span>
-                            </td>
-                          );
-                        }
-                        if (column.id === "rosterSize") {
-                          // Reine Auskunft, kein Rang — deshalb ohne Heat-Farbe. Die Zahl steht
-                          // neben den Raengen, damit „stark" und „duenn besetzt" unterscheidbar
-                          // bleiben.
-                          return (
-                            <td key={column.id} className="nl-tnum" title={`${row.team.name}: ${row.rosterSize} Spieler im Kader`}>
-                              {row.rosterSize}
-                            </td>
-                          );
-                        }
-                        if (column.id === "totalRank") {
-                          return (
-                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.total > 0 ? getRankHeatClass(row.totalRank, gameState.teams.length) : "")}>
-                              <RanksRankCell rank={row.totalRank} delta={row.rankDeltas?.total} />
-                            </td>
-                          );
-                        }
-                        if (column.id === "powRank") {
-                          return (
-                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.pow > 0 ? getRankHeatClass(row.powRank, gameState.teams.length) : "")}>
-                              <RanksRankCell rank={row.powRank} delta={row.rankDeltas?.pow} />
-                            </td>
-                          );
-                        }
-                        if (column.id === "speRank") {
-                          return (
-                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.spe > 0 ? getRankHeatClass(row.speRank, gameState.teams.length) : "")}>
-                              <RanksRankCell rank={row.speRank} delta={row.rankDeltas?.spe} />
-                            </td>
-                          );
-                        }
-                        if (column.id === "menRank") {
-                          return (
-                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.men > 0 ? getRankHeatClass(row.menRank, gameState.teams.length) : "")}>
-                              <RanksRankCell rank={row.menRank} delta={row.rankDeltas?.men} />
-                            </td>
-                          );
-                        }
-                        if (column.id === "socRank") {
-                          return (
-                            <td key={column.id} className={joinClassNames(getRanksMetricToneClass(column.id, "cell"), row.scorePack.soc > 0 ? getRankHeatClass(row.socRank, gameState.teams.length) : "")}>
-                              <RanksRankCell rank={row.socRank} delta={row.rankDeltas?.soc} />
-                            </td>
-                          );
-                        }
-                        const rank = row.disciplineRanks[column.id] ?? 0;
-                        const discipline = orderedDisciplines.find((entry: Discipline) => entry.id === column.id);
-                        const previousDiscipline = [...visibleDisciplineRanksColumns.slice(0, columnIndex)]
-                          .reverse()
-                          .map((entry: FoundationTableColumn) => orderedDisciplines.find((disciplineEntry: Discipline) => disciplineEntry.id === entry.id))
-                          .find(Boolean);
-                        const startsDisciplineGroup = Boolean(discipline && previousDiscipline?.category !== discipline.category);
-                        return (
-                          <td
-                            key={`${row.team.teamId}-${column.id}`}
-                            className={joinClassNames(
-                              "ranks-discipline-cell",
-                              discipline ? `ranks-discipline-cell-${discipline.category}` : "",
-                              startsDisciplineGroup && "ranks-discipline-group-start",
-                              row.scorePack.disciplines[column.id] > 0 ? getRankHeatClass(rank, gameState.teams.length) : "",
-                            )}
-                          >
-                            {rank}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            </div>
-          </section>
-          <FoundationRanksHost {...foundationRanksHostProps} />
-          </>
-          ) : null}
+          {activeView === "ranks" ? <FoundationRanksHost {...foundationRanksHostProps} /> : null}
 
           {activeView === "leagueLeaders" ? <FoundationLeagueLeadersHost {...foundationLeagueLeadersHostProps} /> : null}
 
           {activeView === "allTimeTable" ? <FoundationAllTimeTableHost {...foundationAllTimeTableHostProps} /> : null}
           {activeView === "seasonArchive" ? <FoundationSeasonArchiveHost {...foundationSeasonArchiveHostProps} /> : null}
-
-          {activeView === "merkliste" ? <FoundationMerklisteHost {...foundationMerklisteHostProps} /> : null}
 
           {activeView === "diszis" ? <FoundationDiszisHost {...foundationDiszisHostProps} /> : null}
           {/* S4/A4 (Audit Spieltag): Der frühere Standalone-View `disciplineStage` ist
@@ -3291,6 +2913,15 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onOpenTeam={(teamId) => openTeamProfileById(teamId)}
               onVorstandAktion={vorstandBudgetAktion}
               onOpenOffice={() => navigateHomeTab("office")}
+              kannVerwalten={kannVerwaltenAktivesTeam}
+            />
+          ) : null}
+
+          {activeView === "ausruestung" ? (
+            <FoundationAusruestungHost
+              gameState={gameState}
+              teamId={activeManagerTeamId}
+              onAktion={ausruestungAktion}
               kannVerwalten={kannVerwaltenAktivesTeam}
             />
           ) : null}

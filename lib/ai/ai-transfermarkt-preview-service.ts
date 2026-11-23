@@ -4,7 +4,7 @@ import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-
 import { getTeamObjectiveAiBias, type TeamObjectiveAiBias } from "@/lib/board/team-season-objectives-service";
 import type { ContractShape, GameState, Player, Team, TeamControlMode, TeamStrategyProfile } from "@/lib/data/olyDataTypes";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { getTransferControlSettings as getTeamControlSettings } from "@/lib/ai/ki-delegierte-transfers";
 import { getTeamStrategyProfile, withNormalizedTeamStrategyProfiles } from "@/lib/foundation/team-strategy-profiles";
 import { withNormalizedTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { loadFoundationSnapshotFromPrisma } from "@/lib/db/read/foundation-read-repository";

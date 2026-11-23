@@ -12,6 +12,8 @@ import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-pot
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { stempleWirtschaftsRegelnBeimAnlegen } from "@/lib/resolve/wirtschafts-regeln";
+import { startbudgetStaffelFuerNeuesSpiel } from "@/lib/resolve/startbudget-staffel";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
 import { stempleFormkartenRegelBeimAnlegen } from "@/lib/resolve/formkarten-regel";
 import { stempleEntwicklungsRegelBeimAnlegen } from "@/lib/resolve/entwicklung-regel";
@@ -76,6 +78,8 @@ export type NewGameTeamPreview = {
   shortCode: string;
   name: string;
   budget: number;
+  /** Startkasse inkl. Startbudget-Staffel (= budget bei Schalter aus). `budget` bleibt die Basis fuer Rang und Stufen. */
+  startkasse?: number;
   startRank: number;
   controlMode: TeamControlMode;
   ownerId: string;
@@ -446,6 +450,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   );
 
   const resetGameState = baselineReset.ok ? baselineReset.gameState : baseGameState;
+  const startbudgetStaffel = startbudgetStaffelFuerNeuesSpiel(resetGameState.teams);
 
   /**
    * LIGA-SPLIT AKTIVIERUNG NUR FUER BATTLE-MODE-SAVES (docs/design/battle-mode-spielmodus-plan.md,
@@ -571,7 +576,8 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     },
     teams: resetGameState.teams.map((team) => ({
       ...team,
-      cash: team.budget,
+      // Startkasse = Basis-Budget + Startbudget-Staffel (lib/resolve/startbudget-staffel.ts); `budget` bleibt die Basis fuer Rang und Stufen.
+      cash: team.budget + (startbudgetStaffel.aufschlag[team.teamId] ?? 0),
       humanControlled: humanTeamIds.has(team.teamId),
     })),
     rosters: [],
@@ -586,6 +592,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     seasonState: {
       ...resetGameState.seasonState,
       seasonId: "season-1",
+      startbudgetStaffel,
       standings,
       // Liga-Split-Aktivierung (siehe Kommentar oben) NUR fuer Battle-Mode-Saves. Manager Mode:
       // leagueByTeamId explizit leer, `schedule` bleibt unangetastet (ererbter Baseline-Spielplan).
@@ -659,10 +666,12 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     // Platz, Resistenz, Pause nach Spieltag 10 und aktiver Erholung 4,0.
     // FINANZEN JE SPIELTAG (22.11.): Gehalt, Sponsor-Basis und Gebaeude werden ab Saison 1 je Spieltag gebucht
     // (Rueckweg: OLY_FINANZEN_JE_SPIELTAG=aus).
+    stempleWirtschaftsRegelnBeimAnlegen(
     stempleFinanzenJeSpieltagBeimAnlegen(
       stempleBelastungsRegelBeimAnlegen(
         stempleEntwicklungsRegelBeimAnlegen(stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers)))),
       ),
+    ),
     ),
     input.saveId,
   );
@@ -702,6 +711,7 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
         shortCode: team.shortCode,
         name: team.name,
         budget: team.budget,
+        startkasse: team.budget + (startbudgetStaffel.aufschlag[team.teamId] ?? 0),
         startRank: startRankByTeamId.get(team.teamId) ?? 0,
         controlMode: setting.controlMode,
         ownerId: setting.ownerId ?? AI_OWNER_ID,

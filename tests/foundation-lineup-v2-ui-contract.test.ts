@@ -74,8 +74,8 @@ describe("foundation lineup ui contract", () => {
     expect(clientText).toContain("focusV2DisciplineTacticPreviewBySide");
 
     expect(panelText).toContain('"foundation-lineup-v2"');
-    expect(panelText).toContain("Einsatzliste");
-    expect(panelText).not.toContain("Einsatzliste v2");
+    expect(panelText).toContain("Taktik");
+    expect(panelText).not.toContain("Taktik v2");
 
     expect(routingText).toContain('return "lineup"');
     expect(routingText).toContain("lineup-v2");

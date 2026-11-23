@@ -52,13 +52,6 @@ export const KI_REHA_RUECKLAGE_S1_FAKTOR = 0.5;
 /** R4: Spitzenbedarf, wenn der Spielplan keinen liefert (Chris: min 4, max 12 je Spieltag). */
 export const KI_SPITZENBEDARF_FALLBACK = 12;
 
-/** R5: Teams mit weniger Spielern als Spitzenbedarf minus dieser Luft werden in der Kaderplanung bevorzugt aufgefuellt. */
-export const KI_KADER_LUFT_AUFFUELLEN = 2;
-/** R5: Auffuell-Ziel ist mindestens diese Kadergroesse (Spitzenbedarf minus Luft). */
-export function kiMindestKaderFuerRotation(spitzenbedarf: number): number {
-  return Math.max(8, spitzenbedarf - KI_KADER_LUFT_AUFFUELLEN);
-}
-
 /** Hoechster Spieltagsbedarf (Summe beider Disziplinen) im Spielplan der Saison; ohne Spielplan der Fallback. */
 export function resolveSpitzenbedarf(gameState: GameState): number {
   let max = 0;

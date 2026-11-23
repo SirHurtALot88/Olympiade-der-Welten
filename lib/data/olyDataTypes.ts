@@ -1,3 +1,4 @@
+import type { AusruestungRegelStempel, AusruestungSpielstand } from "@/lib/ausruestung/ausruestung-typen";
 import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import type { LeagueTier } from "@/lib/season/league-split";
@@ -1369,7 +1370,7 @@ export type TeamControlSettings = {
 };
 
 /** Die Bereiche, die ein menschlicher Manager selbst entscheidet oder an die KI abgibt. */
-export type DelegationBereich = "einsatzliste" | "draft" | "transfers" | "training" | "gebaeude" | "sponsor";
+export type DelegationBereich = "einsatzliste" | "draft" | "transfers" | "training" | "gebaeude" | "sponsor" | "ausruestung";
 
 /** Die drei festen Stufen; Einzelschalter in `TeamDelegation.bereiche` gehen ihnen vor. */
 export type DelegationStufe = "voll_selbst" | "halbautomatik" | "voll_ki";
@@ -2637,6 +2638,12 @@ export type RosterEntry = {
   roleTag: "starter" | "bench" | "prospect";
   promisedRole?: RosterPromisedRole | null;
   joinedSeasonId: string;
+  /**
+   * Saison-1-Draft-Pick (Review 22.11. Befund 9): gesetzt, sobald der Spieler im Liga-Setup-Draft (Blocklauf ODER Einzelschritt) zum
+   * Team kam. Die Sperre „feste Konditionen, verhandelt wird erst am Ende von Saison 1“ liest diese Kennung (und weiter den
+   * Draft-Verlauf), damit sie nicht vom Draft-Weg abhaengt. Siehe `lib/contracts/draft-pick-markierung.ts`.
+   */
+  draftPickS1?: true;
   /**
    * Verlaengerung WAEHREND der Saison (21.11., docs/design/verlaengerung-in-saison-21-11.md).
    *
@@ -4211,12 +4218,30 @@ export type SeasonState = {
    */
   wertungsSkalen?: { seasonId: string; pp: "alt" | "c2"; ergebnis: "alt" | "e1"; ppAb?: string; ppTagesanker?: boolean };
   /**
+   * WIRTSCHAFTS-REGELN DIESER SAISON (22.11., lib/resolve/wirtschafts-regeln.ts): Kaderpflicht-Quote, Erwartungsanker, Kernschutz und
+   * Rueckkauf-Sperre. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der Stempel oder gehoert er zu einer
+   * anderen Saison, gilt "alt". `vorjahr`: Platzierung der Vorsaison je Team als Anteil 0..1 in der heutigen Liga.
+   */
+  wirtschaftsRegeln?: {
+    seasonId: string;
+    quote: "alt" | "neu";
+    anker: "alt" | "neu";
+    kernschutz: "alt" | "neu";
+    vorjahr?: Record<string, number>;
+  } | null;
+  /**
    * FINANZEN JE SPIELTAG (22.11., lib/finance/finanzen-je-spieltag.ts): "v1" = Gehalt, Sponsor-Basis, Gebaeude-Einnahme
    * und -Unterhalt werden je Spieltag zu 1/N gebucht (`spieltagFinanzen`), nur Rang-/Sonderziel-Sponsor, Apron, Ziele
    * und Kredit bleiben am Saisonende. Gesetzt beim Anlegen und beim Saisonwechsel, nie mitten in der Saison. Fehlt der
    * Stempel oder gehoert er zu einer anderen Saison, gilt der alte Weg (alles am Saisonende).
    */
   finanzenJeSpieltag?: { seasonId: string; version: "v1" } | null;
+  /**
+   * STARTBUDGET-STAFFEL (22.11., lib/resolve/startbudget-staffel.ts): Aufschlag auf die Startkasse je Team nach Budget-Platz
+   * (`20 + 2 x (32 - Platz)`), gesetzt NUR beim Anlegen eines Spiels. `team.budget` bleibt die Basis (Rang, Stufen), `team.cash` startet bei
+   * budget + aufschlag. Fehlt der Stempel (bestehender Spielstand), gab es keinen Aufschlag.
+   */
+  startbudgetStaffel?: { regel: "alt" | "neu"; aufschlag: Record<string, number> } | null;
   /** Ledger der Spieltagsbuchungen (je Team und Spieltag eine Zeile), siehe `SpieltagFinanzBuchung`. */
   spieltagFinanzen?: SpieltagFinanzBuchung[];
   /**
@@ -4268,6 +4293,11 @@ export type SeasonState = {
    * gesetzt beim Laden. Gebuchte Spieltage behalten ihr Format.
    */
   breakingFormat?: { seasonId: string; wechsel: Array<{ ab: string | null; format: "gauntlet" | "tagteam" }> } | null;
+  /**
+   * AUSRUESTUNGS-REGEL DIESER SAISON (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste (Besitz, Wirkung, Schmiede, Effekte)
+   * je Spieltag, gesetzt beim Laden. Gebuchte Spieltage behalten ihre Stufe. Phase 1a: nur Besitz, Wirkung "keine".
+   */
+  ausruestungRegel?: AusruestungRegelStempel | null;
   /**
    * MIGRATION M1 (docs/SPONSOR_PREISGELD_SOCKEL_ENTWURF.md, Abschnitt 5). Versionsstempel der
    * einmaligen Neuberechnung noch NICHT abgerechneter Sponsorleitern auf die V3-Basisleiter.
@@ -4641,6 +4671,11 @@ export type GameState = {
   playerMoraleState?: PlayerMoraleState[];
   /** Spieler-Form, nur mit `OLY_FORM_MORAL=1` gepflegt (s. `PlayerFormState`). */
   playerFormState?: PlayerFormState[];
+  /**
+   * AUSRUESTUNG (22.11., lib/ausruestung/*): Besitz je Team (Lager, Materialien, Teile, Ruhm, Truhen). BEWUSST AUF DER OBERSTEN
+   * EBENE (ueberlebt den Saisonwechsel). Fremde Teams stehen NICHT in der Nutzlast an den Browser (`ausruestung-sicht.ts`).
+   */
+  ausruestung?: AusruestungSpielstand | null;
   playerRelationshipEvents?: PlayerRelationshipEventRecord[];
   playerDemands?: PlayerDemandRecord[];
   teamCaptains?: TeamCaptainRecord[];

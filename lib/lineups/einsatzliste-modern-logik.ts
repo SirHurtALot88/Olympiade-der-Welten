@@ -235,7 +235,7 @@ export function bauePruefsaetze(input: {
   if (input.kaderLueckeSatz) saetze.push({ id: "kader-luecke", ton: "warnung", satz: input.kaderLueckeSatz });
 
   if (!saetze.some((satz) => satz.ton === "fehler" || satz.ton === "warnung")) {
-    saetze.unshift({ id: "ok", ton: "ok", satz: "Alles in Ordnung — die Einsatzliste kann abgegeben werden." });
+    saetze.unshift({ id: "ok", ton: "ok", satz: "Alles in Ordnung — die Taktik kann abgegeben werden." });
   }
   const rang: Record<PruefTon, number> = { fehler: 0, warnung: 1, hinweis: 2, ok: 3 };
   return saetze.sort((a, b) => rang[a.ton] - rang[b.ton]);

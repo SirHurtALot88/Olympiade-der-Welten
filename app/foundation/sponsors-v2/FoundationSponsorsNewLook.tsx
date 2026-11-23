@@ -652,7 +652,12 @@ function ActiveContractHero({
   return (
     <NlCard className={`nl-sponsor-hero is-${contract.archetype}`} data-testid="nl-sponsor-active-contract">
       <div className="nl-sponsor-hero-main">
-        <SponsorCrest name={contract.name} archetype={contract.archetype} />
+        <SponsorCrest
+          name={contract.name}
+          archetype={contract.archetype}
+          brandId={contract.sponsorParentBrandId ?? contract.sponsorBrandId}
+          kante={64}
+        />
         <div className="nl-sponsor-hero-copy">
           <span className="nl-sponsor-hero-kicker">
             Aktiver Vertrag · {shapeLabel} · {familyLabel}
@@ -944,6 +949,7 @@ export default function FoundationSponsorsNewLook({
         teamName: team.name,
         shortCode: team.shortCode,
         sponsorName: contract?.name ?? null,
+        sponsorBrandId: contract?.sponsorParentBrandId ?? contract?.sponsorBrandId ?? null,
         archetype: contract?.archetype ?? null,
         // Rarität/Kurvenform robust auflösen (Back-Compat für alte Verträge).
         rarity: contract ? (contract.rarity ?? "gewöhnlich") : null,
@@ -1116,7 +1122,7 @@ export default function FoundationSponsorsNewLook({
         return row.sponsorName ? (
           <span className="nl-sponsor-league-sponsorcell">
             <span className="nl-sponsor-league-crest">
-              {row.archetype ? <SponsorCrest name={row.sponsorName} archetype={row.archetype} /> : null}
+              {row.archetype ? <SponsorCrest name={row.sponsorName} archetype={row.archetype} brandId={row.sponsorBrandId} kante={32} /> : null}
             </span>
             <span className="nl-sponsor-league-sponsorname">{row.sponsorName}</span>
             {row.curveShape ? (

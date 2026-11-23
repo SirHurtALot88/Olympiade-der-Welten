@@ -17,6 +17,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import { APPLY_CONFIRM_TOKEN, LegacyMatchdayResultApplyService } from "@/lib/resolve/legacy-matchday-result-apply-service";
 import { buildLegacyMatchdayResolvePreview } from "@/lib/resolve/legacy-matchday-resolve-engine";
 import { buildPrizeMoneyPreview } from "@/lib/season/prize-money-preview";
+import { startbudgetStaffelAufschlag } from "@/lib/resolve/startbudget-staffel";
 import { CASH_PRIZE_APPLY_CONFIRM_TOKEN, executeCashPrizeApply } from "@/lib/season/cash-prize-apply-service";
 import { ADVANCE_MATCHDAY_CONFIRM_TOKEN, executeMatchdayAdvance } from "@/lib/season/matchday-progress-service";
 import { buildStandingsPreview } from "@/lib/standings/standings-preview-engine";
@@ -158,7 +159,7 @@ function validateFreshSeasonStart(saveId: string) {
     // deshalb korrekterweise EINEN Kaderspieler und um genau diesen Kaufpreis weniger Cash als
     // Budget. Nur P-S ist ausgenommen — bei allen anderen Teams bleibt die Gleichheit eine harte
     // Zusicherung, damit echte Startgeld-Fehler weiterhin auffliegen.
-    if (row.budget !== row.cash && row.teamId !== NULA_MASCOT_TEAM_ID) {
+    if (Math.abs(row.budget + startbudgetStaffelAufschlag(gameState, row.teamId) - row.cash) > 0.005 && row.teamId !== NULA_MASCOT_TEAM_ID) {
       throw new Error(`Fresh save budget/cash mismatch for ${row.teamId}: budget=${row.budget}, cash=${row.cash}`);
     }
     if (row.rosterCount !== roster.length) {

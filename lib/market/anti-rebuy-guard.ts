@@ -22,9 +22,16 @@ function isCurrentPreseasonSale(entry: TransferHistoryEntry, seasonId: string) {
   );
 }
 
-export function buildRecentlySoldByTeam(gameState: GameState, seasonId = gameState.season.id) {
-  const byTeam = new Map<string, Map<string, RecentlySoldPlayer>>();
+/** Je Verlaufs-Array und Saison einmal gebaut (Review Runde 2, Punkt 8). */
+const SPERRE_CACHE = new WeakMap<object, Map<string, Map<string, Map<string, RecentlySoldPlayer>>>>();
 
+export function buildRecentlySoldByTeam(gameState: GameState, seasonId = gameState.season.id) {
+  const schluessel = seasonId;
+  const cacheTraeger = gameState.transferHistory as unknown as object;
+  const zwischen = SPERRE_CACHE.get(cacheTraeger);
+  const treffer = zwischen?.get(schluessel);
+  if (treffer) return treffer;
+  const byTeam = new Map<string, Map<string, RecentlySoldPlayer>>();
   for (const entry of gameState.transferHistory) {
     if (!isCurrentPreseasonSale(entry, seasonId) || !entry.fromTeamId) {
       continue;
@@ -45,6 +52,7 @@ export function buildRecentlySoldByTeam(gameState: GameState, seasonId = gameSta
     byTeam.set(entry.fromTeamId, teamSales);
   }
 
+  (zwischen ?? SPERRE_CACHE.set(cacheTraeger, new Map()).get(cacheTraeger)!).set(schluessel, byTeam);
   return byTeam;
 }
 

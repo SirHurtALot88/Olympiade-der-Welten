@@ -614,11 +614,11 @@ export function ReiterKarriere({ data, onOpenFull }: { data: PlayerDetailDrawerD
         ))}
         {preise.length === 0 ? <div className="spr-leer">Noch keine Auszeichnung.</div> : null}
       </Abschnitt>
-      <Abschnitt titel="Wechsel" klein="Kauf, Verkauf, Vertragsende" testId="spielerkurzprofil-wechsel">
+      <Abschnitt titel="Wechsel" klein="Kauf, Verkauf (auch Vertragsende)" testId="spielerkurzprofil-wechsel">
         {wechsel.map((eintrag) => (
           <div key={eintrag.id} className="spr-zeile">
             <span>
-              {eintrag.transferType === "buy" ? "Kauf" : eintrag.transferType === "sell" ? "Verkauf" : "Vertragsende"} · {eintrag.seasonLabel}
+              {eintrag.transferType === "buy" ? "Kauf" : eintrag.transferType === "sell" ? "Verkauf" : "Verkauf (Vertragsende)"} · {eintrag.seasonLabel}
               <small>{eintrag.toTeamName ?? eintrag.fromTeamName ?? "—"}</small>
             </span>
             <strong className="spr-t">{geld(eintrag.fee, 1)}</strong>

@@ -326,7 +326,7 @@ describe("ai market plan convergence service", () => {
     expect(secondCall?.options?.excludeBuyPlayerIds).toContain("fa-blocked");
   });
 
-  it("skips convergence for team already at identity opt even when below slot depth", async () => {
+  it("skips convergence for team already at its planner target (Chris 22.11.: Ziel = Team-OPT 10, auch bei Spitzenbedarf 12; die R5-Anhebung auf 13 ist entfallen)", async () => {
     const gameState = buildGameState({
       teams: [makeTeam({ teamId: "team-bp", name: "BP", shortCode: "B-P", cash: 5 })],
       teamIdentities: [makeTeamIdentity({ teamId: "team-bp", playerMin: 8, playerOpt: 10 })],

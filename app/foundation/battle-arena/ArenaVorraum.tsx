@@ -443,7 +443,7 @@ function Teamtafel({ team, disziplinName }: { team: VorstellungTeam; disziplinNa
               </div>
             </>
           ) : null}
-          <div className="fussn">Deine Einsatzliste, wie abgegeben. Gezeigt = gebucht.</div>
+          <div className="fussn">Deine Taktik, wie abgegeben. Gezeigt = gebucht.</div>
         </>
       ) : (
         <>
@@ -821,7 +821,7 @@ export function ArenaVorstellung({
             {listenGesperrt ? (
               <span className="marke zu">
                 <Ico n="schloss" />
-                Einsatzlisten gesperrt
+                Taktiken gesperrt
               </span>
             ) : null}
           </div>

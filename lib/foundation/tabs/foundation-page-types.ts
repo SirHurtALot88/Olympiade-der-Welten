@@ -82,7 +82,6 @@ export type FoundationView =
   | "trainingV2"
   | "players"
   | "playerProfile"
-  | "merkliste"
   | "teamProfile"
   | "ranks"
   | "diszis"
@@ -99,6 +98,7 @@ export type FoundationView =
   | "admin"
   | "credits"
   | "finances"
+  | "ausruestung"
   | "changelog"
   | "battleArena";
 
@@ -2085,6 +2085,7 @@ export type NewGameTeamPreview = {
   shortCode: string;
   name: string;
   budget: number;
+  startkasse?: number;
   startRank: number;
   controlMode: TeamControlMode;
   ownerId: string;

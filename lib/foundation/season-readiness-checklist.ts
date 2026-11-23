@@ -75,10 +75,10 @@ function buildSeasonActiveItems(gameState: GameState, teamId: string): SeasonRea
       id: "lineup",
       label: "Lineup bestätigt",
       detail: lineupSubmitted
-        ? "Einsatzliste für den aktuellen Spieltag bestätigt."
+        ? "Taktik für den aktuellen Spieltag bestätigt."
         : lineupComplete
-          ? "Slots voll — bitte in der Einsatzliste bestätigen."
-          : "Einsatzliste noch nicht spielbereit.",
+          ? "Slots voll — bitte in der Taktik bestätigen."
+          : "Taktik noch nicht spielbereit.",
       status: lineupSubmitted ? "ready" : lineupComplete ? "open" : rosterCount > 0 ? "open" : "blocked",
       targetView: "lineup",
     },

@@ -550,7 +550,8 @@ describe("ai market plan apply service", () => {
     persistenceState.save.gameState.teamIdentities = [
       makeTeamIdentity({ teamId: "A-I", playerMin: 7, playerOpt: 10 }),
     ] as GameState["teamIdentities"];
-    persistenceState.save.gameState.rosters = Array.from({ length: 10 }, (_, index) =>
+    // Review 22.11.: das Planer-Ziel ist Spitzenbedarf (12, Fallback) + 1 Ersatz = 13 — ein "at Opt"-Team hat jetzt 13 Spieler.
+    persistenceState.save.gameState.rosters = Array.from({ length: 13 }, (_, index) =>
       makeRosterEntry({
         id: `r-A-I-${index + 1}`,
         teamId: "A-I",

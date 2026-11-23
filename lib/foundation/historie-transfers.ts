@@ -64,7 +64,7 @@ export type HistorieTrennung<T> = {
   kaderaufbau: T[];
   /** Alles andere ausser auslaufenden Vertraegen: Transfers. */
   transfers: T[];
-  /** Vertragsende / Abgang, kein Transfer im Sinn der Bilanz. */
+  /** Verkauf durch Vertragsende (Chris 22.11.: zaehlt als Verkauf, nur ohne Ablöseerloes in der Bilanz). */
   abgaenge: T[];
 };
 
@@ -130,7 +130,7 @@ export function dealsAlsCsv(zeilen: readonly HistorieDealZeile[]): string {
       text(zeitText(zeile)),
       text(zeile.seasonLabel),
       text(zeile.playerName),
-      text(dealArt(zeile)),
+      text(dealArt(zeile) === "abgang" ? "verkauf (vertragsende)" : dealArt(zeile)),
       text(zeile.fromTeamName ?? ""),
       text(zeile.toTeamName ?? ""),
       zahl(zeile.fee),

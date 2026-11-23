@@ -298,7 +298,7 @@ test("local cockpit flow is playable through the UI", async ({ page }) => {
 
   expect(freshSave.gameState.teams).toHaveLength(32);
   expect(
-    freshSave.gameState.teams.every((team) => Number(team.cash.toFixed(2)) === Number(team.budget.toFixed(2))),
+    freshSave.gameState.teams.every((team) => Number(team.cash.toFixed(2)) === Number((team.budget + (freshSave.gameState.seasonState.startbudgetStaffel?.aufschlag?.[team.teamId] ?? 0)).toFixed(2))),
   ).toBe(true);
   expect(
     Object.values(freshSave.gameState.seasonState.standings ?? {}).every((entry) => (entry?.points ?? 0) === 0),
@@ -370,7 +370,7 @@ test("local cockpit flow is playable through the UI", async ({ page }) => {
   await page.goto(`${BASE_URL}/foundation?view=lineup`);
   await expect(page).toHaveURL(/view=lineup/);
   const lineupSection = page.getByTestId("foundation-lineup");
-  await expect(lineupSection.getByRole("heading", { name: "Einsatzliste" }).first()).toBeVisible({ timeout: STEP_TIMEOUT_MS });
+  await expect(lineupSection.getByRole("heading", { name: "Taktik" }).first()).toBeVisible({ timeout: STEP_TIMEOUT_MS });
   await expect(lineupSection.getByRole("button", { name: "Lineup speichern" })).toBeVisible({ timeout: STEP_TIMEOUT_MS });
 
   console.log("[ui-cockpit] seed lineups");

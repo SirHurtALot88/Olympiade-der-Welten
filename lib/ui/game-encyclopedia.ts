@@ -123,7 +123,7 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
     meaning:
       "Jeder Platz belastet ein bestimmtes Attribut des Spielers. Die Resistenz ist sein Wert in genau diesem Attribut: liegt er über der Schwelle des Platzes (45, 60 oder 75 je nach niedrig, mittel, hoch), kostet der Einsatz weniger Erschöpfung, liegt er darunter, mehr. Die Resistenz wirkt nur auf die Erschöpfung; das Verletzungsrisiko folgt dann aus der Erschöpfung.",
     factors: ["Resistenz = Wert im Belastungs-Attribut des Platzes", "unter der Schwelle bis zu +4 Last, darüber bis zu −2", "Einsatzstufe und Eigenschaften verändern die Last zusätzlich", "nach Spieltag 10 gibt es eine Pause: alle erholen sich einen spielfreien Spieltag"],
-    usage: "Setze resistente Spieler auf harte Plätze und schwache Spieler auf leichte. Die Einsatzliste zeigt dir die Last je Platz, bevor du bestätigst.",
+    usage: "Setze resistente Spieler auf harte Plätze und schwache Spieler auf leichte. Die Taktik zeigt dir die Last je Platz, bevor du bestätigst.",
     caveat: "Gilt in Saisons, die mit der neuen Belastungsregel angelegt wurden (20 Spieltage); eine bereits laufende Saison rechnet noch nach der alten Regel.",
   },
   {
@@ -282,7 +282,7 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
     meaning:
       "Jeder Einsatz kostet Erschöpfung. Sie sinkt durch Erholung (Bank, aktive Erholung, Reha-Zentrum, Trainingsmodus) und durch die Pause nach Spieltag 10. Je höher sie ist, desto größer das Risiko, dass sich der Spieler verletzt.",
     factors: ["Last des Platzes, Einsatzstufe und Resistenz des Spielers", "Erholung auf der Bank und im Training", "Reha-Zentrum erhöht die Erholung", "Pause nach Spieltag 10: alle erholen sich einen spielfreien Spieltag"],
-    usage: "Schau vor jedem Spieltag auf die Last-Vorschau in der Einsatzliste und rotiere, bevor jemand zu erschöpft ist.",
+    usage: "Schau vor jedem Spieltag auf die Last-Vorschau in der Taktik und rotiere, bevor jemand zu erschöpft ist.",
   },
   {
     id: "netto-forecast",
@@ -424,7 +424,7 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
     category: "System",
     short: "Je Bereich selbst entscheiden oder an die KI geben.",
     meaning:
-      "Für jeden Bereich (Einsatzliste und Formkarten, Draft, Käufe/Verkäufe/Verträge, Training, Gebäude, Sponsor) kannst du selbst entscheiden oder die KI machen lassen. Drei Stufen: Voll selbst, Halbautomatik (die KI stellt auf und trainiert, Käufe und Verkäufe machst du selbst) und Voll KI. Was du selbst gesetzt hast, überschreibt die KI nicht.",
+      "Für jeden Bereich (Taktik und Formkarten, Draft, Käufe/Verkäufe/Verträge, Training, Gebäude, Sponsor) kannst du selbst entscheiden oder die KI machen lassen. Drei Stufen: Voll selbst, Halbautomatik (die KI stellt auf und trainiert, Käufe und Verkäufe machst du selbst) und Voll KI. Was du selbst gesetzt hast, überschreibt die KI nicht.",
     factors: ["Voll selbst · Halbautomatik · Voll KI", "die KI nutzt dieselben Regeln wie die KI-Teams", "sie füllt nur, was du nicht selbst gesetzt hast", "die Freigabe des Vorstands gilt für sie genauso"],
     usage: "Gib Bereiche ab, auf die du keine Lust hast; ein Spieltag wartet nie auf einen abwesenden Mitspieler, dessen Bereich delegiert ist.",
   },
@@ -436,7 +436,7 @@ export const GAME_ENCYCLOPEDIA_ENTRIES: GameEncyclopediaEntry[] = [
     short: "Pro Disziplin-Seite legbare Karten mit Bonus oder Malus für den Spieltag.",
     meaning:
       "Formkarten werden je Disziplin-Seite (D1/D2) gelegt. Eine Karte wirkt auf alle Spieler der Seite und zusätzlich auf die Spieler, deren Klassenfarbe der Kartenfarbe entspricht (Farbträger). Passt die Kartenfarbe zur Farbe der Disziplin, zählt sie voll, sonst nur halb. Pluskarten helfen, Minuskarten schaden. Seit der Plus/Minus-Regel (neue Spiele ab Saison 1, bestehende ab dem nächsten Saisonwechsel) gibt es keine 0er mehr, die Werte sind 2, 4, 6 und 8, und jede Karte hat eine Gegenfarbe (Kraft gegen Geist, Tempo gegen Sozial): bei Spielern der Gegenfarbe wird ein Viertel des Kartenwerts gegengerechnet (eine Pluskarte hilft ihnen weniger, eine Minuskarte schadet ihnen weniger).",
-    factors: ["Karte passend zur Disziplinfarbe: voller Wert für alle, sonst halber Wert", "Zusatzbonus für Spieler, deren Klassenfarbe = Kartenfarbe (nicht die Rolle, nicht die Disziplinfarbe)", "Spitze: bis +12 je Karte, wenn die Farbe passt und der Spieler Träger ist", "Pflicht-Minuskarten müssen bis Saisonende gelegt sein, sonst gibt es Strafpunkte", "die gelegte Karte zählt in allen zwanzig Disziplinen; die Einsatzliste zeigt vorab, was sie bringt"],
+    factors: ["Karte passend zur Disziplinfarbe: voller Wert für alle, sonst halber Wert", "Zusatzbonus für Spieler, deren Klassenfarbe = Kartenfarbe (nicht die Rolle, nicht die Disziplinfarbe)", "Spitze: bis +12 je Karte, wenn die Farbe passt und der Spieler Träger ist", "Pflicht-Minuskarten müssen bis Saisonende gelegt sein, sonst gibt es Strafpunkte", "die gelegte Karte zählt in allen zwanzig Disziplinen; die Taktik zeigt vorab, was sie bringt"],
     usage: "Lege Pluskarten dort, wo viele Farbträger spielen, und verteile Minuskarten auf Disziplinen, in denen ein Duell ohnehin entschieden ist.",
   },
   {

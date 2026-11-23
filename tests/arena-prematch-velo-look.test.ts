@@ -144,7 +144,7 @@ describe("Die relevante Information ist der Held", () => {
   it("eigene Einsatzliste mit Zählern und echtem CTA", () => {
     expect(PREMATCH).toContain("Plätzen besetzt");
     expect(PREMATCH).toContain('data-testid="arena-prematch-lineup-cta"');
-    expect(PREMATCH).toContain("Einsatzliste öffnen →");
+    expect(PREMATCH).toContain("Taktik öffnen →");
   });
 
   it("der CTA ist bis in den Router verdrahtet (Arena → Einsatzliste)", () => {

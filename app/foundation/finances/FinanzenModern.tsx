@@ -24,6 +24,8 @@ import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-poli
 import type { FinanceLeagueTableRow, FinancesViewModel } from "@/lib/foundation/finances/finances-types";
 import type { SalaryFactorOutlook } from "@/lib/foundation/finances/salary-factor-outlook";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { sponsorWappenPfadFuer } from "@/lib/sponsor/sponsor-wappen";
+import { SponsorWappen } from "@/components/foundation/sponsor/SponsorWappen";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 import "./finanzen-modern.css";
@@ -284,7 +286,7 @@ function Uebersicht({ m, gew, setGew }: { m: FinanzSeiteModell; gew: number; set
 const ART_TEXT: Record<string, string> = {
   transfer_kauf: "Kauf",
   transfer_verkauf: "Verkauf",
-  vertragsende_abloese: "Vertragsende",
+  vertragsende_abloese: "Verkauf (Vertragsende)",
   sponsor: "Sponsor",
   gehalt_und_sponsor_saisonende: "Saisonabrechnung",
   gehalt_spieltag: "Gehalt",
@@ -830,13 +832,17 @@ function SponsorAnsicht({ m, gameState }: { m: FinanzSeiteModell; gameState: Gam
       </div>
     );
   }
+  const wappen = sponsorWappenPfadFuer(vertrag);
   const erwartet = m.stand.herleitung.sponsorErwartung;
   return (
     <div className="fin-gr" style={{ gridTemplateRows: "auto minmax(0,1fr)" }} data-testid="fin-sponsor">
       <div className="fin-rech is-gross is-voll" style={{ "--n": 4, margin: 0 } as CSSProperties}>
-        <div>
-          <small>Hauptsponsor</small>
-          <strong className="bc-t" style={{ fontSize: "clamp(18px,1.2vw,30px)" }}>{vertrag.name}</strong>
+        <div className={wappen ? "fin-sponsor-kopf" : undefined}>
+          {wappen ? <SponsorWappen pfad={wappen} kante={48} /> : null}
+          <span>
+            <small>Hauptsponsor</small>
+            <strong className="bc-t" style={{ fontSize: "clamp(18px,1.2vw,30px)" }}>{vertrag.name}</strong>
+          </span>
         </div>
         <div className="is-su">
           <small>Erwartete Einnahme</small>

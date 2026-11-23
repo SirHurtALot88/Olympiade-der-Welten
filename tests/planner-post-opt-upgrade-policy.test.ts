@@ -57,7 +57,7 @@ function gameStateWithPrices(prices: number[]): GameState {
 describe("planner-post-opt-upgrade-policy", () => {
   it("allows 1-2 on-top buys at opt when spendable cash remains", () => {
     const mandate = resolvePostOptUpgradeMandate(
-      richOptGameState({ cash: 100, salary: 40, roster: 8, playerOpt: 8 }),
+      richOptGameState({ cash: 100, salary: 40, roster: 13, playerOpt: 13 }),
       "S-S",
     );
     expect(mandate.active).toBe(true);

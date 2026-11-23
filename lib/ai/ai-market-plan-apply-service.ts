@@ -42,7 +42,7 @@ import type {
   TeamControlMode,
   TeamStrategyProfile,
 } from "@/lib/data/olyDataTypes";
-import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { getTransferControlSettings as getTeamControlSettings, istTransferAnKiDelegiert } from "@/lib/ai/ki-delegierte-transfers";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import { isTransferActionAllowed } from "@/lib/season/transfer-season-policy";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -1515,6 +1515,7 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     gameState: preflightGameState,
   });
   recordPhase("marketPlanPreview", Date.now() - scanStartedAt);
+  if (!preview) throw new Error("ai_market_plan_preview_missing");
   const baselineCloneStartedAt = Date.now();
   const baselineGameState = dryRun
     ? preflightGameState
@@ -1608,7 +1609,8 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
     // check below: `team.controlMode` comes from `seasonState.teamControlSettings`, which can lag
     // `room.state.teamOwnership` (the authoritative record of who actually owns a team in an
     // online room) — `callerWritableTeamIds` is read from whichever is authoritative.
-    if (callerWritableTeamIds && !callerWritableTeamIds.has(team.teamId)) {
+    // Delegierter Bereich Transfers (Runde 2, Punkt 6): gehoert dem Team, nicht dem Ausloeser des Laufs.
+    if (callerWritableTeamIds && !callerWritableTeamIds.has(team.teamId) && !istTransferAnKiDelegiert(preflightGameState, team.teamId)) {
       nextResult.result = "skipped_not_writable";
       nextResult.blockingReasons = ["team_not_writable_by_caller"];
       nextResult.warnings = [];

@@ -298,6 +298,22 @@
   font-weight: 700;
   white-space: nowrap;
 }
+/* Hauptsponsor mit Wappen (22.11.): Bild fest 48 px links, Name daneben; die Zelle bleibt so hoch wie ihre Nachbarn. */
+.fin-rech > div.fin-sponsor-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: left;
+}
+.fin-rech > div.fin-sponsor-kopf > span {
+  min-width: 0;
+}
+.fin-rech > div.fin-sponsor-kopf strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .fin-rech .is-su {
   background: var(--bc-flaeche-3);
 }

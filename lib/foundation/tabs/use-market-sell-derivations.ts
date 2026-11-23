@@ -67,7 +67,7 @@ export type MarketSellPlayerPerformance = {
 };
 
 function getTransferTypeLabel(type: "buy" | "sell" | "contract_exit") {
-  if (type === "contract_exit") return "Vertragsende";
+  if (type === "contract_exit") return "Verkauf (Vertragsende)";
   return type === "buy" ? "Kauf" : "Verkauf";
 }
 

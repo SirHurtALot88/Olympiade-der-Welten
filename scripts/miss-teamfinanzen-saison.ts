@@ -51,6 +51,8 @@ import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
+process.env.OLY_KERN_VERKAUF_LOG ??= "1";
+import { KERN_VERKAUF_LOG } from "@/lib/ai/organic-squad/draft-adapter";
 import { fuehreKiPreseasonLaufAus } from "@/lib/ai/ai-preseason-background-service";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { getTeamFacilityUpkeepTotal, getTeamActualSalaryTotal, getTeamNegotiatedSalaryTotal } from "@/lib/sponsor/sponsor-team-salary-display";
@@ -98,8 +100,8 @@ const STOP_AFTER = arg("stop-after", "");
 const NUR_ANLAGE = process.argv.includes("--nur-anlage");
 /** Vorhandene (kopierte) Anlage-SQLite weiterverwenden: saveId, ab dem Draft laufen. */
 const VON_ANLAGE = arg("von-anlage", "");
-/** "block" (Standard, alter Hintergrund-Draft) oder "einzelschritt" (neuer Liga-Draft Pick fuer Pick). */
-const DRAFT_ART = arg("draft", "block") as "block" | "einzelschritt";
+/** "einzelschritt" (Standard seit 22.11., wie die App: Liga-Draft Pick fuer Pick) oder "block" (alter Hintergrund-Draft; setzt seit Befund 9 dieselbe Roster-Kennung `draftPickS1`). */
+const DRAFT_ART = arg("draft", "einzelschritt") as "block" | "einzelschritt";
 
 /**
  * S1-KADERBAU-VARIANTEN (18.11., Messung "S1 ohne Draft"):
@@ -112,6 +114,12 @@ const DRAFT_ART = arg("draft", "block") as "block" | "einzelschritt";
  */
 const VARIANTE = arg("variante", "A") as "A" | "C" | "C2";
 const MISCHEN = arg("mischen", "");
+/**
+ * BUDGET-VARIANTE (Messung 22.11., docs/design/guv-saisonfaktor-messung-22-11.md): `--budget-variante plus20plus2` hebt NACH der
+ * Anlage (vor Sponsor-Pruefung und Draft) jedes Startbudget um 20 (Rang 32) und je Platz besser um weitere 2 an (Chris 22.11.)
+ * (Rang 32 +20, Rang 31 +22 ... Rang 1 +82). Rein im Messskript, kein Produktcode. Rangfolge bleibt erhalten (monoton).
+ */
+const BUDGET_VARIANTE = arg("budget-variante", "");
 
 const t0 = Date.now();
 const log = (msg: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0).padStart(5)}s] ${msg}`);
@@ -356,6 +364,17 @@ async function main() {
       applyGameModeOwnership(persistence.getSaveById(saveId)!.gameState, { saveMode: "solo_1", chrisTeamIds: [], frankyTeamIds: [] }),
     );
     persistence.saveSingleplayerState(saveId, kiState);
+    if (BUDGET_VARIANTE === "plus20plus2") {
+      const rangListe = [...kiState.teams].sort((a, b) => (b.budget ?? 0) - (a.budget ?? 0) || a.teamId.localeCompare(b.teamId));
+      const zuschlag = new Map(rangListe.map((t, i) => [t.teamId, 20 + 2 * (32 - (i + 1))] as const));
+      const angehoben: GameState = {
+        ...kiState,
+        teams: kiState.teams.map((t) => ({ ...t, budget: r2(t.budget + (zuschlag.get(t.teamId) ?? 0)), cash: r2(t.cash + (zuschlag.get(t.teamId) ?? 0)) })),
+      };
+      persistence.saveSingleplayerState(saveId, angehoben);
+      Object.assign(kiState, angehoben);
+      log(`Budget-Variante plus20plus2: Summe +${r2([...zuschlag.values()].reduce((a, b) => a + b, 0))}`);
+    } else if (BUDGET_VARIANTE) throw new Error(`Unbekannte --budget-variante ${BUDGET_VARIANTE}`);
     const ohneSponsor = kiState.teams.filter((t) => getTeamSponsorContract(kiState, t.teamId) == null).map((t) => t.teamId);
     if (ohneSponsor.length > 0) throw new Error(`Teams ohne Sponsor vor dem Draft: ${ohneSponsor.join(",")}`);
     log(`32 KI-Teams, alle mit Sponsor`);
@@ -380,6 +399,7 @@ async function main() {
   }
   const phasen = run.phasen as Record<string, unknown>;
   const schreibe = () => {
+    run.kernVerkaeufe = [...KERN_VERKAUF_LOG];
     if (OUT) fs.writeFileSync(OUT, JSON.stringify(run));
   };
   const finish = () => {
@@ -507,6 +527,8 @@ async function main() {
     // Spieltage
     const md = get().gameState.season.matchdayIds.length;
     const kasseJeSpieltag: Record<string, number[]> = {};
+    // Chris 22.11.: gleichzeitig verletzte Spieler je Team und Spieltag (Verletzt/Genesend laut Verfuegbarkeitsstand) - Entscheidung, ob 14 als Kadergrenze reicht.
+    const verletztJeSpieltag: Record<string, number[]> = {};
     const ts = Date.now();
     for (let i = ersterIdx; i < md; i += 1) {
       const cur = get();
@@ -520,11 +542,20 @@ async function main() {
       const adv = await executeMatchdayAdvance({ saveId, seasonId: sid, source: "sqlite", execute: true, confirm: ADVANCE_MATCHDAY_CONFIRM_TOKEN }, persistence);
       if (!adv.ok || !adv.applied) { log(`Wechsel blockiert: ${adv.blockingReasons.join(" | ")}`); break; }
       for (const t of get().gameState.teams) (kasseJeSpieltag[t.teamId] ??= []).push(r2(t.cash));
+      {
+        const g = get().gameState;
+        const roster = new Set(g.rosters.map((r) => `${r.teamId}|${r.playerId}`));
+        const je: Record<string, number> = {};
+        for (const a of g.seasonState.playerAvailabilityState ?? []) {
+          if ((a.injuryStatus === "injured" || a.injuryStatus === "recovering") && roster.has(`${a.teamId}|${a.playerId}`)) je[a.teamId] = (je[a.teamId] ?? 0) + 1;
+        }
+        for (const t of g.teams) (verletztJeSpieltag[t.teamId] ??= []).push(je[t.teamId] ?? 0);
+      }
       if ((i + 1) % 5 === 0) log(`${praefix} Spieltag ${i + 1}/${md} (${((Date.now() - ts) / 1000).toFixed(0)}s)`);
     }
     const vorAbschluss = get().gameState;
     phasen[`${praefix}_03_nach_spieltagen`] = {
-      snap: snap(vorAbschluss), kasseJeSpieltag,
+      snap: snap(vorAbschluss), kasseJeSpieltag, verletztJeSpieltag,
       sponsorEvents: (vorAbschluss.seasonState.sponsorEvents ?? []).filter((e) => (e as { seasonId?: string }).seasonId === sid || true).length,
     };
     schreibe();

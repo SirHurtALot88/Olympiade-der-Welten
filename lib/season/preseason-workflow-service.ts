@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
+import { vorjahrAnteileFuerSaisonwechsel, wirtschaftsRegelnFuerNeueSaison } from "@/lib/resolve/wirtschafts-regeln";
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
 import { entwicklungsRegelFuerSpielmodus } from "@/lib/resolve/entwicklung-regel";
+import { ausruestungRegelFuerNeueSaison } from "@/lib/ausruestung/ausruestung-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
 import { finanzenJeSpieltagFuerNeueSaison } from "@/lib/finance/finanzen-je-spieltag";
 import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
@@ -672,12 +674,18 @@ function buildNextSeasonGameState(
     // einer laufenden Saison nie verrutscht. Bestehende Saves bekommen hier die neuen Skalen.
     // Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel (und verliert einen alten).
     wertungsSkalen: wertungsSkalenFuerSpielmodus(save.gameState, nextSeasonId),
+    // WIRTSCHAFTS-REGELN (22.11., lib/resolve/wirtschafts-regeln.ts): gelten ab der FOLGENDEN Saison; mit dem Vorjahres-Anteil je Team
+    // (ligagerecht, Auf-/Absteiger abgebildet) fuer den Erwartungsanker des Vorstands.
+    wirtschaftsRegeln: wirtschaftsRegelnFuerNeueSaison(nextSeasonId, vorjahrAnteileFuerSaisonwechsel(save.gameState, save.gameState.season.id)),
     // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
     // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
     formkartenRegel: nextFormkartenRegel,
     // ENTWICKLUNGSREGEL (22.11., lib/resolve/entwicklung-regel.ts): gilt ab der FOLGENDEN Saison; Training je Spieltag und
     // Saisonende-Wirkung muessen in einer Saison dieselbe Regel haben, der Saisonwechsel ist deshalb der einzige Wechselort.
     entwicklungsRegel: entwicklungsRegelFuerSpielmodus(save.gameState, nextSeasonId) ?? null,
+    // AUSRUESTUNGS-REGEL (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste der neuen Saison, ab Saisonbeginn nach dem
+    // Schalter OLY_AUSRUESTUNG (Phase 1a: nur Besitz). Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel.
+    ausruestungRegel: ausruestungRegelFuerNeueSaison(save.gameState, nextSeasonId),
     // BELASTUNGSREGEL (21.11., lib/fatigue/belastung-regel-stempel.ts): Chris: ab der FOLGENDEN Saison
     // gilt Belastung/Resistenz mit Pause nach Spieltag 10 — der Saisonwechsel ist der Ort, an dem ein
     // bestehender Spielstand umschaltet. Nur Battle-Doppelsaisons; die Pause der alten Saison verfaellt.

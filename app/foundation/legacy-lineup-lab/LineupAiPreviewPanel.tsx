@@ -306,7 +306,7 @@ function AiBatchPreview({
             disabled={isBusy}
             onChange={(event) => onOverwriteExistingChange(event.target.checked)}
           />
-          <span>Bestehende Einsatzlisten ersetzen</span>
+          <span>Bestehende Taktiken ersetzen</span>
         </label>
       </div>
 
@@ -336,7 +336,7 @@ function AiBatchPreview({
       {applyFeed ? (
         <small className="nl-ai-preview-feed">
           {applyFeed.dryRun ? "Probelauf: " : "Gespeichert: "}
-          {applyFeed.dryRun ? applyFeed.summary.plannedLineups : applyFeed.summary.savedTeams} Einsatzlisten
+          {applyFeed.dryRun ? applyFeed.summary.plannedLineups : applyFeed.summary.savedTeams} Taktiken
           {applyFeed.summary.wouldOverwrite > 0 && applyFeed.dryRun
             ? ` · ${applyFeed.summary.wouldOverwrite} bestehende würden ersetzt`
             : ""}

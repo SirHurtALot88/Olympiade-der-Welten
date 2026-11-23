@@ -157,7 +157,7 @@ export function applyStoredColumnOrder(
 export const foundationPrimaryViews: Array<{ id: FoundationView; label: string; tooltip: string }> = [
   { id: "home", label: "Home", tooltip: "Manager-Zentrale: nächste Schritte, wichtigste Spieler, Liga-Lage und To-dos." },
   { id: "season", label: "Saisonstand", tooltip: "Tabelle, Manager, Teamstärken und Punkteentwicklung." },
-  { id: "lineup", label: "Einsatzliste", tooltip: "Spieler in Slots setzen, Team-Boost wählen und Spieltag vorbereiten." },
+  { id: "lineup", label: "Taktik", tooltip: "Spieler in Slots setzen, Team-Boost wählen und Spieltag vorbereiten." },
   { id: "matchdayArena", label: "Arena", tooltip: "Spieltag als Reveal/Event ansehen und Ergebnis verstehen." },
   { id: "teams", label: "Teams", tooltip: "Kader, Verträge, Value, Achsenprofil und Teamdetails prüfen." },
   { id: "trainingCompact", label: "Training", tooltip: "Kompakte Trainingssteuerung: Modus, Klasse, Forecast und Risiko pro Spieler." },

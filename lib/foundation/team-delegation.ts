@@ -38,15 +38,17 @@ export const DELEGATION_BEREICHE: readonly DelegationBereich[] = [
   "training",
   "gebaeude",
   "sponsor",
+  "ausruestung",
 ];
 
 export const DELEGATION_BEREICH_LABEL: Record<DelegationBereich, string> = {
-  einsatzliste: "Einsatzliste und Formkarten",
+  einsatzliste: "Taktik und Formkarten",
   draft: "Draft-Picks",
   transfers: "Käufe, Verkäufe und Verträge",
   training: "Training und Entwicklung",
   gebaeude: "Gebäude",
   sponsor: "Sponsorwahl",
+  ausruestung: "Ausrüstung (Truhen und Lager)",
 };
 
 export const DELEGATION_STUFE_LABEL: Record<DelegationStufe, string> = {
@@ -69,6 +71,7 @@ export const DELEGATION_STUFEN: Record<DelegationStufe, Record<DelegationBereich
     training: "selbst",
     gebaeude: "selbst",
     sponsor: "selbst",
+    ausruestung: "selbst",
   },
   halbautomatik: {
     einsatzliste: "ki",
@@ -77,6 +80,7 @@ export const DELEGATION_STUFEN: Record<DelegationStufe, Record<DelegationBereich
     training: "ki",
     gebaeude: "ki",
     sponsor: "ki",
+    ausruestung: "ki",
   },
   voll_ki: {
     einsatzliste: "ki",
@@ -85,6 +89,7 @@ export const DELEGATION_STUFEN: Record<DelegationStufe, Record<DelegationBereich
     training: "ki",
     gebaeude: "ki",
     sponsor: "ki",
+    ausruestung: "ki",
   },
 };
 

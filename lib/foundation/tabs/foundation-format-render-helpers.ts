@@ -19,7 +19,7 @@ type FoundationAiNeedsCompareStatus = "matched" | "partial" | "deviated" | "reto
 type MarketNegotiationOutcomeTone = "success" | "warning" | "error";
 
 export function getTransferTypeLabel(type: "buy" | "sell" | "contract_exit") {
-  if (type === "contract_exit") return "Contract Exit";
+  if (type === "contract_exit") return "Verkauf (Vertragsende)";
   return type === "buy" ? "Kauf" : "Verkauf";
 }
 
@@ -431,7 +431,7 @@ const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
   active_player_not_in_save: "Spieler gehört nicht zu diesem Spielstand.",
   active_player_not_in_season: "Spieler ist in dieser Saison nicht gemeldet.",
   active_player_not_in_team: "Spieler gehört nicht zu diesem Team.",
-  active_player_referenced_in_lineup: "Spieler steht noch in einer Einsatzliste.",
+  active_player_referenced_in_lineup: "Spieler steht noch in einer Taktik.",
   active_player_salary_missing: "Gehalt des Spielers fehlt.",
   contract_length_override_in_effect: "Mehrjahresvertrag weicht vom Standard ab.",
   defiance_surcharge_pending: "Trotz-Aufschlag: die letzte Runde macht dieses Angebot teurer.",
@@ -461,7 +461,7 @@ const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
   preview_only_contract_negotiation: "Verhandlungssimulation — finaler Kauf über „Kauf bestätigen“.",
   previous_rejected_offer_reduces_trust: "Spieler ist nach der letzten Runde noch angefressen und verhandelt härter.",
   prisma_sell_buyout_schedule_approximated: "Buyout-Staffel ist näherungsweise berechnet.",
-  recently_sold_same_preseason: "Gerade erst verkauft — Rückkauf in derselben Preseason gesperrt.",
+  recently_sold_same_preseason: "Verkauft (auch durch Vertragsende) — Rückkauf in diesem Transferfenster gesperrt.",
   recently_sold_same_preseason_override: "Rückkauf-Sperre der Preseason per Admin-Freigabe umgangen.",
   retreat_after_counter_affront: "Nach dem Affront zieht sich der Spieler aus der Verhandlung zurück.",
   roster_limit_reached: "Kader ist bereits voll.",
@@ -482,6 +482,13 @@ const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
 };
 
 export function formatNegotiationSignalLabel(value: string) {
+  // Verkaufs-Sperre mit Parametern: player_sold_this_season_unavailable:<sell|contract_exit>:<Saison X>:<Saison Y> (Chris 22.11.)
+  const sperre = /^player_sold_this_season_unavailable:(sell|contract_exit):([^:]+):([^:]+)$/.exec(value);
+  if (sperre) {
+    const nr = (id: string) => /(\d+)\s*$/.exec(id)?.[1] ?? id;
+    const art = sperre[1] === "contract_exit" ? "Verkauft (Vertragsende)" : "Verkauft";
+    return `${art} in Saison ${nr(sperre[2]!)} — erst wieder ab Transferfenster Saison ${nr(sperre[3]!)} verfügbar.`;
+  }
   const label = NEGOTIATION_SIGNAL_LABELS[value];
   if (label) {
     return label;

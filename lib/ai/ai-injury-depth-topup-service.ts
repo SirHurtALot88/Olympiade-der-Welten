@@ -1,7 +1,7 @@
 import { getPrevSeasonInjuryCount } from "@/lib/ai/ai-team-management-preview-service";
 import { isPreseasonRepairCandidateEligible } from "@/lib/ai/chunked-redraft-topup-service";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
-import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { getTransferControlSettings as getTeamControlSettings } from "@/lib/ai/ki-delegierte-transfers";
 import { executeLocalTransfermarktBuy, previewLocalTransfermarktBuy } from "@/lib/market/transfermarkt-local-service";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 

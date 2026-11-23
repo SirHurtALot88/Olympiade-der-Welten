@@ -164,8 +164,8 @@ export function getSeasonCompletionStepTone(status: string | null | undefined) {
 export function formatAiLineupAuditWarning(warning: string) {
   const mapped: Record<string, string> = {
     ai_lineup_audit_no_source: "AI-Audit hat keine lesbare Lineup-Quelle.",
-    ai_lineup_audit_no_lineup_drafts: "Keine gespeicherten Einsatzlisten für diese Saison gefunden.",
-    ai_lineup_audit_no_ai_drafts: "AI-Teams haben keine gespeicherten Einsatzlisten.",
+    ai_lineup_audit_no_lineup_drafts: "Keine gespeicherten Taktiken für diese Saison gefunden.",
+    ai_lineup_audit_no_ai_drafts: "AI-Teams haben keine gespeicherten Taktiken.",
     ai_lineups_missing: "AI-Lineups fehlen.",
     ai_captain_unused: "Captain wurde nicht genutzt.",
     ai_form_cards_unused: "Formkarten wurden nicht genutzt.",
@@ -188,8 +188,8 @@ export function formatHomeWarningLabel(warning: string) {
     no_active_team: "Kein aktives Team",
     season_started_no_results: "Saison ohne Ergebnis",
     no_final_standings: "Tabelle noch offen",
-    missing_lineups: "Einsatzliste offen",
-    lineup_not_submitted: "Einsatzliste voll — bitte in der Einsatzliste bestätigen.",
+    missing_lineups: "Taktik offen",
+    lineup_not_submitted: "Taktik voll — bitte in der Taktik bestätigen.",
     formcard_pool_missing: "Formkarten-Pool fehlt",
     unused_negative_formcards: "Negative Formkarten offen",
     formcards_open: "Formkarten-Pool fehlt",
