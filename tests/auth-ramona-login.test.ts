@@ -108,6 +108,8 @@ describe("Team-Zuordnung mit drei Menschen", () => {
       gebaeude: "ki",
       sponsor: "ki",
       ausruestung: "ki",
+      // Budget-Gespraech 23.11.: eigener Bereich „Vorstand“, bei Halbautomatik verhandelt die KI.
+      vorstand: "ki",
     });
     expect(resolveTeamDelegation(settings[chris]).stufe).toBe("voll_selbst");
     expect(resolveTeamDelegation(settings[franky]).stufe).toBe("voll_selbst");
