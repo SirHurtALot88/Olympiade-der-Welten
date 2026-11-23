@@ -164,7 +164,7 @@ export const GLOBAL_TABLE_REGISTRY: Record<GlobalTableId, GlobalTableRegistryEnt
   "lineup-expert": {
     tableId: "lineup-expert",
     storageKey: "selectedRosterTable",
-    label: "Einsatzliste / Expert",
+    label: "Taktik / Expert",
     layoutVersion: GLOBAL_TABLE_LAYOUT_VERSION,
     status: "connected",
     requiresResizableColumns: true,

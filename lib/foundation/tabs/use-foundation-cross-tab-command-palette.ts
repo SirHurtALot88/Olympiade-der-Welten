@@ -117,7 +117,7 @@ export function useFoundationCrossTabCommandPalette(input: {
       },
       {
         id: "lineup-open",
-        label: "Einsatzliste öffnen",
+        label: "Taktik öffnen",
         detail: "Slots, Captain und Team-Boosts",
         section: "Aktion",
         keywords: "lineup einsatzliste slots teamdeck spieler einsetzen",

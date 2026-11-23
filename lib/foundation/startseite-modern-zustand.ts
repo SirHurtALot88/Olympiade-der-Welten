@@ -118,7 +118,7 @@ export function baueAbgeleiteteEntscheidungen(input: {
     aus.push({
       id: "einsatzliste",
       ton: "rot",
-      titel: gesetzt === 0 ? "Einsatzliste leer" : "Einsatzliste unvollständig",
+      titel: gesetzt === 0 ? "Taktik leer" : "Taktik unvollständig",
       detail: `${gesetzt} von ${gesamt} Plätzen gesetzt · ${einsatz.offenePlaetze} offen`,
       ziel: { art: "einsatzliste" },
       zielText: "setzen ›",
@@ -192,7 +192,7 @@ export function baueAbgeleiteteEntscheidungen(input: {
  * die Inbox nennt die leere Einsatzliste „Lineup fehlt“, die abgeleitete Zeile „Einsatzliste leer“ (Abnahme 18.11.: beides stand da).
  */
 const SACHE_NACH_ID: Array<{ id: string; muster: RegExp }> = [
-  { id: "einsatzliste", muster: /lineup|einsatzliste/i },
+  { id: "einsatzliste", muster: /lineup|einsatzliste|taktik/i },
   { id: "minuskarte", muster: /minuskarte/i },
   { id: "vertraege", muster: /vertr.*(läuft|laufen|endet)/i },
 ];

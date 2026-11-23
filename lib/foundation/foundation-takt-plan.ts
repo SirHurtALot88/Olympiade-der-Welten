@@ -48,7 +48,7 @@ export const TAKT_WARUM: Record<string, string> = {
   sell_players: "Verkaufserlöse darfst du nur im Rahmen der Vorstandsfreigabe wieder ausgeben.",
   buy_players: "Der Kader braucht mindestens 8 Spieler; Käufe sind durch Transfertopf und Vorstandsfreigabe begrenzt.",
   set_training: "Training wirkt je Spieltag, aber nur in die Richtung, die du wählst.",
-  prepare_season: "Setzt Tabelle, Einsatzlisten und Formkarten für die neue Saison zurück.",
+  prepare_season: "Setzt Tabelle, Taktiken und Formkarten für die neue Saison zurück.",
   start_matchday_1: "Danach läuft die Saison: zwei Disziplinen je Spieltag.",
   scouting_facilities: "Mehr Scouting zeigt echte Werte statt grober Bereiche — wichtig vor jedem Kauf.",
   choose_sponsor: "Der Sponsor bringt ein festes Saisonbudget und stellt dir ein Ziel.",
@@ -57,7 +57,7 @@ export const TAKT_WARUM: Record<string, string> = {
   finalize_transfers: "Erst danach stehen deine Formkarten für den Spieltag fest.",
   set_lineup: "Wer auf welchem Platz steht, entscheidet das Duell: Eignung, Platzrolle und Belastung zählen.",
   assign_formcards: "Karten geben Bonus oder Malus je Disziplin; Pflicht-Minuskarten müssen bis Saisonende gelegt sein.",
-  confirm_lineup: "Nur bestätigte Einsatzlisten gehen in den Spieltag.",
+  confirm_lineup: "Nur bestätigte Taktiken gehen in den Spieltag.",
   open_arena: "Hier siehst du die Duelle deines Teams.",
   run_reveal: "Die Auswertung bucht Punkte, Spieler-PP, Form, Moral und Erschöpfung.",
   review_matchday_results: "Sieg bringt 2 Punkte, Remis 1, Niederlage 0 — hier siehst du, wie jedes Duell ausging.",
@@ -122,7 +122,7 @@ export function baueTaktPlan(input: {
      * Gibt es zu einem Inbox-Eintrag über die Einsatzliste schon einen offenen Lineup-Schritt, wird DIESER Schritt rot
      * (bei kritischem Eintrag) und trägt den Grund; ein zweiter Eintrag entsteht nicht.
      */
-    if (/lineup|einsatzliste/i.test(item.title)) {
+    if (/lineup|einsatzliste|taktik/i.test(item.title)) {
       const vorhanden = schritte.find((x) => x.id.startsWith("schritt:") && /lineup/i.test(x.id) && x.status !== "erledigt");
       if (vorhanden) {
         if (item.severity === "critical" && vorhanden.status !== "rot") {

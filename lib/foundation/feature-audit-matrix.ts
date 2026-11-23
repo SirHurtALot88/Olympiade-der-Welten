@@ -464,7 +464,7 @@ const registry: RegistryInput[] = [
   },
   {
     featureId: "lineups",
-    label: "Einsatzliste / Lineups",
+    label: "Taktik / Lineups",
     category: "Lineups",
     status: "multiplayer_ready",
     views: ["lineup"],

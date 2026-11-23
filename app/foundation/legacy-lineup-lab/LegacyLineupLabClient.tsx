@@ -155,7 +155,7 @@ const LineupNewLook = dynamic(() => import("@/app/foundation/legacy-lineup-lab/L
 // `?einsatzliste=klassisch` bzw. der Knopf in der neuen Ansicht schaltet auf die klassische zurueck.
 const EinsatzlisteModern = dynamic(() => import("@/app/foundation/legacy-lineup-lab/EinsatzlisteModern"), {
   ssr: false,
-  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Taktik wird geladen…" />,
 });
 const FormBoardPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FormBoardPanel"), {
   ssr: false,
@@ -3786,7 +3786,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
       const message =
         error instanceof Error && error.name === "AbortError"
           ? "Lineup-Kontext wurde neu geladen."
-          : "Einsatzliste konnte gerade nicht geladen werden. Bitte erneut versuchen.";
+          : "Taktik konnte gerade nicht geladen werden. Bitte erneut versuchen.";
       setErrors([message]);
     } finally {
       if (loadContextAbortRef.current === controller) {
@@ -3952,7 +3952,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         immediate: true,
       });
       const scoreLabel = formatProjectedMetricWindow(matchdayPreviewCards.totalRangeLow, matchdayPreviewCards.totalRangeHigh);
-      setMessage(`Einsatzliste gespeichert — bereit (${scoreLabel} Pkt. projiziert). Weiter mit „Zur Arena“.`);
+      setMessage(`Taktik gespeichert — bereit (${scoreLabel} Pkt. projiziert). Weiter mit „Zur Arena“.`);
     }
   }
 
@@ -4706,7 +4706,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
         : `Jetzt ${aiBatchApplyFeed.summary.plannedLineups} bereite Auto-Teams lokal speichern?`;
       const overwriteHint =
         aiBatchOverwriteExisting && aiBatchApplyFeed.summary.wouldOverwrite > 0
-          ? ` ${aiBatchApplyFeed.summary.wouldOverwrite} bestehende Einsatzlisten werden ersetzt.`
+          ? ` ${aiBatchApplyFeed.summary.wouldOverwrite} bestehende Taktiken werden ersetzt.`
           : "";
       const confirmed = window.confirm(confirmText + overwriteHint);
       if (!confirmed) {
@@ -5573,7 +5573,7 @@ export default function LegacyLineupLabClient(props: LegacyLineupLabClientProps)
     const overwritesExisting =
       (draft?.entries.length ?? 0) > 0 || hasLineupDraftValues(selections, captains);
     const confirmText = overwritesExisting
-      ? "Bestehende Einsatzliste wird ersetzt. AI-Vorschlag jetzt lokal speichern?"
+      ? "Bestehende Taktik wird ersetzt. AI-Vorschlag jetzt lokal speichern?"
       : "AI-Vorschlag jetzt lokal speichern?";
     const confirmed = window.confirm(confirmText);
     if (!confirmed) {

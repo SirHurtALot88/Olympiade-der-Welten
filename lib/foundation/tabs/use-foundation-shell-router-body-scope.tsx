@@ -848,7 +848,7 @@ const FoundationSeasonV2Panel = dynamic(() => import("@/app/foundation/season-v2
 });
 const FoundationLineupPanel = dynamic(() => import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel"), {
   ssr: false,
-  loading: () => <FoundationPanelSkeleton variant="lineup" label="Einsatzliste wird geladen…" />,
+  loading: () => <FoundationPanelSkeleton variant="lineup" label="Taktik wird geladen…" />,
 });
 const FoundationTeamsDetailPanel = dynamic(() => import("@/app/foundation/teams-v2/FoundationTeamsDetailPanel"), {
   ssr: false,
@@ -10092,7 +10092,7 @@ export function useFoundationShellRouterBodyScope({
     if (!payload.silent) {
       setFoundationActionFeedback({
         tone: "success",
-        title: "Einsatzliste gespeichert",
+        title: "Taktik gespeichert",
         detail: `${getTeamLockedName(payload.teamId)} ist für ${currentMatchdayDisplayLabel} aktualisiert. KI-Einsatzlisten werden bei Bedarf nachgezogen.`,
       });
     }
@@ -10938,13 +10938,13 @@ export function useFoundationShellRouterBodyScope({
         // kryptische Zwei-Wort-Text ist raus).
         title:
           homeNextMatchdayStatus.openSlots > 0
-            ? `Einsatzliste füllen — ${homeNextMatchdayStatus.openSlots} ${homeNextMatchdayStatus.openSlots === 1 ? "Platz" : "Plätze"} offen`
-            : "Einsatzliste steht",
+            ? `Taktik füllen — ${homeNextMatchdayStatus.openSlots} ${homeNextMatchdayStatus.openSlots === 1 ? "Platz" : "Plätze"} offen`
+            : "Taktik steht",
         detail:
           homeNextMatchdayStatus.openSlots > 0
             ? homeNextMatchdayStatus.requiredSlots > 0
-              ? `${homeNextMatchdayStatus.filledSlots} von ${homeNextMatchdayStatus.requiredSlots} Plätzen besetzt — ohne Einsatzliste startet der Spieltag nicht.`
-              : "Ohne Einsatzliste startet der Spieltag nicht."
+              ? `${homeNextMatchdayStatus.filledSlots} von ${homeNextMatchdayStatus.requiredSlots} Plätzen besetzt — ohne Taktik startet der Spieltag nicht.`
+              : "Ohne Taktik startet der Spieltag nicht."
             : "Alles gesetzt — weiter in die Arena.",
         tone: homeNextMatchdayStatus.openSlots > 0 ? "warning" : "ready",
         view: homeNextMatchdayStatus.openSlots > 0 ? "lineup" : "matchdayArena",

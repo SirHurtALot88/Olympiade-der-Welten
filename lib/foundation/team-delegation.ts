@@ -42,7 +42,7 @@ export const DELEGATION_BEREICHE: readonly DelegationBereich[] = [
 ];
 
 export const DELEGATION_BEREICH_LABEL: Record<DelegationBereich, string> = {
-  einsatzliste: "Einsatzliste und Formkarten",
+  einsatzliste: "Taktik und Formkarten",
   draft: "Draft-Picks",
   transfers: "Käufe, Verkäufe und Verträge",
   training: "Training und Entwicklung",

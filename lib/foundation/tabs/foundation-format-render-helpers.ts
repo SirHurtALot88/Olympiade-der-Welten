@@ -431,7 +431,7 @@ const NEGOTIATION_SIGNAL_LABELS: Record<string, string> = {
   active_player_not_in_save: "Spieler gehört nicht zu diesem Spielstand.",
   active_player_not_in_season: "Spieler ist in dieser Saison nicht gemeldet.",
   active_player_not_in_team: "Spieler gehört nicht zu diesem Team.",
-  active_player_referenced_in_lineup: "Spieler steht noch in einer Einsatzliste.",
+  active_player_referenced_in_lineup: "Spieler steht noch in einer Taktik.",
   active_player_salary_missing: "Gehalt des Spielers fehlt.",
   contract_length_override_in_effect: "Mehrjahresvertrag weicht vom Standard ab.",
   defiance_surcharge_pending: "Trotz-Aufschlag: die letzte Runde macht dieses Angebot teurer.",

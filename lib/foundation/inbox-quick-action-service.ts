@@ -47,7 +47,7 @@ export function getInboxQuickActions(item: GameInboxItem): InboxQuickAction[] {
       actions.push({
         id: "open-lineup",
         label: "Lineup prüfen",
-        detail: "Verletzten Spieler aus der Einsatzliste nehmen.",
+        detail: "Verletzten Spieler aus der Taktik nehmen.",
         kind: "navigate",
       });
     } else if (HEALTH_SOURCES_WITH_LIGHT_TRAINING.has(item.source)) {
@@ -79,7 +79,7 @@ export function getInboxQuickActions(item: GameInboxItem): InboxQuickAction[] {
     actions.push({
       id: "open-lineup",
       label: "Lineup bestätigen",
-      detail: "Zur Einsatzliste springen und bestätigen.",
+      detail: "Zur Taktik springen und bestätigen.",
       kind: "navigate",
     });
   }
