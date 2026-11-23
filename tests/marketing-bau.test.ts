@@ -140,7 +140,7 @@ describe("Team-Anteil: Formel, Grenzen, Sicherheitsnetz", () => {
     expect(a.prozent).toBe(65);
   });
 
-  it("der Anteil bleibt immer in 15..65 und das Team bekommt nie mehr als 25 % des Gehalts", () => {
+  it("der Anteil bleibt immer in 15..65 und das Team bekommt nie mehr als das Netz der Klausel-Stufe (22 / 25 / 28 %) des Gehalts", () => {
     const traitNamen = Object.values(TRAIT_TABELLE).map((t) => t.name);
     let n = 0;
     for (let i = 0; i < traitNamen.length; i += 1) {
@@ -153,7 +153,7 @@ describe("Team-Anteil: Formel, Grenzen, Sicherheitsnetz", () => {
           );
           expect(e.teamAnteilProzent).toBeGreaterThanOrEqual(15);
           expect(e.teamAnteilProzent).toBeLessThanOrEqual(65);
-          expect(e.ansTeam).toBeLessThanOrEqual(0.25 * (2 + (i % 5) * 3) + 1e-9);
+          expect(e.ansTeam).toBeLessThanOrEqual(MARKETING_KONFIG.klauselNetz[String(klausel) as "-1" | "0" | "1"] * (2 + (i % 5) * 3) + 1e-9);
           expect(e.anIhn).toBeGreaterThanOrEqual(-1e-9);
           n += 1;
         }

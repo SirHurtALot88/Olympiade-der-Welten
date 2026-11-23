@@ -489,3 +489,19 @@
 .tmk .kz .slotpips i { height: 100%; background: rgba(255, 255, 255, 0.08); border-radius: 1px; }
 .tmk .kz .slotpips i.voll { background: var(--creme); }
 .tmk .kz.an .slotpips i.voll { background: var(--gold); }
+
+/* Werbeklausel (23.11., Mockup marketing-werbeklausel-aushaengeschild-23-11): drei Zeilen, Gehalt gross je Saison, klein je Spieltag */
+.tmk .wk{display:flex;flex-direction:column;gap:calc(.35 * var(--u))}
+.tmk .wk-tab{display:flex;flex-direction:column;gap:calc(.3 * var(--u))}
+.tmk .wk-z{display:grid;grid-template-columns:minmax(0,1.5fr) repeat(4,minmax(0,1fr));gap:calc(.4 * var(--u));align-items:center;text-align:left;padding:calc(.4 * var(--u)) calc(.6 * var(--u));border-radius:calc(.4 * var(--u));border:1px solid var(--linie);background:var(--flaeche-2);color:var(--tinte);cursor:pointer}
+.tmk .wk-z:hover:not(:disabled){border-color:var(--linie-2)}
+.tmk .wk-z.an{border-color:var(--gold);background:rgba(240,195,90,.12)}
+.tmk .wk-z.nein{opacity:.45;cursor:not-allowed}
+.tmk .wk-n b{display:block;font-size:calc(1.02 * var(--u));font-weight:700;line-height:1.1}
+.tmk .wk-n small,.tmk .wk-w small{display:block;font-size:calc(.68 * var(--u));letter-spacing:.06em;text-transform:uppercase;color:var(--stumm);font-weight:600;line-height:1.15}
+.tmk .wk-w{display:block;text-align:right;min-width:0}
+.tmk .wk-w b{display:block;font-size:calc(1.12 * var(--u));line-height:1.1;white-space:nowrap}
+.tmk .wk-w b.null{color:var(--leise)}
+.tmk .wk-leer{grid-column:2 / -1;color:var(--stumm);text-align:right}
+.tmk .wk-sum{display:flex;flex-direction:column;gap:calc(.15 * var(--u));font-size:calc(.86 * var(--u));line-height:1.25;color:var(--leise)}
+.tmk .wk-sum b{color:var(--tinte)}

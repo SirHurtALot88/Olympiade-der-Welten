@@ -82,7 +82,7 @@ import { computeTeamDisciplineRanks } from "@/lib/lineups/team-discipline-ranks"
 import { buildLegacyMatchdayReadiness, type LegacyMatchdayReadinessStatus } from "@/lib/lineups/legacy-matchday-readiness";
 import { loadLocalLegacyLineupContextFromGameState } from "@/lib/lineups/legacy-lineup-local-service";
 import type { AiNeedSummary } from "@/lib/ai/types";
-import { alleTraitsVon, klauselFuerVertrag, klauselZeilen } from "@/lib/marketing/marketing-klausel";
+import { alleTraitsVon, klauselFuerVertrag, klauselTraitInfo, klauselZeilen } from "@/lib/marketing/marketing-klausel";
 import { gehaltMitKlausel, klauselErlaubt } from "@/lib/marketing/marketing-modell";
 import { werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
 import type {
@@ -1221,6 +1221,7 @@ function buildLocalTransfermarktBuyPreviewFromContext(
       ? {
           gewaehlt: klauselGewaehlt,
           zeilen: klauselZeilen(gameState, params.teamId, player, contractSalaryBasis, contractLength, null, true),
+          ...klauselTraitInfo(player),
         }
       : null;
   /**

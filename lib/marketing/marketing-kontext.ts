@@ -221,10 +221,13 @@ export function gesichtKandidaten(
   teamId: string,
   moralOhneFn?: (playerId: string) => number | null,
 ): GesichtKandidat[] {
+  // Ohne Verfuegbarkeitsstand: eine Verletzung darf die Wahl der KI nicht kippen (die Saison-Wahl bleibt stabil; der Zuschlag eines verletzten
+  // Gesichts ruht trotzdem, das liest die Buchung ueber `marketingSpielerFuer` mit dem echten Stand).
+  const stabil: GameState = { ...gameState, seasonState: { ...gameState.seasonState, playerAvailabilityState: [] } };
   return besteSechs(gameState, teamId).map(({ entry, player }) => {
     const moral = moralOhneFn ? moralOhneFn(player.id) : null;
-    const jetzt = marketingSpielerFuer(gameState, teamId, player, entry, moral, false);
-    const alsGesicht = marketingSpielerFuer(gameState, teamId, player, entry, moral, true);
+    const jetzt = marketingSpielerFuer(stabil, teamId, player, entry, moral, false);
+    const alsGesicht = marketingSpielerFuer(stabil, teamId, player, entry, moral, true);
     return { playerId: player.id, jetzt, alsGesicht, zusatz: alsGesicht.ansTeam - jetzt.ansTeam };
   });
 }

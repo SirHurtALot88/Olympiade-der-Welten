@@ -108,7 +108,7 @@ export type TransfermarktBuyPreview = {
   /** Werbeklausel (23.11.): Gehalt, das unterschrieben wird (verhandeltes Gehalt mit Klausel-Faktor); fehlt ohne Regel `klausel-v2`. */
   gehaltMitKlausel?: number | null;
   /** Werbeklausel (23.11.): gewaehlte Stufe und die drei Zeilen der Verhandlung (Gehalt, Team-Anteil, Werbegeld, Saldo); `null` ohne Regel. */
-  klausel?: { gewaehlt: Werbeklausel; zeilen: KlauselZeile[] } | null;
+  klausel?: { gewaehlt: Werbeklausel; zeilen: KlauselZeile[]; ablehnung: string | null; loyal: boolean } | null;
   offerRatio?: number | null;
   yearlySalarySchedule?: ContractYearSalary[];
   totalSalary?: number | null;

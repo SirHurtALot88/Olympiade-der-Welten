@@ -18,6 +18,7 @@ import {
   KLAUSEL_NAMEN,
   gehaltMitKlausel,
   klauselErlaubt,
+  normalisiereTrait,
   wirksameKlausel,
   type MarketingSpielerErgebnis,
   type Werbeklausel,
@@ -59,6 +60,12 @@ export function klauselFuerVertrag(
   if (gewaehlt === -1 || gewaehlt === 0 || gewaehlt === 1) return wirksameKlausel(gewaehlt, traits);
   if (klauselEntscheidetKi(gameState, teamId)) return wirksameKlausel(kiKlauselFuerTeam(gameState, teamId), traits);
   return 0;
+}
+
+/** Wer „Team bekommt mehr“ ablehnt (Name des Traits) und ob er sie ohne Aufschlag annimmt (Loyal). */
+export function klauselTraitInfo(player: Pick<Player, "traitsPositive" | "traitsNegative">): { ablehnung: string | null; loyal: boolean } {
+  const t = alleTraitsVon(player).map((x) => normalisiereTrait(x));
+  return { ablehnung: t.includes("egomaniac") ? "Egomaniac" : t.includes("diva") ? "Diva" : null, loyal: t.includes("loyal") };
 }
 
 export type KlauselZeile = {

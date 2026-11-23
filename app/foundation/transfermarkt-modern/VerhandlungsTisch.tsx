@@ -15,6 +15,9 @@ import { betragC, begrenze, de, jeSpieltag, rangText } from "./tm-format";
 import { freigabeKosten, freigabeSperreFuerBetrag } from "@/lib/market/transfermarkt-freigabe";
 import { postJson, schreibKontext } from "./tm-daten";
 import { useEscSchliesst } from "@/app/foundation/shared/klickregel";
+import type { KlauselZeile } from "@/lib/marketing/marketing-klausel";
+import type { Werbeklausel } from "@/lib/marketing/marketing-modell";
+import WerbeklauselBlock from "./WerbeklauselBlock";
 
 /**
  * VERHANDLUNGSTISCH (Mockup 18.11.): EIN Dialog für Kauf und Verlängerung. Drei Spalten — der Spieler und warum er so
@@ -80,6 +83,10 @@ type Stand = {
   rosterBefore: number | null;
   rosterAfter: number | null;
   confirmToken: string | null;
+  /** Werbeklausel (23.11.): Vorschau des Servers; `null`, solange die Regel nicht gilt. */
+  klausel: { gewaehlt: Werbeklausel; zeilen: KlauselZeile[]; ablehnung: string | null; loyal: boolean } | null;
+  /** Gehalt, das unterschrieben wird (verhandeltes Gehalt mit Klausel-Faktor). */
+  gehaltK: number | null;
 };
 
 type Antwort = {
@@ -128,6 +135,8 @@ function normalisiere(modus: TischModus, antwort: any): Stand | null {
       rosterBefore: s.rosterBefore ?? null,
       rosterAfter: s.rosterAfter ?? null,
       confirmToken: null,
+      klausel: s.klausel ?? null,
+      gehaltK: s.gehaltMitKlausel ?? null,
     };
   }
   const neg = summary.negotiationPreview ?? null;
@@ -144,6 +153,8 @@ function normalisiere(modus: TischModus, antwort: any): Stand | null {
     rosterBefore: null,
     rosterAfter: null,
     confirmToken: summary.confirmToken ?? null,
+    klausel: summary.klausel ?? null,
+    gehaltK: summary.klausel?.gehalt ?? null,
   };
 }
 
@@ -153,6 +164,8 @@ export default function VerhandlungsTisch(props: TischProps) {
   const [form, setForm] = useState<ContractShape | null>(null);
   const [gehalt, setGehalt] = useState<number | null>(null);
   const [manuell, setManuell] = useState(false);
+  // Werbeklausel (23.11.): `null` = noch nicht selbst gewählt (dann gilt Standard bzw. die KI-Wahl des delegierten Bereichs).
+  const [klausel, setKlausel] = useState<Werbeklausel | null>(null);
   const [stand, setStand] = useState<Stand | null>(null);
   const [laedt, setLaedt] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -184,6 +197,7 @@ export default function VerhandlungsTisch(props: TischProps) {
                   ...(laenge != null ? { contractLength: laenge } : {}),
                   ...(form != null ? { contractShape: form } : {}),
                   ...(gehalt != null ? { offeredSalary: gehalt } : {}),
+                  ...(klausel != null ? { marketingKlausel: klausel } : {}),
                   dryRun: true,
                   source,
                 },
@@ -198,6 +212,7 @@ export default function VerhandlungsTisch(props: TischProps) {
                   contractLength: laenge ?? 2,
                   contractShape: form ?? "balanced",
                   ...(gehalt != null ? { offeredSalary: gehalt } : {}),
+                  ...(klausel != null ? { marketingKlausel: klausel } : {}),
                   dryRun: true,
                   source,
                 },
@@ -226,7 +241,7 @@ export default function VerhandlungsTisch(props: TischProps) {
       abbruch.abort();
     };
     // gehalt bewusst nur nach manuellem Eingriff als Auslöser
-  }, [modus, saveId, seasonId, teamId, playerId, laenge, form, manuell ? gehalt : null, nachlauf, source, kontext]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [modus, saveId, seasonId, teamId, playerId, laenge, form, klausel, manuell ? gehalt : null, nachlauf, source, kontext]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const neg = stand?.neg ?? {};
   // Der Fit wirkt wirklich auf die Verhandlung (Wechselwille, Forderung): die Punkte stehen im Vorschau-Aufschlüssel `team_fit`.
@@ -331,6 +346,7 @@ export default function VerhandlungsTisch(props: TischProps) {
                 ...(laenge != null ? { contractLength: laenge } : {}),
                 ...(form != null ? { contractShape: form } : {}),
                 ...(angebot != null ? { offeredSalary: angebot } : {}),
+                ...(klausel != null ? { marketingKlausel: klausel } : {}),
                 dryRun: false,
                 source,
               },
@@ -345,6 +361,7 @@ export default function VerhandlungsTisch(props: TischProps) {
                 contractLength: laenge ?? 2,
                 contractShape: form ?? "balanced",
                 offeredSalary: angebot,
+                ...(klausel != null ? { marketingKlausel: klausel } : {}),
                 confirmToken: stand.confirmToken,
                 dryRun: false,
                 source,
@@ -377,8 +394,8 @@ export default function VerhandlungsTisch(props: TischProps) {
   const planMax = Math.max(1, ...plan.map((j) => j.salary ?? 0));
   const freigabeKostenBetrag =
     modus === "kauf"
-      ? freigabeKosten(stand?.purchasePrice, angebot)
-      : Math.max(0, (angebot ?? 0) - (props.aktuellesGehalt ?? 0));
+      ? freigabeKosten(stand?.purchasePrice, stand?.gehaltK ?? angebot)
+      : Math.max(0, (stand?.gehaltK ?? angebot ?? 0) - (props.aktuellesGehalt ?? 0));
   const freigabeGrund = freigabeSperreFuerBetrag(props.freigabeFrei ?? null, freigabeKostenBetrag);
   const sperrGrund = (modus === "kauf" ? props.gesperrtGrund : null) ?? freigabeGrund;
   const gesperrt = sperrGrund != null;
@@ -572,6 +589,21 @@ export default function VerhandlungsTisch(props: TischProps) {
                   <div className="z"><span>Kader</span><b className="t">{stand?.rosterBefore ?? props.kader ?? "—"}{stand?.rosterAfter != null && <> → {stand.rosterAfter}</>}<small>Minimum {props.kaderMin ?? 8}</small></b></div>
                 )}
               </div>
+              {stand?.klausel ? (
+                <WerbeklauselBlock
+                  zeilen={stand.klausel.zeilen}
+                  gewaehlt={klausel ?? stand.klausel.gewaehlt}
+                  vonKi={klausel == null && stand.klausel.gewaehlt !== 0}
+                  onWahl={(k) => {
+                    setKlausel(k);
+                    setAntwort(null);
+                  }}
+                  gesperrt={beschaeftigt}
+                  ablehnungTrait={stand.klausel.ablehnung}
+                  loyal={stand.klausel.loyal}
+                  laufzeit={laenge ?? wunschLaenge ?? 2}
+                />
+              ) : null}
               <h4>Kaderränge, wenn er {modus === "kauf" ? "kommt" : "bleibt"}</h4>
               <div className="rw">
                 {props.wirkungen

@@ -461,3 +461,48 @@
 .mk-vh b {
   text-align: right;
 }
+
+/* AUSHAENGESCHILD (23.11.): Tabelle der sechs besten, Vorschau rechts. Raster, Rahmen und Kacheln wie die Kader-Ansicht. */
+.ag .fin-kb { overflow-y: auto; }
+.ag-cols {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.7fr) 96px minmax(110px, 1fr) minmax(90px, 0.8fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(120px, 1fr) minmax(80px, 0.7fr);
+  gap: 8px;
+  align-items: center;
+}
+.ag-g { color: var(--bc-gold); }
+.ag-zeile { text-align: left; width: 100%; }
+.ag-zeile.is-gew { background: rgba(240, 195, 90, 0.1); box-shadow: inset 3px 0 0 var(--bc-gold); }
+.ag-zeile.is-fest { box-shadow: inset 3px 0 0 var(--bc-gut, #62d394); }
+.ag-zeile.is-zu:not(.is-fest) { opacity: 0.45; cursor: not-allowed; }
+.ag-gr { display: block; min-width: 0; }
+.ag-gr b { display: block; font-size: var(--fin-text); line-height: 1.1; white-space: nowrap; }
+.ag-gr small { display: block; font-size: var(--fin-klein); color: var(--bc-stumm); line-height: 1.15; }
+.ag-netz { color: var(--bc-warn, #ff6058); font-weight: 600; }
+.ag-banner {
+  margin: 8px 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--bc-linie);
+  border-radius: var(--bc-r-s);
+  background: var(--bc-flaeche-2);
+  font-size: var(--fin-text);
+  line-height: 1.3;
+  color: var(--bc-leise);
+}
+.ag-banner b { color: var(--bc-tinte); }
+.ag-banner.is-gut { border-color: rgba(98, 211, 148, 0.5); background: rgba(98, 211, 148, 0.08); }
+.ag-lupe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 0 14px 8px; }
+.ag-lupe > div { background: var(--bc-flaeche-2); border: 1px solid var(--bc-linie); border-radius: var(--bc-r-s); padding: 6px 10px; min-width: 0; }
+.ag-lupe small { display: block; font: 600 var(--fin-klein) var(--bc-zahl); letter-spacing: 0.12em; text-transform: uppercase; color: var(--bc-leise); }
+.ag-lupe strong { display: block; font-size: calc(var(--fin-text) * 1.5); line-height: 1.1; }
+.ag-lupe em { font-style: normal; font-size: var(--fin-klein); color: var(--bc-stumm); }
+.ag-tabelle { padding: 0 14px 8px; }
+.ag-neu { background: rgba(240, 195, 90, 0.1); border-radius: 4px; }
+.ag-kachel { background: var(--bc-flaeche-2); border: 1px solid var(--bc-linie); border-radius: var(--bc-r-s); padding: 7px 12px 8px; }
+.ag-zaehler { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: var(--fin-text); color: var(--bc-leise); }
+.ag-zaehler i { width: 22px; height: 8px; border-radius: 4px; background: var(--bc-linie); display: inline-block; }
+.ag-zaehler i.is-an { background: var(--bc-gold); }
+.ag-zaehler i.is-ok { background: var(--bc-gut, #62d394); }
+.ag-hat { margin-left: auto; color: var(--bc-gold); font-weight: 600; }
+.ag-fuss { align-items: center; gap: 12px; }
+.ag-knopf { white-space: nowrap; }

@@ -75,7 +75,7 @@ import {
 } from "@/lib/morale/player-morale-service";
 import { kasseVorSpieltagsbuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
-import { alleTraitsVon, klauselFuerVertrag, klauselZeilen, type KlauselZeile } from "@/lib/marketing/marketing-klausel";
+import { alleTraitsVon, klauselFuerVertrag, klauselTraitInfo, klauselZeilen, type KlauselZeile } from "@/lib/marketing/marketing-klausel";
 import { gehaltMitKlausel, klauselErlaubt, type Werbeklausel } from "@/lib/marketing/marketing-modell";
 import { werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
 import { moralOhneWerbung } from "@/lib/morale/player-morale-service";
@@ -175,7 +175,7 @@ export type ContractActionPreview = {
   warnings: string[];
   blockingReasons: string[];
   /** Werbeklausel (23.11.): die drei Zeilen der Verhandlung samt gewaehlter Stufe und dem Gehalt, das unterschrieben wuerde; `null` ohne Regel. */
-  klausel?: { gewaehlt: Werbeklausel; basisGehalt: number; gehalt: number; zeilen: KlauselZeile[] } | null;
+  klausel?: { gewaehlt: Werbeklausel; basisGehalt: number; gehalt: number; zeilen: KlauselZeile[]; ablehnung: string | null; loyal: boolean } | null;
 };
 
 export type ContractInSaisonVorschau = {
@@ -2227,6 +2227,7 @@ export function previewContractRenewalAction(input: {
             basisGehalt,
             gehalt: neuesGehalt,
             zeilen: klauselZeilen(input.save.gameState, input.teamId, player, basisGehalt, contractLength, moralOhneWerbung(input.save.gameState, player.id, input.teamId), false),
+            ...klauselTraitInfo(player),
           }
         : null,
   };
