@@ -72,7 +72,8 @@ describe("Beide Schreibwege halten sich daran", () => {
   it("nur der Liga-Draft (draftFestkonditionen) darf am Verdikt vorbei kaufen", () => {
     expect(kauf).toContain("const festkonditionen = params.draftFestkonditionen === true && salary != null;");
     expect(kauf).toContain(
-      "const blockingReasonsMitVerdikt = festkonditionen ? [...blockingReasons] : [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict)];",
+      // Seit der Werbeklausel (23.11.) haengt dahinter noch der Klausel-Blocker; Festkonditionen bleiben davon frei.
+      "const blockingReasonsMitVerdikt = festkonditionen ? [...blockingReasons] : [...blockingReasons, ...verdiktBlocker(negotiationPreview.verdict), ...klauselBlocker];",
     );
     const setzer = ["lib/draft/liga-draft-dienst.ts", "lib/market/transfermarkt-local-service.ts"];
     for (const datei of setzer) expect(readFileSync(join(process.cwd(), datei), "utf8")).toContain("draftFestkonditionen");
@@ -87,7 +88,9 @@ describe("Beide Schreibwege halten sich daran", () => {
     // `applyContractRenewalAction` haengt an `preview.ok` — beides muss stimmen, sonst meldet die
     // Vorschau einen Blocker, den der Schreibweg nicht kennt, oder umgekehrt.
     expect(verlaengerung).toContain("const verdiktBlockingReasons = verdiktBlocker(negotiationPreview?.verdict);");
-    expect(verlaengerung).toContain("verdiktBlockingReasons.length === 0,");
+    // Seit der Werbeklausel (23.11.) folgt in `ok` noch der Klausel-Blocker, daher `,` oder `&&`.
+    expect(verlaengerung).toMatch(/verdiktBlockingReasons\.length === 0\s*(,|&&)/);
+    expect(verlaengerung).toContain("klauselBlockingReasons.length === 0,");
     expect(verlaengerung).toContain("...verdiktBlockingReasons,");
   });
 });
