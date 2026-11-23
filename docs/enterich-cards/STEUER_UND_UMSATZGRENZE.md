@@ -59,8 +59,9 @@ Abgleich: 2024 EÜR 24.707 € gegen eBay-Rückrechnung ≈ 27.705 € (Differen
 
 ## 3. Stand 2026
 
-- eBay-App „Gesamt seit Jahresbeginn“ (23.11.2026): **24.187 €** inkl. Privatverkäufen und inkl. Versand, **ohne** zurückerstattete, nicht bezahlte und abgebrochene Bestellungen (steht so im Info-Text der App). Beträge über 100 € werden je Bestellung auf ganze Euro abgerundet.
-- Die Rückerstattungen sind darin also schon abgezogen. Das Finanzamt sieht für 2026 über den PStTG-Bericht daher etwa dasselbe: **≈ 24.187 €**, noch ohne Dezember.
+- eBay-App „Gesamt seit Jahresbeginn“ (23.11.2026): **24.187 €** inkl. Privatverkäufen und inkl. Versand. Nach Chris' Prüfung sind Erstattungen **nicht** als Minusbetrag darin enthalten und müssen noch abgezogen werden (geschätzt 200 bis 300 €). Der Info-Text der App behauptet das Gegenteil; maßgeblich ist hier Chris' Beobachtung. Beträge über 100 € werden je Bestellung auf ganze Euro abgerundet.
+- eBay-Zahl nach Erstattungen: **≈ 23.940 €**. Der PStTG-Bericht (Einkünfte + Gebühren + Steuern) ist schon nach Erstattungen gerechnet, das Finanzamt sieht daher etwa diese Zahl.
+- Das Finanzamt hat sich bisher immer auf die **EÜR** bezogen, der eBay-PStTG-Bericht wurde nie erwähnt (Chris, 23.11.). Beträge, die über den Jahreswechsel rutschten, zählten bisher im Jahr der Auszahlung (Zuflussprinzip), wodurch die EÜR im Januar deutlich höher ausfiel.
 - Chris will die 25.000 € nicht überschreiten: „lieber mach ich 2 Wochen im Dezember Urlaub ohne Umsätze“.
 - Dezember rechnet Chris sonst mit 1.600 bis 1.800 € Umsatz.
 - Faustwert: etwa 80 € Umsatz je Tag (geschätzt).
@@ -78,15 +79,26 @@ Abgleich: 2024 EÜR 24.707 € gegen eBay-Rückrechnung ≈ 27.705 € (Differen
 
 Chris sucht weitere. Die Verkäufe sind „Verkauft über Anzeigen“ (Anzeigengebühren), also nicht ins Gewerbe buchen, falls sie dort gebucht wurden. Herkunft der Silbermünze und der Schmuck-Konvolute festhalten (eigener Bestand, nicht als Ware gekauft).
 
-### Luft bis 25.000 € (Stand 23.11.2026)
+### Lücke eBay-App zu EÜR bis Ende Oktober (Stand 23.11.)
 
-| Basis | Betrag | Luft bis 25.000 € | reicht bei 80 €/Tag bis |
-|---|---:|---:|---|
-| eBay-Zahl (Sicht des Finanzamts) | 24.187 € | 813 € | ≈ 3. Dezember |
-| eBay-Zahl minus belegbare Privatverkäufe | ≈ 23.260 € | ≈ 1.740 € | ≈ 14. Dezember |
-| EÜR gebucht bis Ende Oktober | 20.282 € | 4.718 € | nicht aussagekräftig, November fehlt |
+| Posten | Betrag |
+|---|---:|
+| eBay-App zum 31.10. (24.187 € minus 1.894 € November) | 22.293 € |
+| EÜR zum 31.10. | 20.282 € |
+| Lücke | 2.010 € |
+| erklärt: Privatverkäufe | 927 € |
+| erklärt: 27 Bestellungen ohne Rechnung (21.–23.8., 4.9.), noch nicht in der EÜR | 548 € |
+| erklärt: Erstattungen (geschätzt) | ≈ 250 € |
+| ungeklärt | ≈ 300 € |
 
-**Plan:** Pausengrenze bei etwa **24.700 € laut eBay-App**, das ist rund eine Woche früher, **ca. 29. November**. Vor der Pause Preisvorschläge und Sofort-Kaufen ausschalten (3 offene Preisvorschläge am 23.11.). Am **1. Dezember** neu rechnen mit echten Zahlen.
+Die Rechnungen zu den 27 Bestellungen ohne Rechnung werden in Lexoffice nachgezogen (Umsatz und Gebühren steigen um denselben Betrag, kein Effekt auf den Gewinn, aber Zeile 12 steigt um die vollen 548 €).
+
+### Luft bis 25.000 € (Zufluss-Basis, geschätzt)
+
+- Zufluss 2026 heute: etwa **22.700 €** (24.187 − 250 Erstattungen − 927 Privat − ca. 300 Verzug und Sonstiges).
+- Luft bis 25.000 €: ca. 2.300 €. Mit 1.000 € Puffer (24.000 €) bleiben ca. 1.300 €, bei etwa 80 € Umsatz je Tag also rund 16 Tage.
+- **Plan:** Pause **um den 9. Dezember** (Chris will ohnehin ca. zwei Wochen im Dezember Urlaub ohne Umsätze). Neuprüfung am 1. Dezember mit den November-Auszahlungen und der neuen EÜR-Zeile 12 nach den nachgezogenen Rechnungen. Vor der Pause Preisvorschläge und Sofort-Kaufen ausschalten.
+- Vorsichts-Variante: Wird die eBay-Zahl nach Erstattungen wichtiger genommen als die EÜR, liegt die Linie bei ca. 24.700 € (≈ 29. November). Das ist die strengere Messlatte.
 
 ## 4. Warum die Grenze für Chris so teuer ist
 
