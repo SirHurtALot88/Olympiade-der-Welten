@@ -58,6 +58,8 @@ import {
 import { DEVELOPMENT_MAX_ATTRIBUTE_VALUE } from "@/lib/training/training-levelup-service";
 import { getTrainingSetpointsJeSpieltag } from "@/lib/training/training-mode-presentation";
 import { entwicklungNeuFuer } from "@/lib/resolve/entwicklung-regel";
+import { trainingsVorliebenAktivFuer } from "@/lib/resolve/trainings-vorlieben";
+import { TRAININGS_VORLIEBEN_AUSGLEICH, vorliebeArt, vorliebeFaktor, type VorliebeArt } from "@/lib/training/trainings-vorlieben";
 import { entwicklungsParameter, trainingsBudgetFaktor } from "@/lib/training/entwicklung-neu";
 import { fokusDominanz, istDiligent, ligaAbbauFaktor } from "@/lib/training/entwicklung-tag";
 import type { PlayerTrainingMode } from "@/lib/training/training-plan-types";
@@ -186,8 +188,10 @@ export type SpieltagsZuwachs = {
   abbauFaktor: number;
   /** Entwicklung neu: Obergrenze je Attribut, die die Rechnung angewendet hat (fuer die Zusammenfuehrung mit der Leistung). */
   deckel: Partial<Record<PlayerGeneratorAttributeName, number>>;
-  /** Entwicklung neu: Faktor auf das Spieltags-Budget (Eichung x Gewicht Training x Fokus); 1 bei Regel "alt". */
+  /** Entwicklung neu: Faktor auf das Spieltags-Budget (Eichung x Gewicht Training x Fokus); 1 bei Regel "alt". Seit Runde 2 auch x Vorliebe x Ausgleich. */
   budgetFaktor: number;
+  /** Trainingsvorlieben (22.11.): Art der Ziel-Disziplin fuer diesen Spieler (1 Liebling, -1 ungeliebt, 0 neutral / Regel aus) und der Faktor, der im Budget steckt. */
+  vorliebe: { art: VorliebeArt; faktor: number };
 };
 
 /** Warum ein Attribut weniger zulegt als sein Anteil am Budget hergibt. */
@@ -269,13 +273,19 @@ export function berechneSpieltagsZuwachs(input: {
   const entNeu = entwicklungNeuFuer(input.gameState);
   const akku = input.player.seasonTrainingAccumulator;
   const verlauf = akku && akku.seasonId === input.gameState.season.id ? akku.verlauf : undefined;
-  const budgetFaktor = entNeu
+  const budgetEntwicklung = entNeu
     ? trainingsBudgetFaktor(
         istDiligent(input.player),
         fokusDominanz(verlauf, input.ziel.disziplinId, input.spieltagId ?? undefined),
         entwicklungsParameter(),
       )
     : 1;
+  // TRAININGSVORLIEBEN (22.11.): Lieblings-Disziplin x1,15, ungeliebte x0,80 auf dem Budget -- nur, wenn der Stempel der Saison "v1" sagt. Der Ausgleich
+  // haelt das Ligamittel gleich; beide stecken im Budget, das Buchung, Vorschau, Heatmap und Transparenz gemeinsam rechnen.
+  const vorlieben = trainingsVorliebenAktivFuer(input.gameState);
+  const vorliebeKind: VorliebeArt = vorlieben ? vorliebeArt(input.player, input.ziel.disziplinId, input.gameState.season?.id ?? "") : 0;
+  const vorliebeF = vorlieben ? vorliebeFaktor(vorliebeKind) : 1;
+  const budgetFaktor = budgetEntwicklung * vorliebeF * (vorlieben ? TRAININGS_VORLIEBEN_AUSGLEICH : 1);
   const ergebnis = buildOrganicSeasonProgression({
     gameState: input.gameState,
     player: input.player,
@@ -341,6 +351,7 @@ export function berechneSpieltagsZuwachs(input: {
     abbauFaktor: rund(abbauFaktor, 3),
     deckel: deckelJeAttribut,
     budgetFaktor: rund(budgetFaktor, 4),
+    vorliebe: { art: vorliebeKind, faktor: rund(vorliebeF, 3) },
     budget: rund(ergebnis.trainingSetpoints, 4),
     zuwachs,
     nebeneffekt,
@@ -476,6 +487,7 @@ export function bewerteTrainingsZiele(kontext: TrainingsZielKontext, player: Pla
     headroomCache.set(attribute, faktor);
     return faktor;
   };
+  const vorlieben = trainingsVorliebenAktivFuer(kontext.gameState);
   const ergebnis: TrainingsZielBewertung[] = [];
   for (const [disziplinId, liste] of teamListe) {
     const slots = kontext.slotsJeDisziplin.get(disziplinId) ?? 2;
@@ -519,7 +531,10 @@ export function bewerteTrainingsZiele(kontext: TrainingsZielKontext, player: Pla
         besterWeg = option.weg;
       }
     }
-    const punkte = (wichtigkeit * lueckeFaktor * schwelle * Math.max(0, besterWegFaktor)) / 20;
+    // TRAININGSVORLIEBEN (22.11.): Lieblings-Disziplin zaehlt x1,15, die ungeliebte x0,80 -- dieselben Faktoren, die das Budget bekommt. Die Wahl
+    // entscheidet weiter die Kaderluecke; die Vorliebe kippt sie nur bei knappen Abstaenden.
+    const vorliebeGewicht = vorlieben ? vorliebeFaktor(vorliebeArt(player, disziplinId, kontext.gameState.season?.id ?? "")) : 1;
+    const punkte = (wichtigkeit * lueckeFaktor * schwelle * Math.max(0, besterWegFaktor) * vorliebeGewicht) / 20;
     ergebnis.push({ disziplinId, weg: besterWeg, punkte: rund(punkte, 4), kaderRang, slots, offeneAuftritte: offen, luecke: rund(luecke, 2), begruendung });
   }
   return ergebnis.sort((a, b) => b.punkte - a.punkte || a.disziplinId.localeCompare(b.disziplinId));

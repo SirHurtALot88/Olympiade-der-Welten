@@ -8,6 +8,7 @@ import { vorjahrAnteileFuerSaisonwechsel, wirtschaftsRegelnFuerNeueSaison } from
 import { wertungsSkalenFuerSpielmodus } from "@/lib/resolve/wertungs-skalen";
 import { formkartenRegelFuerSpielmodus } from "@/lib/resolve/formkarten-regel";
 import { entwicklungsRegelFuerSpielmodus } from "@/lib/resolve/entwicklung-regel";
+import { trainingsVorliebenFuerSpielmodus } from "@/lib/resolve/trainings-vorlieben";
 import { ausruestungRegelFuerNeueSaison } from "@/lib/ausruestung/ausruestung-regel";
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
 import { finanzenJeSpieltagFuerNeueSaison } from "@/lib/finance/finanzen-je-spieltag";
@@ -689,6 +690,8 @@ function buildNextSeasonGameState(
     // ENTWICKLUNGSREGEL (22.11., lib/resolve/entwicklung-regel.ts): gilt ab der FOLGENDEN Saison; Training je Spieltag und
     // Saisonende-Wirkung muessen in einer Saison dieselbe Regel haben, der Saisonwechsel ist deshalb der einzige Wechselort.
     entwicklungsRegel: entwicklungsRegelFuerSpielmodus(save.gameState, nextSeasonId) ?? null,
+    // TRAININGSVORLIEBEN (22.11., lib/resolve/trainings-vorlieben.ts): gelten ab der FOLGENDEN Saison; Rueckweg OLY_TRAINING_VORLIEBEN=aus.
+    trainingsVorlieben: trainingsVorliebenFuerSpielmodus(save.gameState, nextSeasonId) ?? null,
     // MARKETING-REGEL (22.11., lib/marketing/marketing-regel.ts): gilt ab der FOLGENDEN Saison; die Fanfarbe jedes Teams driftet hier
     // (Kader und Erfolg der abgelaufenen Saison), der Verlauf wird fortgeschrieben. Rueckweg OLY_MARKETING=aus.
     marketingRegel: marketingStempelFuerSaisonwechsel(save.gameState, save.gameState.season.id, nextSeasonId),
