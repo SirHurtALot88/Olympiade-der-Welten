@@ -145,3 +145,13 @@ Gelesen: § 19 UStG auf gesetze-im-internet.de und zwei Ratgeber-Seiten zu DAC7.
 - Gebühren, Stornos, Jahreswechsel-Auszahlungen erklären typischerweise den Unterschied zwischen eBay-Meldung („Einkünfte“ nach Gebühren) und EÜR (Umsatz brutto, Gebühren als Ausgabe).
 
 Quellen: [§ 19 UStG](https://www.gesetze-im-internet.de/ustg_1980/__19.html), [Hortmann Law zum DAC7-Abgleich](https://www.hortmannlaw.com/articles/dac7-steuerfahndung-datenabgleich-anwalt), [EÜR Einfach zu DAC7](https://eur-einfach.de/ratgeber/dac7-meldung-finanzamt.html). Die Ratgeber sind keine amtlichen Quellen.
+
+## 9. Nachtrag 23.11.2026 (Tempo, Linien, Verweis)
+
+- **Tempo:** Verkäufer-Cockpit: letzte 7 Tage 447,46 € (≈ 64 € je Tag), letzte 31 Tage 2.253,66 € (≈ 73 €), letzte 90 Tage 6.072,72 € (≈ 67 €), November bis 23.11. 1.936,97 € (≈ 84 € je Tag, getragen von einzelnen Spitzentagen). Planungswert ab jetzt **65 € je Tag**.
+- **eBay-Bericht, Stand 23.11. nachmittags:** Gesamtumsatz 1.1.–23.11. 24.192,87 € plus ca. 43 € seit dem Vormittag. Beide eBay-Texte („Rücknahmen und abgebrochene Transaktionen wurden berücksichtigt", App: „keine zurückerstatteten Bestellungen") sagen, dass Erstattungen schon abgezogen sind; der Vergleich Umsatzbericht gegen PStTG-Gesamtbetrag (2025: −180 €, 2024: −300 €) spricht dafür. Chris ist unsicher. **Vorsichtige Annahme:** Anzeige schon netto, die früher geschätzten 250 € Erstattungen werden nicht noch einmal abgezogen.
+- **Linien auf der eBay-Anzeige (Gesamtumsatz) und Pausentermin bei 65 € je Tag:** 24.900 € (Platz ≈ 707 €) etwa 4. Dezember; 25.150 € (≈ 957 €) etwa 8. Dezember; 25.500 € als harte Obergrenze (≈ 1.307 €) etwa 13. Dezember. Bei 55 € je Tag verschiebt es sich um 2 bis 3 Tage nach hinten, bei 80 € um 3 bis 4 Tage nach vorn.
+- **Rechtlich** liegt der Zufluss 2026 bei etwa 22.400 bis 23.000 €. Selbst bei 25.500 € Anzeige liegt der gewerbliche Umsatz (ohne Privatverkäufe 927 €) bei etwa 24.570 € (Soll) bzw. 24.200 bis 24.400 € Zufluss.
+- **Januar-Verschiebung:** Chris erwartet die letzte Dezember-Auszahlung um den 19.12.; Verkäufe ab etwa dem 17.12. würden erst im Januar ausgezahlt und zählen (wenn die Auszahlung für die Grenze zählt) für 2027. Als Bonus, nicht als Plan zu behandeln; Frage 1 in `WECHSEL_REGELBESTEUERUNG_CHECKLISTE.md` Abschnitt 5.
+- **Gewinn 2026:** etwa 640 € bis Oktober plus Chris' Schätzung von 600 bis 800 € für November und für den Dezember bei vollem Verkauf, also etwa 2.000 € im Jahr.
+- **Alles zur Entscheidung Pause oder Wechsel zur Regelbesteuerung und zur Checkliste für den Jahresübergang** steht in `WECHSEL_REGELBESTEUERUNG_CHECKLISTE.md`.
