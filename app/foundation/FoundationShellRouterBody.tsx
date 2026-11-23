@@ -243,10 +243,6 @@ const FoundationDisciplineStageHost = dynamic(() => import("@/app/foundation/dis
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Arena wird geladen…" />,
 });
-const FoundationCreditsHost = dynamic(() => import("@/app/foundation/credits/FoundationCreditsHost"), {
-  ssr: false,
-  loading: () => <FoundationPanelSkeleton label="Kredite werden geladen…" />,
-});
 const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/FoundationFinancesHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
@@ -2898,19 +2894,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
             hostProps={foundationHistoryV2HostProps}
           />
 
-          {activeView === "credits" ? (
-            <FoundationCreditsHost
-              gameState={gameState}
-              teamId={activeManagerTeamId}
-              onBorrow={originateLoanForActiveTeam}
-              onEarlyPayoff={repayLoanEarlyForActiveTeam}
-            />
-          ) : null}
-
-          {/* saveId: Seed fürs Season-Ökonomie-Fenster (Salary-Factor-Chip) — muss die echte
-              activeSaveId sein, damit Finanzen dieselben Faktoren zeigen wie Briefing + KI. */}
-          {activeView === "finances" ? (
+          {/* Finanzen und Kredite (22.11.): „Kredite“ in der Navigation springt auf den Reiter Kredite der Finanzseite (eine Seite, ein Reiter).
+              saveId: Seed fürs Season-Ökonomie-Fenster (Salary-Factor-Chip) — muss die echte activeSaveId sein, damit Finanzen dieselben
+              Faktoren zeigen wie Briefing + KI. */}
+          {activeView === "finances" || activeView === "credits" ? (
             <FoundationFinancesHost
+              key={activeView}
               gameState={gameState}
               teamId={activeManagerTeamId}
               saveId={activeSaveId}
@@ -2918,6 +2907,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               onVorstandAktion={vorstandBudgetAktion}
               onOpenOffice={() => navigateHomeTab("office")}
               kannVerwalten={kannVerwaltenAktivesTeam}
+              onKreditAufnehmen={originateLoanForActiveTeam}
+              onKreditAbloesen={repayLoanEarlyForActiveTeam}
+              startAnsicht={activeView === "credits" ? "kredite" : undefined}
             />
           ) : null}
 

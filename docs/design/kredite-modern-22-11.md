@@ -98,3 +98,42 @@ daran.
    Alternative: grobe Stufen wie beim Scouting-Nebel.
 3. **Zinsspanne.** Der Code rechnet 7 bis 20 % (Death Peaches 18 %), `finanzen-posten-22-11.md` nennt 5 bis 12 %. Das
    Mockup folgt dem Code. Falls 5 bis 12 % gewollt ist, muss die Formel neu geeicht werden.
+
+## 9. Bau (22.11., nach „bau das“)
+
+Entscheidungen (PM, verbindlich): Raten je Spieltag als eigener erster Teil; das Kreditregister der Liga ist öffentlich und exakt, die Kasse fremder
+Teams bleibt verborgen; Zinsspanne bleibt 7 bis 20 %; Kredite gehören zum Bereich „Käufe/Verkäufe/Verträge“, kein eigener Delegationsschalter.
+
+**Teil 1, Mechanik** (`lib/finance/kredit-raten.ts`): Stempel `seasonState.kreditRegel` (`raten` | `saisonende`), neues Spiel ab Saison 1, bestehender
+Spielstand ab dem nächsten Saisonwechsel (Lade-Migration schreibt `saisonende` fest), Rückweg `OLY_KREDIT_RATEN=aus` (neue Saisons). Jeder Rechenweg fragt
+`kreditRatenAktiv(gameState)`. Rate = Annuität über Laufzeit x Spieltage mit Zins/N, gebucht in `bucheSpieltagFinanzen` als Posten `kreditZins`,
+`kreditTilgung`, `kreditEingang` (Rückfluss an den Geber eines Team-Kredits), Kasse = Summe der Buchungen, idempotent über das Ledger. Die
+Saisonende-Abrechnung überspringt, was die Spieltage buchen; ein Raten-Kredit in einer Saison ohne Raten wird zur Jahresrate zurückgerechnet, ein alter Kredit in
+einer Raten-Saison umgerechnet: keine Doppelbuchung, keine Lücke. Zahlungsausfall je Spieltag: bezahlt wird, was da ist, Rest plus 5 % Strafzins kapitalisiert, ein
+Vertrauenspunkt je Kredit und Saison, geplatzt nach einem Viertel der Saison (5 Raten). GuV: nur der Zins (eine Zerlegung `kreditSaisonZerlegung` für GuV,
+Verpflichtungen, Planer). Notkredit-Rücknahme, Ablöse, Kontoauszug und Kassenprognose angepasst. Die Sperre für Saison 1 ist gefallen (Finanzkonzept f.6); die KI leiht in
+Saison 1 weiter nie für den Draft. Gefundener Fehler: der gebuchte Team-Satz ignorierte den Eigenzins des Gebers, das Angebot nicht; jetzt gleich.
+
+**Teil 2, Seite** (`FinanzenKredite.tsx`, `kredite-modern.css`, Modell `lib/finance/kredite-seite-modell.ts`): Reiter „Kredite“ der Finanzseite, drei Tafeln. Der
+Navigationspunkt „Kredite“ springt auf den Reiter. `FoundationCreditsNewLook`, Host, View-Modell und `.nl-credit*` sind entfernt. Sperren (Obergrenze 20 % der
+Planeinnahmen, Sparauflage) in `lib/finance/kredit-pruefung.ts`: dieselbe Funktion sperrt den Knopf und die Route `POST /api/finance/loan/originate`.
+
+| Mockup-Merkmal | Stand | Anmerkung |
+|---|---|---|
+| Reiter Kredite im Kopf der Finanzseite, Schulden und Zahl | drin | |
+| Vorstand rechts im Kopf (Vertrauen, Freigabe, erlaubt/gesperrt) | drin | zeigt „Kredit nur in der Vorsaison“, wenn das Fenster zu ist |
+| Fünf Kennzahlen (Schulden, Rate groß/klein, Ø Zins, Rahmen, Schuldendienst) | drin | |
+| Tabelle laufender Kredite, sortierbar, Ablösen | drin | Ablösen wählt den Kredit und fragt im Fuß nach (zwei Schritte) |
+| Tilgungsplan: Diagramm, Tabelle je Saison, Spieltagsleiste, Ablösefuß | drin | Plan wird aus dem Kredit nachgerechnet; bei verpassten Raten oder alten Krediten nur der Rest ab heute |
+| Rechner: Betrag, Laufzeit 1 bis 10, Angebote, günstigstes, gesperrter Geber | drin | |
+| Wirkung vorher → nachher | angepasst | Transfertopf, Kasse, GuV kommen aus der simulierten echten Aufnahme; „Raten im Gehaltstopf“ heißt „Raten je Saison (Fixkosten)“, weil die Rate den Gehaltstopf im Code nicht mindert |
+| Warnung bei Kasse im Minus (Pflichtkredit) | angepasst | der Pflichtkredit am Kassensturz ist nicht gebaut; gezeigt wird der echte Notkredit der Bank am Ende des Kauffensters (4 Saisons, Bankzins) |
+| Schuldendienst-Balken mit 10 % / 20 % | drin | 20 % sperrt auf Seite und Server |
+| Liga-Vergleich, Rang 1 = geringste Schulden, Rang unter 32 klein | drin | alle Spalten sortierbar |
+| Kreditregister (alle Kredite, Nehmer und Geber) | neu | Reiter „Register“ im Liga-Vergleich (Wunsch aus der alten Seite, bleibt erhalten) |
+| Beispielmarken „Beispiel“ | entfallen | die App zeigt echte Werte |
+| Zweiter Beispielkredit (Wrecking Legionnaires) | fehlt im Bild | Team-Geber hatte in der Aufnahme nicht genug freies Geld; die Zeile ist in Test und Seite vorhanden |
+| Aufnehmen mitten in der Saison | fehlt (bewusst) | die Phasenregel `credit_borrow` bleibt: Vorsaison und vor dem ersten Spieltag |
+
+Bilder (Mockup | App): `vergleich-1920x1080.png` (Spieltag 12, Fenster zu), `vergleich-2560x1440.png`, `vergleich-1710x1112.png` (Vorsaison, Aufnehmen und Ablösen aktiv),
+`vergleich-leer-1920x1080.png` (kein Kredit); dazu `app-kredite-register-1920x1080.png`. Kein Seitenscroll, keine Überlappung bei 1920, 2560 und 1710.

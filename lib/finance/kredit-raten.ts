@@ -26,7 +26,7 @@
  * DIESE DATEI IST CLIENT-SICHER (kein node:fs, keine Dienste) und importiert `loan-service` nicht (der importiert sie).
  */
 import type { GameState, LoanRecord, SeasonState, SpieltagKreditPosten } from "@/lib/data/olyDataTypes";
-import { istJeSpieltagSaison, runde1, spieltageDerSaison } from "@/lib/finance/finanzen-je-spieltag";
+import { istJeSpieltagSaison, spieltageDerSaison } from "@/lib/finance/finanzen-je-spieltag";
 
 export type KreditRegel = NonNullable<SeasonState["kreditRegel"]>;
 export type KreditRegelWert = KreditRegel["regel"];
@@ -338,7 +338,16 @@ export type KreditPlan = {
  * Tilgungsplan ab einer Restschuld: `raten` Raten, die erste am Spieltag `start` (1-basiert) der laufenden Saison, danach Saison fuer
  * Saison. Dieselbe Schrittrechnung wie die Buchung (`ratenSchritt`), damit der Plan zeigt, was gebucht wird.
  */
-export function kreditPlan(input: { restschuld: number; zinsJeSaison: number; n: number; raten: number; rate: number; start: number }): KreditPlan {
+export function kreditPlan(input: {
+  restschuld: number;
+  zinsJeSaison: number;
+  n: number;
+  raten: number;
+  rate: number;
+  start: number;
+  /** Nummer der Saison, in der `start` liegt (Beschriftung der Plan-Zeilen); Standard 1. */
+  startSaison?: number;
+}): KreditPlan {
   const { zinsJeSaison, n } = input;
   let rest = Math.max(0, input.restschuld);
   let offen = Math.max(0, Math.round(input.raten));
@@ -346,7 +355,7 @@ export function kreditPlan(input: { restschuld: number; zinsJeSaison: number; n:
   const saisons: PlanSaison[] = [];
   const jeRate: KreditPlan["jeRate"] = [];
   let zinsenGesamt = 0;
-  let saison = 1;
+  let saison = input.startSaison ?? 1;
   let aktuell: PlanSaison | null = null;
   while (offen > 0 && rest > 0.00005) {
     if (!aktuell || spieltag > n) {

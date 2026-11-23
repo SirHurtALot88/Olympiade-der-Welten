@@ -156,7 +156,7 @@ export default function FoundationHomeV2Host({
   const homeActiveTeamLogo = selectedTeam ? getTeamLogoModel(selectedTeam, { variant: "thumb" }) : null;
 
   // Kredit-Kern (Fog of War): nur für das aktive Manager-Team berechnet — nie
-  // für ein fremdes Team, siehe `use-credits-view-model.ts`. `null` statt `0`,
+  // für ein fremdes Team, siehe `lib/finance/kredite-seite-modell.ts`. `null` statt `0`,
   // wenn kein Team aktiv ist, damit die Home-/Office-Chips sauber ausblenden.
   const loanInstallment = activeManagerTeamId
     ? getTeamAnnualLoanInstallment(gameState, activeManagerTeamId)

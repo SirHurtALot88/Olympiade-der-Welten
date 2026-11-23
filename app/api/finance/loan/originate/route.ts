@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
+import { pruefeKreditAufnahme } from "@/lib/finance/kredit-pruefung";
 import { originateLoan } from "@/lib/finance/loan-service";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -132,16 +133,29 @@ export async function POST(request: Request) {
     // liefert den maßgeblichen `reason`. `lenderTeamId` non-empty selects a
     // team offer (Phase 3); leer/omitted bleibt die Bank (unverändertes
     // Verhalten).
-    const result = originateLoan(
-      save.gameState,
-      {
-        borrowerTeamId: teamId,
-        principal,
-        termSeasons,
-        ...(lenderTeamId ? { lenderType: "team" as const, lenderTeamId } : {}),
-      },
-      { execute: true, allowSeason1: adminOverride },
-    );
+    const eingabe = {
+      borrowerTeamId: teamId,
+      principal,
+      termSeasons,
+      ...(lenderTeamId ? { lenderType: "team" as const, lenderTeamId } : {}),
+    };
+
+    // SPERREN DES VORSTANDS (22.11., lib/finance/kredit-pruefung.ts): Obergrenze Schuldendienst 20 % der Planeinnahmen und keine freiwilligen
+    // Kredite in der Sparauflage. Dieselbe Funktion sperrt auf der Seite den Knopf; hier lehnt der Server ab, was die Seite nicht anbietet.
+    if (!adminOverride) {
+      const vorschau = originateLoan(save.gameState, eingabe);
+      if (vorschau.ok && vorschau.loan) {
+        const pruefung = pruefeKreditAufnahme(save.gameState, teamId, vorschau.loan.installmentPerSeason);
+        if (!pruefung.ok) {
+          return NextResponse.json(
+            { ok: false, reason: pruefung.reason, loan: null, capacity: vorschau.capacity, terms: vorschau.terms },
+            { status: 409 },
+          );
+        }
+      }
+    }
+
+    const result = originateLoan(save.gameState, eingabe, { execute: true, allowSeason1: adminOverride });
 
     if (!result.ok) {
       return NextResponse.json(

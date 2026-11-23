@@ -121,6 +121,24 @@ export function computeBorrowingCapacity(input: {
   return roundCash(Math.max(0, teamwertCap - Math.max(0, input.currentOutstandingDebt)));
 }
 
+/**
+ * Kreditrahmen eines Teams in EINER Rechnung: Gesamtrahmen (15 % der Kasse + 30 % des Kaderwerts), davon schon genutzt (aktive und geplatzte
+ * Restschuld) und der freie Rest. Seite und Kern lesen dieselbe Funktion (`computeBorrowingCapacity`), damit gezeigt = gebucht.
+ */
+export function berechneKreditRahmen(gameState: GameState, teamId: string) {
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  const kaderwert = getTeamMarketValueTotal(gameState, teamId);
+  const schuld = getTeamOwedOutstandingDebt(gameState, teamId);
+  const frei = computeBorrowingCapacity({
+    cash: team?.cash ?? 0,
+    marketValueTotal: kaderwert,
+    annualRevenue: estimateTeamAnnualRevenue(gameState, teamId),
+    currentOutstandingDebt: schuld,
+  });
+  const gesamt = roundCash(CAPACITY_CASH_SHARE * Math.max(0, team?.cash ?? 0) + CAPACITY_MARKET_VALUE_SHARE * Math.max(0, kaderwert));
+  return { kaderwert: roundCash(kaderwert), gesamt, schuld, frei };
+}
+
 export function getTeamOutstandingDebt(gameState: GameState, teamId: string): number {
   const loans = gameState.seasonState.loans ?? [];
   return roundCash(

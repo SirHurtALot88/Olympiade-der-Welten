@@ -28,6 +28,9 @@ import { sponsorWappenPfadFuer } from "@/lib/sponsor/sponsor-wappen";
 import { SponsorWappen } from "@/components/foundation/sponsor/SponsorWappen";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
+import FinanzenKredite, { FinanzenKreditKopfRechts, type KreditAbloeseFn, type KreditAufnahmeFn } from "./FinanzenKredite";
+import { getTeamOutstandingDebt } from "@/lib/finance/loan-service";
+
 import "./finanzen-modern.css";
 
 export type { VorstandAktionFn } from "@/lib/finance/vorstand-aktion-typen";
@@ -45,12 +48,15 @@ export type FinanzenModernProps = {
   /** Springt ins Office (Reiter Gespräch): dort laufen Rücklage anzapfen und „Alles auf eine Karte“ jetzt. */
   onOpenOffice?: () => void;
   kannVerwalten?: boolean;
+  /** Schreibweg Kredit aufnehmen und ablösen (Reiter Kredite); beide laufen serverseitig durch den Raum-Schreibschutz. */
+  onKreditAufnehmen?: KreditAufnahmeFn;
+  onKreditAbloesen?: KreditAbloeseFn;
   /** Reiter, mit dem die Seite aufgeht (Tests und Sprunglinks); sonst die Übersicht. */
   startAnsicht?: FinanzenAnsicht;
   startKontext?: FinanzenKontextReiter;
 };
 
-export type FinanzenAnsicht = "uebersicht" | "kontoauszug" | "budgets" | "sponsor" | "guv" | "apron";
+export type FinanzenAnsicht = "uebersicht" | "kontoauszug" | "budgets" | "sponsor" | "guv" | "apron" | "kredite";
 type Ansicht = FinanzenAnsicht;
 export type FinanzenKontextReiter = "lage" | "quelle" | "liga";
 type KontextReiter = FinanzenKontextReiter;
@@ -1322,6 +1328,8 @@ export default function FinanzenModern({
   onVorstandAktion,
   onOpenOffice,
   kannVerwalten = false,
+  onKreditAufnehmen,
+  onKreditAbloesen,
   startAnsicht = "uebersicht",
   startKontext = "lage",
 }: FinanzenModernProps) {
@@ -1331,6 +1339,12 @@ export default function FinanzenModern({
   const [gewZeile, setGewZeile] = useState<string | null>(null);
 
   const m = useMemo(() => (teamId ? buildFinanzSeiteModell(gameState, teamId, finanzen) : null), [gameState, teamId, finanzen]);
+  // Kennzahl des Reiters Kredite: Schulden und Zahl der laufenden Kredite (billig, die ganze Kredite-Seite baut erst der Reiter selbst).
+  const kreditKopf = useMemo(() => {
+    if (!teamId) return { schulden: 0, anzahl: 0 };
+    const laufend = (gameState.seasonState.loans ?? []).filter((l) => l.borrowerTeamId === teamId && l.status === "active");
+    return { schulden: getTeamOutstandingDebt(gameState, teamId), anzahl: laufend.length };
+  }, [gameState, teamId]);
 
   if (!teamId || !m) {
     return (
@@ -1366,6 +1380,7 @@ export default function FinanzenModern({
     sponsor: ["Sponsor", "Der Vertrag trägt das Gehaltsbudget"],
     guv: ["Gewinn und Verlust", "Alle Posten der Saison, gezeigt = gebucht"],
     apron: ["Apron", "Wer wegen hoher Gehälter zahlt und wer ausgeschüttet bekommt"],
+    kredite: ["Kredite", "Was du schuldest, was ein neuer Kredit kostet, wie die Liga dasteht"],
   };
   const spieltagText = m.spieltag <= 0 ? "VOR SPIELTAG 1" : `NACH SPIELTAG ${m.spieltag} VON ${m.spieltageGesamt}`;
 
@@ -1414,20 +1429,36 @@ export default function FinanzenModern({
               wert={zahl(s.herleitung.sponsorErwartung, 1)}
               wertNote="C je Saison"
             />
+            <BcReiter
+              aktiv={ansicht === "kredite"}
+              onClick={() => setAnsicht("kredite")}
+              eyebrow={`${kreditKopf.anzahl} ${kreditKopf.anzahl === 1 ? "Kredit" : "Kredite"}`}
+              titel="Kredite"
+              symbol={<BcIcon name="bank" />}
+              wert={zahl(kreditKopf.schulden, 1)}
+              wertNote="C Schulden"
+            />
           </>
         }
         rechts={
-          <div className="fin-hr">
-            <div className="fin-frist">
-              <em>{m.saisonendeGebucht ? "Saisonabrechnung gebucht" : "Saisonende · erwartet"}</em>
-              <strong className={`bc-t ${vz(ende.bewegung)}`}>{Cv(ende.bewegung)}</strong>
+          ansicht === "kredite" ? (
+            <FinanzenKreditKopfRechts gameState={gameState} teamId={teamId} />
+          ) : (
+            <div className="fin-hr">
+              <div className="fin-frist">
+                <em>{m.saisonendeGebucht ? "Saisonabrechnung gebucht" : "Saisonende · erwartet"}</em>
+                <strong className={`bc-t ${vz(ende.bewegung)}`}>{Cv(ende.bewegung)}</strong>
+              </div>
+              <button type="button" className="fin-btn" onClick={() => setAnsicht("kontoauszug")}>
+                Kontoauszug <BcIcon name="rechts" />
+              </button>
             </div>
-            <button type="button" className="fin-btn" onClick={() => setAnsicht("kontoauszug")}>
-              Kontoauszug <BcIcon name="rechts" />
-            </button>
-          </div>
+          )
         }
       />
+      {ansicht === "kredite" ? (
+        <FinanzenKredite gameState={gameState} teamId={teamId} m={m} kannVerwalten={kannVerwalten} onAufnehmen={onKreditAufnehmen} onAbloesen={onKreditAbloesen} />
+      ) : (
       <div className="fin-work">
         <section className="fin-pan" aria-label="Finanzen">
           <div className="fin-ktabs" role="tablist">
@@ -1496,6 +1527,7 @@ export default function FinanzenModern({
           </div>
         </aside>
       </div>
+      )}
     </div>
   );
 }
