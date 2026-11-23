@@ -23,9 +23,9 @@ export const FAN_KONFIG = {
   matrixFaktorGrund: 0.45,
   matrixFaktorJePunkt: 0.12,
   /** Anteil der Fanbasis je Tabellenpunkt ueber/unter der Erwartung eines Spieltags. */
-  ergebnisRelativ: 0.0035,
+  ergebnisRelativ: 0.0045,
   /** Anteil der Fanbasis je Tabellenpunkt ueber/unter dem Schnitt (2 Punkte) eines Spieltags. */
-  ergebnisAbsolut: 0.0035,
+  ergebnisAbsolut: 0.0045,
   /** Serie ab drei: Anteil je Spieltag. */
   serie: 0.004,
   /** Rueckzug zum Anker je Spieltag (ca. 20 % je Saison). */
@@ -33,7 +33,7 @@ export const FAN_KONFIG = {
   /** Anteil, mit dem der Anker am Saisonende der Fanbasis folgt. */
   ankerFolge: 0.4,
   /** Saisonende: Tabellenplatz von -platz bis +platz (Rang 1 = +platz). */
-  platz: 0.12,
+  platz: 0.14,
   /** Saisonende: Platz gegen die Erwartung der Kaderstaerke. */
   erwartung: 0.12,
   titel: 0.08,
