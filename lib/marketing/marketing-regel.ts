@@ -65,12 +65,21 @@ export function startFanfarben(teamIds: readonly string[]): Record<string, Fanfa
 export function marketingRegelFuerNeueSaison(
   seasonId: string,
   teamIds: readonly string[],
-  optionen?: { fanfarbe?: Record<string, Fanfarbe>; verlauf?: MarketingStempel["verlauf"]; teamErfolg?: MarketingStempel["teamErfolg"] },
+  optionen?: {
+    fanfarbe?: Record<string, Fanfarbe>;
+    verlauf?: MarketingStempel["verlauf"];
+    teamErfolg?: MarketingStempel["teamErfolg"];
+    gesichtVorsaison?: MarketingStempel["gesichtVorsaison"];
+    klassenVorliebe?: MarketingStempel["klassenVorliebe"];
+  },
 ): MarketingStempel {
   const s = marketingSchalter();
   return {
     seasonId,
     regel: s === "an" ? "an" : "aus",
+    ...(s === "an" ? { version: "klausel-v2" as const } : {}),
+    ...(optionen?.gesichtVorsaison ? { gesichtVorsaison: optionen.gesichtVorsaison } : {}),
+    ...(optionen?.klassenVorliebe && Object.keys(optionen.klassenVorliebe).length ? { klassenVorliebe: optionen.klassenVorliebe } : {}),
     fanfarbe: optionen?.fanfarbe ?? startFanfarben(teamIds),
     ...(optionen?.verlauf ? { verlauf: optionen.verlauf } : {}),
     ...(optionen?.teamErfolg ? { teamErfolg: optionen.teamErfolg } : {}),
@@ -120,4 +129,13 @@ export function marketingAktiv(gameState: MarketingQuelle): boolean {
   // Die Notbremse steht auch im Stempel (der Server spiegelt sie beim naechsten Buchen), damit der Browser sie sieht.
   if (!stempel || stempel.regel !== "an" || stempel.notbremse) return false;
   return istJeSpieltagSaison(gameState as Parameters<typeof istJeSpieltagSaison>[0]);
+}
+
+/**
+ * Gilt die Werbeklausel samt Aushaengeschild-Regel (23.11.) in dieser Saison? Marketing aktiv UND Stempel `version: "klausel-v2"`. Ein Stempel
+ * aus der Zeit davor (Neustart nach dem 22.11., Saison laeuft) rechnet weiter wie gestempelt: Klausel bleibt Standard, KI-Wahl nach Marketability.
+ */
+export function werbeklauselAktiv(gameState: MarketingQuelle): boolean {
+  if (!marketingAktiv(gameState)) return false;
+  return gueltigerMarketingStempel(gameState)?.version === "klausel-v2";
 }

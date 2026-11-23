@@ -812,6 +812,7 @@ import {
 import type { VorstandAktionEingabe } from "@/lib/finance/vorstand-aktion-typen";
 import type { AusruestungAktion } from "@/lib/ausruestung/ausruestung-aktionen";
 import type { ArenaAktionEingabe } from "@/lib/arena/arena-aktion-typen";
+import type { MarketingAktionEingabe } from "@/lib/marketing/marketing-aktion-typen";
 import {
   HISTORY_ALL_SEASONS_FILTER,
   TRANSFER_HISTORY_ALL_SEASONS_PAGE_SIZE,
@@ -6405,6 +6406,39 @@ export function useFoundationShellRouterBodyScope({
     }
     try {
       const response = await fetch("/api/arena", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          seasonId: gameState.season.id,
+          teamId: activeManagerTeamId,
+          ...input,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { ok?: boolean; reason?: string | null; meldung?: string };
+      if (response.ok && payload.ok) await loadSave(activeSaveId);
+      return { ok: Boolean(response.ok && payload.ok), reason: payload.reason ?? null, meldung: payload.meldung ?? "" };
+    } catch {
+      return { ok: false, reason: "network_error", meldung: "Keine Verbindung zum Server." };
+    }
+  }
+
+  /**
+   * Marketing (23.11.): Aushaengeschild waehlen. Gleiches Muster wie die Arena-Aktion: POST, dann den Spielstand neu laden. Immer das aktive
+   * Team des Managers; der Server prueft den Besitz ueber `authorizeServerRoomWrite` (andere Menschen lesen nur).
+   */
+  async function marketingAktion(input: MarketingAktionEingabe): Promise<{ ok: boolean; reason: string | null; meldung: string }> {
+    if (!activeManagerTeamId || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return { ok: false, reason: "not_available", meldung: "Nur lesbar." };
+    }
+    if (!canManageTeamId(activeManagerTeamId)) {
+      showTeamManagementLockedNotice();
+      return { ok: false, reason: "not_available", meldung: "Dieses Team gehoert dir nicht." };
+    }
+    try {
+      const response = await fetch("/api/marketing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(withRoomBody({
@@ -13497,6 +13531,7 @@ export function useFoundationShellRouterBodyScope({
     vorstandBudgetAktion,
     ausruestungAktion,
     arenaAktion,
+    marketingAktion,
     kannVerwaltenAktivesTeam: Boolean(activeManagerTeamId && canManageTeamId(activeManagerTeamId)),
     repayLoanEarlyForActiveTeam,
     ownerQuickSwitchTeams,

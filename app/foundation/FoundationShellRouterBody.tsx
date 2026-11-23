@@ -504,6 +504,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   vorstandBudgetAktion,
   ausruestungAktion,
   arenaAktion,
+  marketingAktion,
   kannVerwaltenAktivesTeam,
   repayLoanEarlyForActiveTeam,
   persistenceError,
@@ -2941,7 +2942,7 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
           ) : null}
 
           {/* Marketing (22.11.): nur der eigene Kader des AKTIVEN Managers, je Manager getrennt. */}
-          {activeView === "marketing" ? <FoundationMarketingHost gameState={gameState} teamId={activeManagerTeamId} /> : null}
+          {activeView === "marketing" ? <FoundationMarketingHost gameState={gameState} teamId={activeManagerTeamId} onAktion={marketingAktion} kannSchreiben={kannVerwaltenAktivesTeam} /> : null}
 
           {activeView === "ausruestung" ? (
             <FoundationAusruestungHost

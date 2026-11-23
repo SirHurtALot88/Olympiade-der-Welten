@@ -19,11 +19,15 @@ import { gueltigerMarketingStempel, marketingAktiv } from "@/lib/marketing/marke
 import { MARKETING_KONFIG } from "@/lib/marketing/marketing-modell";
 import { marketingTeamUebersicht, type MarketingKaderZeile } from "@/lib/marketing/marketing-team";
 import { useTabellenSortierung } from "@/lib/ui/tabellen-sortierung";
+import type { MarketingAktionFn } from "@/lib/marketing/marketing-aktion-typen";
+import { werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
+import AushaengeschildAnsicht from "./AushaengeschildAnsicht";
 
 import "@/app/foundation/finances/finanzen-modern.css";
 import "./marketing-modern.css";
 
 export type MarketingKontextReiter = "fan" | "spieler" | "verlauf";
+export type MarketingAnsicht = "kader" | "gesicht";
 
 export type MarketingModernProps = {
   gameState: GameState;
@@ -32,6 +36,11 @@ export type MarketingModernProps = {
   startKontext?: MarketingKontextReiter;
   /** Vorgewaehlter Spieler (Tests, Aufnahmen). */
   startSpieler?: string | null;
+  /** Aushaengeschild waehlen (`POST /api/marketing`); ohne Funktion nur lesen. */
+  onAktion?: MarketingAktionFn;
+  /** Darf der Aufrufer fuer dieses Team schreiben (eigener Manager)? */
+  kannSchreiben?: boolean;
+  startAnsicht?: MarketingAnsicht;
 };
 
 const FARB_VAR = ["var(--bc-p1)", "var(--bc-p4)", "var(--bc-p5)", "var(--bc-p6)"];
@@ -217,7 +226,7 @@ function KaderTabelle({
             <AnteilZelle z={z} />
             <span className="fin-re mk-gt">
               <b className="bc-t">{z.ergebnis.ansTeam < 0.05 ? "0" : C1(z.ergebnis.ansTeam)}</b>
-              {z.ergebnis.netzGreift ? <small>Netz: 25 % vom Gehalt</small> : z.ergebnis.ansTeam >= 0.05 ? <small>{Math.round((z.ergebnis.ansTeam / Math.max(z.gehalt, 0.1)) * 100)} % vom Gehalt</small> : null}
+              {z.ergebnis.netzGreift ? <small>Netz: {Math.round(MARKETING_KONFIG.klauselNetz[String(z.klausel) as "-1" | "0" | "1"] * 100)} % vom Gehalt</small> : z.ergebnis.ansTeam >= 0.05 ? <small>{Math.round((z.ergebnis.ansTeam / Math.max(z.gehalt, 0.1)) * 100)} % vom Gehalt</small> : null}
             </span>
             <span className="fin-re mk-gs">
               <b className="bc-t">{z.ergebnis.anIhn < 0.05 ? "0" : C1(z.ergebnis.anIhn)}</b>
@@ -243,7 +252,7 @@ function KaderTabelle({
   );
 }
 
-function Karten({ u, gesicht }: { u: ReturnType<typeof marketingTeamUebersicht>; gesicht: MarketingKaderZeile | null }) {
+function Karten({ u, gesicht, klauselRegel }: { u: ReturnType<typeof marketingTeamUebersicht>; gesicht: MarketingKaderZeile | null; klauselRegel: boolean }) {
   return (
     <div className="mk-karten">
       <section className="mk-karte" aria-label="Wohin das Werbegeld geht">
@@ -265,7 +274,7 @@ function Karten({ u, gesicht }: { u: ReturnType<typeof marketingTeamUebersicht>;
               Marketability <b className="bc-t">{Math.round(gesicht.ergebnis.marketability)}</b> · Werbegeld{" "}
               <b className="bc-t">{C1(gesicht.ergebnis.werbegeld)}</b> (+25 %) · Team-Anteil <b className="bc-t">{gesicht.ergebnis.teamAnteilProzent} %</b> (+8 Punkte)
             </p>
-            <p className="mk-klein">Höchste Marketability unter deinen sechs besten Spielern. Verkaufst du ihn, fällt die Stimmung der Fans.</p>
+            <p className="mk-klein">{klauselRegel ? "Wahl im Reiter Aushängeschild; ohne Wahl gilt die KI-Wahl mit dem höchsten Zusatzertrag fürs Team." : "Höchste Marketability unter deinen sechs besten Spielern."}</p>
           </>
         ) : (
           <p className="mk-klein">Noch kein Kader.</p>
@@ -279,7 +288,7 @@ function Karten({ u, gesicht }: { u: ReturnType<typeof marketingTeamUebersicht>;
           <div><dt>Klausel · Laufzeit</dt><dd className="bc-t">±10 · ±5</dd></div>
           <div><dt>Moral · Gesicht</dt><dd className="bc-t">±5 · +8</dd></div>
           <div><dt>Teamerfolg</dt><dd className="bc-t">{vz(u.erfolg.punkte)} <small>{u.erfolg.grund}</small></dd></div>
-          <div className="is-su"><dt>Grenzen · Netz · Deckel</dt><dd className="bc-t">15 bis 65 % · 25 % vom Gehalt · 12 C je Team</dd></div>
+          <div className="is-su"><dt>Grenzen · Netz · Deckel</dt><dd className="bc-t">15 bis 65 % · 22 / 25 / 28 % vom Gehalt (je Klausel) · 12 C je Team</dd></div>
         </dl>
       </section>
     </div>
@@ -386,7 +395,7 @@ function KontextSpieler({ z, u }: { z: MarketingKaderZeile | null; u: ReturnType
         ))}
         <div className="mk-zl is-su"><span>Team-Anteil{e.teamAnteilRoh !== e.teamAnteilProzent ? ` (rechnerisch ${e.teamAnteilRoh} %, begrenzt auf 15 bis 65 %)` : ""}</span><b className="bc-t">{e.teamAnteilProzent} %</b></div>
         <div className="mk-zl"><span>Werbegeld je Saison</span><b className="bc-t">{C1(e.werbegeld)}</b></div>
-        <div className="mk-zl"><span>ans Team{e.netzGreift ? " (Sicherheitsnetz: höchstens 25 % des Gehalts)" : ""}</span><b className="bc-t">{C1(e.ansTeam)}</b></div>
+        <div className="mk-zl"><span>ans Team{e.netzGreift ? ` (Sicherheitsnetz: höchstens ${Math.round(MARKETING_KONFIG.klauselNetz[String(z.klausel) as "-1" | "0" | "1"] * 100)} % des Gehalts)` : ""}</span><b className="bc-t">{C1(e.ansTeam)}</b></div>
         <div className="mk-zl"><span>an ihn: seine Werbeverträge</span><b className="bc-t">{C1(e.anIhn)}</b></div>
         <div className="mk-zl"><span>Moral aus den Werbeverträgen</span><b className="bc-t">{e.moralZuschlag > 0 ? <><BcMoralGesicht wert={Math.min(100, (z.moralOhne ?? 50) + e.moralZuschlag)} groesse={16} /> +{e.moralZuschlag}</> : "±0"}</b></div>
         <p className="mk-klein">Verletzte zählen zur Hälfte. Team-Anteile gelten je Saison und Kaderstand (Moral im Anteil eingefroren{u.vorschau ? "; Vorschau: noch nicht gebucht, die Zahlen rechnen mit dem heutigen Stand" : ""}); je Spieltag wird ein Zwanzigstel gebucht. Der Teamerfolg der Vorsaison gilt für alle Spieler des Teams ({u.erfolg.grund}).</p>
@@ -428,8 +437,9 @@ function KontextVerlauf({ gameState, u }: { gameState: GameState; u: ReturnType<
   );
 }
 
-export default function MarketingModern({ gameState, teamId, startKontext = "fan", startSpieler = null }: MarketingModernProps) {
+export default function MarketingModern({ gameState, teamId, startKontext = "fan", startSpieler = null, onAktion, kannSchreiben = false, startAnsicht = "kader" }: MarketingModernProps) {
   const [kontext, setKontext] = useState<MarketingKontextReiter>(startKontext);
+  const [ansicht, setAnsicht] = useState<MarketingAnsicht>(startAnsicht);
   const [wahl, setWahl] = useState<string | null>(startSpieler);
   const aktiv = marketingAktiv(gameState);
   const u = useMemo(() => (teamId ? marketingTeamUebersicht(gameState, teamId) : null), [gameState, teamId]);
@@ -468,9 +478,10 @@ export default function MarketingModern({ gameState, teamId, startKontext = "fan
         }
         mitte={
           <>
-            <BcReiter aktiv={kontext === "fan"} onClick={() => setKontext("fan")} eyebrow="Fanprofil" titel="Fans" symbol={<BcIcon name="team" />} wert={vz(Math.round(u.profil.ton * 100) / 100)} wertNote="Ton" />
-            <BcReiter aktiv={kontext === "spieler"} onClick={() => setKontext("spieler")} eyebrow="Kasse je Saison" titel="Marketing" symbol={<BcIcon name="karte" />} wert={z1(u.ansKasse)} wertNote="C" />
-            <BcReiter aktiv={kontext === "verlauf"} onClick={() => setKontext("verlauf")} eyebrow="Farbe der Fans" titel="Verlauf" symbol={<BcIcon name="krone" />} wert={String(Math.max(1, (gueltigerMarketingStempel(gameState)?.verlauf?.[teamId]?.length ?? 1)))} wertNote="Saisons" />
+            <BcReiter aktiv={ansicht === "kader" && kontext === "fan"} onClick={() => { setAnsicht("kader"); setKontext("fan"); }} eyebrow="Fanprofil" titel="Fans" symbol={<BcIcon name="team" />} wert={vz(Math.round(u.profil.ton * 100) / 100)} wertNote="Ton" />
+            <BcReiter aktiv={ansicht === "kader" && kontext === "spieler"} onClick={() => { setAnsicht("kader"); setKontext("spieler"); }} eyebrow="Kasse je Saison" titel="Marketing" symbol={<BcIcon name="karte" />} wert={z1(u.ansKasse)} wertNote="C" />
+            <BcReiter aktiv={ansicht === "kader" && kontext === "verlauf"} onClick={() => { setAnsicht("kader"); setKontext("verlauf"); }} eyebrow="Farbe der Fans" titel="Verlauf" symbol={<BcIcon name="krone" />} wert={String(Math.max(1, (gueltigerMarketingStempel(gameState)?.verlauf?.[teamId]?.length ?? 1)))} wertNote="Saisons" />
+            <BcReiter aktiv={ansicht === "gesicht"} onClick={() => setAnsicht("gesicht")} eyebrow="Aushängeschild" titel="Gesicht" symbol={<BcIcon name="zauber" />} wert={gesicht ? gesicht.name.split(" ")[0]! : "—"} wertNote={werbeklauselAktiv(gameState) ? "" : "ab Saisonwechsel"} />
           </>
         }
         rechts={
@@ -482,6 +493,9 @@ export default function MarketingModern({ gameState, teamId, startKontext = "fan
           </div>
         }
       />
+      {ansicht === "gesicht" ? (
+        <AushaengeschildAnsicht gameState={gameState} teamId={teamId} onAktion={onAktion} kannSchreiben={kannSchreiben} />
+      ) : (
       <div className="fin-work">
         <section className="fin-pan" aria-label="Dein Kader">
           <div className="fin-pk">
@@ -500,7 +514,7 @@ export default function MarketingModern({ gameState, teamId, startKontext = "fan
             ) : null}
             {u.zeilen.length === 0 ? <div className="fin-leer">Dein Kader ist leer. Ohne Spieler gibt es kein Werbegeld, nur die Teammarke.</div> : (
               <>
-                <Karten u={u} gesicht={gesicht} />
+                <Karten u={u} gesicht={gesicht} klauselRegel={werbeklauselAktiv(gameState)} />
                 <KaderTabelle zeilen={u.zeilen} gewaehlt={gewaehlt?.playerId ?? null} onWahl={waehle} />
               </>
             )}
@@ -534,6 +548,7 @@ export default function MarketingModern({ gameState, teamId, startKontext = "fan
           </div>
         </aside>
       </div>
+      )}
     </div>
   );
 }

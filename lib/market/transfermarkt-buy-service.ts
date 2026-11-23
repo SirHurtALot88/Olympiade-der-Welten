@@ -11,6 +11,8 @@ import type {
   NegotiationVerdict,
   PlayerContractPreference,
 } from "@/lib/market/contract-negotiation-preview";
+import type { KlauselZeile } from "@/lib/marketing/marketing-klausel";
+import type { Werbeklausel } from "@/lib/marketing/marketing-modell";
 
 type PrismaLike = Pick<
   PrismaClient,
@@ -33,6 +35,8 @@ export type TransfermarktBuyParams = {
   contractLength?: number;
   contractShape?: ContractShape;
   offeredSalary?: number;
+  /** Werbeklausel (23.11.): Wahl am Verhandlungstisch; ohne Angabe entscheidet bei KI-Teams die KI-Regel, sonst Standard. */
+  marketingKlausel?: Werbeklausel | null;
   promisedRole?: RosterPromisedRole;
   transferSource?: string;
   purchasePriceOverride?: number;
@@ -101,6 +105,10 @@ export type TransfermarktBuyPreview = {
   baseExpectedSalary?: number | null;
   demandMultiplier?: number | null;
   offeredSalary?: number | null;
+  /** Werbeklausel (23.11.): Gehalt, das unterschrieben wird (verhandeltes Gehalt mit Klausel-Faktor); fehlt ohne Regel `klausel-v2`. */
+  gehaltMitKlausel?: number | null;
+  /** Werbeklausel (23.11.): gewaehlte Stufe und die drei Zeilen der Verhandlung (Gehalt, Team-Anteil, Werbegeld, Saldo); `null` ohne Regel. */
+  klausel?: { gewaehlt: Werbeklausel; zeilen: KlauselZeile[]; ablehnung: string | null; loyal: boolean } | null;
   offerRatio?: number | null;
   yearlySalarySchedule?: ContractYearSalary[];
   totalSalary?: number | null;

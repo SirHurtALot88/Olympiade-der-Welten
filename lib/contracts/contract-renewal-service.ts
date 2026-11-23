@@ -75,6 +75,10 @@ import {
 } from "@/lib/morale/player-morale-service";
 import { kasseVorSpieltagsbuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { getCanonicalSeasonLabel } from "@/lib/season/season-label";
+import { alleTraitsVon, klauselFuerVertrag, klauselTraitInfo, klauselZeilen, type KlauselZeile } from "@/lib/marketing/marketing-klausel";
+import { gehaltMitKlausel, klauselErlaubt, type Werbeklausel } from "@/lib/marketing/marketing-modell";
+import { werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
+import { moralOhneWerbung } from "@/lib/morale/player-morale-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
 // Weiterexport: die Abwaegung „Verlust realisieren oder ueberbruecken" ist in eine eigene Datei
@@ -170,6 +174,8 @@ export type ContractActionPreview = {
   inSaison?: ContractInSaisonVorschau | null;
   warnings: string[];
   blockingReasons: string[];
+  /** Werbeklausel (23.11.): die drei Zeilen der Verhandlung samt gewaehlter Stufe und dem Gehalt, das unterschrieben wuerde; `null` ohne Regel. */
+  klausel?: { gewaehlt: Werbeklausel; basisGehalt: number; gehalt: number; zeilen: KlauselZeile[]; ablehnung: string | null; loyal: boolean } | null;
 };
 
 export type ContractInSaisonVorschau = {
@@ -1898,6 +1904,7 @@ function buildContractActionToken(input: {
   playerId: string;
   contractLength?: number | null;
   offeredSalary?: number | null;
+  marketingKlausel?: Werbeklausel | null;
 }) {
   const entry = input.save.gameState.rosters.find((candidate) => candidate.teamId === input.teamId && candidate.playerId === input.playerId);
   return buildToken({
@@ -1912,6 +1919,7 @@ function buildContractActionToken(input: {
       entry?.salary ?? "missing",
       input.contractLength ?? "-",
       input.offeredSalary ?? "-",
+      ...(input.marketingKlausel != null ? [`klausel${input.marketingKlausel}`] : []),
     ].join(":"),
   });
 }
@@ -2026,6 +2034,8 @@ export function previewContractRenewalAction(input: {
   contractLength?: number | null;
   offeredSalary?: number | null;
   contractShape?: ContractShape;
+  /** Werbeklausel (23.11.): Wahl im Dialog; ohne Angabe entscheidet bei KI-Teams die KI-Regel, sonst Standard. */
+  marketingKlausel?: Werbeklausel | null;
 }): ContractActionPreview {
   const rosterEntry = input.save.gameState.rosters.find((entry) => entry.teamId === input.teamId && entry.playerId === input.playerId) ?? null;
   const team = input.save.gameState.teams.find((candidate) => candidate.teamId === input.teamId) ?? null;
@@ -2142,11 +2152,19 @@ export function previewContractRenewalAction(input: {
    * KI gleich; gleiches oder niedrigeres Gehalt geht immer. Gerechnet wird mit dem Gehalt, das unterschrieben wuerde.
    */
   const vorstandBlockingReasons: string[] = [];
-  const neuesGehalt =
+  const basisGehalt =
     rosterEntry != null
       ? (roundMoney(input.offeredSalary ?? moraleAdjustedExpectedSalary ?? negotiationPreview?.expectedSalary ?? rosterEntry.salary) ??
         rosterEntry.salary)
       : 0;
+  // WERBEKLAUSEL (23.11.): das Gehalt, das unterschrieben wird, ist das verhandelte Gehalt mit dem Klausel-Faktor (eine Rechenstelle).
+  const klauselTraits = player ? alleTraitsVon(player) : [];
+  const klauselGewaehlt = input.action === "renew" && player ? klauselFuerVertrag(input.save.gameState, input.teamId, player, input.marketingKlausel) : 0;
+  const neuesGehalt = rosterEntry != null ? gehaltMitKlausel(basisGehalt, klauselGewaehlt, klauselTraits) : 0;
+  const klauselBlockingReasons =
+    input.action === "renew" && player && input.marketingKlausel === 1 && werbeklauselAktiv(input.save.gameState) && !klauselErlaubt(1, klauselTraits)
+      ? ["werbeklausel_vom_spieler_abgelehnt"]
+      : [];
   if (input.action === "renew" && rosterEntry && team) {
     const vorstand = pruefeVerlaengerungGegenVorstandFreigabe(input.save.gameState, input.teamId, {
       altesGehalt: rosterEntry.salary ?? 0,
@@ -2162,7 +2180,8 @@ export function previewContractRenewalAction(input: {
       moraleBlockingReasons.length === 0 &&
       vorstandBlockingReasons.length === 0 &&
       inSaisonBlockingReasons.length === 0 &&
-      verdiktBlockingReasons.length === 0,
+      verdiktBlockingReasons.length === 0 &&
+      klauselBlockingReasons.length === 0,
     saveId: input.save.saveId,
     seasonId: input.save.gameState.season.id,
     teamId: input.teamId,
@@ -2198,8 +2217,19 @@ export function previewContractRenewalAction(input: {
         ...verdiktBlockingReasons,
         ...vorstandBlockingReasons,
         ...inSaisonBlockingReasons,
+        ...klauselBlockingReasons,
       ]),
     ),
+    klausel:
+      input.action === "renew" && player && rosterEntry && werbeklauselAktiv(input.save.gameState)
+        ? {
+            gewaehlt: klauselGewaehlt,
+            basisGehalt,
+            gehalt: neuesGehalt,
+            zeilen: klauselZeilen(input.save.gameState, input.teamId, player, basisGehalt, contractLength, moralOhneWerbung(input.save.gameState, player.id, input.teamId), false),
+            ...klauselTraitInfo(player),
+          }
+        : null,
   };
 }
 
@@ -2213,6 +2243,7 @@ export function applyContractRenewalAction(input: {
   contractLength?: number | null;
   offeredSalary?: number | null;
   contractShape?: ContractShape;
+  marketingKlausel?: Werbeklausel | null;
   source: "manual_contract_renewal" | "ai_contract_renewal" | "manual_player_release" | "ai_player_release";
 }) {
   const preview = previewContractRenewalAction(input);
@@ -2260,10 +2291,16 @@ export function applyContractRenewalAction(input: {
    * deshalb dieselbe Vorgabe wie im Verhandlungsfenster — zwei Saisons.
    */
   const nextLength = Math.max(1, Math.min(5, normalizeLength(input.contractLength ?? STANDARD_VERTRAGSLAENGE)));
-  const newSalary =
+  const basisSalary =
     input.action === "renew"
       ? roundMoney(input.offeredSalary ?? preview.moraleAdjustedExpectedSalary ?? preview.negotiationPreview?.expectedSalary ?? rosterEntry.salary) ?? rosterEntry.salary
       : null;
+  // WERBEKLAUSEL (23.11.): dieselbe Stufe und derselbe Faktor wie in der Vorschau (`previewContractRenewalAction`).
+  const klauselSpieler = input.save.gameState.players.find((candidate) => candidate.id === input.playerId) ?? null;
+  const klauselNeu: Werbeklausel =
+    input.action === "renew" && klauselSpieler ? klauselFuerVertrag(input.save.gameState, input.teamId, klauselSpieler, input.marketingKlausel) : 0;
+  const newSalary =
+    basisSalary != null && klauselSpieler && werbeklauselAktiv(input.save.gameState) ? gehaltMitKlausel(basisSalary, klauselNeu, alleTraitsVon(klauselSpieler)) : basisSalary;
   const nextContractShape = input.contractShape ?? "balanced";
   const nextContractSchedule =
     input.action === "renew"
@@ -2324,13 +2361,16 @@ export function applyContractRenewalAction(input: {
     input.action === "renew"
       ? input.save.gameState.rosters.map((entry) =>
           entry.id === rosterEntry.id
-            ? baueErneuertenEintrag(input.save.gameState, entry, {
-                newSalary,
-                nextLength,
-                shape: nextContractShape,
-                schedule: nextContractSchedule,
-                inSaison: inSaisonVermerk,
-              })
+            ? {
+                ...baueErneuertenEintrag(input.save.gameState, entry, {
+                  newSalary,
+                  nextLength,
+                  shape: nextContractShape,
+                  schedule: nextContractSchedule,
+                  inSaison: inSaisonVermerk,
+                }),
+                ...(werbeklauselAktiv(input.save.gameState) ? { marketingKlausel: klauselNeu } : {}),
+              }
             : entry,
         )
       : input.save.gameState.rosters.filter((entry) => entry.id !== rosterEntry.id);

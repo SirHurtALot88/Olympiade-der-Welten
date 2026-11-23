@@ -232,6 +232,8 @@ export type TeamWriteAction =
   | "ausruestung_update"
   /** Arena (22.11.): Ausbau von Hand und Dauerkarten-Wahl. */
   | "arena_update"
+  /** Marketing (23.11.): Aushaengeschild waehlen. */
+  | "marketing_update"
   /** Postfach: Gelesen-Markierung je Manager (21.11.). */
   | "inbox_gelesen"
   | "player_generator_commit"
