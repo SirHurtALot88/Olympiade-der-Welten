@@ -31,6 +31,7 @@ import {
   type WirkungsZeile,
 } from "@/lib/finance/kredite-seite-modell";
 import { evaluateGamePhaseAction } from "@/lib/foundation/game-phase-action-policy";
+import { formatNlNumber } from "@/components/foundation/new-look/nl-tones";
 import { useTabellenSortierung } from "@/lib/ui/tabellen-sortierung";
 
 import "./kredite-modern.css";
@@ -42,7 +43,7 @@ export type KreditAbloeseFn = (loanId: string) => Promise<{ ok: boolean; reason:
 
 const MINUS = "−";
 function zahlDe(v: number, st = 1): string {
-  const betrag = Math.abs(v).toLocaleString("de-DE", { minimumFractionDigits: st, maximumFractionDigits: st });
+  const betrag = formatNlNumber(Math.abs(v), st, st);
   return (v < 0 && Math.round(Math.abs(v) * 10 ** st) > 0 ? MINUS : "") + betrag;
 }
 const z1 = (v: number) => zahlDe(v, 1);
@@ -149,8 +150,8 @@ function PlanDiagramm({ k, kredit, pm }: { k: NonNullable<ReturnType<typeof baue
     const ht = (r.tilgung / maxA) * hoehe * 0.5;
     const bez = i < heute;
     balken.push(
-      <rect key={`z${i}`} x={(x + bw * 0.14).toFixed(1)} y={(hoehe - hz).toFixed(1)} width={(bw * 0.72).toFixed(1)} height={hz.toFixed(1)} fill="#ff6058" opacity={bez ? 0.35 : 0.95} />,
-      <rect key={`t${i}`} x={(x + bw * 0.14).toFixed(1)} y={(hoehe - hz - ht).toFixed(1)} width={(bw * 0.72).toFixed(1)} height={ht.toFixed(1)} fill="#f0c35a" opacity={bez ? 0.35 : 0.95} />,
+      <rect key={`z${i}`} x={(x + bw * 0.14).toFixed(1)} y={(hoehe - hz).toFixed(1)} width={(bw * 0.72).toFixed(1)} height={hz.toFixed(1)} fill="var(--bc-warn)" opacity={bez ? 0.35 : 0.95} />,
+      <rect key={`t${i}`} x={(x + bw * 0.14).toFixed(1)} y={(hoehe - hz - ht).toFixed(1)} width={(bw * 0.72).toFixed(1)} height={ht.toFixed(1)} fill="var(--bc-gold)" opacity={bez ? 0.35 : 0.95} />,
     );
     linie += ` L${((i + 1) * bw).toFixed(1)},${(hoehe - (r.rest / Math.max(0.0001, pm.gesamt ? kredit.aufgenommen : kredit.restschuld)) * hoehe * 0.98).toFixed(1)}`;
   });
@@ -175,8 +176,8 @@ function PlanDiagramm({ k, kredit, pm }: { k: NonNullable<ReturnType<typeof baue
       <svg viewBox={`0 0 ${breite} ${hoehe}`} preserveAspectRatio="none" role="img" aria-label="Zins, Tilgung und Restschuld je Rate">
         {marken}
         {balken}
-        <path d={linie} fill="none" stroke="#f4e6c4" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
-        {pm.gesamt ? <line x1={hx} x2={hx} y1={0} y2={hoehe} stroke="#62d394" strokeWidth={2} vectorEffect="non-scaling-stroke" /> : null}
+        <path d={linie} fill="none" stroke="var(--bc-creme)" strokeWidth={2.5} vectorEffect="non-scaling-stroke" />
+        {pm.gesamt ? <line x1={hx} x2={hx} y1={0} y2={hoehe} stroke="var(--bc-gut)" strokeWidth={2} vectorEffect="non-scaling-stroke" /> : null}
       </svg>
       <div className="kre-ct">
         <span>{pm.gesamt ? "Rate 1" : "nächste Rate"}</span>
