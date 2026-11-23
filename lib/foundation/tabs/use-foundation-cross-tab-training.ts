@@ -1,3 +1,4 @@
+import { berechneAusbauKosten, berechneAusbauLeiter } from "@/lib/facilities/facility-upgrade-kosten";
 import { useMemo } from "react";
 
 import { buildTeamPlayerTrainingLoadPlanMap, type AiPlayerTrainingLoadPlan } from "@/lib/ai/ai-player-training-load-service";
@@ -374,7 +375,9 @@ export function useFoundationCrossTabTraining(input: {
         effect: facility.effectDescription,
         level,
         nextLevel,
-        upgradeCost: level >= facility.maxLevel ? null : nextLevelDefinition?.upgradeCost ?? null,
+        // Gezeigt = gebucht: derselbe Preis wie im Upgrade-Service (inkl. Entwicklungsrabatt), nicht der Katalogpreis.
+        upgradeCost: level >= facility.maxLevel ? null : berechneAusbauKosten(input.gameState, input.selectedTeam.teamId, facility.facilityId, nextLevel),
+        stufenKosten: berechneAusbauLeiter(input.gameState, input.selectedTeam.teamId, facility.facilityId),
         currentUpkeep: currentLevel?.seasonUpkeep ?? 0,
         nextUpkeep: nextLevelDefinition?.seasonUpkeep ?? currentLevel?.seasonUpkeep ?? 0,
         currentIncome: currentLevel?.seasonIncome ?? 0,
@@ -396,7 +399,7 @@ export function useFoundationCrossTabTraining(input: {
         nextLevelEffect: nextLevelDefinition?.effectDescription ?? "Max Level erreicht",
       };
     });
-  }, [input.readMeta.readOnly, input.readMeta.source, input.selectedTeamFacilityState, shouldBuildTrainingFacilitiesDerivations]);
+  }, [input.gameState, input.readMeta.readOnly, input.readMeta.source, input.selectedTeam.teamId, input.selectedTeamFacilityState, shouldBuildTrainingFacilitiesDerivations]);
 
   const selectedTrainingFacilityPreview = useMemo(
     () => trainingFacilityRows.find((facility) => facility.id === input.trainingFacilityPreviewId) ?? null,

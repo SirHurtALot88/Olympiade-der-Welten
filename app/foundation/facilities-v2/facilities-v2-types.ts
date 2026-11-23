@@ -9,6 +9,8 @@ export type FacilityRowView = {
   level: number;
   nextLevel: number;
   upgradeCost: number | null;
+  /** Gebuchter Ausbaupreis je Stufe 1..max (Index 0 = Stufe 1), aus `berechneAusbauLeiter`. */
+  stufenKosten: Array<number | null>;
   currentUpkeep: number;
   nextUpkeep: number;
   currentIncome: number;

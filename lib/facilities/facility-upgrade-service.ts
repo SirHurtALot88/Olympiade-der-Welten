@@ -14,8 +14,7 @@ import {
   getFacilityEfficiency,
   getTeamFacilityState,
 } from "@/lib/facilities/facility-effects";
-import { getDevelopmentWeightedFacilityUpgradeDiscount, getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
-import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
+import { berechneAusbauKosten } from "@/lib/facilities/facility-upgrade-kosten";
 import { FACILITY_CONDITION_FULL } from "@/lib/facilities/facility-condition";
 import { pruefeGebaeudeGegenVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
@@ -207,17 +206,10 @@ export function previewFacilityUpgrade(
   const currentIncome = calculateFacilityIncome(teamFacilities);
   const newIncome = calculateFacilityIncome(nextTeamFacilities);
   const rawUpgradeCost = action === "upgrade" ? nextDefinition?.upgradeCost ?? null : 0;
-  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
-  const profile = getTeamStrategyProfile(gameState, teamId);
-  const developmentTendency =
-    team != null ? getTeamDevelopmentTendency({ team, identity, profile }) : null;
+  // Gezeigt = gebucht: dieselbe Rechenstelle wie die Gebaeude-Seite (`berechneAusbauKosten`).
   const upgradeCost =
-    rawUpgradeCost != null && developmentTendency
-      ? getDevelopmentWeightedFacilityUpgradeDiscount({
-          baseUpgradeCost: rawUpgradeCost,
-          facilityId,
-          tendency: developmentTendency,
-        })
+    action === "upgrade" && team && nextLevel != null
+      ? berechneAusbauKosten(gameState, teamId, facilityId, nextLevel) ?? rawUpgradeCost
       : rawUpgradeCost;
   const refundAmount =
     action === "downgrade" && downgradeRefundSourceDefinition
