@@ -92,9 +92,12 @@ function getIdentityFitMultiplier(gameState: GameState, teamId: string, player: 
     return 1;
   }
 
-  const teamPlayers = gameState.players.filter((entry) =>
-    gameState.rosters.some((roster) => roster.teamId === teamId && roster.playerId === entry.id),
-  );
+  // Saisonwechsel-Tempo (23.11.): vorher players x rosters je Aufruf (~1 Mio. Vergleiche, je Spieler); jetzt eine Id-Menge je Team.
+  const teamPlayerIds = new Set<string>();
+  for (const roster of gameState.rosters) {
+    if (roster.teamId === teamId) teamPlayerIds.add(roster.playerId);
+  }
+  const teamPlayers = gameState.players.filter((entry) => teamPlayerIds.has(entry.id));
   const fit = calculateTransfermarktFit(player, teamPlayers, { teamId }).teamFit;
   if (fit == null || !Number.isFinite(fit)) {
     return 1;

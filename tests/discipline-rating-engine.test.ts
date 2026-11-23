@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { Player, PlayerGeneratorAttributes } from "@/lib/data/olyDataTypes";
 import {
   buildCompetitionRanks,
+  buildLeagueDisciplineRatingsForOverride,
+  buildLeagueDisciplineRatingsWithAttributeOverrides,
+  buildLeagueRankContext,
   calculateRawDisciplineScore,
   mapRankToDisciplineStat,
 } from "@/lib/player-formulas/discipline-rating-engine";
@@ -115,5 +118,33 @@ describe("discipline-rating-engine", () => {
     const [rebuilt] = rebuildLeagueDisciplineRatings([strong, makePlayer("weak", makeAttributes({ speed: 40, dexterity: 38, awareness: 36 }))]);
     expect(rebuilt.coreStats.spe).toBeGreaterThan(50);
     expect(rebuilt.coreStats.pow).toBeGreaterThan(10);
+  });
+});
+
+describe("Rangkontext fuer einzelne Ueberschreibungen (Saisonwechsel-Tempo 23.11.)", () => {
+  it("liefert exakt das Ergebnis des vollen Liga-Rankings, auch bei Gleichstand und Spielern ausserhalb der Liga", () => {
+    let seed = 7;
+    const next = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    const attr = () =>
+      makeAttributes(
+        Object.fromEntries(
+          ["power", "speed", "stamina", "intelligence", "dexterity", "will"].map((k) => [k, Math.round(20 + next() * 30) * 2]),
+        ) as Partial<PlayerGeneratorAttributes>,
+      );
+    const liga = Array.from({ length: 60 }, (_, i) => makePlayer(`p${i}`, attr()));
+    // Gleichstand erzwingen: zwei identische Spieler.
+    liga[1] = makePlayer("p1", liga[0]!.attributeSheetStats as PlayerGeneratorAttributes);
+    const kontext = buildLeagueRankContext(liga)!;
+    expect(kontext).not.toBeNull();
+    for (const spieler of liga) {
+      for (const neu of [attr(), liga[5]!.attributeSheetStats as PlayerGeneratorAttributes, spieler.attributeSheetStats as PlayerGeneratorAttributes]) {
+        const alt = buildLeagueDisciplineRatingsWithAttributeOverrides(liga, { [spieler.id]: neu }).get(spieler.id);
+        expect(buildLeagueDisciplineRatingsForOverride(kontext, spieler.id, neu)).toEqual(alt);
+      }
+    }
+    expect(buildLeagueDisciplineRatingsForOverride(kontext, "fremd", attr())).toBeUndefined();
   });
 });
