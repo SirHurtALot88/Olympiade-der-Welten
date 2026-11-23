@@ -443,7 +443,6 @@ import type { FoundationMerklisteHostProps } from "@/app/foundation/merkliste-v2
 import { baueMerklistenAnsicht } from "@/lib/merkliste/merkliste-ansicht";
 import { normalisiereMerklistenBesitzer, vergiss } from "@/lib/merkliste/merkliste-service";
 import { buildAllTimeTableModel } from "@/lib/foundation/all-time-table";
-import { buildPreviousSeasonPodium } from "@/lib/foundation/ranks-previous-season-podium";
 import type { FoundationMarketV2ShellHostProps } from "@/app/foundation/transfermarkt-v2/FoundationMarketV2ShellHost";
 import FoundationTeamSettingsHost from "@/app/foundation/team-settings/FoundationTeamSettingsHost";
 import FoundationTeamsViewHost from "@/app/foundation/teams-v2/FoundationTeamsViewHost";
@@ -13106,31 +13105,17 @@ export function useFoundationShellRouterBodyScope({
     onOpenSaisonstand: historieOpenSaisonstand,
   };
 
-  // Vorsaison-Podium (W1): nur relevant, wenn das PP-Board leer startet — die
-  // Ableitung selbst ist billig (Top-3 der letzten archivierten Saison).
-  const ranksPreviousSeasonPodium = useMemo(() => buildPreviousSeasonPodium(gameState), [gameState]);
-
+  /**
+   * RANKS MODERN (22.11.): reine Leseseite. Stärke aus der kanonischen Rangfunktion des GameState, Punkte aus den
+   * Duell-Übersichten (`seasonV2Spieltage`, dieselbe Quelle wie der Saisonstand), eigenes Team aus dem aktiven Manager.
+   * Das Vorsaison-Podium der alten Seite zieht in die Historie (Ewige Tabelle / Saison-Archiv).
+   */
   const foundationRanksHostProps: FoundationRanksHostProps = {
-    sortedPpAreaRows: sortedPpAreaRows as unknown as FoundationRanksHostProps["sortedPpAreaRows"],
-    ppAreaRankClassMaps,
-    ppAreaMetricPools,
-    tableSorts: { ppArea: tableSorts.ppArea },
-    toggleTableSort,
-    openTeamProfileById,
+    gameState,
     ownTeamId: activeManagerTeamId ?? selectedTeamId ?? null,
-    // W1 (Muster 3): echtes Vorsaison-Podium für den PP-Board-Saisonstart —
-    // derselbe Snapshot-Datenweg wie die Ewige Tabelle, keine zweite Quelle.
-    previousSeasonPodium: ranksPreviousSeasonPodium,
-    renderPpAreaMetricCell: (value, formBonus, options: { tone: string; pool: Array<number | null | undefined>; fallbackMax: number }) =>
-      renderMetricBar(value, {
-        tone: options.tone as Parameters<typeof renderMetricBar>[1]["tone"],
-        pool: options.pool,
-        fallbackMax: options.fallbackMax,
-        format: (nextValue) => formatPpsValue(nextValue),
-        detail: formatPpFormBonus(formBonus),
-        detailNegative: (formBonus ?? 0) < 0,
-      }),
-    SortableHeader,
+    spieltage: seasonV2Spieltage,
+    onOpenTeam: openTeamProfileById,
+    onOpenPlayer: openPlayerProfileById,
   };
 
   const foundationDiszisHostProps: FoundationDiszisHostProps = {
