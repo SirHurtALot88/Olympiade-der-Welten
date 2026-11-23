@@ -24,6 +24,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import type { PersistenceService } from "@/lib/persistence/types";
 
+// Alle Tests dieser Datei haengen an einem echten 32-Team-Spielstand mit SQLite; unter CI-Last (zwei vitest-Prozesse, geteilte
+// Platte) wandern die 2-3 s Einzelmessung weit ueber die Standardgrenze. Jeder Test traegt deshalb eine grosszuegige eigene Grenze.
 const DB = path.join(os.tmpdir(), `oly-liga-draft-kern-${process.pid}-${Date.now()}.sqlite`);
 
 let persistence: PersistenceService;
@@ -115,7 +117,7 @@ describe("Liga-Draft im Einzelschritt gegen einen echten Spielstand", () => {
     const gs = lade();
     expect(gs.seasonState.leagueSetupStatus).toBe("in_progress");
     expect(dienst.ligaDraftSperrtMarktkauf(gs)).toBe(true);
-  });
+  }, 120_000);
 
   it("der erste KI-Pick ist die erste Entscheidung des Blocklaufs fuer dasselbe Team", async () => {
     const { planOrganicDraftForTeam } = await import("@/lib/ai/organic-squad/draft-adapter");
@@ -217,7 +219,7 @@ describe("Liga-Draft im Einzelschritt gegen einen echten Spielstand", () => {
     dienst.setzeMenschAutoPick({ persistence, saveId, teamId: menschTeamId, an: false, erwarteteNr: stand });
     expect(lade().seasonState.ligaDraft!.verlauf.length).toBe(stand);
     expect(modell.werIstDran(lade().seasonState.ligaDraft!)).toMatchObject({ teamId: menschTeamId, automatisch: false });
-  });
+  }, 120_000);
 
   it("Mensch-Pick ueber den Kaufweg der Kauf-Route; danach ist wieder die KI dran", () => {
     const gs = lade();
@@ -242,7 +244,7 @@ describe("Liga-Draft im Einzelschritt gegen einen echten Spielstand", () => {
     expect(nachher.rosters.some((r) => r.teamId === menschTeamId && r.playerId === playerId)).toBe(true);
     expect(ergebnis.draft.verlauf.at(-1)).toMatchObject({ art: "pick", quelle: "mensch", runde: 1 });
     expect(modell.werIstDran(ergebnis.draft)?.runde).toBe(2);
-  });
+  }, 120_000);
 
   it("Variante A: Mensch geht in den Nachzug, KI pickt fertig, Liga ist bereit; Nachzug bis zum Mindestkader", () => {
     dienst.bucheMenschUeberspringen({ persistence, saveId, teamId: menschTeamId, variante: "A" });
