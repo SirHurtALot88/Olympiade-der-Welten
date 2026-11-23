@@ -497,6 +497,16 @@ describe("Dauer-Cache: einmal je Saison und Kaderstand", () => {
     const ohneEinen: GameState = { ...mit, rosters: mit.rosters.filter((r) => !(r.teamId === TEAM_A && r.playerId === a.zeilen[0]!.playerId)) };
     expect(marketingCacheSchluessel(ohneEinen, TEAM_A)).not.toBe(marketingCacheSchluessel(mit, TEAM_A));
     expect(marketingTeamUebersicht(ohneEinen, TEAM_A)).not.toBe(a);
+    // Verletzung: anderer Schluessel, Werbegeld des Verletzten halbiert, genesen = wieder der alte Wert.
+    const verletzter = a.zeilen.find((z) => z.ergebnis.werbegeld > 0.01) ?? a.zeilen[0]!;
+    const verletzt: GameState = {
+      ...mit,
+      seasonState: { ...mit.seasonState, playerAvailabilityState: [{ playerId: verletzter.playerId, teamId: TEAM_A, injuryStatus: "injured" } as never] },
+    };
+    expect(marketingCacheSchluessel(verletzt, TEAM_A)).not.toBe(marketingCacheSchluessel(mit, TEAM_A));
+    const nachVerletzung = marketingTeamUebersicht(verletzt, TEAM_A).zeilen.find((z) => z.playerId === verletzter.playerId)!;
+    expect(nachVerletzung.ergebnis.verletztHalb).toBe(true);
+    expect(nachVerletzung.ergebnis.werbegeld).toBeCloseTo(verletzter.ergebnis.werbegeld * 0.5, 9);
     // Klausel-Aenderung ebenso.
     const klausel: GameState = { ...mit, rosters: mit.rosters.map((r) => (r.teamId === TEAM_A && r.playerId === a.zeilen[0]!.playerId ? { ...r, marketingKlausel: 1 as const } : r)) };
     expect(marketingCacheSchluessel(klausel, TEAM_A)).not.toBe(marketingCacheSchluessel(mit, TEAM_A));

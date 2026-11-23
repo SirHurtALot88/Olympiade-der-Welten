@@ -32,11 +32,11 @@ export const MARKETING_KONFIG = {
   /**
    * Teammarke (Sockel) je Saison, UMGEKEHRT nach Budget-Rang gestaffelt (Messung 22.11.: ein pauschaler Sockel oeffnete die Schere reich/arm,
    * und ein Sockel nach Finanzwert (1..10) wirkte nicht, weil der Finanzwert kaum mit dem Budget zusammenhaengt): Liga-Basis (Liga 1: 3,0 C,
-   * Liga 2: 5,0 C, Ligamittel 4,0 C) + 0,5 C je Platz Abstand von der Ligamitte (Budget-Rang 1 = reichstes Team zahlt am wenigsten), 0..9 C.
+   * Liga 2: 5,0 C, Ligamittel 4,0 C) + 0,35 C je Platz Abstand von der Ligamitte (Budget-Rang 1 = reichstes Team zahlt am wenigsten), 0..9 C.
    * Liga 2 bekommt mehr, weil ihr Werbe-Hoechstwert kleiner ist (sonst waechst das Einnahmenverhaeltnis Liga 1 zu Liga 2).
    */
   teammarkeLiga: { 1: 3.0, 2: 5.0 } as Record<1 | 2, number>,
-  teammarkeRangSteigung: 0.5,
+  teammarkeRangSteigung: 0.35,
   teammarkeMin: 0,
   teammarkeMax: 9,
   /** Deckel fuer die Summe der Team-Anteile je Team und Saison (C). Was darueber liegt, geht als Spieler-Anteil an die Moral. */

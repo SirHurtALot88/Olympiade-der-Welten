@@ -207,6 +207,7 @@ function KaderTabelle({
                 <i className="mk-kl" />
                 {z.className} · {z.race}
                 {z.istGesicht ? <Marke text="GESICHT" art="neu" /> : null}
+                {z.ergebnis.verletztHalb ? <Marke text="VERLETZT" art="ne" /> : null}
               </small>
             </span>
             <ReichweiteBalken z={z} />
@@ -388,7 +389,7 @@ function KontextSpieler({ z, u }: { z: MarketingKaderZeile | null; u: ReturnType
         <div className="mk-zl"><span>ans Team{e.netzGreift ? " (Sicherheitsnetz: höchstens 25 % des Gehalts)" : ""}</span><b className="bc-t">{C1(e.ansTeam)}</b></div>
         <div className="mk-zl"><span>an ihn: seine Werbeverträge</span><b className="bc-t">{C1(e.anIhn)}</b></div>
         <div className="mk-zl"><span>Moral aus den Werbeverträgen</span><b className="bc-t">{e.moralZuschlag > 0 ? <><BcMoralGesicht wert={Math.min(100, (z.moralOhne ?? 50) + e.moralZuschlag)} groesse={16} /> +{e.moralZuschlag}</> : "±0"}</b></div>
-        <p className="mk-klein">Team-Anteile und Moral gelten je Saison und Kaderstand; je Spieltag wird ein Zwanzigstel gebucht. Der Teamerfolg der Vorsaison gilt für alle Spieler des Teams ({u.erfolg.grund}).</p>
+        <p className="mk-klein">Verletzte zählen zur Hälfte. Team-Anteile gelten je Saison und Kaderstand (Moral im Anteil eingefroren); je Spieltag wird ein Zwanzigstel gebucht. Der Teamerfolg der Vorsaison gilt für alle Spieler des Teams ({u.erfolg.grund}).</p>
       </div>
     </div>
   );

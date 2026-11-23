@@ -63,35 +63,38 @@ Messung: 3 Saaten (je 32 KI-Teams, derselbe Lauf mit `OLY_MARKETING=aus`; weil M
 nach dem "reich/arm" gemessen wird; (2) der Deckel greift nie (größte Team-Anteile je Team liegen unter 12 C, `Deckel` = 0 Teams); (3) die Liga-Schere
 kommt aus dem niedrigeren Werbe-Höchstwert der Liga 2, den ein gleicher Sockel nicht ausgleicht.
 
-**Umgesetzt (Variante L):** Teammarke = Liga-Basis (Liga 1: 3,0 C, Liga 2: 5,0 C, Ligamittel 4,0 C) + 0,5 C je Platz Abstand von der Ligamitte nach **Budget-Rang**
-im Ligakreis (reichstes Team zahlt am wenigsten, 0 bis 9 C), `teammarkeAusRang`. Der Deckel von 12 C je Team und Saison bleibt (Rest geht als Moral an die
-Spieler), er greift in den Messungen bei keinem Team.
+**Umgesetzt (Variante L, Steigung 0,35):** Teammarke = Liga-Basis (Liga 1: 3,0 C, Liga 2: 5,0 C, Ligamittel 4,0 C) + 0,35 C je Platz Abstand von der Ligamitte nach **Budget-Rang**
+im Ligakreis (reichstes Team zahlt am wenigsten, 0 bis 9 C), `teammarkeAusRang`. Die Steigung 0,35 (zuerst 0,5, das drehte die Schere zu stark: arme Teams bekamen
+8,3 gegen 6,4 C) lässt Marketing eher neutral wirken; den Aufholweg tragen Sponsor-Rework und Budget-Staffel. Der Deckel von 12 C je Team und Saison bleibt (Rest geht als Moral
+an die Spieler), er greift in den Messungen bei keinem Team.
+
+Messung wiederholt für 0,35 (dieselben drei Läufe, offline neu gerechnet, weil die Steigung nur die Teammarke ändert; die Team-Anteile der Läufe sind ohne Verletzten-Halbierung
+gemessen, deren Wirkung klein ist). Rohdaten `messung-schere-s1.txt` und `messung-schere-s2.txt`.
 
 | Saat (Saison 1) | Marketing Summe (L1 / L2 je Team) | Teams GuV ≥ 0 ohne → mit | Einnahmen L1 : L2 ohne → mit | GuV-Abstand reiche 8 − arme 8 ohne → mit | Marketing reiche 8 / arme 8 | Moral je Spieler |
 |---|---:|---:|---:|---:|---:|---:|
-| 1 | 225,0 (7,6 / 6,5) | 16 → 18 | 1,25 → 1,24 | 4,1 → 2,1 (−2,0) | 6,4 / 8,4 | +1,09 |
-| 2 | 217,6 (7,1 / 6,4) | 19 → 24 | 1,25 → 1,24 | 11,4 → 9,5 (−1,9) | 6,4 / 8,3 | +0,98 |
-| 3 | 217,2 (7,4 / 6,2) | 18 → 21 | 1,24 → 1,23 | 11,9 → 10,4 (−1,6) | 6,4 / 8,0 | +0,91 |
-| Mittel | 219,9 | 17,7 → 21,0 | 1,25 → 1,24 | 9,1 → 7,3 (−1,8) | | |
-
-**Saison 2** (dieselben drei Läufe, Teamerfolg der Vorsaison wirkt; die Fanfarbe driftet im Lauf mit `OLY_MARKETING=aus` nicht, Rohdaten `messung-schere-s2.txt`):
+| 1 | 224,1 (7,5 / 6,5) | 16 → 19 | 1,25 → 1,24 | 4,1 → 3,2 (−0,9) | 6,9 / 7,8 | +1,09 |
+| 2 | 216,7 (7,1 / 6,5) | 19 → 24 | 1,25 → 1,24 | 11,4 → 10,6 (−0,8) | 6,8 / 7,7 | +0,98 |
+| 3 | 216,3 (7,3 / 6,2) | 18 → 21 | 1,24 → 1,23 | 11,9 → 11,4 (−0,5) | 6,9 / 7,4 | +0,91 |
+| Mittel | 219,0 | 17,7 → 21,3 | 1,25 → 1,24 | 9,1 → 8,4 (−0,7) | | |
 
 | Saat (Saison 2) | Marketing Summe (L1 / L2 je Team) | Teams GuV ≥ 0 ohne → mit | Einnahmen L1 : L2 ohne → mit | GuV-Abstand reiche 8 − arme 8 ohne → mit | Marketing reiche 8 / arme 8 | Moral je Spieler |
 |---|---:|---:|---:|---:|---:|---:|
-| 1 | 224,0 (7,2 / 6,8) | 26 → 28 | 1,25 → 1,24 | −5,0 → −7,7 (−2,8) | 6,1 / 8,9 | +0,84 |
-| 2 | 224,0 (7,2 / 6,8) | 28 → 28 | 1,23 → 1,22 | −15,3 → −16,7 (−1,4) | 7,2 / 8,5 | +0,77 |
-| 3 | 211,3 (6,6 / 6,6) | 27 → 29 | 1,38 → 1,35 | 0,2 → −1,5 (−1,7) | 6,3 / 8,0 | +0,65 |
+| 1 | 223,1 (7,1 / 6,8) | 26 → 28 | 1,25 → 1,24 | −5,0 → −6,3 (−1,4) | 6,8 / 8,2 | +0,84 |
+| 2 | 223,2 (7,2 / 6,8) | 28 → 28 | 1,23 → 1,21 | −15,3 → −15,5 (−0,2) | 7,6 / 7,8 | +0,77 |
+| 3 | 210,5 (6,5 / 6,6) | 27 → 28 | 1,38 → 1,35 | 0,2 → −0,2 (−0,4) | 6,9 / 7,2 | +0,65 |
+| Mittel | 218,9 | 27,0 → 28,0 | 1,29 → 1,27 | −6,7 → −7,3 (−0,6) | | |
 
-Ziel erreicht: das Verhältnis steigt in keiner Saat, der Abstand wächst nirgends (er schrumpft um 1,6 bis 2,0 C). Nebenwirkung: die Schere dreht leicht (arme
-Teams bekommen im Mittel mehr Marketing als reiche, 8,2 gegen 6,4 C); `teammarkeRangSteigung` 0,5 → 0,35 halbiert das, wenn das nicht gewollt ist.
-Der Wert "ohne Marketing" liegt hier (anderer Draft, drei neue Saaten) bei 1,24 bis 1,25 statt 1,23 der ersten Messung.
+Ziel erreicht: das Verhältnis steigt in keiner Saat und der GuV-Abstand wächst nirgends (Veränderung −0,2 bis −1,4 C). Marketing wirkt damit leicht ausgleichend, aber deutlich
+weniger als bei 0,5; reiche und arme 8 liegen im Marketing nahe beieinander (6,8 gegen 7,7 C). Der Ausgangswert "ohne Marketing" liegt in diesen Läufen bei 1,24 bis 1,25
+(Saison 1) statt 1,23 der ersten Messung (anderer Draft).
 
 ## Nachbesserung 2: Dauer der Spieltagsbuchung
 
 Team-Anteile und Moral werden nicht mehr je Spieltag für alle Teams gerechnet, sondern einmal je Saison und Kaderstand (`dauerCache`,
-Schlüssel aus Saison, Team, Liga, Fanfarbe, Aushängeschild-Wahl, Budget-Rang und einem Hash des Kaders aus Spieler, Restlaufzeit, Klausel, Rating, Gehalt). Je Spieltag
-wird nur 1/N gebucht. Folge: die Moral im Team-Anteil und die Verletzung wirken nicht mehr je Spieltag (Verletzte zählen nicht mehr zur Hälfte);
-Kauf, Verkauf, Verlängerung und Klausel rechnen neu. Der Moral-Zuschlag liest dieselbe gecachte, gedeckelte Zeile (gezeigt = gebucht).
+Schlüssel aus Saison, Team, Liga, Fanfarbe, Aushängeschild-Wahl, Budget-Rang und einem Hash des Kaders aus Spieler, Restlaufzeit, Klausel, Rating, Gehalt, Verletzt-Status). Je Spieltag
+wird nur 1/N gebucht. Folge: die **Moral im Team-Anteil ist auf den Stand beim ersten Rechnen eingefroren** (bewusst so gelassen). Verletzte zählen weiter zur Hälfte: der Verfügbarkeitsstatus steht im
+Kader-Hash, eine Verletzung oder Genesung rechnet neu (selten, der Cache bleibt fast immer warm). Kauf, Verkauf, Verlängerung und Klausel rechnen ebenfalls neu. Der Moral-Zuschlag liest dieselbe gecachte, gedeckelte Zeile (gezeigt = gebucht).
 
 Messung `scripts/miss-spieltagsbuchung-dauer.ts` (`bucheSpieltagFinanzen` für alle 32 Teams, 364 Spieler, neues GameState-Objekt je Spieltag, Rechner unter Last):
 

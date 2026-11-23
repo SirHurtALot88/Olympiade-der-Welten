@@ -10,6 +10,7 @@ import {
   aushaengeschildFuer,
   budgetRangFuer,
   fanProfilFuer,
+  istVerletzt,
   kaderEinesTeams,
   ligaStufeFuer,
   marketingSpielerFuer,
@@ -67,7 +68,7 @@ const uebersichtCache = new WeakMap<object, Map<string, MarketingTeamUebersicht>
 /**
  * DAUER-CACHE (Nachbesserung 22.11.): Team-Anteile und Moral werden einmal je Saison und Kaderstand gerechnet, nicht je Spieltag fuer
  * alle Teams neu. Schluessel = Saison, Team, Liga, Fanfarbe, Aushaengeschild-Wahl und ein Hash des Kaders (Spieler, Restlaufzeit,
- * Klausel, Rating, Gehalt). Kauf, Verkauf, Verlaengerung und Klausel aendern den Hash und rechnen neu; je Spieltag wird nur 1/N gebucht.
+ * Klausel, Rating, Gehalt, Verletzt-Status). Kauf, Verkauf, Verlaengerung und Klausel aendern den Hash und rechnen neu; je Spieltag wird nur 1/N gebucht.
  * Die Moral im Team-Anteil ist damit auf den Stand beim ersten Rechnen der Saison bzw. nach der Kaderaenderung eingefroren.
  */
 const dauerCache = new Map<string, MarketingTeamUebersicht>();
@@ -75,7 +76,7 @@ const DAUER_CACHE_MAX = 4000;
 
 export function marketingCacheSchluessel(gameState: GameState, teamId: string): string {
   const kader = kaderEinesTeams(gameState, teamId)
-    .map(({ entry, player }) => `${player.id}:${entry.contractLength}:${entry.marketingKlausel ?? 0}:${player.rating}:${Math.round((entry.salary ?? 0) * 10)}`)
+    .map(({ entry, player }) => `${player.id}:${entry.contractLength}:${entry.marketingKlausel ?? 0}:${player.rating}:${Math.round((entry.salary ?? 0) * 10)}:${istVerletzt(gameState, player.id, teamId) ? 1 : 0}`)
     .sort()
     .join(",");
   const stempel = gueltigerMarketingStempel(gameState);

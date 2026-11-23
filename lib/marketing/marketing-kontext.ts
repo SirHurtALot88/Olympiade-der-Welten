@@ -226,8 +226,8 @@ export function marketingSpielerFuer(
       moralOhne,
       restlaufzeit: Number.isFinite(entry.contractLength) ? entry.contractLength : null,
       klausel: entry.marketingKlausel ?? 0,
-      // Verletzung wirkt hier NICHT: Team-Anteile und Moral gelten je Saison und Kader (gecacht), je Spieltag wird nur 1/N gebucht.
-      verletzt: false,
+      // Verletzte zaehlen zur Haelfte; der Verfuegbarkeitsstatus steht im Kader-Hash des Dauer-Caches (marketing-team.ts).
+      verletzt: istVerletzt(gameState, player.id, teamId),
       istGesicht: aushaengeschildFuer(gameState, teamId) === player.id,
     },
     teamEingabe(gameState, teamId),
