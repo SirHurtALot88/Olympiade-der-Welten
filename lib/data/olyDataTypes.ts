@@ -1987,7 +1987,12 @@ export type SpieltagFinanzBuchung = {
   /** Tabellenplatz, nach dem der Abschlag berechnet wurde (Anzeige: "Platz x"). */
   rang?: number | null;
   cashDelta: number;
-  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number };
+  /**
+   * MARKETING (22.11., docs/design/marketing-22-11.md, Stempel `seasonState.marketingRegel`): Teammarke und Team-Anteile am Werbegeld,
+   * zu 1/N je Spieltag, immer >= 0 und in `cashDelta` enthalten. Fehlt in Zeilen ohne Marketing (dann 0).
+   */
+  marketing?: number;
+  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number; marketing?: number };
   createdAt: string;
 };
 
@@ -2597,6 +2602,11 @@ export type RosterEntry = {
    * `app/`). Die Wahrheit ist die Endsaison; siehe `lib/contracts/vertragslaufzeit.ts`.
    */
   contractLength: number;
+  /**
+   * WERBEKLAUSEL (22.11., Marketing): -1 = Spieler behaelt mehr, 0 = Standard, +1 = Team bekommt mehr. Fehlt = 0 (neutral). Die Verhandlung
+   * ueber die Klausel ist Folgeauftrag; das Feld ist vorbereitet und wird vom Team-Anteil gelesen.
+   */
+  marketingKlausel?: -1 | 0 | 1;
   /**
    * DIE SAISON, NACH DER DER VERTRAG ENDET — die Wahrheit ueber die Laufzeit.
    *
@@ -4270,6 +4280,44 @@ export type SeasonState = {
    * oder "alt" (18.11.). Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel; gilt fuer die ganze Saison.
    */
   formkartenRegel?: { seasonId: string; regel: "alt" | "plusminus" } | null;
+  /**
+   * MARKETING-REGEL DIESER SAISON (22.11., lib/marketing/marketing-regel.ts): "an" = Werbegeld, Team-Anteil, Teammarke und Moral-Zuschlag
+   * gelten; "aus" = nichts davon. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison. Dazu die Fanfarbe
+   * je Team (vier Zahlen, driftet beim Saisonwechsel), ihr Verlauf und der Verlaufstext je Saisonwechsel.
+   */
+  marketingRegel?: {
+    seasonId: string;
+    regel: "an" | "aus";
+    fanfarbe?: Record<string, [number, number, number, number]>;
+    verlauf?: Record<string, Array<{ seasonId: string; farbe: [number, number, number, number]; grund: string }>>;
+    /** Teamerfolg der VORSAISON je Team, beim Saisonwechsel aus dem Snapshot geschrieben (Browser ohne Snapshots rechnet damit gleich). */
+    teamErfolg?: Record<string, { punkte: number; grund: string; stufe: "verfehlt" | "erreicht" | "titel" | "keiner" }>;
+    /** Spiegel der Notbremse `OLY_MARKETING=aus-sofort`, vom Server beim naechsten Buchen gesetzt: ab dann buchen/wirken keine neuen Anteile, Gebuchtes bleibt. */
+    notbremse?: boolean;
+  } | null;
+  /**
+   * MARKETING-STAND JE TEAM (22.11., lib/marketing/marketing-team.ts): das eingefrorene Rechenergebnis der Saison. Nur der Server schreibt
+   * ihn (`bucheSpieltagFinanzen`: erster Spieltag der Saison, neu bei geaendertem Kader-Hash). Seite, GuV-Prognose, Moral-Zuschlag und
+   * Buchung lesen ihn; ohne Stand rechnet die Seite eine als "Vorschau" gekennzeichnete Zahl.
+   */
+  marketingStand?: Record<
+    string,
+    {
+      seasonId: string;
+      kaderHash: string;
+      berechnetAmSpieltag: number;
+      /** Teammarke + Team-Anteile je Saison (Betrag fuer die Kasse). */
+      ansKasse: number;
+      /** Moral OHNE Werbe-Zuschlag je Spieler zum Stand der Berechnung (eingefroren). */
+      moralOhne: Record<string, number | null>;
+      /** Leistungsperzentil je Spieler zum Stand der Berechnung (eingefroren). */
+      leistungPerz: Record<string, number>;
+      /** Moral-Zuschlag je Spieler (nach Deckel). */
+      moralZuschlag: Record<string, number>;
+    }
+  > | null;
+  /** Manager-Wahl des Aushaengeschilds je Team und Saison (optional; ohne Eintrag gilt die KI-Regel). */
+  marketingAushaengeschild?: Record<string, { seasonId: string; playerId: string }> | null;
   /**
    * BASKETBALL-PUSTE-REGEL DIESER SAISON (22.11., lib/resolve/basketball-puste.ts): Wechselliste "alt"/"neu" je Spieltag,
    * gesetzt beim Laden. Gebuchte Spieltage behalten ihre Regel.

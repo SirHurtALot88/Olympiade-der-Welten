@@ -82,6 +82,7 @@ export const SEASON_GUV_POSTEN_KEYS = [
   "sponsor",
   "sponsorereignisse",
   "gebaeude_einnahme",
+  "marketing",
   "apron",
   "boardziele",
   "gehaelter",
@@ -137,6 +138,11 @@ export type SeasonGuvParts = {
   sponsorEventCount?: number | null;
   /** Gebäude-Einnahme brutto (vor Unterhalt). */
   facilityIncome?: number | null;
+  /**
+   * MARKETING (22.11.): Teammarke + Team-Anteile am Werbegeld der ganzen Saison (gebucht je Spieltag plus der Rest zum heutigen Stand).
+   * Der Spieler-Anteil steht nie hier, er hebt nur die Moral. Ohne gueltige Marketing-Regel 0.
+   */
+  marketingCash?: number | null;
   /** Tatsächlich bezahlter Gebäude-Unterhalt (Season-End-Semantik), als positive Zahl. */
   facilityUpkeep?: number | null;
   /** Apron-Netto beim aktuellen Rang hochgerechnet: `ausgleich − abgabe`. Negativ = Abgabe. */
@@ -207,6 +213,7 @@ const POSTEN_LABEL: Record<SeasonGuvPostenKey, string> = {
   sponsor: "Sponsor",
   sponsorereignisse: "Sponsor-Ereignisse",
   gebaeude_einnahme: "Gebäude-Einnahme",
+  marketing: "Marketing",
   apron: "Apron",
   boardziele: "Vorstandsziele",
   gehaelter: "Gehälter",
@@ -240,6 +247,13 @@ export function buildSeasonGuv(parts: SeasonGuvParts): SeasonGuv {
           : "keine in dieser Saison",
     },
     { key: "gebaeude_einnahme", label: POSTEN_LABEL.gebaeude_einnahme, amount: round2(num(parts.facilityIncome)), counted: true },
+    {
+      key: "marketing",
+      label: POSTEN_LABEL.marketing,
+      amount: round2(num(parts.marketingCash)),
+      counted: true,
+      note: "Teammarke und Team-Anteile am Werbegeld",
+    },
     {
       key: "apron",
       label: POSTEN_LABEL.apron,

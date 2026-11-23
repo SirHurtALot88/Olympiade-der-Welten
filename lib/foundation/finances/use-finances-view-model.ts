@@ -1,5 +1,6 @@
 "use client";
 
+import { marketingSaisonbetrag } from "@/lib/marketing/marketing-team";
 import { baueBuchungsKontext, bucheTransferEintrag, istKaderaufbauSaison } from "@/lib/season/transferbilanz-buchung";
 import { useMemo } from "react";
 
@@ -459,6 +460,7 @@ export function buildFinancesViewModel(gameState: GameState, teamId: string | nu
     sponsorEventCash: sponsorEventCash.byTeamId.get(teamId) ?? 0,
     sponsorEventCount: sponsorEventCash.anzahlByTeamId.get(teamId) ?? 0,
     facilityIncome: facilityIncome?.total ?? 0,
+    marketingCash: marketingSaisonbetrag(gameState, teamId),
     facilityUpkeep: facilityUpkeepTotal,
     apronNetto: apronNettoDelta?.nettoDelta ?? 0,
     apronRank: apronNettoDelta?.rank ?? null,

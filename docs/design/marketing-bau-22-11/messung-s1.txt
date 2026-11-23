@@ -1,0 +1,30 @@
+
+=== MARKETING-MESSUNG S1: mit gegen ohne (gleiche Anlage, 32 KI-Teams) ===
+
+1) MARKETING IN DEN KASSEN (gebucht je Spieltag, Teammarke + Team-Anteile), C je Saison
+   liga1: 16 Teams, Summe 132.8, Mittel 8.3, Median 9.1, klein 4.4, gross 11.6
+   liga2: 16 Teams, Summe 82.4, Mittel 5.1, Median 5, klein 4.2, gross 7
+   Liga gesamt: Summe 215.2, Mittel 6.7 je Team
+   davon Teammarke 128, Team-Anteile 89.9; Werbegeld im Kader 272.9, an die Spieler 183
+   Sicherheitsnetz greift bei 4 von 364 Spielern
+
+2) OPERATIVE GuV (alle gezaehlten Posten der EINEN GuV; Transfers und Tilgung zaehlen nicht)
+   ohne Marketing: 11 von 32 Teams >= 0 (Liga 1: 4/16, Liga 2: 7/16); Mittel -5 (L1 -9, L2 -1)
+   mit Marketing: 16 von 32 Teams >= 0 (Liga 1: 7/16, Liga 2: 9/16); Mittel 2.4 (L1 0.3, L2 4.6)
+   GuV-Posten "Marketing" (mit): Summe 215.2, Mittel 6.7
+   Teams, die erst mit Marketing ueber die Null kommen: 5 (M-S, P-C, P-S, R-L, W-L)
+
+3) SCHERE REICH/ARM
+   Einnahmen ohne: Liga 1 73.5 : Liga 2 59.6 = 1.23
+   Einnahmen mit: Liga 1 82.8 : Liga 2 65.1 = 1.27
+   Kasse am Saisonende ohne: reichstes 66.3, aermstes -4.3, Mittel oberes Viertel 50.9 / unteres Viertel 1.9 (Abstand 49), Streuung 18.9
+   Kasse am Saisonende mit: reichstes 71.9, aermstes -1.4, Mittel oberes Viertel 59.5 / unteres Viertel 8.2 (Abstand 51.3), Streuung 19.8
+   operative GuV nach Budget ohne: reiche 8 0.6, arme 8 0.2, Abstand 0.4
+   operative GuV nach Budget mit: reiche 8 11.7, arme 8 5.8, Abstand 5.9
+   Marketing nach Budget: reiche 8 9.8, arme 8 4.8 (Marketing oeffnet die Schere quer zum Budget: Kader mit Kante)
+
+4) MORAL-WIRKUNG (Mittel der Kader-Moral je Team, Ende der Spieltage)
+   ohne 50.3 -> mit 51.3; Differenz je Team Mittel 1, klein -4.2, gross 5.4
+   Zuschlag je Spieler im Mittel: 1.11 Moralpunkte (Konzept: +2 bis +8 ab 0,5 C Spieler-Anteil)
+   Moral zum Saisonstart (mit): 51.1
+

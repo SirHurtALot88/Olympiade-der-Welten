@@ -62,7 +62,7 @@ import "./transfermarkt-modern.css";
 export type { TransfermarktModernProps } from "./tm-typen";
 
 type Ansicht = "markt" | "verkauf" | "vertraege" | "draft";
-type SortKey = "eignung" | "hebt" | "abloese" | "gehalt" | "potenzial" | "value" | "pow" | "spe" | "men" | "soc" | "fit" | "name";
+type SortKey = "eignung" | "hebt" | "abloese" | "gehalt" | "potenzial" | "value" | "pow" | "spe" | "men" | "soc" | "fit" | "marketability" | "name";
 type Zeile = { item: TransfermarktFreeAgentItem; sicht: SpielerSicht };
 
 const SEITE = 15;
@@ -78,6 +78,7 @@ const SORT_LABEL: Record<SortKey, string> = {
   men: "MEN",
   soc: "SOC",
   fit: "Fit",
+  marketability: "Marketability",
   name: "Name",
 };
 /** Nur diese Sortierungen stehen als Knopf in der Filterzeile; Achsen und Fit sortiert man über die Spaltenköpfe. */
@@ -102,6 +103,7 @@ export const TM_SPALTEN: SpaltenDef[] = [
   { id: "eg", standard: 6.6, min: 4.5, max: 12 },
   { id: "ax", standard: 9.5, min: 8, max: 20 },
   { id: "fit", standard: 3.6, min: 3, max: 8 },
+  { id: "mk", standard: 3.8, min: 3, max: 8 },
   { id: "abl", standard: 3.6, min: 2.8, max: 9 },
   { id: "geh", standard: 4.6, min: 3.6, max: 10 },
   { id: "rang", standard: 5.2, min: 4, max: 10 },
@@ -307,6 +309,8 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
         case "value": return z.item.marketValueSalaryRatio;
         case "pow": case "spe": case "men": case "soc": return z.sicht.achsen[sortierung].summe ?? z.sicht.achsen[sortierung].sortWert;
         case "fit": return fitSortWert(z.item);
+        // Marketability (22.11.): Sortschluessel = Mitte der Stufe (fuer alle Spieler einer Stufe gleich); Gleichstand entscheidet der Name.
+        case "marketability": return z.item.marketability?.schluessel ?? null;
         case "name": return 0; // alphabetisch, siehe unten
       }
     };
@@ -623,6 +627,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                 <span className={sortierung === "eignung" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("eignung")} data-testid="tm-kopf-eignung">Eignung{kopfPfeil("eignung")}{griff("eg")}</span>
                 <span style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", textAlign: "center" }}>{MARKT_ACHSEN.map((a) => <i key={a} role="button" title="Achsen-Summe · Klick sortiert, nochmal klicken dreht die Richtung" className={sortierung === a ? "so" : ""} style={{ fontStyle: "normal", cursor: "pointer" }} onClick={() => sortiereNach(a)} data-testid={`tm-kopf-${a}`}>{ACHSEN_LABEL[a]}{kopfPfeil(a)}</i>)}{griff("ax")}</span>
                 <span className={sortierung === "fit" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Team-Fit zu deinem Kader · Klick sortiert, nochmal klicken dreht die Richtung" onClick={() => sortiereNach("fit")} data-testid="tm-kopf-fit">Fit{kopfPfeil("fit")}{griff("fit")}</span>
+                <span className={sortierung === "marketability" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Marketability für DEIN Team (Fanprofil) · Stufe nach Scouting: 10er ungescoutet, 5er beobachtet, exakt gescoutet · Klick sortiert, nochmal klicken dreht die Richtung" onClick={() => sortiereNach("marketability")} data-testid="tm-kopf-marketability">Mkt{kopfPfeil("marketability")}{griff("mk")}</span>
                 <span className={`re ${sortierung === "abloese" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("abloese")} data-testid="tm-kopf-abloese">Ablöse{kopfPfeil("abloese")}{griff("abl")}</span>
                 <span className={`re ${sortierung === "gehalt" ? "so" : ""}`} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("gehalt")} data-testid="tm-kopf-gehalt">Gehalt/Saison{kopfPfeil("gehalt")}{griff("geh")}</span>
                 <span className={sortierung === "hebt" ? "so" : ""} style={{ cursor: "pointer" }} role="button" title="Klick sortiert · nochmal klicken dreht die Richtung" onClick={() => sortiereNach("hebt")} data-testid="tm-kopf-kaderrang">Kaderrang{kopfPfeil("hebt")}{griff("rang")}</span>
@@ -660,6 +665,7 @@ export default function TransfermarktModern(props: TransfermarktModernProps) {
                       })}
                     </span>
                     <FitZelle item={it} />
+                    <span className="re" title={it.marketability ? (it.marketability.exakt ? "Marketability für dein Team (gescoutet)" : `Marketability für dein Team als Stufe ${it.marketability.text} (Scouting-Stufe ${it.marketability.stufe}); Scouten schärft das Bild`) : "Marketing gilt in dieser Saison noch nicht"} data-testid="tm-marketability"><b className="t">{it.marketability ? it.marketability.text : "—"}</b></span>
                     <span className={`re ${teuer ? "zt" : ""}`} title={teuer ? "über deiner Kasse" : ""}><b className="t">{de(it.marketValue ?? 0, 1)}</b></span>
                     <span className="re"><b className="t">{de(it.salary ?? 0, 1)}</b><small style={{ display: "block", color: "var(--stumm)", fontSize: "calc(.7 * var(--u))" }}>{de(jeSpieltag(it.salary) ?? 0, 2)}/Spieltag</small></span>
                     <RangAnzeige w={w} />

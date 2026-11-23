@@ -1,0 +1,9 @@
+
+=== SCHERE S2: Marketing neu (Teammarke nach Budget-Rang, Deckel 12 C), 3 Saaten ===
+
+Saat      | Marketing Summe (L1 / L2 je Team) | Teams GuV>=0 ohne->mit | Einnahmen L1:L2 ohne->mit | GuV-Abstand reiche8-arme8 ohne->mit (Delta) | Marketing reiche8 / arme8 | Deckel | Moral+
+s1        | 223.1 (7.1 / 6.8) | 26 -> 28 | 1.25 -> 1.24 | -5 -> -6.3 (-1.4) | 6.8 / 8.2 | 0 | 0.84
+s2        | 223.2 (7.2 / 6.8) | 28 -> 28 | 1.23 -> 1.21 | -15.3 -> -15.5 (-0.2) | 7.6 / 7.8 | 0 | 0.77
+s3        | 210.5 (6.5 / 6.6) | 27 -> 28 | 1.38 -> 1.35 | 0.2 -> -0.2 (-0.4) | 6.9 / 7.2 | 0 | 0.65
+Mittel    | 218.9 | 27 -> 28 | 1.29 -> 1.27 | -6.7 -> -7.3 (-0.6)
+

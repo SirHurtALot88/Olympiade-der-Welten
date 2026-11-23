@@ -1,3 +1,4 @@
+import { marketingStempelFuerSaisonwechsel } from "@/lib/marketing/marketing-team";
 import { createHash, randomUUID } from "node:crypto";
 
 import { vertragsentscheidungSperrgruende } from "@/lib/contracts/vertragsentscheidung";
@@ -679,6 +680,11 @@ function buildNextSeasonGameState(
     // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
     // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
     formkartenRegel: nextFormkartenRegel,
+    // MARKETING-REGEL (22.11., lib/marketing/marketing-regel.ts): gilt ab der FOLGENDEN Saison; die Fanfarbe jedes Teams driftet hier
+    // (Kader und Erfolg der abgelaufenen Saison), der Verlauf wird fortgeschrieben. Rueckweg OLY_MARKETING=aus.
+    marketingRegel: marketingStempelFuerSaisonwechsel(save.gameState, save.gameState.season.id, nextSeasonId),
+    marketingAushaengeschild: null,
+    marketingStand: null,
     // AUSRUESTUNGS-REGEL (22.11., lib/ausruestung/ausruestung-regel.ts): Wechselliste der neuen Saison, ab Saisonbeginn nach dem
     // Schalter OLY_AUSRUESTUNG (Phase 1a: nur Besitz). Nur Battle-Saves; ein Manager-Save bekommt keinen Stempel.
     ausruestungRegel: ausruestungRegelFuerNeueSaison(save.gameState, nextSeasonId),

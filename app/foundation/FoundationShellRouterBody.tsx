@@ -251,6 +251,10 @@ const FoundationFinancesHost = dynamic(() => import("@/app/foundation/finances/F
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Finanzen werden geladen…" />,
 });
+const FoundationMarketingHost = dynamic(() => import("@/app/foundation/marketing/FoundationMarketingHost"), {
+  ssr: false,
+  loading: () => <FoundationPanelSkeleton label="Marketing wird geladen…" />,
+});
 const FoundationAusruestungHost = dynamic(() => import("@/app/foundation/ausruestung/FoundationAusruestungHost"), {
   ssr: false,
   loading: () => <FoundationPanelSkeleton label="Ausrüstung wird geladen…" />,
@@ -2916,6 +2920,9 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
               kannVerwalten={kannVerwaltenAktivesTeam}
             />
           ) : null}
+
+          {/* Marketing (22.11.): nur der eigene Kader des AKTIVEN Managers, je Manager getrennt. */}
+          {activeView === "marketing" ? <FoundationMarketingHost gameState={gameState} teamId={activeManagerTeamId} /> : null}
 
           {activeView === "ausruestung" ? (
             <FoundationAusruestungHost

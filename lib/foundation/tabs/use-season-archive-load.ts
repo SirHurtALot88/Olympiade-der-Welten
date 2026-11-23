@@ -44,6 +44,8 @@ export function shouldLoadSeasonArchiveForView(
     activeView === "allTimeTable" ||
     // Finanzen: Cash-Abgleich/Verlauf lesen das Saisonarchiv (Saisonstart-Cash der Vorsaison).
     activeView === "finances" ||
+    // Marketing: der Teamerfolg der Vorsaison (Team-Anteil, Drift der Fanfarbe) liest den Saison-Snapshot.
+    activeView === "marketing" ||
     (activeView === "teams" && options.showExtendedTeamPanels === true)
   ) {
     return true;
