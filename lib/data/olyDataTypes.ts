@@ -1986,7 +1986,12 @@ export type SpieltagFinanzBuchung = {
   /** Tabellenplatz, nach dem der Abschlag berechnet wurde (Anzeige: "Platz x"). */
   rang?: number | null;
   cashDelta: number;
-  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number };
+  /**
+   * MARKETING (22.11., docs/design/marketing-22-11.md, Stempel `seasonState.marketingRegel`): Teammarke und Team-Anteile am Werbegeld,
+   * zu 1/N je Spieltag, immer >= 0 und in `cashDelta` enthalten. Fehlt in Zeilen ohne Marketing (dann 0).
+   */
+  marketing?: number;
+  rest: { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number; marketing?: number };
   createdAt: string;
 };
 
@@ -2596,6 +2601,11 @@ export type RosterEntry = {
    * `app/`). Die Wahrheit ist die Endsaison; siehe `lib/contracts/vertragslaufzeit.ts`.
    */
   contractLength: number;
+  /**
+   * WERBEKLAUSEL (22.11., Marketing): -1 = Spieler behaelt mehr, 0 = Standard, +1 = Team bekommt mehr. Fehlt = 0 (neutral). Die Verhandlung
+   * ueber die Klausel ist Folgeauftrag; das Feld ist vorbereitet und wird vom Team-Anteil gelesen.
+   */
+  marketingKlausel?: -1 | 0 | 1;
   /**
    * DIE SAISON, NACH DER DER VERTRAG ENDET — die Wahrheit ueber die Laufzeit.
    *
@@ -4269,6 +4279,19 @@ export type SeasonState = {
    * oder "alt" (18.11.). Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel; gilt fuer die ganze Saison.
    */
   formkartenRegel?: { seasonId: string; regel: "alt" | "plusminus" } | null;
+  /**
+   * MARKETING-REGEL DIESER SAISON (22.11., lib/marketing/marketing-regel.ts): "an" = Werbegeld, Team-Anteil, Teammarke und Moral-Zuschlag
+   * gelten; "aus" = nichts davon. Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel, nie mitten in der Saison. Dazu die Fanfarbe
+   * je Team (vier Zahlen, driftet beim Saisonwechsel), ihr Verlauf und der Verlaufstext je Saisonwechsel.
+   */
+  marketingRegel?: {
+    seasonId: string;
+    regel: "an" | "aus";
+    fanfarbe?: Record<string, [number, number, number, number]>;
+    verlauf?: Record<string, Array<{ seasonId: string; farbe: [number, number, number, number]; grund: string }>>;
+  } | null;
+  /** Manager-Wahl des Aushaengeschilds je Team und Saison (optional; ohne Eintrag gilt die KI-Regel). */
+  marketingAushaengeschild?: Record<string, { seasonId: string; playerId: string }> | null;
   /**
    * BASKETBALL-PUSTE-REGEL DIESER SAISON (22.11., lib/resolve/basketball-puste.ts): Wechselliste "alt"/"neu" je Spieltag,
    * gesetzt beim Laden. Gebuchte Spieltage behalten ihre Regel.

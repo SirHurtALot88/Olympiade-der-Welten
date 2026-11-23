@@ -65,6 +65,7 @@ export const FOUNDATION_NAV_GROUPS: FoundationNavGroup[] = [
       { id: "merkliste", label: "Merkliste", tooltip: "Gemerkte Teams und Spieler — deine Lesezeichen.", icon: "★" },
       { id: "trainingCompact", label: "Training", tooltip: "Trainingssteuerung pro Spieler.", icon: "↑" },
       { id: "trainingV2", label: "Gebäude", tooltip: "Facilities, Upgrade und Wirkung.", icon: "▦" },
+      { id: "marketing", label: "Marketing", tooltip: "Wer wirbt, warum, und wie viel davon bleibt beim Team: dein Kader und deine Fans.", icon: "☆" },
     ],
   },
   {

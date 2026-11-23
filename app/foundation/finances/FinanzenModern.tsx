@@ -293,6 +293,7 @@ const ART_TEXT: Record<string, string> = {
   rang_schlussausgleich: "Rangprämie Schlussausgleich",
   gebaeude_einnahme_spieltag: "Gebäude-Einnahme",
   gebaeude_unterhalt_spieltag: "Gebäude-Unterhalt",
+  marketing_spieltag: "Marketing",
   apron: "Apron",
   vorstandsziele: "Vorstandsziele",
   notfall_kasse: "Notfall-Kasse",

@@ -28,6 +28,7 @@ export type KontoauszugArt =
   | "rang_schlussausgleich"
   | "gebaeude_einnahme_spieltag"
   | "gebaeude_unterhalt_spieltag"
+  | "marketing_spieltag"
   | "apron"
   | "vorstandsziele"
   | "vorstand_praemien"
@@ -136,6 +137,9 @@ export function buildKontoauszuege(gameState: GameState, seasonId?: string | nul
     });
     add(b.teamId, { ...basis, art: "gebaeude_einnahme_spieltag", text: `Gebäude-Einnahme Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.gebaeudeEinnahme });
     add(b.teamId, { ...basis, art: "gebaeude_unterhalt_spieltag", text: `Gebäude-Unterhalt Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.gebaeudeUnterhalt });
+    if ((b.marketing ?? 0) !== 0) {
+      add(b.teamId, { ...basis, art: "marketing_spieltag", text: `Marketing Spieltag ${b.matchdayIndex}/${b.matchdayCount}`, betrag: b.marketing ?? 0 });
+    }
   }
 
   // 3) Apron.

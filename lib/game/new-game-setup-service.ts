@@ -1,3 +1,4 @@
+import { stempleMarketingBeimAnlegen } from "@/lib/marketing/marketing-regel";
 import { createFreshSeasonOneGameState } from "@/lib/game-state/singleplayer-state";
 import type {
   GameMode,
@@ -666,9 +667,12 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
     // FINANZEN JE SPIELTAG (22.11.): Gehalt, Sponsor-Basis und Gebaeude werden ab Saison 1 je Spieltag gebucht
     // (Rueckweg: OLY_FINANZEN_JE_SPIELTAG=aus).
     stempleWirtschaftsRegelnBeimAnlegen(
-    stempleFinanzenJeSpieltagBeimAnlegen(
-      stempleBelastungsRegelBeimAnlegen(
-        stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers))),
+    // MARKETING (22.11.): Werbegeld, Team-Anteil, Teammarke und Moral-Zuschlag ab Saison 1 (Rueckweg: OLY_MARKETING=aus).
+    stempleMarketingBeimAnlegen(
+      stempleFinanzenJeSpieltagBeimAnlegen(
+        stempleBelastungsRegelBeimAnlegen(
+          stempleFormkartenRegelBeimAnlegen(stempleWertungsSkalenBeimAnlegen(stampSponsorSystemVersion(baseGameStateBeforeSponsorOffers))),
+        ),
       ),
     ),
     ),

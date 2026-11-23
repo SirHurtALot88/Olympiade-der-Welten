@@ -21,24 +21,29 @@ import {
   spieltageDerSaison,
   teileJahresbetrag,
 } from "@/lib/finance/finanzen-je-spieltag";
+import { marketingJahresbetrag } from "@/lib/marketing/marketing-team";
+import { marketingAktiv } from "@/lib/marketing/marketing-regel";
+import { buildMoraleLookupIndex, type MoraleLookupIndex } from "@/lib/morale/player-morale-service";
 import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
 
 export function spieltagBuchungsId(seasonId: string, matchdayId: string, teamId: string): string {
   return `spieltag-finanz:${seasonId}:${matchdayId}:${teamId}`;
 }
 
-/** Die vier Jahresbetraege eines Teams zum heutigen Stand (Gehalt am Spieltag `matchdayIndex`). */
+/** Die Jahresbetraege eines Teams zum heutigen Stand (Gehalt am Spieltag `matchdayIndex`); Marketing nur mit gueltiger Regel, sonst 0. */
 export function jahresbetraegeEinesTeams(
   gameState: GameState,
   teamId: string,
   matchdayIndex: number | null,
-): { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number } {
+  moralIndex?: MoraleLookupIndex,
+): { gehalt: number; sponsorBasis: number; gebaeudeEinnahme: number; gebaeudeUnterhalt: number; marketing: number } {
   const gebaeude = berechneGebaeudeSaisonbetraege(gameState, teamId);
   return {
     gehalt: kaderJahresgehaltAmSpieltag(gameState, teamId, matchdayIndex),
     sponsorBasis: sponsorBasisJahr(gameState, teamId),
     gebaeudeEinnahme: gebaeude.income,
     gebaeudeUnterhalt: gebaeude.upkeep,
+    marketing: marketingJahresbetrag(gameState, teamId, moralIndex),
   };
 }
 
@@ -63,22 +68,26 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
 
   const neue: SpieltagFinanzBuchung[] = [];
   const cashDelta = new Map<string, number>();
+  // MARKETING (22.11.): der Moral-Index wird fuer alle Teams EINMAL gebaut (die Team-Anteile lesen die Moral je Spieler).
+  const moralIndex = marketingAktiv(gameState) ? buildMoraleLookupIndex(gameState) : undefined;
   for (const team of gameState.teams) {
     const bisher = jeTeam.get(team.teamId) ?? [];
     if (bisher.some((zeile) => zeile.matchdayId === matchdayId)) continue;
     // Rundungsrest der letzten frueheren Buchung dieser Saison (Reihenfolge nach Spieltag, nicht nach Schreibzeit).
     const vorher = bisher.filter((zeile) => zeile.matchdayIndex < index).sort((a, b) => b.matchdayIndex - a.matchdayIndex)[0];
-    const rest0 = vorher?.rest ?? { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0 };
-    const j = jahresbetraegeEinesTeams(gameState, team.teamId, index);
+    const rest0 = vorher?.rest ?? { gehalt: 0, sponsorBasis: 0, gebaeudeEinnahme: 0, gebaeudeUnterhalt: 0, marketing: 0 };
+    const j = jahresbetraegeEinesTeams(gameState, team.teamId, index, moralIndex);
     const gehalt = teileJahresbetrag(j.gehalt, n, rest0.gehalt);
     const sponsor = teileJahresbetrag(j.sponsorBasis, n, rest0.sponsorBasis);
     const einnahme = teileJahresbetrag(j.gebaeudeEinnahme, n, rest0.gebaeudeEinnahme);
     const unterhalt = teileJahresbetrag(j.gebaeudeUnterhalt, n, rest0.gebaeudeUnterhalt);
+    // MARKETING (22.11.): Teammarke + Team-Anteile zu 1/N, immer >= 0. Ohne gueltige Regel 0 (die Zeile traegt dann kein Feld).
+    const marketing = teileJahresbetrag(j.marketing, n, rest0.marketing ?? 0);
     // RANG-ABSCHLAG (Chris, 22.11.): 80 % der Rangpraemie bei heutigem Tabellenplatz, zu 1/N. Der Schlussausgleich am
     // Saisonende bucht Endrang-Praemie minus Summe der Abschlaege. Ohne Sponsorvertrag 0.
     const rang = sponsorRangFuerAbschlag(gameState, team.teamId);
     const rangAbschlag = sponsorRangAbschlag(gameState, team.teamId, rang, n).abschlag;
-    const delta = runde1(-gehalt.betrag + sponsor.betrag + einnahme.betrag - unterhalt.betrag + rangAbschlag);
+    const delta = runde1(-gehalt.betrag + sponsor.betrag + einnahme.betrag - unterhalt.betrag + rangAbschlag + marketing.betrag);
     neue.push({
       id: spieltagBuchungsId(seasonId, matchdayId, team.teamId),
       seasonId,
@@ -92,8 +101,15 @@ export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, 
       gebaeudeUnterhalt: unterhalt.betrag === 0 ? 0 : -unterhalt.betrag,
       rangAbschlag,
       rang: rangAbschlag === 0 ? null : rang,
+      ...(j.marketing > 0 || marketing.betrag !== 0 ? { marketing: marketing.betrag } : {}),
       cashDelta: delta,
-      rest: { gehalt: gehalt.rest, sponsorBasis: sponsor.rest, gebaeudeEinnahme: einnahme.rest, gebaeudeUnterhalt: unterhalt.rest },
+      rest: {
+        gehalt: gehalt.rest,
+        sponsorBasis: sponsor.rest,
+        gebaeudeEinnahme: einnahme.rest,
+        gebaeudeUnterhalt: unterhalt.rest,
+        ...(j.marketing > 0 || marketing.betrag !== 0 ? { marketing: marketing.rest } : {}),
+      },
       createdAt: jetzt,
     });
     if (delta !== 0) cashDelta.set(team.teamId, delta);

@@ -1,3 +1,5 @@
+import { marketingSpielerFuer } from "@/lib/marketing/marketing-kontext";
+import { marketingAktiv } from "@/lib/marketing/marketing-regel";
 import type {
   GameState,
   Player,
@@ -807,6 +809,34 @@ export function assessPlayerMorale(input: PlayerMoraleInput): PlayerMoraleAssess
   };
 }
 
+/** Wahr, solange `moralOhneWerbung` rechnet: dann gibt es keinen Marketing-Zuschlag (und keinen Kreis). */
+let ohneWerbungLauf = false;
+
+/**
+ * Die Moral eines Spielers OHNE den Werbe-Zuschlag, frisch gerechnet (ohne Uebertrag aus dem gespeicherten Stand). Das ist die Moral,
+ * die der Team-Anteil am Werbegeld liest (Marketing-Konzept 4.2: "kein Kreis"). `null`, wenn der Spieler nicht im Kader des Teams steht.
+ */
+export function moralOhneWerbung(gameState: GameState, playerId: string, teamId: string, index?: MoraleLookupIndex): number | null {
+  const player = (index ? index.playersById.get(playerId) : gameState.players.find((entry) => entry.id === playerId)) ?? null;
+  if (!player) return null;
+  const rosterEntry =
+    (index
+      ? index.rostersByPlayerId.get(playerId)?.find((entry) => entry.teamId === teamId)
+      : gameState.rosters.find((entry) => entry.playerId === playerId && entry.teamId === teamId)) ?? null;
+  if (!rosterEntry) return null;
+  const team = (index ? index.teamsById.get(teamId) : gameState.teams.find((entry) => entry.teamId === teamId)) ?? null;
+  if (!team) return null;
+  const teamIdentity =
+    (index ? index.teamIdentitiesByTeamId.get(teamId) : gameState.teamIdentities.find((entry) => entry.teamId === teamId)) ?? null;
+  const vorher = ohneWerbungLauf;
+  ohneWerbungLauf = true;
+  try {
+    return computePlayerMorale({ gameState, player, rosterEntry, team, teamIdentity, renewalSalaryPreview: null }).morale;
+  } finally {
+    ohneWerbungLauf = vorher;
+  }
+}
+
 function computePlayerMorale(input: {
   gameState: GameState;
   player: Player;
@@ -1051,6 +1081,16 @@ function computePlayerMorale(input: {
   }
 
   morale = roundValue(clamp(50 + (morale - 50) * MORAL_SKALA_FAKTOR, 0, 100));
+  // MARKETING (22.11., docs/design/marketing-22-11.md 4.2): der Spieler-Anteil am Werbegeld hebt die Moral um +2/+4/+6/+8, als fester
+  // Zuschlag NACH der Streckung (gezeigt = gebucht: die Zeile traegt genau diese Punkte). Der Team-Anteil rechnet mit der Moral VOR
+  // dem Zuschlag (`morale` hier), sonst zoege sich der Wert selbst hoch. Im `moralOhneWerbung`-Lauf entfaellt der Zuschlag ganz.
+  if (!ohneWerbungLauf && marketingAktiv(gameState)) {
+    const werbung = marketingSpielerFuer(gameState, team.teamId, player, rosterEntry, morale);
+    if (werbung.moralZuschlag !== 0) {
+      morale = roundValue(clamp(morale + werbung.moralZuschlag, 0, 100));
+      addReason(reasons, "marketing_werbevertraege", "Werbeverträge", werbung.moralZuschlag, "marketing");
+    }
+  }
   const visibleMood = getVisibleMood(morale);
   const contractIntent = getContractIntent(morale, player);
   const moraleSalaryModifier = getMoraleSalaryModifier({
