@@ -1,4 +1,4 @@
-import { gueltigeWirtschaftsRegeln, wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
+import { gueltigeWirtschaftsRegeln, toepfeAbSaison1, wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 import type {
   GamePhase,
   GameState,
@@ -2134,6 +2134,38 @@ function buildVorstandBudgetObjectiveDrafts(input: {
       source: "vorstand_alles_auf_eine_karte",
     });
   }
+  // Budget-Gespraech (23.11.): „Bescheiden“ = zusaetzliches, leichteres Rang-Ziel (+0,3 / −0,4); „Ruecklage voll halten“ = +0,2.
+  // Beide wirken wie die Zusage „Vertrauen einsetzen“ erst bei der naechsten Festlegung, nicht in der laufenden Quote.
+  if (zustand.zielTief && !karte) {
+    const rank = input.row.rank ?? null;
+    const geschafft = rank != null && rank <= zustand.zielTief.zielRang;
+    const aus = getRemainingMatchdays(input.gameState) === 0;
+    const status: TeamSeasonObjectiveStatus = rank == null ? "open" : geschafft ? "completed" : aus ? "failed" : "open";
+    drafts.push({
+      objectiveId: "vorstand-budget-ziel-tief",
+      category: "sport",
+      label: `Bescheiden vereinbart: Top ${zustand.zielTief.zielRang}`,
+      detail: "Im Budget-Gespräch vereinbart: ein Ziel zwei Plätze unter dem des Vorstands, dafür eine Freigabe-Stufe tiefer. Das Vorstandsziel gilt weiter. Kein Geldabzug.",
+      targetValue: `Top ${zustand.zielTief.zielRang}`,
+      currentValue: rank ?? "offen",
+      status,
+      boardConfidenceDelta: status === "completed" ? 0.3 : status === "failed" ? -0.4 : 0,
+      source: "vorstand_budget_gespraech",
+    });
+  }
+  if (zustand.ruecklageVoll && !karte) {
+    drafts.push({
+      objectiveId: "vorstand-budget-ruecklage-voll",
+      category: "finance",
+      label: "Rücklage voll gehalten",
+      detail: "Im Budget-Gespräch zugesagt: die volle Rücklage. Der Vorstand honoriert es mit +0,2 Vertrauen bei der nächsten Festlegung.",
+      targetValue: "Rücklage voll",
+      currentValue: "voll",
+      status: "open",
+      boardConfidenceDelta: 0.2,
+      source: "vorstand_budget_gespraech",
+    });
+  }
   if (zustand.vertrauensKosten > 0) {
     drafts.push({
       objectiveId: "vorstand-ruecklage-angezapft",
@@ -2522,7 +2554,7 @@ export function calculateBoardConfidence(input: {
   }
   // Die Zusage „Vertrauen einsetzen" (Office 21.11) wirkt erst bei der naechsten Festlegung (Abrechnung), nicht sofort.
   const delta = input.objectives.reduce(
-    (sum, objective) => sum + (objective.objectiveId === GESPRAECH_VERTRAUEN_ID ? 0 : objective.boardConfidenceDelta ?? 0),
+    (sum, objective) => sum + (objective.objectiveId === GESPRAECH_VERTRAUEN_ID || objective.objectiveId === "vorstand-budget-ziel-tief" || objective.objectiveId === "vorstand-budget-ruecklage-voll" ? 0 : objective.boardConfidenceDelta ?? 0),
     0,
   );
   // Optionale Zusatzziele (herabgestufte Rang-Ziele) erzeugen keinen Druck: Der Vorstand hat sie
@@ -2667,8 +2699,11 @@ export function buildTeamObjectiveOverview(gameState: GameState): TeamObjectiveO
   const boardConfidence: Record<string, TeamBoardConfidenceRecord> = {};
   const aiBiasByTeamId: Record<string, TeamObjectiveAiBias> = {};
   const warnings: string[] = [];
-  const neutralPreseasonBoard = isSeasonOnePreseasonNeutralBoard(gameState);
-  const initialSeason = (resolveSeasonNumberFromState(gameState) ?? 1) === 1;
+  // Budget-Gespraech (23.11., Chris: „S1 auch mit Vertrauen aus Identitaet, nicht 100 %“): mit dem Stempel `toepfeS1` startet Saison 1
+  // nicht mehr neutral bei 5, sondern beim Identitaets-Vertrauen.
+  const toepfeS1 = toepfeAbSaison1(gameState);
+  const neutralPreseasonBoard = !toepfeS1 && isSeasonOnePreseasonNeutralBoard(gameState);
+  const initialSeason = !toepfeS1 && (resolveSeasonNumberFromState(gameState) ?? 1) === 1;
 
   for (const team of gameState.teams) {
     const row = rowsByTeamId.get(team.teamId);
@@ -2960,7 +2995,7 @@ function buildStoredObjectiveAiBiasByTeamId(gameState: GameState) {
     objectivesByTeamId.set(objective.teamId, objectives);
   }
 
-  const initialSeason = (resolveSeasonNumberFromState(gameState) ?? 1) === 1;
+  const initialSeason = !toepfeAbSaison1(gameState) && (resolveSeasonNumberFromState(gameState) ?? 1) === 1;
   const aiBiasByTeamId: Record<string, TeamObjectiveAiBias> = {};
   for (const team of gameState.teams) {
     const objectives = objectivesByTeamId.get(team.teamId) ?? [];

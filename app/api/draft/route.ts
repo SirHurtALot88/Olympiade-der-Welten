@@ -25,6 +25,7 @@ export const dynamic = "force-dynamic";
  * und Auto-Pick fuer ein fremdes Team sind Gastgeber-Aktionen. Die private Sicht `mein` (Vorschlag des GM, Kasse,
  * Reserve) gibt es nur fuer ein Team, fuer das der Aufrufer dasselbe Schreibrecht hat (A7) — sonst nur die oeffentliche.
  */
+import { teamsOhneVereinbarung } from "@/lib/finance/vorstand-budget-gespraech";
 import { NextResponse } from "next/server";
 
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
@@ -177,6 +178,14 @@ export async function POST(request: Request) {
       if (!ligaDraftDieserSaison(vorher.gameState)) return fehler("liga_draft_fehlt", 404);
     } else if (aktion !== "starten" && !ligaDraftLaeuft(vorher.gameState)) {
       return fehler("draft_laeuft_nicht", 409);
+    }
+
+    // BUDGET-GESPRAECH (23.11.): in Saison 1 wartet der Draft, bis alle Menschen, die selbst verhandeln, unterschrieben haben.
+    if (aktion !== "starten" && aktion !== "abbrechen" && aktion !== "wunschliste") {
+      const wartet = teamsOhneVereinbarung(vorher.gameState);
+      if (wartet.length > 0) {
+        return NextResponse.json({ success: false, error: "budget_vereinbarung_fehlt", wartetAuf: wartet }, { status: 409 });
+      }
     }
 
     // A6: jede schreibende Aktion ausser `starten` nennt den Stand, den sie gesehen hat.

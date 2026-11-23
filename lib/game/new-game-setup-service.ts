@@ -16,6 +16,7 @@ import { buildPlayerPotentialRecordsForSave } from "@/lib/progression/player-pot
 import { chooseSponsorOfferForAiTeams, ensureSeasonSponsorOffers } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonEconomyFactorWindow } from "@/lib/season/season-economy-factors";
 import { stampSponsorSystemVersion } from "@/lib/sponsor/sponsor-v3-offer-service";
+import { fuehreKiBudgetGespraecheAus } from "@/lib/finance/vorstand-budget-gespraech";
 import { stempleWirtschaftsRegelnBeimAnlegen } from "@/lib/resolve/wirtschafts-regeln";
 import { startbudgetStaffelFuerNeuesSpiel } from "@/lib/resolve/startbudget-staffel";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
@@ -709,7 +710,9 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // Schritt (chooseSponsorOfferForAiTeams überspringt controlMode==="manual"). Deterministisch + idempotent
   // (Teams mit bestehendem Vertrag werden übersprungen), deferBaseFirstPayout=true → keine sofortige
   // Cash-Gutschrift, die Basisrate wird regulär bei der Saison-Abrechnung fällig.
-  const gameState: GameState = chooseSponsorOfferForAiTeams(gameStateWithSponsorOffers);
+  // BUDGET-GESPRAECH (23.11.): ab Saison 1 gelten die zwei Toepfe samt Vorstands-Quote. KI-Teams und Menschen mit delegiertem Vorstand
+  // fuehren ihr Gespraech sofort (dieselbe Regel wie der Mensch); wer selbst verhandelt, unterschreibt vor dem Draft.
+  const gameState: GameState = fuehreKiBudgetGespraecheAus(chooseSponsorOfferForAiTeams(gameStateWithSponsorOffers));
 
   const preview: NewGameSetupPreview = {
     mode: "preview",

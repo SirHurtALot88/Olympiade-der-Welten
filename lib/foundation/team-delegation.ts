@@ -39,6 +39,7 @@ export const DELEGATION_BEREICHE: readonly DelegationBereich[] = [
   "gebaeude",
   "sponsor",
   "ausruestung",
+  "vorstand",
 ];
 
 export const DELEGATION_BEREICH_LABEL: Record<DelegationBereich, string> = {
@@ -49,6 +50,7 @@ export const DELEGATION_BEREICH_LABEL: Record<DelegationBereich, string> = {
   gebaeude: "Gebäude",
   sponsor: "Sponsorwahl",
   ausruestung: "Ausrüstung (Truhen und Lager)",
+  vorstand: "Budget-Gespräch mit dem Vorstand",
 };
 
 export const DELEGATION_STUFE_LABEL: Record<DelegationStufe, string> = {
@@ -72,6 +74,7 @@ export const DELEGATION_STUFEN: Record<DelegationStufe, Record<DelegationBereich
     gebaeude: "selbst",
     sponsor: "selbst",
     ausruestung: "selbst",
+    vorstand: "selbst",
   },
   halbautomatik: {
     einsatzliste: "ki",
@@ -81,6 +84,8 @@ export const DELEGATION_STUFEN: Record<DelegationStufe, Record<DelegationBereich
     gebaeude: "ki",
     sponsor: "ki",
     ausruestung: "ki",
+    // Chris-Entscheid 23.11. (PM, Frage 3): Ramona kauft selbst, soll aber nicht mit dem Vorstand verhandeln muessen.
+    vorstand: "ki",
   },
   voll_ki: {
     einsatzliste: "ki",
@@ -90,6 +95,7 @@ export const DELEGATION_STUFEN: Record<DelegationStufe, Record<DelegationBereich
     gebaeude: "ki",
     sponsor: "ki",
     ausruestung: "ki",
+    vorstand: "ki",
   },
 };
 

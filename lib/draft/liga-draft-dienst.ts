@@ -14,6 +14,7 @@
  *
  * Seit der Abnahme 19.11. ist dieser Draft der Standard fuer neue Ligen; `OLY_LIGA_DRAFT_MODUS=block` ist der Rueckweg.
  */
+import { fuehreKiBudgetGespraecheAus } from "@/lib/finance/vorstand-budget-gespraech";
 import { stempleDraftPicksS1 } from "@/lib/contracts/draft-pick-markierung";
 import { meldeHintergrundArbeit } from "@/lib/hintergrund/hintergrund-arbeit";
 import { istKaderplanAktiv } from "@/lib/ai/organic-squad/draft-adapter";
@@ -284,6 +285,8 @@ export function starteLigaDraft(input: LigaDraftStartEingabe): LigaDraftZustand 
       wahlOffen: input.wahlOffen,
     });
     setzeDraftImKontext(ctx, draft);
+    // Budget-Gespraech (23.11.): wer nicht selbst verhandelt (KI, delegierter Vorstand), hat seine Vereinbarung vor dem ersten Pick.
+    ctx.save = { ...ctx.save, gameState: fuehreKiBudgetGespraecheAus(ctx.save.gameState) };
     return draft;
   });
 }

@@ -13,6 +13,7 @@ import {
   ziehGegenangebotZurueck,
   type GespraechAntrag,
 } from "@/lib/finance/vorstand-gespraech";
+import { unterschreibeBudgetVereinbarung, type BudgetWahl } from "@/lib/finance/vorstand-budget-gespraech";
 import { setzePraemienPlan } from "@/lib/finance/vorstand-praemien";
 import { createPersistenceService } from "@/lib/persistence/persistence-service";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
@@ -25,12 +26,14 @@ type VorstandBody = {
   seasonId?: string;
   teamId?: string;
   /**
-   * "umschichten" | "vorstand_fordert_annehmen" | "gespraech_antrag" | "gespraech_annehmen" | "gespraech_zurueckziehen" | "praemien_setzen".
+   * "umschichten" | "vorstand_fordert_annehmen" | "gespraech_antrag" | "gespraech_annehmen" | "gespraech_zurueckziehen" | "praemien_setzen" | "budget_unterschreiben" (Budget-Gespraech vor dem Draft / Fenster).
    * „ruecklage_anzapfen" und „alles_auf_eine_karte" gibt es fuer den Menschen nur noch im Vorstandsgespraech (Office 21.11).
    */
   aktion?: string;
   /** Vorstandsgespraech: Bitte, Betrag, Ziel und Zusagen (siehe `GespraechAntrag`). */
   antrag?: GespraechAntrag;
+  /** Budget-Gespraech (23.11.): die gewaehlte Vereinbarung (Ambition, Ruecklage, Aufteilung, Zusagen). */
+  wahl?: Partial<BudgetWahl>;
   /** Praemien: Stufen 0 bis 2. */
   siegStufe?: number;
   treueStufe?: number;
@@ -114,6 +117,16 @@ export async function POST(request: Request) {
       if (!g) return NextResponse.json({ ok: false, reason: "missing_fields", meldung: "Angaben fehlen." }, { status: 400 });
       if (!g.ok) return NextResponse.json({ ok: false, reason: g.reason, meldung: g.meldung }, { status: 400 });
       ergebnis = { ok: true, reason: g.ausgang, meldung: g.meldung, gameState: g.gameState, stand: null };
+    } else if (aktion === "budget_unterschreiben") {
+      const w = body.wahl ?? {};
+      const wahl: BudgetWahl = {
+        ambition: w.ambition === "tief" || w.ambition === "hoch" || w.ambition === "alles" ? w.ambition : "ziel",
+        ruecklage: w.ruecklage === "vorsichtig" || w.ruecklage === "mutig" ? w.ruecklage : "normal",
+        umschichtung: typeof w.umschichtung === "number" && Number.isFinite(w.umschichtung) ? w.umschichtung : 0,
+        zusagen: Array.isArray(w.zusagen) ? w.zusagen.filter((a): a is "deckel" | "vertrauen" => a === "deckel" || a === "vertrauen") : [],
+      };
+      const u = unterschreibeBudgetVereinbarung(save.gameState, teamId, wahl, activeOwnerId ?? null);
+      ergebnis = { ok: u.ok, reason: u.reason, meldung: u.meldung, gameState: u.gameState, stand: null };
     } else if (aktion === "praemien_setzen") {
       const p = setzePraemienPlan(save.gameState, teamId, {
         siegStufe: typeof body.siegStufe === "number" ? body.siegStufe : NaN,

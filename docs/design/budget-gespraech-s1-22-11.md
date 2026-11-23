@@ -361,3 +361,60 @@ steht mit der Identität fest, und die Rasse folgt dem Thema des Teams (das die 
 Vorstände wechseln können. Die Mienen empfehle ich nicht: dreifache Kosten, und der farbige Rahmen sagt dasselbe. Bei einem
 Guthaben von 303,5 und der Reserve 150 sind rund 153 Generationen frei, die sich die Porträts mit den anderen offenen
 Bestellungen (Beute-Icons, Arenen) teilen; B passt hinein, C nur knapp.
+
+## 10. Bau und Abgleich (23.11.)
+
+Gebaut nach Chris' „bau das“ (23.11.). PM-Entscheide zu Abschnitt 7: (1) Messlauf A (Entscheidung pur, Quote nach Identitäts-Vertrauen inkl. 70 %), bei gerissenem Abbruchkriterium
+Variante B (Untergrenze 80 % nur in Saison 1); die Startbudget-Staffel (+20/+2, #1703) ist schon auf main, A enthält also das Geld aus Lauf C. (2) Saison 1: der Draft wartet
+auf alle Menschen, die selbst verhandeln; ab Saison 2 wartet das Fenster nicht (Abwesende bekommen den Vorschlag, nachverhandelbar bis zum ersten Kauf). (3) Eigener
+Delegationsbereich „Vorstand“, Halbautomatik = KI. (4) Das Budget-Gespräch zählt nicht als eines der zwei Gespräche je Saison.
+
+**Code:** `lib/resolve/wirtschafts-regeln.ts` (Stempel `toepfeS1`, `toepfeAbSaison1`; Schalter `OLY_TOEPFE_AB_SAISON_1=aus`, wirkt nur auf neue Saisons) ·
+`lib/finance/vorstand-budgetfreigabe.ts` (Saison-1-Zweig weg, `gedeckelt` ab Saison 1, Faktor 0,5 für Rücklage und Gehaltspuffer im Topf, Startvertrauen
+`startVertrauenAusIdentitaet`, `S1_QUOTE_UNTERGRENZE`) · `lib/board/team-season-objectives-service.ts` (Start nicht mehr neutral 5) ·
+`lib/finance/vorstand-budget-gespraech.ts` (geführter Antrag, Urteil, Stempel `seasonState.budgetVereinbarung`, KI-Wahl, Tor, Tisch) · `lib/finance/vorstand-gespraech.ts` (Werte
+„Rücklage voll“ 1/3/5, „Ziel senken“ 16/10/6, „Stufe tiefer“ 4) · `lib/ai/organic-squad/draft-adapter.ts` (`spielraumS1` und der Saison-1-KI-Puffer entfallen; `SAISON_EINS_RUECKLAGE_FAKTOR`
+bleibt nur für Altstände ohne Stempel) · `lib/foundation/team-delegation.ts` (Bereich `vorstand`) · `app/api/finance/vorstand/route.ts` (`budget_unterschreiben`) ·
+`app/api/draft/route.ts` (409 `budget_vereinbarung_fehlt`, solange ein Mensch nicht unterschrieben hat) · UI `app/foundation/office/BudgetGespraech.tsx` + `budget-gespraech.css`
+(Office-Reiter „Budget“ und Tor vor dem Draft in `FoundationShellRouterBody.tsx`). Neues Spiel: ab Saison 1; laufender Spielstand: erst ab dem nächsten Saisonwechsel (Altstempel ohne `toepfeS1` = „alt“).
+Wirkung über die vorhandenen Felder in `seasonState.vorstandBudget` (neu: `stufenSenkung`, `ruecklageVoll`, `zielTief`), gezeigt = gebucht. Tests: `tests/budget-gespraech-23-11.test.ts`.
+
+**Abweichungen vom Konzept (ehrlich):** „Bescheiden“ bucht ein zusätzliches, leichteres Rang-Ziel (+0,3/−0,4, wirkt wie „Vertrauen einsetzen“ erst bei der nächsten Festlegung), das Vorstandsziel gilt weiter.
+Vor dem ersten Pick gibt es keine Kaderstärke, das Rang-Ziel kommt deshalb aus dem Rang des Startbudgets in der Liga minus `1 + Ambition/3` (`schaetzeStartZielRang`); nach dem Draft gilt das echte Ziel.
+Die neuen Bitten/Zusagen sind eigene Typen im Budget-Modul, die Office-Typen `VorstandBitteArt`/`VorstandZusageArt` blieben unverändert. Kreditfenster ab Saison 1 war schon durch die Phasenregel (`isEarlySeasonSetup`) offen.
+In Saison 1 sperrt die Untergrenze 80 % auch „Bescheiden“ bei Quote 80 %.
+
+### Messung (Abschnitt 6, `scripts/miss-teamfinanzen-saison.ts`, 32 KI-Teams, Battle, Wegwerf-SQLite)
+
+Nicht erreicht: drei Saisons. Die Läufe wurden unter hoher Last (Load 13–18, drei Agenten) nach Saison 2 abgebrochen; gemessen sind Saison 1 (nach dem Draft = Saisonstart) und Saison 2 (nach der KI-Kaufphase). Saat 1 = Standard, Saat 2 = `--mischen 7`. Referenz main (Konzept Abschnitt 1): Bottom-4 37,4, Kader Median 13 (S1) → 11 (S2), Σ Kasse zum Start S2 587 bzw. 1158 C, drei Teams mit 9 bis 10 Spielern. Kein eigener Lauf gegen main.
+
+| Lauf | Kader S1 Median / min / Teams unter 10 | Bottom-4 S1 | Σ Kasse S1-Start | Kader S2 Median / Teams unter 10 | Bottom-4 S2 | Σ Kasse S2-Start | „Alles“ / angezapft S2 | Sperre Kauf (Teams) S2 |
+|---|---|---:|---:|---|---:|---:|---|---|
+| A · Saat 1 (Quote 70 % möglich) | 12 / 8 / 9 | 37,1 | 2 560 | 12 / 7 | 39,7 | 1 604 | 2 / 2 | 4 (3) |
+| B · Saat 1 (Untergrenze 80 %) | 12 / 8 / 10 | 37,6 | 2 511 | 12 / 6 | 40,4 | 1 622 | 2 / 4 | 6 (4) |
+| B · Saat 2 | 12 / 8 / 7 | 37,3 | 2 535 | 12 / 6 | 39,1 | 1 511 | 4 / 3 | 12 (7) |
+
+**Abbruchkriterium** (S1-Kader Median < 12, ein Team < 10, Bottom-4 < 37,4): Lauf A reißt es (Bottom-4 37,1; Teams mit 8 bis 9 Spielern; Median 12 knapp gehalten). Daraufhin B (Untergrenze 80 % in Saison 1): Bottom-4 37,6 (Saat 1) und
+37,3 (Saat 2), Median 12, aber weiter 10 bzw. 7 Teams unter 10 Spielern (Minimum 8 = Pflichtkader). **Das Kriterium „kein Team unter 10“ hält auch B nicht**; main selbst hat laut Konzept drei solche Teams. Der Sprung S1 → S2 ist
+weg: Kader-Median S1 und S2 gleich (12), Σ Kasse zum S2-Start 1 511 bis 1 622 C (main 1 158 C), Teams über dem Topf: keine Überziehung gemessen, weil die harte Sperre greift (Zähler „Sperre Kauf“ = abgelehnte Prüfungen, nicht Überziehungen).
+Offene Entscheidung für Chris/PM: zusätzliche Hebel gegen die schmalen Kader (Untergrenze 90 % in Saison 1, oder Sockel +20/+2 verstärken) oder das Kriterium „unter 10“ für Saison 1 lockern.
+
+### Abgleich Mockup | App (1920×1080 und 2560×1440, Bilder `docs/design/budget-gespraech-23-11/`)
+
+Paare: `mockup-*` gegen `app-*` (`1-lage`, `2-verhandeln`, `2-gegenangebot`, `3-vereinbarung`, `3-unterschrieben`; dazu `app-2-zusage-ehrgeizig`, `app-2-alles`). Aufnahme mit `scripts/screenshot-budget-gespraech.ts`
+(Wegwerf-SQLite, Dev-Server Port 3267, Team des Dev-Nutzers `user_local`, deviceScaleFactor 1). Kein Seitenscroll, kein Überlauf in Karten (automatisch geprüft je Aufnahme). Das App-Team ist ein Team aus dem Mittelfeld der Startbudgets, das Mockup zeigt Death Peaches, Zahlen weichen daher ab.
+
+| Mockup-Merkmal | Stand |
+|---|---|
+| Hero mit Wappen, Titel, drei Schritt-Reitern mit Ergebnis | drin (Office-`BcHero`/`BcReiter`; Wertnotiz entfällt, Platz) |
+| „Draft beginnt, sobald alle unterschrieben haben“ rechts | drin im Draft-Tor (zeigt, auf wen gewartet wird); im Office stattdessen „Zum Office“ |
+| Linke Karte: Vorstands-Porträt, Charakter, Vertrauen/Finanzwert/Ambition | drin (PixelLab-Porträts aus #1695, Rahmenfarbe nach Urteil; kein CSS-Gesicht nötig) |
+| Sprechblase mit Urteil, „Gegenangebot annehmen“ | drin |
+| Waage Gewicht gegen Preis mit Posten, Vertrauens-Folgen, Regeltext | drin, Zahlen aus `beurteileBudgetWahl` |
+| Schritt 1: Leiter Vertrauen → Freigabe, Transfertopf-Rechnung, Gehaltstopf-Rechnung, Saisonziel | drin, Zahlen aus dem echten Topf |
+| Schritt 2: Ambition, Rücklage, Sonderantrag, Aufteilung mit Schieber | drin; „Bescheiden“ in Saison 1 bei Quote 80 % gesperrt (angepasst: Untergrenze) |
+| Schritt 3: beide Töpfe groß, Klauseln, Stempel „Vereinbart“, „Gezeigt = gebucht“ | drin |
+| Rechts: Entwurf, Balken, Kader-Ausblick, Vergleich mit dem Vorschlag | drin; Kader-Ausblick mit Marktpreisen (Median des freien Marktes) statt Beispielpreisen (angepasst) |
+| Am Tisch: Chris, Franky, Ramona mit Status | angepasst: zeigt die tatsächlich menschlichen Teams des Spielstands (im Testspiel eines); keine Zahlen der anderen |
+| Mockup-Leiste (Beispielteams), Schiene | fehlt bewusst: gehört nicht zur UI |
+| Zielrang „6 von 16“ als Beispiel | angepasst: Rang aus Startbudget-Schätzung vor dem Draft, danach echtes Ziel |
