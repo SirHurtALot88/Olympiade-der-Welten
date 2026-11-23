@@ -36,7 +36,6 @@ import {
   vorliebeFaktor,
   vorliebeMoral,
 } from "@/lib/training/trainings-vorlieben";
-import { SIGNATURE_ORGANIC_GROWTH_MULTIPLIER, WEAK_ORGANIC_GROWTH_MULTIPLIER } from "@/lib/training/organic-season-progression";
 
 /**
  * TRAININGSVORLIEBEN (22.11.): Ableitung, Stempel, Budget-Faktor, Heatmap = Buchungsfunktion, Moral-Grund, KI-Gewicht.
@@ -114,10 +113,10 @@ describe("Vorlieben: Ableitung je Spieler", () => {
     expect(anteil).toBeLessThan(0.6);
   });
 
-  it("Faktoren sind genau die der Attribut-Affinitaet: x1,15 und x0,80; Moral +3 und -6", () => {
-    expect(VORLIEBE_FAKTOR_LIEBLING).toBe(SIGNATURE_ORGANIC_GROWTH_MULTIPLIER);
-    expect(VORLIEBE_FAKTOR_UNGELIEBT).toBe(WEAK_ORGANIC_GROWTH_MULTIPLIER);
-    expect([vorliebeFaktor(1), vorliebeFaktor(-1), vorliebeFaktor(0)]).toEqual([1.15, 0.8, 1]);
+  it("Faktoren: Liebling x1,30, ungeliebt x0,50 (Chris 23.11.); Moral +3 und -6", () => {
+    expect(VORLIEBE_FAKTOR_LIEBLING).toBe(1.3);
+    expect(VORLIEBE_FAKTOR_UNGELIEBT).toBe(0.5);
+    expect([vorliebeFaktor(1), vorliebeFaktor(-1), vorliebeFaktor(0)]).toEqual([1.3, 0.5, 1]);
     expect([vorliebeMoral(1), vorliebeMoral(-1), vorliebeMoral(0)]).toEqual([3, -6, 0]);
     const v = leiteTrainingsVorliebenAb(SPIELER);
     expect(vorliebeArt(SPIELER, v.lieblinge[0])).toBe(1);
@@ -172,15 +171,15 @@ describe("Vorlieben: Stempel im Spielstand", () => {
 describe("Vorlieben: Wirkung auf das Trainingsbudget (eine Funktion fuer Buchung, Vorschau und Heatmap)", () => {
   const ziel = (id: string) => ({ disziplinId: id, weg: 0 as const });
 
-  it("Liebling x1,15, ungeliebt x0,80, neutral x1 gegenueber der Regel aus (mal Ausgleich)", () => {
+  it("Liebling x1,30, ungeliebt x0,50, neutral x1 gegenueber der Regel aus (mal Ausgleich)", () => {
     const v = leiteTrainingsVorliebenAb(SPIELER);
     const neutral = officialDisciplineWeightOrder.find((d) => !v.lieblinge.includes(d) && v.ungeliebt !== d)!;
     const aus = mitRegel(BASIS, "aus");
     const rechne = (gs: GameState, d: string) => berechneSpieltagsZuwachs({ gameState: gs, player: SPIELER, ziel: ziel(d), quelle: "manager" })!;
     for (const [d, faktor] of [
-      [v.lieblinge[0], 1.15],
-      [v.lieblinge[1], 1.15],
-      [v.ungeliebt, 0.8],
+      [v.lieblinge[0], 1.3],
+      [v.lieblinge[1], 1.3],
+      [v.ungeliebt, 0.5],
       [neutral, 1],
     ] as const) {
       const an = rechne(BASIS, d);
@@ -201,7 +200,7 @@ describe("Vorlieben: Wirkung auf das Trainingsbudget (eine Funktion fuer Buchung
     expect(notbremse.budgetFaktor).toBe(aus.budgetFaktor);
   });
 
-  it("die KI gewichtet Lieblinge mit x1,15 und die ungeliebte mit x0,80 in der Zielbewertung", () => {
+  it("die KI gewichtet Lieblinge mit x1,30 und die ungeliebte mit x0,50 in der Zielbewertung", () => {
     const aus = mitRegel(BASIS, "aus");
     const kontextAn = baueTrainingsZielKontext(BASIS, "md-12");
     const kontextAus = baueTrainingsZielKontext(aus, "md-12");
@@ -210,8 +209,8 @@ describe("Vorlieben: Wirkung auf das Trainingsbudget (eine Funktion fuer Buchung
     const ohne = new Map(bewerteTrainingsZiele(kontextAus, SPIELER).map((b) => [b.disziplinId, b.punkte]));
     expect(an.size).toBe(20);
     for (const [d, faktor] of [
-      [v.lieblinge[0], 1.15],
-      [v.ungeliebt, 0.8],
+      [v.lieblinge[0], 1.3],
+      [v.ungeliebt, 0.5],
     ] as const) {
       if ((ohne.get(d) ?? 0) > 0.001) expect((an.get(d) ?? 0) / (ohne.get(d) ?? 1)).toBeCloseTo(faktor, 2);
     }

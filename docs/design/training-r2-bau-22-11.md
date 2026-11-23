@@ -25,8 +25,8 @@ Jede Zelle der Heatmap ist die Summe von Aufrufen der Buchungsfunktion `berechne
 ### 1.2 Vorlieben
 
 - **Ableitung** nur aus `player.id` (FNV-Hash je Disziplin) plus Klassenfarbe: Lieblinge mit +0,15 für die Klassenfarbe, die ungeliebte mit +0,15 für die Gegenfarbe (POW<->MEN, SPE<->SOC). Die im Konzept vorgesehene Tendenz „unter den besten / schwächsten fünf“ ist **weggelassen**: Stärke und Eignung ändern sich mit dem Training, die Vorlieben müssen über Saisons stabil bleiben und brauchen keinen Spielstandseintrag. Gleiches Spiel, gleiche Vorlieben, für Mensch und KI.
-- **Wirkung:** Ziel = Lieblingsdisziplin: Trainingsbudget x1,15 (`SIGNATURE_ORGANIC_GROWTH_MULTIPLIER`), Moral +3; ungeliebte: x0,80 (`WEAK_ORGANIC_GROWTH_MULTIPLIER`), Moral -6. Der Faktor liegt auf dem Budget je Spieltag in `berechneSpieltagsZuwachs`, also in Buchung, Vorschau und Heatmap zugleich. Der Moral-Grund gilt, solange die Disziplin das Ziel ist (gesetztes Ziel, sonst das Ziel des letzten gebuchten Trainingstags).
-- **KI:** `bewerteTrainingsZiele` multipliziert die Punkte einer Disziplin mit 1,15 bzw. 0,80; entschieden wird weiter nach Kaderlücke. Delegierte Teams (Ramona) nutzen dieselbe Funktion.
+- **Wirkung (Chris, 23.11.: Boost +30 %, Malus -50 %):** Ziel = Lieblingsdisziplin: Trainingsbudget x1,30, Moral +3; ungeliebte: x0,50, Moral -6. (Bau-Stand war x1,15/x0,80 wie die Attribut-Affinität; die Messung unten gilt für diesen Stand.) Der Faktor liegt auf dem Budget je Spieltag in `berechneSpieltagsZuwachs`, also in Buchung, Vorschau und Heatmap zugleich. Der Moral-Grund gilt, solange die Disziplin das Ziel ist (gesetztes Ziel, sonst das Ziel des letzten gebuchten Trainingstags).
+- **KI:** `bewerteTrainingsZiele` multipliziert die Punkte einer Disziplin mit 1,30 bzw. 0,50; entschieden wird weiter nach Kaderlücke. Delegierte Teams (Ramona) nutzen dieselbe Funktion.
 - **Stempel:** `seasonState.trainingsVorlieben = { seasonId, regel: "v1" | "aus" }`. Neues Spiel: `v1` ab Saison 1 (`stempleTrainingsVorliebenBeimAnlegen`). Bestehender Spielstand: Lade-Migration schreibt für die laufende Saison `aus`, der Saisonwechsel (`preseason-workflow-service.ts`) setzt nach Schalter. Jeder Rechenweg fragt `trainingsVorliebenAktivFuer(gameState)`. Manager-Spielstände bekommen keinen Stempel.
 - **Schalter** `OLY_TRAINING_VORLIEBEN` (nur Server): nicht gesetzt = an; `aus` = neue Saisons ohne Vorlieben; `aus-sofort` = Notbremse, schaltet die Wirkung auch mitten in der Saison ab. **Compose und `.env.example` sind nicht angefasst.** Vorschlag für `deploy/hetzner/docker-compose.yml`, Abschnitt `environment` des Dienstes `oly-app`: `OLY_TRAINING_VORLIEBEN: ${OLY_TRAINING_VORLIEBEN:-}`, und in `deploy/hetzner/.env.example` die auskommentierte Zeile `OLY_TRAINING_VORLIEBEN=` mit dem Hinweis „aus | aus-sofort“.
 - **Mehrspieler:** die Vorliebe gehört dem Spieler, nicht dem Manager; die Seite liest das Team aus `selectedTeam` (aktives Manager-Team), der Schreibweg der Ziele ist unverändert (`onSetTrainingsZiele`, `authorizeServerRoomWrite`); Delegation „Training“ unverändert.
@@ -93,3 +93,14 @@ Korrekturschleife (Funde beim Ansehen der Aufnahmen): SVG-Grundregeln fehlten (r
 - Der Kader-Reiter zeigt die Vorlieben noch nicht als Spalte (nur der Plan).
 - Menschen wählen ihr Ziel gezielter als die KI; ist der Lieblings-Anteil bei ihnen deutlich höher als bei der KI (KI gemessen: 17 %), liegt ihr Trainingsertrag leicht über dem Ligamittel. Beobachten, ggf. `TRAININGS_VORLIEBEN_AUSGLEICH` nachziehen.
 - Zwei Saaten und zwei Saisons ergeben ein Messrauschen von rund 1 bis 2 % im Trainingsertrag zwischen zwei Läufen (Verletzungen und Aufstellungen laufen auseinander); der Ausgleich ist deshalb zusätzlich aus dem Anteil der Lieblings- und Ungeliebt-Tage hergeleitet (Abschnitt 2).
+
+
+## Nachtrag 23.11.: +30 % / -50 % ohne Neumessung
+
+Chris: „Mach mal den Boost, wenn Leute was mögen, zu +30 % und Malus -50 %. Beim Training musst du nicht messen, nur kurz umstellen.“
+`VORLIEBE_FAKTOR_LIEBLING = 1,3`, `VORLIEBE_FAKTOR_UNGELIEBT = 0,5`. Der Ausgleich ist aus den gemessenen Zielanteilen der KI gerechnet, nicht
+neu gemessen: 0,169 × 0,30 − 0,015 × 0,50 = +4,3 % Budget, also **`TRAININGS_VORLIEBEN_AUSGLEICH = 0,959`**. Menschen, die gezielter auf
+Lieblinge trainieren, liegen damit leicht über dem Ligamittel; das ist gewollt (die Vorliebe soll sich lohnen).
+
+Die Vorlieben hängen nicht an der Eignung: gewürfelt aus der Spieler-ID (FNV-Hash), nur mit leichter Tendenz +0,15 zur Klassenfarbe bzw. für
+die ungeliebte zur Gegenfarbe. Ein Spieler kann also eine Disziplin mögen, in der er schwach ist, und eine nicht mögen, in der er stark ist.

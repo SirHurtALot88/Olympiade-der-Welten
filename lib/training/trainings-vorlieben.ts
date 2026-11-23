@@ -4,8 +4,8 @@
  * Jeder Spieler hat zwei Lieblings-Disziplinen, auf die er Lust hat zu trainieren, und eine ungeliebte -- dasselbe Muster wie die
  * Attribut-Affinitaet (`deriveAttributeAffinityProfile`: zwei Signatur-Attribute, ein schwaches). Wirkung:
  *
- *   Ziel = Lieblings-Disziplin   Trainingsbudget x1,15 (= Signatur-Faktor), Moral +3, solange sie Ziel ist
- *   Ziel = ungeliebte Disziplin  Trainingsbudget x0,80 (= Faktor "schwach"),          Moral -6, solange sie Ziel ist
+ *   Ziel = Lieblings-Disziplin   Trainingsbudget x1,30 (Chris 23.11.), Moral +3, solange sie Ziel ist
+ *   Ziel = ungeliebte Disziplin  Trainingsbudget x0,50 (Chris 23.11.),      Moral -6, solange sie Ziel ist
  *
  * FEST JE SPIELER, DETERMINISTISCH: nur aus `player.id` (und der Klassenfarbe, die sich nie aendert) abgeleitet, kein Zufall, kein Spielstandsfeld.
  * Dasselbe Spiel, dieselben Vorlieben, fuer Mensch und KI gleich, ueber Saisons stabil. Weder Staerke noch Eignung gehen ein (die aendern sich mit
@@ -22,14 +22,10 @@ import { foundationSeedDisciplines } from "@/lib/data/dataAdapter";
 import { getPlayerClassColor } from "@/lib/lineups/legacy-lineup-modifiers";
 import { GEGENFARBE } from "@/lib/lineups/formkarten-farbregel";
 import { officialDisciplineWeightOrder } from "@/lib/player-generator/official-discipline-weights";
-import {
-  SIGNATURE_ORGANIC_GROWTH_MULTIPLIER,
-  WEAK_ORGANIC_GROWTH_MULTIPLIER,
-} from "@/lib/training/organic-season-progression";
 
-/** Trainingsbudget-Faktor einer Lieblings-/ungeliebten Disziplin: dieselben Zahlen wie die Attribut-Affinitaet (Chris, 22.11.). */
-export const VORLIEBE_FAKTOR_LIEBLING = SIGNATURE_ORGANIC_GROWTH_MULTIPLIER;
-export const VORLIEBE_FAKTOR_UNGELIEBT = WEAK_ORGANIC_GROWTH_MULTIPLIER;
+/** Trainingsbudget-Faktor einer Lieblings-/ungeliebten Disziplin (Chris, 23.11.: Boost +30 %, Malus -50 %; vorher wie die Attribut-Affinitaet x1,15/x0,80). */
+export const VORLIEBE_FAKTOR_LIEBLING = 1.3;
+export const VORLIEBE_FAKTOR_UNGELIEBT = 0.5;
 /** Moral-Wirkung, solange die Disziplin Trainingsziel ist (Chris, 22.11.). */
 export const VORLIEBE_MORAL_LIEBLING = 3;
 export const VORLIEBE_MORAL_UNGELIEBT = -6;
@@ -37,11 +33,13 @@ export const VORLIEBE_MORAL_UNGELIEBT = -6;
 export const VORLIEBE_TENDENZ = 0.15;
 
 /**
- * AUSGLEICH (22.11., Messung docs/design/training-r2-bau-22-11.md Abschnitt 4): Zwei von zwanzig Disziplinen geben +15 %, eine -20 %; wer gezielt auf
+ * AUSGLEICH (22.11., Messung docs/design/training-r2-bau-22-11.md Abschnitt 4): Zwei von zwanzig Disziplinen geben +30 %, eine -50 %; wer gezielt auf
  * Lieblinge trainiert, bekommt im Ligamittel mehr Training. Gilt NUR, solange die Vorlieben-Regel der Saison "v1" ist (Faktor auf dem Trainingsbudget
  * je Spieltag, in `berechneSpieltagsZuwachs`), damit der Rueckweg `OLY_TRAINING_VORLIEBEN=aus` exakt den Stand vor Runde 2 liefert.
  */
-export const TRAININGS_VORLIEBEN_AUSGLEICH = 0.979;
+// 23.11. auf +30/-50 umgestellt, ohne Neumessung (Chris: "musst du nicht messen"): aus den gemessenen Zielanteilen der KI (Liebling 16,9 %,
+// ungeliebt 1,5 % der Trainingstage) folgt ein Budget-Plus von 0,169*0,30 - 0,015*0,50 = 4,3 %, also Ausgleich 1/1,043 = 0,959.
+export const TRAININGS_VORLIEBEN_AUSGLEICH = 0.959;
 
 export type TrainingsVorlieben = {
   /** Die zwei Lieblings-Disziplinen (Matrix-Ids), in Reihenfolge ihrer Staerke. */
