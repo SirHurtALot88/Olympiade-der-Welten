@@ -14,16 +14,19 @@ import { BcHero, BcIcon, BcReiter } from "@/components/foundation/broadcast";
 import { getStaticTeamLogoUrl } from "@/lib/data/mediaAssets";
 import type { GameState, VorstandBitteArt } from "@/lib/data/olyDataTypes";
 import { buildOfficeModell } from "@/lib/finance/office-modell";
+import { lesBudgetVereinbarung } from "@/lib/finance/vorstand-budget-gespraech";
+import { toepfeAbSaison1 } from "@/lib/resolve/wirtschafts-regeln";
 import type { VorstandAktionFn } from "@/lib/finance/vorstand-aktion-typen";
 import { vorstandFordertAlleAufEineKarte } from "@/lib/finance/vorstand-budget-aktionen";
 import { C, prozent, zahl } from "./office-format";
+import BudgetGespraech from "./BudgetGespraech";
 import { OfficeGespraechTab } from "./OfficeGespraechTab";
 import { OfficePraemienTab } from "./OfficePraemienTab";
 import { OfficeVorstandTab } from "./OfficeVorstandTab";
 
 import "./office-modern.css";
 
-export type OfficeReiter = "vorstand" | "gespraech" | "praemien" | "kabine";
+export type OfficeReiter = "vorstand" | "gespraech" | "praemien" | "kabine" | "budget";
 
 export type OfficeModernProps = {
   gameState: GameState;
@@ -62,6 +65,11 @@ export default function OfficeModern({ gameState, teamId, onVorstandAktion, kann
     setReiter(r);
   };
   const schreiben = kannVerwalten && Boolean(onVorstandAktion);
+  // Budget-Gespraech (23.11.): eigene Seite im Mockup-Stil, kein Reiter im alten Kopf.
+  if (reiter === "budget") {
+    return <BudgetGespraech gameState={gameState} teamId={teamId} onAktion={onVorstandAktion} kannSchreiben={schreiben} onZurueck={() => wechsle("vorstand")} />;
+  }
+  const budgetOffen = toepfeAbSaison1(gameState) && lesBudgetVereinbarung(gameState, teamId) == null;
 
   return (
     <div className="bc off" data-testid="office-modern" id="foundation-hq">
@@ -95,6 +103,17 @@ export default function OfficeModern({ gameState, teamId, onVorstandAktion, kann
               wert={s.gedeckelt ? `${m.gespraech.frei}` : "—"}
               wertNote={s.gedeckelt ? "von 2 frei" : "ab Saison 2"}
             />
+            {toepfeAbSaison1(gameState) ? (
+              <BcReiter
+                aktiv={false}
+                onClick={() => wechsle("budget")}
+                eyebrow="Pflichttermin"
+                titel="Budget"
+                symbol={<BcIcon name="bank" />}
+                wert={budgetOffen ? "offen" : "ok"}
+                wertNote={budgetOffen ? "Vereinbarung fehlt" : "unterschrieben"}
+              />
+            ) : null}
             <BcReiter
               aktiv={reiter === "praemien"}
               onClick={() => wechsle("praemien")}

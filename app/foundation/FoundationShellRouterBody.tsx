@@ -13,10 +13,13 @@ import { formatNlMoney, formatNlCoins } from "@/components/foundation/new-look/n
 import { VeloPendingRanking } from "@/components/foundation/velo-ui";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { useLigaDraftTor } from "@/app/foundation/draft-modern/draft-tor";
+import { lesBudgetVereinbarung, teamsOhneVereinbarung } from "@/lib/finance/vorstand-budget-gespraech";
+import { toepfeAbSaison1 } from "@/lib/resolve/wirtschafts-regeln";
 import { DraftHinweis } from "@/app/foundation/draft-modern/DraftHinweis";
 import SaisonInfoModern from "@/app/foundation/season-briefing/SaisonInfoModern";
 import { waehleTaktQuelle } from "@/lib/foundation/takt-auswahl";
 import type { DraftTaktZustand } from "@/app/foundation/draft-modern/LigaDraftSeite";
+const BudgetGespraech = dynamic(() => import("@/app/foundation/office/BudgetGespraech"), { ssr: false });
 const LigaDraftSeite = dynamic(() => import("@/app/foundation/draft-modern/LigaDraftSeite"), { ssr: false });
 import { baueVertragsAktionen } from "@/app/foundation/spielerprofil/vertrags-aktionen";
 import { abonniereEinsatzlisteAbgabe, getEinsatzlisteAbgabe } from "@/lib/foundation/einsatzliste-abgabe-store";
@@ -725,6 +728,12 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
   // Draft-Neubau (18.11.): mit `OLY_LIGA_DRAFT_MODUS=einzelschritt` zeigt die Shell statt des Schildes
   // „Liga wird erstellt …“ die Draft-Seite; ohne Schalter antwortet die Probe „kein Draft“ und nichts ändert sich.
   const ligaDraftTor = useLigaDraftTor({ gameState, saveId: activeSaveId, leagueSetupStatus });
+  // BUDGET-GESPRAECH (23.11.): vor dem ersten Pick (Saison 1) unterschreibt jeder Mensch, der selbst verhandelt; der Draft wartet auf alle.
+  const [budgetTorQuittiert, setBudgetTorQuittiert] = useState(false);
+  const budgetOffeneTeams = teamsOhneVereinbarung(gameState);
+  const budgetEigeneFertig = Boolean(activeManagerTeamId) && lesBudgetVereinbarung(gameState, activeManagerTeamId ?? "") != null;
+  const budgetWartetAuf = budgetOffeneTeams.filter((id) => id !== activeManagerTeamId).map((id) => gameState.teams.find((t: { teamId: string; name?: string }) => t.teamId === id)?.name ?? id);
+  const budgetTorOffen = gameState.season.id === "season-1" && toepfeAbSaison1(gameState) && !budgetTorQuittiert && (gameState.seasonState.ligaDraft?.verlauf?.length ?? 0) === 0;
   const [draftTakt, setDraftTakt] = useState<DraftTaktZustand | null>(null);
 
   // Rivalen-Hervorhebung (additiv): Team-IDs aller Rivalen des aktiven Teams.
@@ -1306,7 +1315,17 @@ export function FoundationShellRouterBody(props: FoundationShellRouterBodyProps)
         }
       >
 
-      {ligaDraftTor.aktiv ? (
+      {ligaDraftTor.aktiv && budgetTorOffen && activeManagerTeamId ? (
+        <BudgetGespraech
+          gameState={gameState}
+          teamId={activeManagerTeamId}
+          onAktion={vorstandBudgetAktion}
+          kannSchreiben={kannVerwaltenAktivesTeam}
+          imTor
+          wartetAuf={budgetWartetAuf}
+          onFertig={budgetEigeneFertig ? () => setBudgetTorQuittiert(true) : undefined}
+        />
+      ) : ligaDraftTor.aktiv ? (
         <LigaDraftSeite
           hostProps={foundationMarketV2ShellHostProps}
           // Gastgeber = Solo oder eigener Sitz mit Rolle „host“; unbekannte Rolle (Schnappschuss fehlt) zeigt den
