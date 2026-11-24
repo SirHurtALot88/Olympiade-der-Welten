@@ -18,6 +18,9 @@ describe("boardGap", () => {
     expect(boardGap(row("b", 11, market()))).toMatchObject({ euro: expect.closeTo(2.32, 2), target: 8.68 });
     expect(boardGap(row("c", 8, market()))).toEqual({ euro: 0, percent: 0, target: null });
   });
+  it("Preis, den der Markt frisch genommen hat (provenByDemand): keine Abweichung und kein Vorschlag", () => {
+    expect(boardGap(row("a", 11, market({ provenByDemand: true, soldAt: { qty: 1, avg: 11, days: 14 } })))).toEqual({ euro: 0, percent: 0, target: null });
+  });
   it("ohne Zielspanne oder VK keine Abweichung", () => {
     expect(boardGap(row("a", 5, null))).toBeNull();
     expect(boardGap(row("b", 5, market({ targetMin: null, targetOpt: null })))).toBeNull();
