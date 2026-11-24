@@ -49,8 +49,10 @@ export const SPONSOR_TOPF = {
   /**
    * Zuschlag in Saison 1: der erste Entwicklungsschritt nach der Draft-Saison schreibt den Kaderwert um rund 6 % ab (BASIS -418 C, TOPF -442 C;
    * ab Saison 2 +1 %). Damit der Liga-Wert auch von Saison 1 auf 2 stehen bleibt, traegt der Ersatz in Saison 1 diesen Betrag mit.
+   * Nachkalibriert 24.11. (Review-Runde) von 0,08 auf 0,11: mit 0,08 lag die Drift S1 auf S2 systematisch bei -3,2 bis -4,0 % (zwei Seeds), weil die Kaufphase
+   * mehr Wert vernichtet, als Saison 1 zusaetzlich bringt; mit 0,11 liegen beide Seeds in allen Uebergaengen innerhalb +-3 % (docs/design/sponsoren-rework-bau-24-11.md).
    */
-  kaderErsatzZuschlagSaison1: 0.08,
+  kaderErsatzZuschlagSaison1: 0.11,
   /** Kaderwert je Team, mit dem der VORLAEUFIGE Topf rechnet, solange es keine Kader gibt (Neues Spiel vor dem Draft; gemessen 201 bis 204 C). */
   richtwertKaderwert: 200,
   /** Bremse des Betriebsteils je Saison und Richtwert Saison 1 (32 Teams x 62 C). */

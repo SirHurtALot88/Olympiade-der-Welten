@@ -63,6 +63,7 @@ import { resolveSeasonGuvPartsByTeam } from "@/lib/finance/season-guv-resolver";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
 import { getSeasonSponsorCashByTeam } from "@/lib/sponsor/sponsor-settlement-service";
+import { SPONSOR_TOPF } from "@/lib/sponsors/sponsor-topf-modell";
 import { sponsorRegelFuer } from "@/lib/resolve/sponsor-regel";
 import { topfFarbVerteilung } from "@/lib/sponsors/sponsor-topf-buchung";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
@@ -97,6 +98,17 @@ const MODE = arg("mode", "battle") as "battle" | "manager";
 const SEASONS = Number(arg("seasons", "2"));
 const OUT = arg("out", "");
 const LABEL = arg("label", "A");
+/**
+ * Nur fuer Kalibrierlaeufe (--konst name=zahl, mehrfach moeglich): ueberschreibt eine Zahl aus SPONSOR_TOPF in DIESEM Prozess. Die Produktion liest
+ * keine Variable; die Zahlen stehen fest im Modell.
+ */
+for (let i = 0; i < process.argv.length; i += 1) {
+  if (process.argv[i] !== "--konst") continue;
+  const [name, wert] = String(process.argv[i + 1] ?? "").split("=");
+  if (!name || !(name in SPONSOR_TOPF) || !Number.isFinite(Number(wert))) throw new Error(`--konst ${process.argv[i + 1]} unbekannt`);
+  (SPONSOR_TOPF as unknown as Record<string, number>)[name] = Number(wert);
+  console.log(`[konst] ${name} = ${wert}`);
+}
 /** Wiederaufnahme einer abgebrochenen Messung: bestehende Wegwerf-SQLite + bereits geschriebene Rohdaten (--out) weiterverwenden. */
 const RESUME = arg("resume", "");
 /** "kaufphase": nach der Kaufphase von Saison 2 (und dem Saisonstart-Schnappschuss) aufhoeren.

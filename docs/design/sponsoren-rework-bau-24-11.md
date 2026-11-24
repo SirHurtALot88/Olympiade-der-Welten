@@ -17,7 +17,7 @@ läuft weiter, zeigt unter dem neuen Stempel aber noch die Zahlen des alten Syst
 
 ### Entscheidungen Chris 23.11., wie umgesetzt
 
-1. **κ = 1** (Kader-Ersatz an, auch in Saison 1): `K_E = 0,06 × Σ Kaderwert` (Saison 1 zusätzlich +0,08, siehe Abschnitt 7: die Konstanten sind **gemessen**, nicht aus dem Konzept übernommen). Die Steigung ist mit Kader-Ersatz 1,8 / 1,6 C je Erwartungsrang (nachkalibriert, Abschnitt 7). Dazu eine **Liga-Wert-Rückkopplung** (Abschnitt 2), die den Rest auf „die Liga bleibt im Wert“ zieht.
+1. **κ = 1** (Kader-Ersatz an, auch in Saison 1): `K_E = 0,06 × Σ Kaderwert` (Saison 1 zusätzlich +0,11, siehe Abschnitt 7: die Konstanten sind **gemessen**, nicht aus dem Konzept übernommen). Die Steigung ist mit Kader-Ersatz 1,8 / 1,6 C je Erwartungsrang (nachkalibriert, Abschnitt 7). Dazu eine **Liga-Wert-Rückkopplung** (Abschnitt 2), die den Rest auf „die Liga bleibt im Wert“ zieht.
 2. **Neue Einnahmen verdrängen den Topf**: in `P_i` stehen die gebauten Posten Tickets samt Dauerkarten (`ticketsSaisonbetrag`, nur mit `arenaAktiv`), Marketing (`marketingJahresbetrag`, nur mit `marketingAktiv`), Medaillen (Planwert 1,25 / 0,75 C, nur mit `medaillenAktiv`), Gebäude-Einnahme, Vorstandsziele (6,5 C Plan, gemessen 5,2 bis 7,6 C) und Sponsorentermine (1,5 C Plan). Ungebaute Posten (Verpflegung, Versicherung, Trainingslager, Ausrüstung) stehen **nicht** in `B_i`: sonst wäre der Topf um Geld größer, das nie ausgegeben wird.
 3. **Keine Seltenheitsstufen auf neuen Angeboten, stattdessen Passung** 0,95 bis 1,05 (2/3 Beliebtheit des Kaders gegen das Liga-Mittel, 1/3 Treue 0 bis 3 Saisons), über die Liga auf Mittel 1,00 normiert (topfneutral), deterministisch. Der Leih-Kurs folgt der Passung (`leihKursFuerPassung`: 1,4 bis 3,0). Laufende Verträge behalten ihre alten Konditionen bis zum Vertragsende (der Vertrag rollt wie bisher, nur das Geld rechnet neu).
 4. **Der Farb-Partner ist der Farb-Meister**: unter dem Topf-Stempel zahlt `berechneVergabe` keinen Farb-Meister mehr (die Schleife läuft über keine Liga), die Medaillen bleiben. `rangPraemieFaktor` ist unter dem Stempel 1 (es gibt keine Rang­prämie zu kürzen).
@@ -27,7 +27,7 @@ läuft weiter, zeigt unter dem neuen Stempel aber noch die Zahlen des alten Syst
 ```
 F    = Grundwert (Stempel, 1,00) x Konjunktur;   Konjunktur = klammere(1 + (f_alt - 1) x 0,24, 0,95 .. 1,05)    f_alt = seasonEconomyFactors[0]
 K_B  = klammere( Summe_i (B_i - P_i),  0,85 x K_B,Vorjahr,  1,15 x K_B,Vorjahr )          Saison 1: K_B,Vorjahr = Summe_i (59 C - P_i)
-K_E  = (0,06 + 0,08 in Saison 1) x Summe_i W_i
+K_E  = (0,06 + 0,11 in Saison 1) x Summe_i W_i
 Korr = klammere( Korr_alt + 0,75 x (V_Stichtag - V_Vorjahr),  +-6 % von F x (K_B + K_E) )      V = Summe Kasse + Summe Kaderwert
 T    = F x (K_B + K_E) - Uebertrag - Korr
 T_H  = T - 4 x (12 x F + 9 x F) - Summe Treueboni                                                              Farb-Toepfe Liga 1 / Liga 2 je Farbe
@@ -64,7 +64,7 @@ Die Saisonende-Zeilen kommen aus `topfSaisonendeZeilen`; dieselben Funktionen sp
 
 - **Neues Spiel** (nur Battle): `"topf"` ab Saison 1, gesetzt in `new-game-setup-service.ts` **vor** der Angebotserzeugung, damit die KI-Wahl Vertragsart, Laufzeit und Farben an den Vertrag hängt.
 - **Bestehender Spielstand**: Lade-Migration `stempleSponsorRegelNachLaden` schreibt für die laufende Saison `"alt"`; sie rechnet bit-gleich alt zu Ende (Test „alt-Stempel“). Beim nächsten Saisonwechsel (`preseason-workflow-service.ts`) bekommt die neue Saison `"topf"`, `ueberfuehreAltvertraege` macht aus jedem laufenden Altvertrag einen Leistungsvertrag derselben Marke (Restlaufzeit bleibt, Vertragsjahr aus der Laufzeit, Treuebonus zählt weiter, KI-Farben, `gewaehltVon: "ueberfuehrt"`). Die alten Konditionen (`sponsorV3`) bleiben am Vertrag und rollen weiter: ein Rückweg landet ohne Datenverlust im alten System.
-- **Rückweg** `OLY_SPONSOR_REGEL=aus`: neue Saisons bekommen `"alt"`. **Notbremse** `=aus-sofort`: `spiegleSponsorNotbremse` (Spieltagsabschluss, nur Server) setzt `notbremse` im Stempel; danach zahlt der Grundbetrag weiter, Leistungsteil und Farb-Partner sind 0, es entstehen keine neuen Termine. Die Variable wird **nur** in `lib/resolve/sponsor-regel.ts` gelesen (Test „nur dort aus der Variable gelesen“). Sie muss noch in `deploy/hetzner/docker-compose.yml` und `.env.example` stehen (diese PR fasst `deploy/` nicht an); ohne Eintrag gilt der Standard „an“.
+- **Rückweg** `OLY_SPONSOR_REGEL=aus`: neue Saisons bekommen `"alt"`. **Notbremse** `=aus-sofort`: `spiegleSponsorNotbremse` (Spieltagsabschluss, nur Server) setzt `notbremse` im Stempel; danach zahlt der Grundbetrag weiter, Leistungsteil und Farb-Partner sind 0, es entstehen keine neuen Termine. Die Variable wird **nur** in `lib/resolve/sponsor-regel.ts` gelesen (Test „nur dort aus der Variable gelesen“). Ohne Eintrag gilt der Standard „an“; ein Eintrag in compose/`.env` ist bewusst nicht vorgesehen (Chris).
 - **Stichtag** = Fensterschluss vor der ersten Wertung (`legacy-matchday-result-apply-service.ts`, neben dem Einfrieren der Apron-Linien), Rückfall beim ersten Buchen (`bucheSpieltagFinanzen`). Idempotent. Wer bis dahin keinen Vertrag hat, bekommt den Leistungsvertrag des Angebots mit der besten Passung, Laufzeit 1, KI-Farben (`gewaehltVon: "auto"`): der Stichtag wartet nie auf einen Menschen.
 
 ## 4. Mehrspieler und Delegation
@@ -187,7 +187,7 @@ Das Liga-Mittel der Betriebsrechnung liegt in sieben von acht gemessenen Saisons
 
 ### Tests
 
-Neue Dateien: `tests/sponsor-topf-modell.test.ts` (27), `tests/sponsor-topf-regel.test.ts` (29). Alle 78 Quelltext-Wächter-Dateien, die eine der geänderten Quellen lesen, sind grün (860 Tests); die ganze Suite lief grün bis auf `tests/bahn-pod-vier-teams.test.ts` (3 Tests „spieleBahn() bit-identisch zum Vorstand“, Motor-Fingerabdrücke, unabhängig von dieser PR) und zwei eigene Tests, die danach korrigiert wurden. `tsc --noEmit`: 741 Fehler gesamt, keiner in einer berührten Datei (vorher ~740 in fremden Skripten und Tests).
+Neue Dateien: `tests/sponsor-topf-modell.test.ts` (30), `tests/sponsor-topf-regel.test.ts` (31), `tests/sponsor-topf-review.test.ts` (13, eigene Tests zu den Review-Punkten 3, 4, 5, 6, 8 bis 12, 15, 16). Alle 78 Quelltext-Wächter-Dateien, die eine der geänderten Quellen lesen, sind grün (860 Tests); die ganze Suite lief grün bis auf `tests/bahn-pod-vier-teams.test.ts` (3 Tests „spieleBahn() bit-identisch zum Vorstand“, Motor-Fingerabdrücke, unabhängig von dieser PR) und zwei eigene Tests, die danach korrigiert wurden. `tsc --noEmit`: 741 Fehler gesamt, keiner in einer berührten Datei (vorher ~740 in fremden Skripten und Tests).
 
 
 ## 8. Offen für die Seiten-PR (Phase 4) und Entscheidungen
@@ -200,18 +200,17 @@ Neue Dateien: `tests/sponsor-topf-modell.test.ts` (27), `tests/sponsor-topf-rege
 - Seltenheitsstufen auf den Angebotskarten ausblenden (das Feld `rarity` bleibt am Angebot, wirkt aber unter dem Stempel nicht auf Geld); Passungszeile aus `angebote[].passung.text`.
 - Wahl beim Unterschreiben: `POST /api/sponsor/choose` mit `vertragsart`, `laufzeit`, `farben`; Sponsorentermin: `POST /api/sponsor/event` mit `terminId`, `antwort`.
 - Nachfordern (Konzept 4.6) und die Wappen-Wellen bleiben Phase 4/5.
-- `OLY_SPONSOR_REGEL` in `deploy/hetzner/docker-compose.yml` und `.env.example` eintragen (Standard „an“, ohne Eintrag ändert sich nichts).
 
 ### Entscheidungen, die ich Chris vorlege
 
 1. **Ziel nur auf Achsen-Karten.** Das alte Gerüst gibt jedem Team zwei von drei Angeboten mit Zielachse. Für „jeder Vertrag trägt ein Ziel“ müsste jede Karte eine Achse bekommen (Eingriff in die Slate-Erzeugung).
 2. **Kader-Ersatz auch in Saison 1.** Konzept 4.2 setzt ihn in Saison 1 auf 0; die Abnahme „Liga-Wert ±3 % je Saison“ (Entscheidung 1) verlangt ihn, weil der Wert der Liga schon von Saison 1 auf 2 stehen bleiben soll (siehe Messung).
-3. **Die Konstanten sind aus zwei Seeds und drei Saisons gemessen** (Kader-Ersatz 6 % + 8 % in Saison 1, Steigung 1,8 / 1,6, Plan Vorstandsziele 6,5 C). Die Liga-Wert-Rückkopplung fängt Abweichungen auf, ersetzt aber keine Nachmessung: nach den ersten drei echten Saisons (mit Menschen, die anders kaufen als die KI) sollte `scripts/auswerte-sponsor-topf.ts` über die Live-Abbilder laufen.
+3. **Die Konstanten sind aus zwei Seeds und drei Saisons gemessen** (Kader-Ersatz 6 % + 11 % in Saison 1, Steigung 1,8 / 1,6, Plan Vorstandsziele 6,5 C). Die Liga-Wert-Rückkopplung fängt Abweichungen auf, ersetzt aber keine Nachmessung: nach den ersten drei echten Saisons (mit Menschen, die anders kaufen als die KI) sollte `scripts/auswerte-sponsor-topf.ts` über die Live-Abbilder laufen.
 4. **Form −1 beim Sponsorentermin** ist als eine Anzeige-Stufe (15 Formpunkte) gebaut, nicht als −1 Punkt.
 
 ## 9. Review-Runde (PR #1740, 24.11.): was sich geändert hat
 
-Entscheidungen des PM nach unabhängigem Opus-Review, alle gebaut und mit Tests belegt (`tests/sponsor-topf-regel.test.ts`, `tests/sponsor-topf-modell.test.ts`).
+Entscheidungen des PM nach unabhängigem Opus-Review, alle gebaut und mit Tests belegt (`tests/sponsor-topf-review.test.ts`, `tests/sponsor-topf-regel.test.ts`, `tests/sponsor-topf-modell.test.ts`).
 
 | Nr. | Änderung |
 |---|---|
@@ -232,19 +231,30 @@ Entscheidungen des PM nach unabhängigem Opus-Review, alle gebaut und mit Tests 
 | Typ | `FinanceSponsorComponentRow.kind` erlaubt `"farbe"`; `tsc -p tsconfig.next.json` ist fehlerfrei. |
 | Nachtrag PM | Vor dem Stichtag zeigt das View-Modell denselben Weg wie der Stichtag (`fuelleFehlendeVertraege` + Vorab-Zusage mit anteiliger Kürzung) und setzt `vorlaeufig: true`. `ligaBilanz` kommt mit der Seiten-PR (Merge). |
 
-### Messung nach der Review-Runde (Konstanten final: Steigung 1,8 / 1,6, K_E 6 % + 8 % in Saison 1, Rückkopplung 0,75)
+### Drift Saison 1 auf 2: Ursache und Kalibrierung (24.11., nach der Review-Runde)
 
-Dreisaisonlauf (ein Seed, 32 KI-Teams, `scripts/miss-teamfinanzen-saison.ts --seasons 3`, Auswertung `auswerte-sponsor-topf.ts`):
+**Befund.** Mit K_E 6 % + 8 % in Saison 1 lag die Drift S1 → S2 systematisch unter −3 %: −4,0 % (Seed 1) und −3,2 % (Seed 2, `--mischen 7`); S2 → S3 +2,5 % bzw. +0,8 %. Kein Ausreißer.
 
-| Saison | Liga-Wert Start | Drift | GuV Ø | Topf T | Wert-Korrektur | Σ Grund+Farb+Treue gegen T |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 9552,0 | – | 27,6 | 1985,8 | 0 | −0,1 |
-| 2 | 9168,7 | **−4,0 %** | 18,2 | 1737,9 | −98,2 | −0,1 |
-| 3 | 9399,3 | +2,5 % | 12,0 | 1342,9 | +74,8 | 0,0 |
+**Aufschlüsselung** (Seed 1, Σ Kasse + Σ Kaderwert, Saisonende bis nächster Stichtag): Saison 1 gewinnt über Spieltage und Abschluss +323, über die Entwicklung netto +177, zusammen **+500 (+5,2 %)**. Die Kaufphase vor Saison 2 vernichtet **−884**: Kasse −1.897, Kader nur +1.013 (der Markt zahlt mehr, als der Kader danach wert ist). Saldo −384 = −4,0 %. In Saison 2 stehen +857 (Spieltage + Entwicklung) gegen −626 in der Kaufphase (+2,5 %). Die Senke der Kaufphase (6 bis 9 % des Liga-Werts) ist vom Topf unabhängig; ein größerer Topf in Saison 1 gibt der KI zugleich mehr Kasse zum Ausgeben (Vorab-Zusage), also fließt ein Teil des Zuschlags in der Kaufphase wieder ab. Der Verdacht „Saison-1-Zuschlag gegen Kaufphase“ stimmte also: der Zuschlag war zu klein, und die Rückkopplung wirkt erst ab Saison 2 (sie kennt Saison 1 nicht).
 
-Flip-Lauf alt → Topf (Saison 1 im alten System, Wechsel zum Saisonwechsel, `--flip-sponsor`): Liga-Wert 9552,0 → 9448,0, **−1,1 %** (Ziel ±3 %), Topf 1764,6 = Σ Grund+Farb+Treue (Abweichung 0,0).
+**Eine Kalibrierung, keine mehreren Anstupser:** `kaderErsatzZuschlagSaison1` von 0,08 auf **0,11** (K_E in Saison 1 = 17 % des Kaderwerts, ab Saison 2 6 %). Kalibrierläufe Seed 1, nur S1 → S2: 0,08 → −4,0 %, 0,11 → −0,1 %, 0,14 → +6,6 %. Die Kalibrierläufe liefen mit `--konst name=zahl` (nur Messskript, überschreibt die Zahl in diesem Prozess; die Produktion liest keine Variable).
 
-**Ehrlich:** die Drift S1 → S2 liegt in diesem Seed mit −4,0 % über dem Ziel ±3 % (die Auslieferung davor lag bei höchstens ±1,4 %); S2 → S3 mit +2,5 % und der Flip-Lauf liegen innerhalb. Die Rückkopplung zieht die Folgesaison sichtbar zurück (−98,2 bzw. +74,8 im Topf). Ein Seed ist keine Verteilung: die Abweichung ist nicht mit einem zweiten Seed abgesichert, und die Ursache (Saison-1-Kader-Ersatz 8 % gegen die Kaufphase) ist nicht neu nachgerechnet. Vorschlag: nach den ersten echten Saisons nachmessen (Abschnitt 8, Punkt 3). Topf-Verteilung stimmt in allen Läufen auf 0,1 C.
+**Messung mit 0,11** (32 KI-Teams, `scripts/miss-teamfinanzen-saison.ts --seasons 3`, Auswertung `auswerte-sponsor-topf.ts`):
+
+| Seed | Saison | Liga-Wert Start | Drift | Topf T | Wert-Korrektur | Σ Grund+Farb+Treue gegen T |
+|---|---:|---:|---:|---:|---:|---:|
+| 1 | 1 | 9.552,0 | – | 2.514,4 | 0 | 0,0 |
+| 1 | 2 | 9.808,9 | **+2,7 %** | 1.376,1 | +86,3 | 0,0 |
+| 1 | 3 | 9.660,0 | **−1,5 %** | 1.737,0 | −25,3 | 0,0 |
+| 2 (`--mischen 7`) | 1 | 9.552,0 | – | 2.252,4 | 0 | 0,0 |
+| 2 | 2 | 9.585,0 | **+0,3 %** | 1.788,2 | +24,8 | −0,1 |
+| 2 | 3 | 9.527,2 | **−0,6 %** | 1.520,4 | −18,5 | 0,0 |
+
+Flip-Lauf alt → Topf (Saison 1 im alten System, `--flip-sponsor`, 2 Saisonen): 9.552,0 → 9.348,6, **−2,1 %** (die frühere Messung vor der Review-Runde: −1,1 %; Saison 1 läuft im alten System, der Zuschlag wirkt dort nicht, die Streuung ist die der KI-Käufe). Alle fünf Übergänge liegen innerhalb ±3 %; Seed 1 S1 → S2 mit +2,7 % am oberen Rand. Offen bleibt die Streuung zwischen Läufen (Seed 1 mit 0,11 lieferte im 2-Saison-Lauf −0,1 %, im 3-Saison-Lauf +2,7 %: die KI-Käufe sind nicht bitgenau reproduzierbar, sobald sich die Vorab-Zusage ändert). Die Rückkopplung zieht die Folgesaison jeweils zurück.
+
+**Schere** (reichstes minus ärmstes Budget-Viertel bei Erwartung; Ziel höchstens +2): 2,9 / 7,2 / 1,4 (Seed 1) und 2,1 / 3,3 / 0,9 (Seed 2). Saison 2 liegt in beiden Seeds darüber (7,2 und 3,3); das ist das Verhalten der ersten Topf-Saison nach einer Saison 1 mit großem Zuschlag und gehört zur Nachmessung nach den ersten echten Saisonen.
+
+**Zeile „GuV Ø 12,0 / 12,0“ (Lauf davor):** kein Auswertungsfehler. Die Mittel waren 11,95 (Liga 1) und 11,99 (Liga 2) und runden beide auf 12,0; die Spalten rechnen je Liga aus den echten Teamzeilen (16 + 16).
 
 **Client-Bündel-Regel:** nichts, was Client-Komponenten erreichen, darf Persistenz oder `node:`-Module importieren. Prüfung: `npx esbuild app/foundation/FoundationPageClient.tsx --bundle ... | grep 'node:'` bleibt leer.
 
