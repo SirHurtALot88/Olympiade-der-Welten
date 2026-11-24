@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import { getStaticTeamLogoUrl } from "@/lib/data/mediaAssets";
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { bilanzKennzahlen, erwartungsAnzeige, tonVon, topfBeiFaktor, vorzeichenDe, zahlDe } from "@/lib/sponsors/sponsor-seite-modell";
-import { SPONSOR_TOPF, vertragsartLabel } from "@/lib/sponsors/sponsor-topf-modell";
+import { SPONSOR_TOPF } from "@/lib/sponsors/sponsor-topf-modell";
 import type { SponsorFarbe } from "@/lib/sponsors/sponsor-topf-typen";
 import type { SponsorUebersicht } from "@/lib/sponsors/sponsor-uebersicht";
 import { useTabellenSortierung, type SortSpalte } from "@/lib/ui/tabellen-sortierung";
@@ -36,6 +36,8 @@ type LigaZeile = {
   kosten: number;
   ergebnis: number;
 };
+
+const ART_KURZ = { fest: "Fest", leistung: "Leistung", praemie: "Prämie" } as const;
 
 type LigaSpalte = "rang" | "team" | "sponsor" | "art" | "erw" | "platz" | "grund" | "leistung" | "farben" | "farbe" | "ziel" | "summe" | "kosten" | "ergebnis";
 
@@ -84,7 +86,7 @@ export function SponsorenLigaAnsicht({ gameState, teamId, u }: { gameState: Game
       logo: getStaticTeamLogoUrl(t.teamId) ?? gameState.teams.find((x) => x.teamId === t.teamId)?.logoPath ?? null,
       eigen: t.teamId === teamId,
       marke: t.markeName,
-      art: t.vertragsart ? vertragsartLabel(t.vertragsart).replace("vertrag", "") : "–",
+      art: t.vertragsart ? ART_KURZ[t.vertragsart] : "–",
       erw: erwartungsAnzeige(gameState, t.teamId === teamId, t.erwartungsrang),
       platz: t.platz,
       grund: t.grund,
@@ -113,7 +115,7 @@ export function SponsorenLigaAnsicht({ gameState, teamId, u }: { gameState: Game
         <span className="hin">Rang 1 = höchste Summe · alle Spalten sortierbar · C je Saison, Hochrechnung mit dem Tabellenstand · fremde Erwartungsränge nur als Viertel (Scouting-Nebel)</span>
       </div>
       <div className="so-tw">
-        <table className="so-tab" aria-label={`Sponsoren-Vergleich Liga ${u.liga}`}>
+        <table className="so-tab fuellt" aria-label={`Sponsoren-Vergleich Liga ${u.liga}`}>
           <colgroup>
             <col style={{ width: "3%" }} />
             <col style={{ width: "13%" }} />

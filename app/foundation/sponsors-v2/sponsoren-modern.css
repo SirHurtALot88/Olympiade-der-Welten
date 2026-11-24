@@ -843,3 +843,7 @@
   color: var(--bc-creme);
   font-weight: 600;
 }
+.so-tab.fuellt { height: 100%; }
+.so-tab.fuellt td { height: auto; }
+.so-tab.fuellt { height: 100%; }
+.so-tab.fuellt td { height: auto; }

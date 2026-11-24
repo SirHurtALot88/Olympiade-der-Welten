@@ -50,6 +50,8 @@ export type SponsorenModernProps = {
   startAnsicht?: SponsorenAnsicht;
 };
 
+const ART_KURZ: Record<SponsorVertragsart, string> = { fest: "Fest", leistung: "Leistung", praemie: "Prämie" };
+
 const ART_TEXT: Record<SponsorVertragsart, string> = {
   fest: "Planbar. Jeder Platz zählt nur halb, nach oben wie nach unten. Kein Ziel.",
   leistung: "Der Standard. Voller Leistungssatz, ein Ziel mit kleinem Einsatz.",
@@ -201,7 +203,7 @@ function VertragAnsicht({
         <div className="so-pk">
           <h2>Hauptsponsor</h2>
           <span className="sp" />
-          <span className={`so-marke ${u.eingefroren ? "is-echt" : "is-leer"}`}>{u.eingefroren ? "Stichtag gesetzt" : "Vorschau"}</span>
+          <span className={`so-marke ${u.eingefroren ? "is-echt" : "is-leer"}`} title={u.eingefroren ? undefined : "Vorschau: zum Stichtag (vor der ersten Wertung) friert der Grundbetrag ein, mindestens 90 % der Vorab-Zusage"}>{u.eingefroren ? "Stichtag gesetzt" : "Vorschau"}</span>
           {u.notbremse ? <span className="so-marke is-rot">Notbremse</span> : null}
         </div>
         <div className="so-kb">
@@ -556,7 +558,7 @@ function AngeboteAnsicht({
                       setArt(x.vertragsart);
                     }}
                   >
-                    {x.label.replace("vertrag", "")}
+                    {ART_KURZ[x.vertragsart]}
                   </button>
                 ))}
               </div>
@@ -612,12 +614,12 @@ function AngeboteAnsicht({
           <div className="so-chips" role="group" aria-label="Farb-Partner">
             {SPONSOR_FARBEN.map((f) => (
               <button key={f} type="button" className={`so-chip f ${f}`} aria-pressed={gewaehlteFarben.includes(f)} onClick={() => wechsleFarbe(f)}>
-                {f.toUpperCase()} · Liga-Rang {raenge?.[f] ?? "–"}
+                {f.toUpperCase()} · Kaderrang {raenge?.[f] ?? "–"}
               </button>
             ))}
           </div>
           <p className="leise" style={{ margin: 0, fontSize: "0.9em" }}>
-            Liga-Rang nach Farb-Punkten dieser Saison <span className="so-marke is-echt">Echt</span> Geld gibt es nur in den zwei unterschriebenen Farben, verteilt nach Farb-Punkten unter allen Teams mit dieser Farbe.
+            Kaderrang = Stärke deines Kaders in dieser Farbe unter allen 32 Teams (danach wählt auch die KI). Geld gibt es nur in den zwei unterschriebenen Farben, verteilt nach den Farb-Punkten der Saison unter allen Teams mit dieser Farbe.
           </p>
           <div className="so-kopfzeile">Ziel gegen die eigene Ausgangslage</div>
           <p style={{ margin: 0, fontSize: "0.95em", color: "var(--bc-creme)" }}>
