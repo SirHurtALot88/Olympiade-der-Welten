@@ -97,6 +97,27 @@ describe("buildMarketComparisonRow", () => {
     expect(buildMarketComparisonRow(article({ currentVk: 4.99, windows: { "90": w(9, 4.99) } }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("zu_guenstig");
   });
 
+  // Frischer Nachfrage-Beweis (Chris, 24.11.): Preis erst erhoeht, Ø-VK der Fenster liegt noch darunter, der Artikel hat sich aber
+  // gestern/heute zum neuen Preis verkauft. Das ist nicht "zu teuer".
+  it("ein Verkauf in den letzten 14 Tagen zum heutigen VK entkraeftet 'zu teuer', auch wenn der Ø-VK darunter liegt", () => {
+    const w = (qty: number, avgPrice: number) => ({ qty, revenue: qty * avgPrice, ek: qty * 4, ebayFeeTotal: 0, shippingCost: 0, dbI: 0, dbII: 0, fixedCostShare: 0, avgPrice, rank: null });
+    const day = 86_400_000;
+    const sale = (daysAgo: number, unitPrice: number) => ({ soldAt: new Date(Date.now() - daysAgo * day), qty: 1, unitPrice });
+    const windows = { "90": w(13, 5.69), "365": w(13, 5.69) };
+    const ohne = buildMarketComparisonRow(article({ currentVk: 12.99, windows }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
+    expect(ohne.status).toBe("zu_teuer");
+    const frisch = buildMarketComparisonRow(article({ currentVk: 12.99, windows, recentSales: [sale(0, 12.99)] }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null);
+    expect(frisch.status).toBe("im_korridor");
+    expect(frisch.provenByDemand).toBe(true);
+    expect(frisch.soldAtVk).toEqual({ qty: 1, avg: 12.99, days: 14 });
+    expect(frisch.deltaPercent).toBe(0);
+    // Gegenproben: Verkauf liegt 20 Tage zurueck, oder er ging deutlich unter dem heutigen VK weg
+    expect(buildMarketComparisonRow(article({ currentVk: 12.99, windows, recentSales: [sale(20, 12.99)] }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("zu_teuer");
+    expect(buildMarketComparisonRow(article({ currentVk: 12.99, windows, recentSales: [sale(1, 8.99)] }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("zu_teuer");
+    // "zu guenstig" bleibt zu guenstig
+    expect(buildMarketComparisonRow(article({ currentVk: 4.99, recentSales: [sale(0, 4.99)] }), quote({ priceAvg7: 2 }), DEFAULT_COST_SETTINGS, null).status).toBe("zu_guenstig");
+  });
+
   it("zwei Kostenbasen: Marge zum Marktwert (Wiederbeschaffung) und zum letzten EK", () => {
     // Zuletzt guenstig gekauft (EK 1,00 €), heute Marktwert 4,00 €: gegen den letzten EK ist die Marge hoeher.
     const row = buildMarketComparisonRow(article({ currentVk: 12.99, currentEk: 1 }), quote({ priceAvg7: 4 }), DEFAULT_COST_SETTINGS, null);

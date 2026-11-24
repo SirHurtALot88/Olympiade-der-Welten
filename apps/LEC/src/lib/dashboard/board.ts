@@ -26,6 +26,8 @@ export function boardGap(row: SortimentRow): BoardGap | null {
   const m = row.market;
   const vk = boardVk(row);
   if (!m || m.targetMin === null || m.targetOpt === null || !(vk > 0)) return null;
+  // Der Markt nimmt den Preis (frischer Verkauf zum heutigen VK): keine Abweichung, kein "auf X"-Vorschlag.
+  if (m.provenByDemand) return { euro: 0, percent: 0, target: null };
   if (vk < m.targetMin) return { euro: vk - m.targetMin, percent: (vk - m.targetMin) / m.targetMin, target: m.targetMin };
   if (vk > m.targetOpt) return { euro: vk - m.targetOpt, percent: (vk - m.targetOpt) / m.targetOpt, target: m.targetOpt };
   return { euro: 0, percent: 0, target: null };
