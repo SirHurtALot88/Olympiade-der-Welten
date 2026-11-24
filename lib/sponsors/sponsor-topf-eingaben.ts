@@ -8,7 +8,7 @@
 import type { GameState, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
 import { computeTeamExpectation } from "@/lib/board/team-season-objectives-service";
-import { berechneGebaeudeSaisonbetraege } from "@/lib/facilities/facility-season-end-service";
+import { berechneGebaeudeSaisonbetraege } from "@/lib/facilities/gebaeude-saisonbetraege";
 import { kaderJahresgehaltAmSpieltag } from "@/lib/finance/finanzen-je-spieltag";
 import { getTeamAnnualLoanInterest } from "@/lib/finance/loan-service";
 import { ticketsSaisonbetrag } from "@/lib/arena/arena-guv";
