@@ -142,6 +142,55 @@ Aufwand für Voranmeldungen und Belegprüfung, einmalige Beratung, Vorsteuer auf
 
 ---
 
+## 3a. Wo die Kleinunternehmerregelung umgestellt werden muss (Recherche 24.11.2026)
+
+Die Hilfeseiten sind nicht-amtliche Herstellerquellen, Menünamen können abweichen. Alle Punkte vor der Umstellung einmal ansehen. Immer zuerst die Frage, ob die Umstellung für 2027 überhaupt gilt: Über 25.000 € im Jahr 2026 heißt Regelbesteuerung **ab 1.1.2027**, nicht unterjährig. Ein unterjähriger Wechsel gilt nur bei Überschreiten der 100.000 € im laufenden Jahr **[Quelle: Finanzamt Hessen/NRW, Lexware Hilfe]**. Einzelne Ratgeber schreiben „immer unterjährig", das meint nur den 100.000-€-Fall.
+
+### Lexoffice (Lexware Office) **[Quelle: Lexware Hilfe 548698, 548278, 548029]**
+- **Einstellungen > Allgemeine Einstellungen:** die Auswahl „umsatzsteuerbefreiter Kleinunternehmer" auf **Netto-Preise** oder **Brutto-Preise** ändern (laut Hilfe-Artikel 548698; zum Kleinunternehmer-Fall heißt es „Umsatzsteuerbefreit" mit Haken „Kleinunternehmer").
+- **Ebenda: Besteuerungsart** festlegen (Ist- oder Soll-Versteuerung).
+- **Buchhaltung > Steuerliche Meldungen > Einstellungen** (rechts): Meldezeitraum der Umsatzsteuer-Voranmeldung.
+- **Hinweistext auf Rechnungen** „Der Rechnungsbetrag ist Gegenstand der Kleinunternehmerbesteuerung nach §19 UStG" erscheint bei Kleinunternehmern auf jeder Rechnung (über das Stift-Symbol änderbar). Dass er beim Wechsel verschwindet, steht nicht ausdrücklich auf der Seite, **[offen]**: Probe-Rechnung nach der Umstellung ansehen.
+- **Dashboard „Nach Zahldatum"**, Zeitraum „Aktuelles Jahr": Einnahmen gegen 25.000 € und 100.000 € (netto) vergleichen. Das ist deine Stichtagsprüfung am 1.1.
+- Lexware-Reihenfolge laut Hilfe: (1) Finanzamt informieren und ggf. USt-IdNr. beantragen, (2) Voranmeldungszeitraum vom Finanzamt abwarten, (3) Preise auf Netto oder Brutto umstellen, (4) Besteuerungsart festlegen, (5) Voranmeldungszeitraum festlegen, (6) erste USt-VA melden.
+- **Umsatzsteuer-Voranmeldung** läuft über die ELSTER-Schnittstelle in Lexoffice, ohne eigenes Zertifikat. Frist: 10. des Folgemonats (vierteljährlich 10.1., 10.4., 10.7., 10.10.), Dauerfristverlängerung verschiebt um einen Monat. Rhythmus nach der Vorjahres-Zahllast: über 9.000 € monatlich, 2.000 bis 9.000 € vierteljährlich, bis 2.000 € jährlich. Auch eine Nullmeldung ist abzugeben. Eine konsolidierte USt-VA kann Lexoffice nicht erstellen.
+- Regelbesteuerte geben außerdem jährlich eine **Umsatzsteuererklärung** ab; Kleinunternehmer sind seit 2024 davon befreit, außer das Finanzamt fordert sie an.
+- Nicht auf den Seiten: Rechnungsvorlagen und Textbausteine im Detail, Behandlung offener Rechnungen, Stichtag für die Umstellung in der Software.
+
+### Billbee **[Quelle: Billbee Hilfe, Artikel 1257 Kleinunternehmerregelung, 344 Steuereinstellungen, 352 Layouts; nicht alle Menünamen verifiziert]**
+- **Einstellungen > Steuereinstellungen, Reiter „Steuer & Währung":** „Umsatzsteuerart" von Kleinunternehmerregelung auf Regelbesteuerung stellen.
+- **Je Verkaufskanal:** Einstellungen > Kanäle, den **eBay-Kanal** öffnen, Reiter „Umsatzsteuer". Die Kanaleinstellung hat Vorrang vor dem Kontowert, also hier unbedingt mitumstellen.
+- **Je Artikel:** Reiter „Preise", Steuerindizes (19 %) kontrollieren.
+- **Steuersätze nicht auf 0 % setzen:** Laut Billbee bleiben die Sätze des Sitzlandes (19 %, 7 %) stehen, auch bei Kleinunternehmern. Sie wirken bei aktiver Kleinunternehmerregelung nicht auf Rechnungen.
+- **Rechnungsvorlage:** Einstellungen > Auftragsdokumente (Layouts), Reiter **„Ust. Hinweise"**: Der Text „Kleinunternehmerregelung nach § 19 UStG" wird im Steuerfall automatisch ausgegeben. Die Layout-Vorschau zeigt immer 19 %, die echte Rechnung richtet sich nach der Bestellung. Freitext der Fußzeile im Reiter „Fußbereich" prüfen, ob dort ein eigener § 19-Hinweis steht.
+- **Ausland:** Einstellungen > Steuereinstellungen, Reiter **„Ländereinstellungen"**: „Drittland erkennen" (Standard aktiv, Bestellungen aus Nicht-EU-Ländern kommen als „Ausfuhr in Drittland (netto)"), dazu OSS-Schalter und EU-Lieferschwelle. Voraussetzung: eigene Anschrift unter Benutzerkonto > Rechnung & Zahlung. Manuell angelegte Bestellungen werden nicht automatisch angepasst.
+- **Sendungsnummer als Platzhalter und Übertragung an eBay:** Billbee-Artikel 357 (Platzhalter) und 490 (eBay anbinden) nicht gelesen, **[offen]**.
+
+### eBay **[Quelle: eBay Verkäuferportal Umsatzsteuer, eBay Rechtsportal]**
+- **USt-IdNr. ist hinterlegt** (steht im PStTG-Bericht). Pflicht für alle gewerblichen Händler, auch Kleinunternehmer. Name, Firma, Rechtsform und Anschrift müssen mit dem BZSt-Bescheid übereinstimmen. Prüfen unter accountsettings.ebay.de/profile.
+- **Rechtliche Informationen des Verkäufers (Impressum):** auf § 19-Hinweise und aktuelle Angaben prüfen. Impressum-Seite des Rechtsportals ist gewerbliche_vk_4.html (nicht gelesen).
+- **Ein eigenes Kontofeld „Kleinunternehmer ja/nein" oder einen Wechsel-Schalter habe ich nicht gefunden. [offen]** Wahrscheinlich ist bei eBay nur die USt-IdNr. relevant.
+- **Angebotsvorlagen, Beschreibungstexte, AGB, Widerrufsbelehrung:** In den eigenen Texten nach „Kleinunternehmer" und „§ 19" suchen (in eBay-Vorlagen, Mein eBay > Vorlagen oder in den Angeboten selbst). Preise bei eBay sind Endpreise, die du in 2027 nicht ändern musst, wenn du sie nicht anheben willst.
+- Preisangabe „inkl. MwSt." (Rechtsportal gewerbliche_vk_11.html) nicht gelesen, **[offen]**.
+
+### Weitere Orte (selbst abhaken, **[Wissen]**)
+- Eigene **Rechnungs-, Lieferschein- und E-Mail-Vorlagen** in Billbee und Lexoffice (zwei Systeme schreiben Rechnungen).
+- **Cardmarket-Profil und andere Kanäle**, falls vorhanden (nicht bekannt).
+- **PayPal-Geschäftsdaten**, falls dort Steuerinfos stehen.
+- **Website, Visitenkarten, Geschäftsbriefe**, falls ein Kleinunternehmer-Hinweis dort steht.
+- **LEC:** Marge-Rechnung auf Netto umstellen (Abschnitt 6).
+- **Finanzamt:** Mitteilung über den Wechsel, Voranmeldungszeitraum erfragen (Abschnitt 5).
+
+## 3b. Zeitplan Abschluss und Meldung 2026
+
+| Was | Frühester Zeitpunkt | Frist | Rat |
+|---|---|---|---|
+| Jahresabschluss Lexoffice (EÜR 2026) | 1.1.2027 (Zufluss bis 31.12.) | keine feste | Mitte bis Ende Januar, wenn Belege, Auszahlungen und eBay-Abrechnungen da sind |
+| Stichtag Umsatzgrenze | 1.1.2027 | vor der ersten Rechnung 2027 | Zufluss bis 31.12. zusammenzählen, PDFs sichern |
+| Einkommensteuererklärung mit EÜR 2026 (ELSTER) | sobald das Formular 2026 da ist | 31.7.2027 bei Abgabe ohne Berater (§ 149 AO, nach einer Ratgeberquelle) | nach dem eBay-PStTG-Bericht (kam 2026 am 24. Januar), Überleitung erstellen, realistisch Februar bis März |
+| LUCID: Jahresabschlussmengenmeldung 2026 | 1.1.2027 | 15.5.2027 | im Januar |
+| LUCID und Reclay: Planmeldung und Lizenz 2027 | Dezember 2026 | Frist [offen], letztes Mal 20.12. | im Dezember |
+
 ## 4. Vorsteuer auf Lagerbestand beim Wechsel
 Laut BMF-Schreiben vom 10.11.2025 gibt es beim Wechsel **keinen nachträglichen Vorsteuerabzug** für Leistungen, die vor dem Wechsel bezogen wurden. Für Waren im Bestand kommt eine Berichtigung nach § 15a UStG in Frage, aber nur oberhalb von Bagatellgrenzen **[Quelle: [Steuerschroeder](https://www.steuerschroeder.de/blog/vorsteuerabzug-beim-wechsel-zwischen-kleinunternehmer-und-regelbesteuerung-neues-bmf-schreiben-schafft-klarheit/), [WETREU](https://www.wetreu.de/wissensportal/1757/kleinunternehmer-zum-vorsteuerabzug-beim-uebergang-zur-regelbesteuerung)]**. Ob und wie viel bei Chris' Bestand möglich ist, ist **[offen]**. Deshalb die Bestandsaufnahme zum 31.12.
 
