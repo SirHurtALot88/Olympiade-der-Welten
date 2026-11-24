@@ -77,7 +77,7 @@ export type SponsorUebersicht = {
     treueBonus: number;
     /** Die vier Zeilen der Vertragskarte. */
     zeilen: {
-      grund: UebersichtZeile & { treue: number; leihVerzicht: number };
+      grund: UebersichtZeile & { treue: number; leihVerzicht: number; /** Seiten-PR: vor dem Stichtag die zugesagte Untergrenze (90 % des vorlaeufigen Grundbetrags), danach null. */ zusageMind: number | null };
       leistung: UebersichtZeile & { abrechnungshinweis: string; satzJePlatz: number; platzJetzt: number | null; erwartungsrang: number; abstand: number | null };
       farbe: UebersichtZeile;
       ziel: UebersichtZeile & { einsatz: number; erfuellung: number };
@@ -139,6 +139,14 @@ export type SponsorUebersicht = {
     /** GuV bei "alle auf Erwartungsrang": Grund + Farb-Mittel - (Kosten - Plan-Einnahmen) - Kader-Ersatz. */
     guvBeiErwartung: number | null;
   }>;
+  /**
+   * SEITEN-PR (24.11.): beide Ligen mit dem Ergebnis "alle auf Erwartungsrang" (dieselbe Formel wie `liga_vergleich[].guvBeiErwartung`) und die Summe
+   * der Grundbetraege je Liga; die Rechnungsansicht zeichnet daraus das Saeulenbild und das Verhaeltnis Liga 1 zu Liga 2.
+   */
+  ligaBilanz: {
+    teams: Array<{ teamId: string; teamName: string; kuerzel: string; liga: SponsorLiga; guvBeiErwartung: number; grund: number; grob: boolean }>;
+    grundSummeJeLiga: { liga1: number; liga2: number };
+  };
   rechnung: {
     schritte: Array<{ id: "betrieb" | "ersatz" | "wertkorrektur" | "faktor" | "verteilung"; titel: string; formel: string; wert: number }>;
     betriebsteil: number;
@@ -200,7 +208,7 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
         passung: { wert: t.passung, text: passungText(t.passung, 0, contract.sponsorTopf?.treueSaisons ?? 0) },
         treueBonus: t.treue,
         zeilen: {
-          grund: { saison: grundJahr, jeSpieltag: runde1(grundJahr / n), gebucht: gebucht.sponsorBasis, treue: t.treue, leihVerzicht: verzicht },
+          grund: { saison: grundJahr, jeSpieltag: runde1(grundJahr / n), gebucht: gebucht.sponsorBasis, treue: t.treue, leihVerzicht: verzicht, zusageMind: !eingefroren && stempel.vorlaeufig?.grund[teamId] != null ? runde1(stempel.vorlaeufig.grund[teamId]! * SPONSOR_TOPF.zusage) : null },
           leistung: {
             saison: leistungHeute,
             // Gebucht wird je Spieltag nur RANG_ABSCHLAG_QUOTE (80 %) des Leistungsteils / N; der Rest wird zum Saisonende ausgeglichen.
@@ -327,6 +335,30 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
     })
     .sort((a, b) => (a.platz ?? 99) - (b.platz ?? 99) || a.teamName.localeCompare(b.teamName));
 
+  const alleTeams = Object.values(stand.teams);
+  const farbMittelJeLiga = (l: SponsorLiga) => (4 * stand.farbTopf[l - 1]!) / Math.max(1, alleTeams.filter((x) => x.liga === l).length);
+  const ligaBilanz = {
+    teams: alleTeams.map((x) => {
+      const grund = runde1(x.grundbetrag + x.treue);
+      return {
+        teamId: x.teamId,
+        teamName: teamName(gameState, x.teamId),
+        kuerzel: gameState.teams.find((tm) => tm.teamId === x.teamId)?.shortCode ?? x.teamId,
+        liga: x.liga,
+        grund,
+        // Scouting-Nebel: fremde Teams rechnen mit den auf 5 C gerundeten Kosten (wie `liga_vergleich`), die Saeule ist dann eine Naeherung.
+        grob: x.teamId !== teamId && nebelAn,
+        guvBeiErwartung:
+          x.teamId !== teamId && nebelAn
+            ? runde1(grund + farbMittelJeLiga(x.liga) - (grob5(x.kosten) - grob5(x.planEinnahmen)) - kaderErsatzJeTeam)
+            : runde1(grund + farbMittelJeLiga(x.liga) - (x.kosten - x.planEinnahmen) - kaderErsatzJeTeam),
+      };
+    }),
+    grundSummeJeLiga: {
+      liga1: runde1(alleTeams.filter((x) => x.liga === 1).reduce((s, x) => s + x.grundbetrag + x.treue, 0)),
+      liga2: runde1(alleTeams.filter((x) => x.liga === 2).reduce((s, x) => s + x.grundbetrag + x.treue, 0)),
+    },
+  };
   const r = stand.rechnung;
   const ligaMittelBeiErwartung = runde1(ligaTeams.reduce((sum, x) => sum + (x.grundbetrag + x.treue + farbMittel - (x.kosten - x.planEinnahmen) - kaderErsatzJeTeam), 0) / Math.max(1, ligaTeams.length));
   return {
@@ -345,6 +377,7 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
     termine: sponsorTermine(gameState, teamId),
     angebote,
     liga_vergleich,
+    ligaBilanz,
     rechnung: {
       schritte: [
         { id: "betrieb", titel: "Kosten der Liga abzueglich uebriger Einnahmen", formel: `K_B = Summe (Gehaelter + Unterhalt + Zins - Tickets - Marketing - Medaillen - Ziele - Gebaeude), ${Math.round(SPONSOR_TOPF.bremse[0] * 100)} bis ${Math.round(SPONSOR_TOPF.bremse[1] * 100)} % der Vorsaison`, wert: r.betriebsteil },
