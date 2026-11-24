@@ -45,6 +45,14 @@ EMBLEME = {
     "neuzugang": ("Neuzugang der Saison", "rolled parchment contract scroll with a red wax seal and a golden quill pen crossed over it, inside a golden hexagon frame with small stars", 7013),
     "eisern": ("Eiserner Spieler (alle Einsaetze)", "heavy golden anvil with a golden heart shaped shield on top and a chain link around it, solid and sturdy, on a small pedestal", 7014),
     "disziplin": ("Disziplin-Koenig", "golden torch with a bright orange flame inside a golden ring of five small circles, on a small pedestal", 7012),
+    # Runde 2 (24.11.): ersetzen All-Star, Krone der Konstanz, Disziplin-Koenig; dazu Kapitaen, Fan-Liebling und Team-Award Sprung
+    "rookie": ("Rookie der Saison (erste Saison in der Liga)", "bright golden rising sun star breaking out of a cracked golden egg shell, small green sprout leaf, on a small golden pedestal", 7021),
+    "schnaeppchen": ("Schnaeppchen der Saison (PP je Gehalt)", "golden price tag label with a big sparkling diamond on it and a few stacked gold coins beside it, small red string loop", 7022),
+    "allrounder": ("Allrounder der Saison (alle vier Farben)", "round golden compass medallion with four gems at the four points, one red ruby, one green emerald, one blue sapphire, one yellow topaz, a golden four pointed star in the centre", 7023),
+    "comeback": ("Comeback der Saison (nach Verletzung)", "golden phoenix bird rising with spread wings out of orange flames, round golden ring frame behind it", 7024),
+    "kapitaen": ("Kapitaen der Saison", "golden captain armband shield badge with a single raised star and two small chevrons below it, dark blue enamel stripe", 7025),
+    "sprung": ("Sprung der Saison (Team, Kaderstaerke-Rang)", "golden rocket shooting diagonally upwards over a golden ladder of bars getting taller, small sparkle stars, on a dark stone base", 7026),
+    "fanliebling": ("Fan-Liebling der Saison (Werbewert)", "big golden heart with a small golden megaphone in front of it, surrounded by tiny raised cheering hands and confetti, round golden ring frame", 7027),
 }
 
 

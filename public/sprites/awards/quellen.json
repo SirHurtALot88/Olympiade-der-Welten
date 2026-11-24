@@ -1,5 +1,5 @@
 {
- "_hinweis": "Award- und Medaillen-Embleme (24.11., Chris: Spieler-Awards und Team-Medaillen in Gold, Silber, Bronze). Bestellt mit scripts/pixellab-awards.py: je Award EIN Gold-Emblem (PixelLab /create-image-pixflux, 96x96, no_background, ein POST unter flock, keine Wiederholung). Silber und Bronze sind lokal aus dem Gold-Emblem umgefaerbt (0 Generationen). 14 Generationen insgesamt, alle Treffer, Guthaben 203,54 -> 189,54. Bisher nur in public/mockups/awards-historie-24-11.html genutzt. Konzept: docs/design/awards-historie-24-11.md.",
+ "_hinweis": "Award- und Medaillen-Embleme (24.11., Chris: Spieler-Awards und Team-Medaillen in Gold, Silber, Bronze). Bestellt mit scripts/pixellab-awards.py: je Award EIN Gold-Emblem (PixelLab /create-image-pixflux, 96x96, no_background, ein POST unter flock, keine Wiederholung). Silber und Bronze sind lokal aus dem Gold-Emblem umgefaerbt (0 Generationen). 14 Generationen insgesamt, alle Treffer, Guthaben 203,54 -> 189,54. Bisher nur in public/mockups/awards-historie-24-11.html genutzt. Konzept: docs/design/awards-historie-24-11.md. RUNDE 2 (24.11.): sieben weitere Gold-Embleme (rookie, schnaeppchen, allrounder, comeback, kapitaen, sprung, fanliebling), je 1 Generation, alle Treffer, Guthaben 189,54 -> 182,54; Silber und Bronze wieder lokal umgefaerbt. Nicht mehr genutzt (Awards gestrichen): pp-* (Krone der Konstanz), disziplin-* (Disziplin-Koenig).",
  "mvp-gold.png": {
   "paket": "PixelLab",
   "endpunkt": "/create-image-pixflux",
@@ -319,6 +319,167 @@
  "disziplin-bronze.png": {
   "paket": "abgeleitet",
   "aus": "disziplin-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "rookie-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Rookie der Saison (erste Saison in der Liga)",
+  "saat": 7021,
+  "generationen": 1.0,
+  "guthaben_vorher": 189.54,
+  "guthaben_nachher": 188.54,
+  "prompt": "bright golden rising sun star breaking out of a cracked golden egg shell, small green sprout leaf, on a small golden pedestal, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "schnaeppchen-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Schnaeppchen der Saison (PP je Gehalt)",
+  "saat": 7022,
+  "generationen": 1.0,
+  "guthaben_vorher": 188.54,
+  "guthaben_nachher": 187.54,
+  "prompt": "golden price tag label with a big sparkling diamond on it and a few stacked gold coins beside it, small red string loop, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "allrounder-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Allrounder der Saison (alle vier Farben)",
+  "saat": 7023,
+  "generationen": 1.0,
+  "guthaben_vorher": 187.54,
+  "guthaben_nachher": 186.54,
+  "prompt": "round golden compass medallion with four gems at the four points, one red ruby, one green emerald, one blue sapphire, one yellow topaz, a golden four pointed star in the centre, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "comeback-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Comeback der Saison (nach Verletzung)",
+  "saat": 7024,
+  "generationen": 1.0,
+  "guthaben_vorher": 186.54,
+  "guthaben_nachher": 185.54,
+  "prompt": "golden phoenix bird rising with spread wings out of orange flames, round golden ring frame behind it, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "kapitaen-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Kapitaen der Saison",
+  "saat": 7025,
+  "generationen": 1.0,
+  "guthaben_vorher": 185.54,
+  "guthaben_nachher": 184.54,
+  "prompt": "golden captain armband shield badge with a single raised star and two small chevrons below it, dark blue enamel stripe, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "sprung-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sprung der Saison (Team, Kaderstaerke-Rang)",
+  "saat": 7026,
+  "generationen": 1.0,
+  "guthaben_vorher": 184.54,
+  "guthaben_nachher": 183.54,
+  "prompt": "golden rocket shooting diagonally upwards over a golden ladder of bars getting taller, small sparkle stars, on a dark stone base, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "fanliebling-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Fan-Liebling der Saison (Werbewert)",
+  "saat": 7027,
+  "generationen": 1.0,
+  "guthaben_vorher": 183.54,
+  "guthaben_nachher": 182.54,
+  "prompt": "big golden heart with a small golden megaphone in front of it, surrounded by tiny raised cheering hands and confetti, round golden ring frame, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "rookie-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "rookie-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "rookie-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "rookie-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "schnaeppchen-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "schnaeppchen-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "schnaeppchen-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "schnaeppchen-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "allrounder-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "allrounder-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "allrounder-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "allrounder-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "comeback-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "comeback-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "comeback-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "comeback-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "kapitaen-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "kapitaen-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "kapitaen-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "kapitaen-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "sprung-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "sprung-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "sprung-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "sprung-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "fanliebling-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "fanliebling-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "fanliebling-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "fanliebling-gold.png",
   "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
   "generationen": 0
  }

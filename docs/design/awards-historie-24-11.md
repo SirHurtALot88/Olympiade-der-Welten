@@ -8,7 +8,10 @@ Mockup: `public/mockups/awards-historie-24-11.html` (kein App-Code). Es nutzt de
 der Mockups Spieler, Teams und Spielplan und führt `historie-modern-18-11.html` weiter (Ewige Tabelle, Blatt rechts mit dem
 Verlauf eines Teams, Auf- und Abstiege).
 
-![Award-Katalog](awards-historie-24-11/01-katalog-1920.png)
+> **Stand: Runde 2 (24.11.).** Chris' Feedback und Entscheidungen stehen in **Abschnitt 11**; er ersetzt den Katalog aus
+> Abschnitt 2 und die Fragen aus Abschnitt 10. Die Abschnitte 1 bis 10 sind der Stand der Runde 1 und bleiben zum Nachlesen.
+
+![Spieler-Awards](awards-historie-24-11/01-spieler-awards-1920.png)
 
 ## 1. Was heute schon da ist
 
@@ -28,7 +31,7 @@ Verlauf eines Teams, Auf- und Abstiege).
 Es fehlen: Stufen (Silber, Bronze), eigene Embleme, ein Medaillenspiegel, der Gebäudewert im Archiv und eine Historie, die
 Liga 1 und Liga 2 auseinanderhält.
 
-## 2. Award-Katalog
+## 2. Award-Katalog (Runde 1, ersetzt durch Abschnitt 11.3)
 
 Zwölf Spieler-Awards und zwei Team-Auszeichnungen. Jeder hat ein eigenes Emblem in Gold, Silber und Bronze
 (`public/sprites/awards/<name>-gold|silber|bronze.png`). Gold, Silber, Bronze heißt immer Platz 1, 2, 3 der Wertung.
@@ -92,7 +95,7 @@ delegieren.
 
 ## 4. Regeln des Medaillenspiegels
 
-![Medaillen](awards-historie-24-11/06-medaillen-team-1920.png)
+![Medaillen](awards-historie-24-11/05-medaillen-team-1920.png)
 
 - Gezählt werden die **Disziplin-Medaillen**: 20 Disziplinen × 3 Plätze je Liga und Saison.
 - **Rang:** Gold vor Silber vor Bronze. Gleichstand: der bessere Tabellenplatz.
@@ -105,7 +108,7 @@ delegieren.
 
 ## 5. Team-Historie: Kennzahlen
 
-![Team-Historie](awards-historie-24-11/10-team-historie-liga-1-1920.png)
+![Team-Historie](awards-historie-24-11/07-team-historie-liga-2-1920.png)
 
 Zwei Tabellen, eine je Liga. In der Tabelle einer Liga zählt nur, was ein Team **in dieser Liga** gespielt hat. Ein Team, das
 auf- und abgestiegen ist, steht in beiden Tabellen, jeweils mit seinen Saisons dort. Saisons in der anderen Liga zeigt die
@@ -128,14 +131,14 @@ sind Werte des Teams und nicht nach Liga getrennt.
 
 ## 6. Spieler-Historie: Kennzahlen
 
-![Spieler-Historie](awards-historie-24-11/12-spieler-historie-1920.png)
+![Spieler-Historie](awards-historie-24-11/11-spieler-historie-1920.png)
 
 Eine Tabelle für alle Spieler mit Vertrag, **ohne Liga-Trennung**. Spalten: Saisons, PP je Saison (klein die Einsätze),
 All-Time-PP, **Ø PP je abgeschlossener Saison (Standard-Sortierung)**, PP je Einsatz, Einsätze, Spieler des Spieltags
 (Gold/Silber/Bronze), Awards (Gold/Silber/Bronze), OVR mit Änderung seit dem Start, Marktwert. Filter: Klassenfarbe und
 „Mein Kader“. Rechts die Laufbahn des gewählten Spielers mit Sprung in den Trophäenschrank.
 
-![Trophäenschrank](awards-historie-24-11/03-trophaeenschrank-1920.png)
+![Achievements](awards-historie-24-11/03-achievements-1920.png)
 
 ## 7. Echt und Beispiel
 
@@ -151,7 +154,7 @@ Der Live-Stand (Abbild vom 24.11. in `modern-24-11/daten.js`) steht in **Saison 
 Das Beispiel ist bewusst nicht geglättet. Es zeigt zwei Dinge, die beim Bau geklärt sein müssen: ein Team mit **einer** starken
 Liga-2-Saison steht beim Schnitt weit oben (Frage 3), und wenige Stars sammeln sehr viele Awards (Frage 4).
 
-## 8. Ansichten und Bilder
+## 8. Ansichten und Bilder (Runde 1, aktuell: Abschnitt 11.6)
 
 | Ansicht | URL | Ziel in der App |
 |---|---|---|
@@ -185,7 +188,7 @@ entstehen lokal durch Umfärben der Gold-Töne (`stufen`, 0 Generationen). Edels
 Schätzung vorher: 1 Generation je Emblem, höchstens 20. Alle 14 waren Treffer, kein Fehlgriff. Reserve 150 unberührt
 (39,5 darüber). Herkunft je Datei: `public/sprites/awards/quellen.json`.
 
-## 10. Offene Fragen an Chris
+## 10. Offene Fragen an Chris (Runde 1, beantwortet in Abschnitt 11.2)
 
 | # | Frage | Empfehlung |
 |---|---|---|
@@ -200,3 +203,151 @@ Schätzung vorher: 1 Generation je Emblem, höchstens 20. Alle 14 waren Treffer,
 | 9 | **Scouting-Nebel:** Der MIP verrät den OVR-Zuwachs eines fremden Spielers. | **Award öffentlich, die Zahl als Stufe**, solange der Spieler nicht gescoutet ist. |
 | 10 | **Gebäudewert:** Investition × Zustand, ohne Abschreibung über die Jahre? | **Ja**, so wie beauftragt. |
 | 11 | **Weitere Awards** (Kapitän der Saison, Comeback, Fan-Liebling, Wertsprung)? | Erst nach dem Bau der zwölf entscheiden. |
+
+## 11. Runde 2 (24.11.)
+
+### 11.1 Feedback von Chris und was sich geändert hat
+
+| # | Feedback | Änderung im Mockup |
+|---|---|---|
+| 1 | Farb-Awards zählen nur die PP in den Disziplinen der Farbe, nicht die Klassenfarbe des Spielers | Vier Awards „Bester in Power / Speed / Mental / Social“. Auf der Karte steht: „Meiste PP in den 5 gelben (SOC) Disziplinen der Saison: Battlefield, Showcase, Basketball, Football, Eiskunstlauf. Die Klasse des Spielers ist egal.“ Der Kurs und jedes Achievement nennen die Zahl („38,4 PP in den 5 SOC-Disziplinen“). |
+| 2 | All-Star-Team streichen | **Bleibt** (Chris hat es danach doch freigegeben, siehe 11.2 Nr. 7). Je Farbe die zwei PP-Besten in den Disziplinen dieser Farbe; jeder Spieler sitzt einmal, in seiner stärksten Farbe. |
+| 3 | Krone der Konstanz streichen | Gestrichen. Emblem `pp-*` bleibt im Ordner, ungenutzt. |
+| 4 | Disziplin-König streichen oder ersetzen | Gestrichen. Ersatz: **Allrounder der Saison** (PP-Summe in der schwächsten der vier Farben). Er nutzt dieselbe Quelle (PP je Disziplin), unterscheidet aber wirklich, weil er nicht am Deckel von 5 PP je Einsatz hängt. |
+| 5 | Spieler des Spieltags neu: zählen, wie oft Tagesbester und wie oft Bester des eigenen Teams | Zwei Zähler: **Tagesbester** (bester Spieler eines Spieltags, beide Ligen) und **Teambester**. Sie stehen in den Achievements, in der Laufbahn je Saison („Tag · Team“) und als zwei Spalten in der Spieler-Historie. Am Saisonende gibt es Gold, Silber, Bronze für die meisten Tage als Tagesbester, Zweitwertung Teambester. |
+| 6 | Neuzugang und Eisernes Herz bleiben, Höchstwert 20 Einsätze | Beide bleiben. Die Beispiel-Saisons reichen jetzt bis 20 Einsätze („20 von 20 Einsätzen“), der Kurs der laufenden Saison zeigt „10 von 11“ (echt: 11 Spieltage gewertet). |
+| 7 | Team-Auszeichnungen von Spieler-Awards trennen | Zwei Kataloge: **Spieler-Awards** und **Team-Awards**, jeder mit eigener Seite. Die Reiter zeigen nur den eigenen Zusammenhang (Spieler: Spieler-Awards, Achievements, Spieler; Team: Team-Awards, Medaillen, Teams). |
+| 8 | Team-Historie: je Saison die Punkte nach Power / Speed / Mental / Social, als Hover und/oder aufklappbare Zeile | Beides. Klick auf ein Team klappt eine Zeile auf, die in denselben Spalten je Saison die vier Farben zeigt, dazu Summe und Schnitt je Farbe. Der Zeiger auf einer Saison-Zelle öffnet eine Tafel mit Balken und Anteilen. Rechts neu: „Punkte nach Farbe“ als Stapel je Saison. Die Spieler-Historie hat dieselbe Zeiger-Tafel für PP nach Farbe. |
+| 9 | Nicht „Schrank“, eine Ansicht je Spieler | Heißt **Achievements**. Eine Ansicht: alle Awards, die zwei Zähler, „Mit dem Team“ (Meisterschalen und Disziplin-Medaillen aus seinen Vertragsjahren), Kurs, Laufbahn. Keine Unterreiter. |
+| 10 | Medaillenwand wird nach 10 Saisons unübersichtlich; Zählstreifen, Zahl der Spieler-Awards und Medaillenspiegel bleiben | Die Wand ist ersetzt durch **„Medaillen je Disziplin“**: 20 feste Zeilen, egal wie viele Saisons. Je Disziplin Gold, Silber, Bronze, Summe (über alle Saisons), die letzten fünf Saisons als Embleme, der Kurs und ein Streifen mit einem Feld je Saison. Sortierbar. Das Beispiel hat jetzt 10 Saisons. Zählstreifen und Medaillenspiegel sind unverändert. |
+| 11 | 2 bis 4 bessere Awards als Ersatz | **Rookie der Saison**, **Schnäppchen der Saison**, **Allrounder der Saison**, **Comeback der Saison**. Dazu aus den Antworten: **Kapitän der Saison**, **Fan-Liebling**. Als Team-Award: **Sprung der Saison** (Kaderstärke-Rang). |
+
+Die Team-Historie und die Spieler-Historie haben bei mehr als fünf Saisons einen Umschalter „Letzte 5 / Alle“; bei „Alle“ fallen
+Nebenspalten weg, damit die Saison-Spalten Platz haben.
+
+### 11.2 Entscheidungen Chris 24.11.
+
+| # | Entscheidung | Umsetzung |
+|---|---|---|
+| 1 | MVP = höchste PP-Summe der Saison | so im Katalog |
+| 2 | Farb-Awards = PP in den Disziplinen der Farbe, nicht die Klassenfarbe | so im Katalog, siehe 11.1 Nr. 1 |
+| 3 | Kein Mindestwert an Saisons für den Schnitt; nach Saison 1 ist der Schnitt gleich S1 | Schnitt ohne Mindestzahl, im Tooltip vermerkt |
+| 4 | Awards heben Moral und Werbewert, je Award verschieden | Vorschlag je Award in 11.4, auf jeder Karte als Zeile |
+| 5 | Spieler-Awards über beide Ligen | so im Katalog |
+| 6 | Die Ewige Tabelle folgt der gespielten Liga; Auf- und Absteiger stehen in beiden Tabellen | unverändert so |
+| 7 | All-Star-Team bleibt: 8 Spieler, zwei je Farbe, First / Second / Third | bleibt, Auswahl nach PP in den Disziplinen der Farbe |
+| 8 | Kein Nebel auf Statistiken und Awards: Liga-Statistiken, Punkte, PP und Awards sind offiziell und immer öffentlich, auch der OVR-Zuwachs beim MIP | Im Mockup stand kein Nebel auf diesen Zahlen; die Empfehlung „Zahl als Stufe“ aus Runde 1 ist verworfen. Hinweis im Katalog („Alles öffentlich“) und in den Tooltips |
+| 9 | Gebäudewert = Investition × Zustand %, Abschreibung nur über den Zustand | unverändert so, Formel steht im Vermögen-Kopf |
+| 10 | Weitere Awards, wenn zählbar: Kapitän der Saison, Comeback, Fan-Liebling | alle drei im Katalog, Stand der Zählung in 11.3 |
+
+### 11.3 Der neue Katalog
+
+**Spieler-Awards (16), über beide Ligen, je Gold, Silber, Bronze.** „da“ = die Daten stehen heute im Spielstand; „Zählung neu“ =
+die Rohdaten sind da, ein Zähler oder Stempel kommt dazu.
+
+| Emblem | Award | Kriterium | Daten |
+|---|---|---|---|
+| `mvp` | MVP der Saison | Höchste PP-Summe der Saison. Gleichstand: PP je Einsatz | da |
+| `allstar` | All-Star-Team | Drei Achter-Teams, je Farbe die zwei PP-Besten in den Disziplinen der Farbe. First = Gold, Second = Silber, Third = Bronze | da (`disciplineBreakdown`) |
+| `pow` `spe` `men` `soc` | Bester in Power, Speed, Mental, Social | Meiste PP in den fünf Disziplinen der Farbe, Klasse egal | da (`disciplineBreakdown`) |
+| `mip` | Most Improved Player | Größter OVR-Zuwachs der Saison, öffentlich | Zählung neu: OVR-Start je Saison stempeln |
+| `spieltag` | Spieler des Spieltags | Zähler Tagesbester, Zweitwertung Teambester; Saison-Award für die meisten Tage | Zählung neu: PP je Spieltag sind da, die zwei Zähler kommen dazu |
+| `rookie` | Rookie der Saison | PP-Bester in der ersten Saison in der Liga (erster Vertrag). Ab Saison 2 | da |
+| `neuzugang` | Neuzugang der Saison | PP-Bester unter den neu zum Team Gekommenen. Ab Saison 2 | da |
+| `schnaeppchen` | Schnäppchen der Saison | Meiste PP je 1 C Saisongehalt, mindestens die Hälfte der Spieltage im Einsatz | da |
+| `allrounder` | Allrounder der Saison | PP-Summe in der schwächsten der vier Farben | da (`disciplineBreakdown`) |
+| `comeback` | Comeback der Saison | Beste PP je Einsatz nach einer Verletzung von mindestens 3 Spieltagen, mindestens 5 Einsätze danach | Zählung neu: Verletzung und PP je Spieltag sind da, die Auswertung kommt dazu |
+| `kapitaen` | Kapitän der Saison | Unter den 32 Kapitänen: eigene PP + 2 je Platz, den das Team über seinem Startplatz abschließt | da (Kapitän, Startplatz, Abschlussplatz) |
+| `fanliebling` | Fan-Liebling | Höchstes Werbegeld der Saison | da (Marketing-Regel) |
+| `eisern` | Eisernes Herz | Meiste Einsätze (höchstens 20) ohne verpassten Spieltag durch Verletzung | Zählung neu: Verletzungs-Spieltage je Saison |
+
+**Team-Auszeichnungen (3), je Liga, je Gold, Silber, Bronze.**
+
+| Emblem | Auszeichnung | Kriterium | Daten |
+|---|---|---|---|
+| `meister` | Meisterschale | Platz 1, 2, 3 der Abschlusstabelle | da |
+| `medaille` | Disziplin-Medaille | Je Disziplin die beste Ergebnis-Summe der Saison | da (`medaillenVergabe`) |
+| `sprung` | Sprung der Saison | Größter Sprung im Kaderstärke-Rang vom ersten zum letzten Spieltag | Zählung neu: Rang am Saisonstart stempeln |
+
+Gestrichen: Krone der Konstanz, Disziplin-König. Nicht übernommen aus der Ideenliste: **Wertsprung** (höchster
+Marktwert-Zuwachs; läuft fast gleich mit dem MIP) und **Duell-König** (Duellsiege je Spieler gibt es nur in den Duell-Disziplinen,
+dafür fehlt eine einheitliche Zählung).
+
+### 11.4 Vorschlag: Wirkung auf Moral und Werbewert
+
+Einmalig bei der Vergabe am Saisonende, für Gold / Silber / Bronze. Keine Wirkung auf Wertung, PP oder Marktwert.
+
+| Award | Moral | Werbewert | Warum |
+|---|---|---|---|
+| MVP der Saison | +8 / +5 / +3 | +10 / +6 / +4 | größter Titel |
+| All-Star-Team (First / Second / Third) | +5 / +3 / +2 | +6 / +4 / +2 | 24 Spieler, deshalb kleiner |
+| Bester in einer Farbe | +5 / +3 / +2 | +5 / +3 / +2 | |
+| Most Improved Player | +6 / +4 / +2 | +3 / +2 / +1 | stolz, aber noch kein Star |
+| Spieler des Spieltags (Saison) | +4 / +3 / +2 | +6 / +4 / +2 | dazu je Tag als Tagesbester Moral +1 sofort |
+| Rookie der Saison | +5 / +3 / +2 | +6 / +4 / +2 | neues Gesicht zieht |
+| Neuzugang der Saison | +4 / +2 / +1 | +4 / +2 / +1 | |
+| Schnäppchen der Saison | +2 / +1 / +1 | +2 / +1 / 0 | Titel für den Manager, weniger für den Spieler |
+| Allrounder der Saison | +4 / +2 / +1 | +3 / +2 / +1 | |
+| Comeback der Saison | +6 / +4 / +2 | +4 / +2 / +1 | |
+| Kapitän der Saison | +5 / +3 / +2 | +4 / +2 / +1 | |
+| Fan-Liebling | +4 / +2 / +1 | keiner | er wird am Werbegeld gemessen; mit Werbewert würde immer derselbe gewinnen |
+| Eisernes Herz | +3 / +2 / +1 | +2 / +1 / 0 | |
+| Meisterschale, Sprung der Saison (Team) | Team-Moral +4 / +2 / +1 | keiner | Disziplin-Medaillen geben Geld und Moral wie bisher |
+
+Je Spieler und Saison empfehle ich einen Deckel von Moral +12 und Werbewert +15, damit ein Star mit fünf Awards nicht davonläuft.
+
+### 11.5 Echt und Beispiel in Runde 2
+
+- **Echt:** Punkte des Teams nach Farbe in der laufenden Saison (aus den Ergebnissen je Disziplin), Medaillen-Kurs, Tabelle,
+  PP und Einsätze, Gehalt, Kapitän, Startplatz.
+- **Teils echt:** PP je Spieler nach Farbe in der laufenden Saison. Im Abbild-Auszug stehen je Spieler nur die drei besten
+  Disziplinen; der Rest der PP ist nach Achsen-Eignung verteilt. Im Spiel kommt alles aus `disciplineBreakdown`.
+- **Beispiel:** die neun abgeschlossenen Saisons, Tagesbester und Teambester, Comeback, OVR-Entwicklung, Kaderstärke-Rang am
+  Saisonstart, Werbegeld, Gebäudewert.
+
+### 11.6 Ansichten und Bilder
+
+| Ansicht | URL | Ziel in der App |
+|---|---|---|
+| Spieler-Awards | `?ansicht=katalog` | Leaders › Auszeichnungen › Spieler |
+| Team-Awards | `?ansicht=teamawards` | Leaders › Auszeichnungen › Teams |
+| Achievements | `?ansicht=achievements&spieler=<slug>` | Spielerprofil › Achievements |
+| Medaillen und Medaillenspiegel | `?ansicht=medaillen&team=…&zeit=alle\|saison&liga=1\|2` | Teamprofil |
+| Team-Historie | `?ansicht=teams&liga=1\|2&team=…&spann=5\|alle&zu=1&zeig=<Team>\|<Saison>` | Historie |
+| Spieler-Historie | `?ansicht=spieler&farbe=0..3&kader=1&spann=5\|alle` | Historie, zweiter Reiter |
+
+36 Aufnahmen unter `docs/design/awards-historie-24-11/` (`?still=1`, Geräte-Pixelverhältnis 1, 256 Farben), alle alten ersetzt:
+`01` bis `12` bei 1920×1080 und 2560×1440, die sechs Hauptansichten (`01`, `02`, `03`, `05`, `07`, `11`) auch bei 1710×1112,
+`13` bis `18` der echte Stand der Saison 1 bei 1920×1080. Geprüft je Aufnahme per Skript und an den Hauptansichten mit eigenen
+Augen: kein Seitenscroll, keine JS-Fehler, kein Überlauf, kein abgeschnittener Text.
+
+![Team-Awards](awards-historie-24-11/02-team-awards-1920.png)
+
+![Zeiger-Tafel](awards-historie-24-11/08-team-historie-zeiger-1920.png)
+
+### 11.7 PixelLab in Runde 2
+
+| Schritt | Embleme | Generationen | Guthaben |
+|---|---|---:|---:|
+| Stand vorher | | | 189,54 |
+| Stilprobe | `rookie`, `schnaeppchen` | 2 | 187,54 |
+| Satz | `allrounder`, `comeback`, `kapitaen`, `sprung`, `fanliebling` | 5 | 182,54 |
+| **Summe Runde 2** | 7 Embleme, 21 Dateien | **7** | **182,54** |
+
+Schätzung vorher: 1 Generation je Emblem, Rahmen höchstens 12. Je Emblem ein POST unter `flock`, keine Wiederholung, alle sieben
+Treffer. Silber und Bronze lokal umgefärbt. Reserve 150 unberührt (32,5 darüber). Der Fan-Liebling (Herz auf Sockel) ähnelt dem
+Eisernen Herz (Herz im Kettenrahmen); wenn das stört, kostet ein anderes Sinnbild 1 Generation.
+
+### 11.8 Offene Fragen
+
+| # | Frage | Empfehlung |
+|---|---|---|
+| 1 | **Name:** „Achievements“ wie von dir genannt, oder deutsch „Erfolge“? | **Achievements**, passt zu „Awards“, „Leaders“, „MVP“. |
+| 2 | **Größe der Wirkung** auf Moral und Werbewert (11.4) und der Deckel je Saison? | Wie vorgeschlagen, nach einer Mess-Saison nachstellen. |
+| 3 | **16 Spieler-Awards** sind mehr als in Runde 1 (12). Zu viele? | Wenn ja: zuerst Schnäppchen und Neuzugang streichen (Rookie deckt „neu“ ab). |
+| 4 | **Tagesbester bei Gleichstand** (mehrere mit 5,0 PP)? | Alle Gleichen zählen als Tagesbester; mit dem PP-Tagesanker ist das selten. |
+| 5 | **Kapitän der Saison:** eigene PP + 2 je Platz über dem Startplatz. Passt die Formel? | Ja; Alternative: nur die Plätze über dem Startplatz, dann ist es ein reiner Team-Erfolg. |
+| 6 | **Sprung der Saison** nach Kaderstärke-Rang oder nach Tabellenplatz gegenüber der Vorsaison? | Kaderstärke-Rang; der Tabellenplatz wird von Auf- und Abstieg verzerrt. |
+| 7 | **Rookie in Saison 1:** nicht vergeben, weil alle neu sind? | Ja, ab Saison 2. |
+| 8 | **Spieler-Historie, Filter POW/SPE/MEN/SOC:** nach Klassenfarbe des Spielers (wie jetzt) oder nach Farbe der Disziplinen? | Klassenfarbe lassen; die PP nach Farbe zeigt die Zeiger-Tafel. |
+
