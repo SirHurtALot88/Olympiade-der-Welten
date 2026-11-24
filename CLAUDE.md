@@ -439,7 +439,8 @@ verbesserungen der arenen und effekte von sich aus bestellen! freigabe erteilt".
 Kulissen, Requisiten und VFX (auch kleine UI-Rahmen/Icons als Requisiten) — **nicht** für neue
 Charaktere und Animationen, die bleiben gesperrt. Rahmen, gesetzt am selben Tag: etwa **1000
 Generationen für 10 Tage** (Guthaben 1041,7 am 17.11.), **kein Nachkauf** (Chris: „nachkaufen
-nein"), **Reserve 150 unantastbar**; vor jeder Bestellung Kosten schätzen und `/balance` lesen,
+nein"), **Reserve 150 unantastbar** — **seit 24.11. Reserve 0** (Chris: „das Pixel Lab Guthaben kannst du jetzt als Minimum auf 0
+setzen, weil in 3 Tagen läuft das Ding aus und wir wollen es ja eh maximal gut nutzen“; Ablauf etwa 27.11.); vor jeder Bestellung Kosten schätzen und `/balance` lesen,
 danach `usage.generations` aus der Job-Antwort protokollieren (die Kontodifferenz taugt nicht,
 solange mehrere bestellen); **Bestellungen werden nie automatisch wiederholt** (ein POST nur
 einmal) und laufen unter `flock /tmp/pixellab-bestell.lock` (nur ein Besteller zugleich); erst
@@ -470,7 +471,7 @@ beschreiben, sondern wenn du sie findest fixen … für Fixes hast du immer ne F
 wir haben, wenigstens sauber sind und runtergeladen werden und bei uns auf dem Server auch gespeichert werden“. **Reparaturen an
 bestehenden Animationen** (falsche Richtung, Drehung zur Kamera in Nord-Animationen, doppelte Waffen, Effekt in falsche Richtung,
 fehlende/kaputte Frames) **brauchen keine Rückfrage** — gefunden heißt nachbestellen (nur die fehlerhafte Richtung, an dieselbe
-Gruppe, gleiche Framezahl), nicht beschreiben. Es gelten die Bestellregeln (flock, ein POST, Reserve 150, `usage.generations`
+Gruppe, gleiche Framezahl), nicht beschreiben. Es gelten die Bestellregeln (flock, ein POST, Reserve laut Abschnitt oben, `usage.generations`
 protokollieren). **Jede Animation liegt vollständig lokal** unter `public/sprites/figuren/<slug>/` im Repo (und damit auf dem
 Server); nichts darf zur Laufzeit von PixelLab nachgeladen werden.
 

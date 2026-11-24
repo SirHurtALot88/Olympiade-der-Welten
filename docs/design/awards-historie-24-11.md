@@ -447,3 +447,15 @@ Keine Generation. Guthaben unverändert 182,54.
 | 2 | **Standard-Sortierung** nach Medaillen (Liga 1 zuerst) oder nach Punkten? | Medaillen, wie von dir genannt. Nach Punkten kann ein starkes Liga-2-Team vor einem Liga-1-Team mit Goldmedaille stehen. |
 | 3 | **Gold-Serie über einen Liga-Wechsel hinweg** zählen (Gold in Liga 2, Aufstieg, Gold in Liga 1)? | Nein, je Liga; sonst mischt die Serie wieder, was getrennt bleiben soll. |
 | 4 | Soll der Medaillenspiegel in „Medaillen“ (Teamprofil) dieselbe Punkte-Spalte bekommen? | Ja, als nächste kleine Ergänzung; dort ist er heute je Liga umschaltbar. |
+
+### 12.8 Freigabe (Chris, 24.11. abends)
+
+„Okay, Medaillenspiegel und so als Mockup ist freigegeben, kannst du dann auch am Samstag weiter mitmachen.“ Das Mockup aus den
+Runden 1 bis 3 (Awards, Medaillen, Team-Historie, Medaillenspiegel je Disziplin) ist damit **zum Bau freigegeben**; der Bau
+beginnt mit der Samstagsrunde (28.11., 16:05).
+
+- Frage 3: **Gold-Serie nur innerhalb einer Liga** (Chris: „Ja, Goldserie zählt nur innerhalb der Liga logischerweise“).
+- Fragen 1, 2 und 4 hat Chris nicht einzeln beantwortet; gebaut wird nach den Empfehlungen der Tabelle oben (ganze Zahlen
+  10/6/2 und 5/3/1, Standard-Sortierung nach Medaillen mit Liga 1 zuerst, Punkte-Spalte auch im Teamprofil), solange er
+  nichts anderes sagt.
+
