@@ -313,6 +313,22 @@ Obergrenzen 15.000 / 10.000 / 1.200) aus dem Investitionstopf, harte Vorstands-F
 bezahlt aus dem Rangprämien-Topf. Regeln im Spielstand (`seasonState.arenaRegel`, `medaillenRegel`; Abfrage nur `arenaAktiv` / `medaillenAktiv`), Rückweg `OLY_ARENA=aus` /
 `OLY_MEDAILLEN=aus` (`aus-sofort` = Notbremse), nur Server. Bau, Messung, Abbildung des alten Gebäudes: `docs/design/arena-tickets-medaillen-22-11.md`.
 
+## Sponsoren: Liga-Topf und Saisonfaktor (Chris, 22./23.11., gebaut 24.11.)
+
+Der Sponsor-Topf wird aus den Kosten der Liga gerechnet, nicht fest vorgegeben: `Topf = Saisonfaktor × (Betriebsteil + Kader-Ersatz)`
+mit Bremse ±15 %, Übertrag und Liga-Wert-Korrektur. **Abnahme (Chris): bei Faktor 1,00 und allen Teams auf Erwartungsrang bleibt
+der Liga-Wert (Σ Kasse + Σ Kaderwert) je Saison innerhalb ±3 %.** Tickets, Marketing und Medaillen verdrängen den Topf. Verteilt wird
+nach dem eingefrorenen Erwartungsrang (derselbe Anker wie beim Vorstand) plus Passung 0,95–1,05 (Beliebtheit, Treue in Saisons; keine
+Seltenheitsstufen mehr), dazu ein Leistungsteil mit Liga-Summe 0, drei Vertragsarten (Fest/Leistung/Prämie), zwei Farb-Partner (ersetzen
+den Farb-Meister) und höchstens zwei Sponsorentermine je Saison (unbeantwortet entscheidet die KI). Konstanten in
+`lib/sponsors/sponsor-topf-modell.ts` (`SPONSOR_TOPF`), Regel im Spielstand `seasonState.sponsorRegel` (Abfrage nur über
+`sponsorRegelFuer`/`sponsorTopfAktiv`, `lib/resolve/sponsor-regel.ts`): neues Spiel ab Saison 1, laufender Spielstand ab dem nächsten
+Saisonwechsel. Rückweg `OLY_SPONSOR_REGEL=aus` / `aus-sofort` (Chris 24.11.: bewusst nicht in compose eingetragen). Vorstands-Freigabe und
+Kreditprüfung lesen die reine Sponsor-Erwartung, nur die KI-Kaufplanung rechnet die verdrängten Einnahmen mit. Anzeige
+`app/foundation/sponsors-v2/` über `baueSponsorUebersicht` (gezeigt = gebucht; fremde Erwartungsränge und Kosten im Scouting-Nebel,
+schon auf dem Server vergröbert). Doku: `docs/design/sponsoren-rework-22-11.md`, `docs/design/sponsoren-rework-bau-24-11.md`,
+`docs/design/sponsoren-seite-24-11.md`.
+
 ## Marketing (Chris, 22.11.)
 
 Werbegeld je Spieler, dynamischer Team-Anteil und Teammarke in der Kasse (Posten "Marketing"), Spieler-Anteil hebt die Moral; wirkt nie auf Wertung,

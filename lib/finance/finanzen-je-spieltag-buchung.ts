@@ -25,6 +25,8 @@ import { bereiteArenaBuchung } from "@/lib/arena/arena-stand";
 import { bucheKreditRaten } from "@/lib/finance/kredit-raten";
 import { aktualisiereMarketingStand, marketingJahresbetrag } from "@/lib/marketing/marketing-team";
 import type { MoraleLookupIndex } from "@/lib/morale/player-morale-service";
+import { spiegleSponsorNotbremse } from "@/lib/resolve/sponsor-regel";
+import { sichereSponsorTopf } from "@/lib/sponsors/sponsor-topf-stichtag";
 import { sponsorBasisJahr, sponsorRangAbschlag, sponsorRangFuerAbschlag } from "@/lib/sponsor/sponsor-settlement-service";
 
 export function spieltagBuchungsId(seasonId: string, matchdayId: string, teamId: string): string {
@@ -54,6 +56,10 @@ export function jahresbetraegeEinesTeams(
  */
 export function bucheSpieltagFinanzen(gameState: GameState, matchdayId: string, jetzt: string = new Date().toISOString()): GameState {
   if (!istJeSpieltagSaison(gameState)) return gameState;
+  // SPONSOR-TOPF (24.11., lib/sponsors/): die Notbremse (OLY_SPONSOR_REGEL=aus-sofort) wird hier, auf dem Server, in den Stempel gespiegelt; der
+  // Stichtag friert den Topf ein, falls ihn der Fensterschluss vor der ersten Wertung noch nicht eingefroren hat (idempotent). Ohne Topf-Stempel
+  // geben beide Funktionen dieselbe Referenz zurueck.
+  gameState = sichereSponsorTopf(spiegleSponsorNotbremse(gameState));
   const urspruenglich = gameState;
   const seasonId = gameState.season.id;
   const ids = gameState.season.matchdayIds ?? [];

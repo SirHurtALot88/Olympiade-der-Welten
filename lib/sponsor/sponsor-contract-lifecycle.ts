@@ -80,11 +80,18 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
   };
   const uebernahmen: Record<string, SponsorUebernahmeAngebot[]> = {};
 
+  // SPONSOR-TOPF: jede abgeschlossene Saison zaehlt fuer die Dachmarke des Vertrags (Treue = Saisons, nicht Unterschriften).
+  const markenSaisonen: Record<string, Record<string, number>> = { ...(gameState.seasonState.sponsorMarkenSaisonenByTeamId ?? {}) };
   for (const team of gameState.teams) {
     const contract = contracts[team.teamId];
     if (!contract) {
       offers[team.teamId] = [];
       continue;
+    }
+    if (contract.sponsorParentBrandId) {
+      const je = { ...(markenSaisonen[team.teamId] ?? {}) };
+      je[contract.sponsorParentBrandId] = (je[contract.sponsorParentBrandId] ?? 0) + 1;
+      markenSaisonen[team.teamId] = je;
     }
 
     const remaining = contract.seasonsRemaining ?? 1;
@@ -181,6 +188,8 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
       seasonsRemaining: newRemaining,
       payouts: {},
       chosenAt: contract.chosenAt,
+      // SPONSOR-TOPF (24.11.): das Vertragsjahr zaehlt weiter (Treuebonus +1 C im zweiten, +2 C im dritten Jahr).
+      ...(contract.sponsorTopf ? { sponsorTopf: { ...contract.sponsorTopf, jahr: Math.min(3, contract.sponsorTopf.jahr + 1) } } : {}),
       ...(rerolledTerms
         ? {
             sponsorV3: rerolledTerms,
@@ -203,6 +212,7 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
       sponsorContractsByTeamId: contracts,
       sponsorOffersByTeamId: offers,
       goldenSponsorHistoryByTeamId,
+      sponsorMarkenSaisonenByTeamId: markenSaisonen,
       sponsorLeihgabenByTeamId: leihgaben,
       // Nur setzen, wenn es welche gibt — ein leeres Objekt im Spielstand ist Rauschen, und ein
       // altes Angebot darf nicht ueber die Saison hinaus stehen bleiben.

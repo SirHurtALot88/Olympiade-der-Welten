@@ -1,6 +1,7 @@
 import type { AusruestungRegelStempel, AusruestungSpielstand } from "@/lib/ausruestung/ausruestung-typen";
 import type { ArenaRegelStempel, ArenaTeamStand } from "@/lib/arena/arena-typen";
 import type { MedaillenRegelStempel, MedaillenVergabe } from "@/lib/medaillen/medaillen-typen";
+import type { SponsorRegelStempel, SponsorTopfVertrag } from "@/lib/sponsors/sponsor-topf-typen";
 import type { ErgebnisAnzeigeZahl } from "@/lib/resolve/ergebnis-anzeige-typen";
 import type { SeasonGuvPosten } from "@/lib/finance/season-end-guv";
 import type { LeagueTier } from "@/lib/season/league-split";
@@ -1754,7 +1755,7 @@ export type SponsorTermSeasons = 1 | 2 | 3;
 
 export type SponsorNegotiationProfile = "safe" | "balanced" | "ambitious";
 
-export type SponsorEventType = "activation_bonus" | "clause_trigger" | "partner_conflict";
+export type SponsorEventType = "activation_bonus" | "clause_trigger" | "partner_conflict" | "sponsor_termin";
 
 export type SponsorEventRecord = {
   eventId: string;
@@ -1964,6 +1965,11 @@ export type TeamSponsorContract = {
   sponsorV3?: SponsorV3ContractTermsRecord;
   /** LEGACY, nur noch gelesen: V2-Konditionen aus Spielstaenden von vor dem V3-Umbau. */
   sponsorV2?: SponsorLegacyV2TermsRecord;
+  /**
+   * SPONSOR-TOPF (24.11., lib/sponsors/): Vertragsart, gewaehlte Laufzeit, Farb-Partner und Treue des neuen Systems. Nur gesetzt, wenn
+   * der Vertrag unter dem Stempel `seasonState.sponsorRegel` ("topf") unterschrieben oder dorthin ueberfuehrt wurde.
+   */
+  sponsorTopf?: SponsorTopfVertrag;
 };
 
 export type ScoutIntelSource = "watchlist" | "wishlist_mirror" | "passive_need" | "roster";
@@ -4382,6 +4388,11 @@ export type SeasonState = {
    */
   formkartenRegel?: { seasonId: string; regel: "alt" | "plusminus" } | null;
   /**
+   * SPONSOR-REGEL DIESER SAISON (24.11., lib/resolve/sponsor-regel.ts): "topf" (Liga-Topf, Grundbetrag nach Erwartungsrang, Leistungsteil,
+   * Farb-Partner) oder "alt". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel; haelt auch den am Stichtag eingefrorenen Topf.
+   */
+  sponsorRegel?: SponsorRegelStempel | null;
+  /**
    * ENTWICKLUNGSREGEL DIESER SAISON (22.11., lib/resolve/entwicklung-regel.ts): "neu" (PP-Faktor auf das Training, Ertragskurve,
    * Verfall, mittelwertneutrale Potentialdrift) oder "alt". Gesetzt beim Anlegen eines Spiels und beim Saisonwechsel.
    */
@@ -4489,6 +4500,8 @@ export type SeasonState = {
   sponsorOffersByTeamId?: Record<string, SponsorOffer[]>;
   sponsorContractsByTeamId?: Record<string, TeamSponsorContract>;
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;
+  /** SPONSOR-TOPF: gespielte SAISONEN je Team und Dachmarke (zaehlt beim Saisonwechsel, nicht je Unterschrift); Bezug der Treue (0 bis 3). */
+  sponsorMarkenSaisonenByTeamId?: Record<string, Record<string, number>>;
   sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
   /** Zu Saisonbeginn eingefrorene Apron-Linien dieser Saison. Siehe ApronLinesSnapshot. */

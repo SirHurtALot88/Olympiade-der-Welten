@@ -21,6 +21,7 @@ import {
   kaderUnterSoll,
   type ZielKontext,
 } from "@/lib/board/vorstand-ziele-erweitert";
+import { sponsorAnkerFuer } from "@/lib/resolve/sponsor-regel";
 import { buildTeamSeasonOverviewRows, type TeamManagementSnapshotRow } from "@/lib/foundation/team-management-overview";
 import { getTeamDevelopmentTendency } from "@/lib/foundation/team-development-tendency";
 import { getTeamStrategyProfile } from "@/lib/foundation/team-strategy-profiles";
@@ -557,7 +558,10 @@ export function computeTeamExpectation(input: {
   });
   const index = ranked.findIndex((row) => row.teamId === input.row.teamId);
   const expectedRankRoh = index >= 0 ? index + 1 : Math.max(1, teamCount);
-  const expectedRank = vorjahresRangMischung(input.gameState, input.row.teamId, expectedRankRoh, teamCount);
+  // SPONSOR-TOPF (24.11.): nach dem Stichtag gilt der eingefrorene Anker, derselbe, den der Sponsor fuer den Leistungsteil nutzt (ein Anker fuer beide).
+  const sponsorAnker = input.gameState ? sponsorAnkerFuer(input.gameState, input.row.teamId) : null;
+  const expectedRank =
+    sponsorAnker != null ? clamp(Math.round(sponsorAnker), 1, Math.max(1, teamCount)) : vorjahresRangMischung(input.gameState, input.row.teamId, expectedRankRoh, teamCount);
   const strengthPct = clamp(teamCount > 1 ? (teamCount - expectedRank) / (teamCount - 1) : 1, 0, 1);
   // Normalize identity ambition (1..10, default 5) onto roughly -1..1.
   const ambitionMod = clamp(((input.identity?.ambition ?? 5) - 5) / 5, -1, 1);

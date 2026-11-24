@@ -1,6 +1,9 @@
 import { rangPraemieFaktor } from "@/lib/medaillen/medaillen-regel";
 import { bucheMedaillen } from "@/lib/medaillen/medaillen-modell";
 import { randomUUID } from "@/lib/utils/random-id";
+import { sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
+import { sichereSponsorTopf } from "@/lib/sponsors/sponsor-topf-stichtag";
+import { topfGrundJahr, topfRangAbschlag, topfRangFuerAbschlag, topfSaisonendeZeilen } from "@/lib/sponsors/sponsor-topf-buchung";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
@@ -19,7 +22,7 @@ export type SponsorSettlementRow = {
   teamId: string;
   teamName: string;
   componentId: string;
-  kind: SponsorOfferComponent["kind"];
+  kind: SponsorOfferComponent["kind"] | "farbe";
   label: string;
   status: "paid" | "skipped" | "pending" | "failed_penalty";
   cashDelta: number;
@@ -108,6 +111,20 @@ function buildSponsorV3SeasonEndRows(
  * Rechenweg und keine "alte Rechnung" mehr, in die etwas zurueckfallen koennte.
  */
 function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract): SponsorSettlementRow[] {
+  // SPONSOR-TOPF (24.11.): unter dem Stempel "topf" rechnen Grundbetrag, Leistungsteil, Farb-Partner und Ziel aus dem eingefrorenen Topf-Stand.
+  if (sponsorTopfAktiv(gameState)) {
+    const team = gameState.teams.find((entry) => entry.teamId === contract.teamId);
+    return topfSaisonendeZeilen(gameState, contract).map((zeile) => ({
+      teamId: contract.teamId,
+      teamName: team?.name ?? contract.teamId,
+      componentId: `${contract.offerId}:topf:${zeile.key}`,
+      kind: zeile.key === "farbe" ? ("farbe" as const) : zeile.key,
+      label: zeile.label,
+      status: zeile.cashDelta > 0 ? ("paid" as const) : ("skipped" as const),
+      cashDelta: zeile.cashDelta,
+      reason: zeile.reason,
+    }));
+  }
   const row = buildTeamSeasonOverviewRows({ gameState }).find((entry) => entry.teamId === contract.teamId) ?? null;
   const currentRank = row?.rank ?? null;
   const terms = getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract);
@@ -120,6 +137,7 @@ function buildSeasonEndRows(gameState: GameState, contract: TeamSponsorContract)
  * wie in der Saisonende-Abrechnung (`sponsorV3SettlementParts`, Schluessel `base`), unabhaengig vom Endrang.
  */
 export function sponsorBasisJahr(gameState: GameState, teamId: string): number {
+  if (sponsorTopfAktiv(gameState)) return topfGrundJahr(gameState, teamId);
   const contract = getTeamSponsorContract(gameState, teamId);
   if (!contract) return 0;
   const terms = getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract);
@@ -132,6 +150,10 @@ export const RANG_ABSCHLAG_QUOTE = 0.8;
 
 /** Der Platz, nach dem ein Team seinen Rang-Abschlag bekommt: Tabellenplatz, sonst Startrang des Vertrags, sonst Ligamitte. */
 export function sponsorRangFuerAbschlag(gameState: GameState, teamId: string): number {
+  if (sponsorTopfAktiv(gameState)) {
+    const r = topfRangFuerAbschlag(gameState, teamId);
+    if (r != null) return Math.max(1, Math.round(r));
+  }
   const contract = getTeamSponsorContract(gameState, teamId);
   const terms = contract ? getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract) : null;
   const ranks = terms?.rankLadder.length || gameState.teams.length || 32;
@@ -145,6 +167,7 @@ export function sponsorRangFuerAbschlag(gameState: GameState, teamId: string): n
  * Abschlag je Spieltag darauf: 0,8 x Praemie / N. Ohne Sponsorvertrag 0.
  */
 export function sponsorRangAbschlag(gameState: GameState, teamId: string, rang: number, spieltage: number): { praemie: number; abschlag: number } {
+  if (sponsorTopfAktiv(gameState)) return topfRangAbschlag(gameState, teamId, spieltage);
   const contract = getTeamSponsorContract(gameState, teamId);
   if (!contract || !(spieltage > 0)) return { praemie: 0, abschlag: 0 };
   const terms = getSponsorV3Terms(contract) ?? buildMigratedSponsorV3Terms(gameState, contract);
@@ -203,6 +226,8 @@ export function applySponsorSettlement(input: {
   deductSalary?: boolean;
 }): { gameState: GameState; preview: SponsorSettlementPreview; applied: boolean } {
   const phase = input.phase ?? "season_end";
+  // SPONSOR-TOPF: ohne eingefrorenen Stand (Abrechnung ohne je gebuchten Spieltag) friert die Abrechnung ihn zuerst ein; ohne Topf-Stempel dieselbe Referenz.
+  if (sponsorTopfAktiv(input.gameState)) input = { ...input, gameState: sichereSponsorTopf(input.gameState) };
   const preview = previewSponsorSettlement(input.gameState, phase);
   if (!input.execute || (!preview.canApply && !input.deductSalary)) {
     return { gameState: input.gameState, preview, applied: false };

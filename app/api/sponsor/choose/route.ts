@@ -10,6 +10,7 @@ import {
   getTeamSponsorContract,
   getTeamSponsorOffers,
 } from "@/lib/sponsor/sponsor-offer-service";
+import { pruefeTopfWahl } from "@/lib/sponsors/sponsor-topf-wahl";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
@@ -26,6 +27,13 @@ type SponsorChooseBody = {
   termSeasons?: 1 | 2 | 3;
   /** @deprecated Verhandlungs-Achse entfernt. Feld wird bei Alt-Requests ignoriert (kein 400). */
   negotiationProfile?: "safe" | "balanced" | "ambitious";
+  /**
+   * SPONSOR-TOPF (24.11.): Vertragsart, gewaehlte Laufzeit (1 bis 3) und zwei Farb-Partner. Nur unter dem Stempel "topf" wirksam; fehlende
+   * Felder fuellt die KI-Wahl (Mensch ueberschreibt, KI respektiert das). Unter "alt" werden sie ignoriert.
+   */
+  vertragsart?: "fest" | "leistung" | "praemie";
+  laufzeit?: 1 | 2 | 3;
+  farben?: Array<"pow" | "spe" | "men" | "soc">;
   dryRun?: boolean;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
@@ -51,6 +59,16 @@ export async function POST(request: Request) {
     }
     if (!saveId || !teamId || !offerId) {
       return NextResponse.json({ success: false, error: "saveId, teamId and offerId are required.", summary: null }, { status: 400 });
+    }
+
+    // SPONSOR-TOPF: Eingaben der Wahl pruefen, bevor irgendetwas gelesen wird (400 statt stiller KI-Ersatzwahl).
+    const wahlFehler = pruefeTopfWahl({
+      vertragsart: body.vertragsart,
+      laufzeit: body.laufzeit,
+      farben: body.farben,
+    });
+    if (wahlFehler || (body.farben !== undefined && !Array.isArray(body.farben))) {
+      return NextResponse.json({ success: false, error: wahlFehler ?? "sponsor_farben_ungueltig", summary: null }, { status: 400 });
     }
 
     const persistence = createPersistenceService();
@@ -121,6 +139,7 @@ export async function POST(request: Request) {
       teamId,
       offerId,
       saveId,
+      topf: { vertragsart: body.vertragsart, laufzeit: body.laufzeit, farben: body.farben, von: "mensch" },
     });
     if (result.error) {
       return NextResponse.json({ success: false, error: result.error, summary: null }, { status: 400 });

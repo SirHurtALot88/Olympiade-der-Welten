@@ -55,7 +55,7 @@ import {
   resolveKiRuecklageFuerTeam,
   type KiRuecklageErgebnis,
 } from "@/lib/finance/ki-ruecklage";
-import { erwarteterSponsorFuerPlanung, istSponsorForecastAktiv } from "@/lib/finance/sponsor-erwartung";
+import { erwarteterSponsorFuerKaufplanung, istSponsorForecastAktiv } from "@/lib/finance/sponsor-erwartung";
 import { berechneVorstandBudgetStand, kaufRahmen, type VorstandBudgetStand } from "@/lib/finance/vorstand-budgetfreigabe";
 import {
   applyGmBiasToLaneAppetite,
@@ -642,7 +642,7 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   const planCashBuffer = Math.max(ctx.cashBuffer, ruecklage);
   const sponsorForecast =
     istSponsorForecastAktiv() && input.forecast?.sponsorIncome === undefined
-      ? erwarteterSponsorFuerPlanung(input.gameState, input.team.teamId)
+      ? erwarteterSponsorFuerKaufplanung(input.gameState, input.team.teamId)
       : undefined;
 
   // ANPASSUNG B: cash-scaled opt-trim. If the club can't fund Depth-grade bodies across every open slot,

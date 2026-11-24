@@ -13,6 +13,7 @@ import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-se
 import { advancePlayerPotentialRevealTick } from "@/lib/progression/player-potential-service";
 import { maybeGenerateSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
 import { bucheSpieltagFinanzen } from "@/lib/finance/finanzen-je-spieltag-buchung";
+import { beantworteTermineDerKi, erzeugeTermine } from "@/lib/sponsors/sponsor-topf-termine";
 import { aktualisiereKiMerkliste } from "@/lib/ai/ki-merkliste";
 import { buildFrozenValuationSnapshot } from "@/lib/season/frozen-valuation-snapshot";
 import { isMatchdayResultFullyCommitted } from "@/lib/season/season-discipline-schedule";
@@ -372,7 +373,13 @@ function writeLocalMatchdayAdvance(prepared: PreparedMatchdayProgress, persisten
   );
   // FINANZEN JE SPIELTAG (22.11., docs/design/finanzen-je-spieltag-22-11.md): Gehalt, Sponsor-Basis, Gebaeude-Einnahme
   // und -Unterhalt dieses Spieltags, fuer alle Teams gleich und idempotent je Spieltag. Ohne Saison-Stempel unveraendert.
-  const nextGameState: GameState = bucheSpieltagFinanzen(nextGameStateOhneFinanzen, prepared.currentMatchdayId);
+  const nextGameStateGebucht: GameState = bucheSpieltagFinanzen(nextGameStateOhneFinanzen, prepared.currentMatchdayId);
+  // SPONSORENTERMIN (24.11., lib/sponsors/sponsor-topf-termine.ts): neue Termine nach diesem Spieltag; KI-Teams, passive Teams und
+  // delegierte Menschen beantworten sie sofort, wer selbst fuehrt, entscheidet auf der Sponsorenseite. Ohne Topf-Stempel dieselbe Referenz.
+  const nextGameState: GameState = beantworteTermineDerKi(
+    erzeugeTermine(nextGameStateGebucht, (nextGameStateGebucht.season.matchdayIds ?? []).indexOf(prepared.currentMatchdayId) + 1),
+    { saveId: prepared.saveId },
+  );
 
   // Season-End (kein weiterer Matchday = MD10 abgeschlossen): OVR/MVS/PPs/MW + Sale-Factor-Bracket
   // über den vollen MD10-Kader-Pool EINFRIEREN. Der Snapshot wird auf dem eben gebauten

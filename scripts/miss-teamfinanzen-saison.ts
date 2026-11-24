@@ -62,6 +62,10 @@ import { buildSeasonGuv } from "@/lib/finance/season-end-guv";
 import { resolveSeasonGuvPartsByTeam } from "@/lib/finance/season-guv-resolver";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
+import { getSeasonSponsorCashByTeam } from "@/lib/sponsor/sponsor-settlement-service";
+import { SPONSOR_TOPF } from "@/lib/sponsors/sponsor-topf-modell";
+import { sponsorRegelFuer } from "@/lib/resolve/sponsor-regel";
+import { topfFarbVerteilung } from "@/lib/sponsors/sponsor-topf-buchung";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
@@ -94,6 +98,17 @@ const MODE = arg("mode", "battle") as "battle" | "manager";
 const SEASONS = Number(arg("seasons", "2"));
 const OUT = arg("out", "");
 const LABEL = arg("label", "A");
+/**
+ * Nur fuer Kalibrierlaeufe (--konst name=zahl, mehrfach moeglich): ueberschreibt eine Zahl aus SPONSOR_TOPF in DIESEM Prozess. Die Produktion liest
+ * keine Variable; die Zahlen stehen fest im Modell.
+ */
+for (let i = 0; i < process.argv.length; i += 1) {
+  if (process.argv[i] !== "--konst") continue;
+  const [name, wert] = String(process.argv[i + 1] ?? "").split("=");
+  if (!name || !(name in SPONSOR_TOPF) || !Number.isFinite(Number(wert))) throw new Error(`--konst ${process.argv[i + 1]} unbekannt`);
+  (SPONSOR_TOPF as unknown as Record<string, number>)[name] = Number(wert);
+  console.log(`[konst] ${name} = ${wert}`);
+}
 /** Wiederaufnahme einer abgebrochenen Messung: bestehende Wegwerf-SQLite + bereits geschriebene Rohdaten (--out) weiterverwenden. */
 const RESUME = arg("resume", "");
 /** "kaufphase": nach der Kaufphase von Saison 2 (und dem Saisonstart-Schnappschuss) aufhoeren.
@@ -152,6 +167,8 @@ type TeamSnap = {
   hatSponsor: boolean;
   /** Kaderstaerke: Mittel der Top-6-Eignung je Disziplin (fehlende Plaetze zaehlen 0). */
   staerke: number;
+  /** SPONSOR-TOPF (24.11.): der am Stichtag eingefrorene Stand dieses Teams (Erwartungsrang, Grundbetrag, Passung, Hebel, Farben, Plan-Posten); `null` ohne Topf-Regel oder vor dem Stichtag. */
+  sponsorTopf?: unknown;
 };
 
 /**
@@ -256,6 +273,7 @@ function snap(gs: GameState): Record<string, TeamSnap> {
       sponsorAnker: (() => { const a = getSponsorV3Terms(getTeamSponsorContract(gs, t.teamId))?.anchor; return typeof a === "number" ? r2(a) : null; })(),
       hatSponsor: getTeamSponsorContract(gs, t.teamId) != null,
       staerke: staerke.jeTeam[t.teamId] ?? 0,
+      sponsorTopf: gs.seasonState.sponsorRegel?.eingefroren?.teams?.[t.teamId] ?? null,
       // ARENA und MEDAILLEN (22.11.): Plaetze, Fans, Ausbau der Saison und Medaillen-Geld, fuer `scripts/auswerte-arena-tickets-medaillen.ts`.
       arena: (() => {
         const a = gs.seasonState.arena?.[t.teamId];
@@ -614,6 +632,9 @@ async function main() {
     phasen[`${praefix}_03_nach_spieltagen`] = {
       snap: snap(vorAbschluss), kasseJeSpieltag, verletztJeSpieltag, marketing: marketingMessung(vorAbschluss),
       sponsorEvents: (vorAbschluss.seasonState.sponsorEvents ?? []).filter((e) => (e as { seasonId?: string }).seasonId === sid || true).length,
+      sponsorRegel: sponsorRegelFuer(vorAbschluss),
+      sponsorTopf: vorAbschluss.seasonState.sponsorRegel?.eingefroren ?? null,
+      sponsorTermine: (vorAbschluss.seasonState.sponsorRegel?.termine ?? []).map((t) => ({ id: t.id, team: t.teamId, status: t.status, von: t.entschiedenVon ?? null })),
     };
     schreibe();
     // Basis fuer paarweise Vergleiche des Saisonwechsels (Transferfenster, `scripts/miss-transferfenster-gemeinsam.ts`):
@@ -626,8 +647,15 @@ async function main() {
     log(`${praefix} Saisonabschluss: ok=${comp.ok} applied=${comp.applied} ${comp.blockingReasons?.join("|") ?? ""}`);
     const hops: { von: string; nach: string; sumKasse: number }[] = [];
     const nachComp = get().gameState;
-    phasen[`${praefix}_04_nach_abschluss`] = { snap: snap(nachComp), phase: nachComp.gamePhase, guv: guvSnapshot(nachComp), kontoauszug: kontoauszugSummen(nachComp, sid) };
+    phasen[`${praefix}_04_nach_abschluss`] = {
+      snap: snap(nachComp), phase: nachComp.gamePhase, guv: guvSnapshot(nachComp), kontoauszug: kontoauszugSummen(nachComp, sid),
+      // SPONSOR-TOPF (24.11.): gebuchte Sponsor-Summe je Team und die Verteilung der Farb-Toepfe (Summe je Topf = Topf).
+      sponsorCashJeTeam: Object.fromEntries(getSeasonSponsorCashByTeam(nachComp)),
+      farbToepfe: sponsorRegelFuer(nachComp) === "topf" ? topfFarbVerteilung(nachComp)?.toepfe ?? null : null,
+    };
     schreibe();
+    // Flip-Lauf (--flip-sponsor): Saison 1 lief im alten System (OLY_SPONSOR_REGEL=aus beim Anlegen), ab dem Saisonwechsel gilt die Topf-Regel.
+    if (process.argv.includes("--flip-sponsor")) delete process.env.OLY_SPONSOR_REGEL;
     // Saisonende-Kette
     for (let hop = 1; hop <= 12; hop += 1) {
       const aktuell = get();

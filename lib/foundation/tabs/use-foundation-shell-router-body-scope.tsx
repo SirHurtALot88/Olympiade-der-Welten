@@ -6037,7 +6037,10 @@ export function useFoundationShellRouterBodyScope({
     }
   }
 
-  async function chooseTeamSponsor(offerId: string) {
+  async function chooseTeamSponsor(
+    offerId: string,
+    wahl?: { vertragsart?: "fest" | "leistung" | "praemie"; laufzeit?: 1 | 2 | 3; farben?: Array<"pow" | "spe" | "men" | "soc"> },
+  ) {
     if (!selectedTeam || readMeta.readOnly || readMeta.source === "prisma") {
       showReadOnlyNotice();
       return;
@@ -6056,6 +6059,8 @@ export function useFoundationShellRouterBodyScope({
           saveId: activeSaveId,
           teamId: selectedTeam.teamId,
           offerId,
+          // Sponsoren-Topf (24.11.): Vertragsart, Laufzeit und Farb-Partner der neuen Seite; fehlende Felder fuellt die KI-Wahl.
+          ...(wahl ? { vertragsart: wahl.vertragsart, laufzeit: wahl.laufzeit, farben: wahl.farben } : {}),
           dryRun: false,
           source: readMeta.source,
         })),
@@ -6129,6 +6134,45 @@ export function useFoundationShellRouterBodyScope({
       setSponsorChoiceMessage("Sponsor konnte nicht gewählt werden.");
     } finally {
       setSponsorChoiceBusy(null);
+    }
+  }
+
+  /**
+   * Sponsorentermin beantworten (24.11., Sponsoren-Topf): `POST /api/sponsor/event` mit `terminId` und `antwort` (zusagen, absagen, "ki" = an die
+   * KI geben). Die Zusage aendert Kasse, Sponsor-Ereignisse und die Form eines Spielers; der Server schreibt sie, danach liest die Seite den
+   * Spielstand frisch (ein Patch einzelner Felder wuerde die Form-Aenderung verfehlen).
+   */
+  async function answerSponsorTermin(terminId: string, antwort: "zusagen" | "absagen" | "ki") {
+    if (!selectedTeam || readMeta.readOnly || readMeta.source === "prisma") {
+      showReadOnlyNotice();
+      return;
+    }
+    if (!canManageTeamId(selectedTeam.teamId)) {
+      showTeamManagementLockedNotice(selectedTeam.name);
+      return;
+    }
+    setSponsorChoiceMessage(null);
+    try {
+      const response = await fetch("/api/sponsor/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(withRoomBody({
+          saveId: activeSaveId,
+          teamId: selectedTeam.teamId,
+          terminId,
+          antwort,
+          dryRun: false,
+          source: readMeta.source,
+        })),
+      });
+      const payload = (await response.json()) as { success?: boolean; error?: string };
+      if (!response.ok || payload.error) {
+        setSponsorChoiceMessage(formatRoomWriteErrorCode(payload.error) ?? "Sponsorentermin konnte nicht beantwortet werden.");
+        return;
+      }
+      await loadSave(activeSaveId);
+    } catch {
+      setSponsorChoiceMessage("Sponsorentermin konnte nicht beantwortet werden.");
     }
   }
 
@@ -13063,6 +13107,7 @@ export function useFoundationShellRouterBodyScope({
       selectedTeamCanManage,
       formatMoney,
       chooseTeamSponsor,
+      answerSponsorTermin,
       sponsorUebernahmeMessage,
       sponsorUebernahmeBusy,
       handleSponsorUebernahme,
