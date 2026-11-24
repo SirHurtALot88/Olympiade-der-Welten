@@ -223,7 +223,9 @@ describe("Runde 2, Punkte 3 und 10: Kernschutz mit Ausnahme fuer gute Angebote",
   };
   const plan = (regel: "alt" | "neu", cash: number) =>
     planOrganicSellsForTeam({
-      gameState: { disciplines: DISC, seasonState: { seasonId: "season-2", wirtschaftsRegeln: { ...NEU("season-2"), kernschutz: regel } }, season: { id: "season-2" } } as unknown as GameState,
+      // `verkaufSchwellen: alt`: dieser Waechter misst den Kernschutz in der Nutzen-Runde (`sellUtility`); mit `neu` entscheidet die
+      // Kosten-Nutzen-Abwaegung (tests/verkauf-kosten-nutzen.test.ts), die ohne Kaderzeilen kein Angebot hat.
+      gameState: { disciplines: DISC, seasonState: { seasonId: "season-2", wirtschaftsRegeln: { ...NEU("season-2"), kernschutz: regel, verkaufSchwellen: "alt" } }, season: { id: "season-2" } } as unknown as GameState,
       team: team(cash),
       identity: IDENTITY,
       roster: roster(),

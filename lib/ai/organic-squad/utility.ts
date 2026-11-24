@@ -616,3 +616,153 @@ function stopCashOptionValue(state: OrganicTeamState): number {
 export function stopUtility(state: OrganicTeamState): number {
   return state.weights.wPatience * stopCashOptionValue(state);
 }
+
+/**
+ * VERKAUF ALS KOSTEN-NUTZEN-ABWAEGUNG (Chris 24.11., Regel-Stempel `verkaufSchwellen`, docs/design/verkauf-restgehalt-24-11.md
+ * Abschnitt 9). Ersetzt mit dem Stempel die starre Gewinnmitnahme ab 1,1 x Marktwert und die Vertragsende-Schwellen: dieselbe
+ * Verkaufsschleife (`planOrganicSellsForTeam`) waehlt je Schritt den Spieler mit dem groessten Vorteil und verkauft, solange der
+ * Vorteil positiv ist. Alles in Credits (C):
+ *
+ *   Vorteil = Erloes − Haltewert − Ersatzrisiko − Wechselkosten + Gehaltsbilanz − Tiefenkosten + Liquiditaet − Marge − Verlustscheu
+ *             ± Bauchgefuehl
+ *
+ *   Erloes         = realisierter Preis (Angebot nach Angebot/Nachfrage, Leistung, Kaderdruck) − offenes Restgehalt.
+ *   Haltewert      = MW x Leistungsanteil x Team-Bedeutung — was der Spieler DIESEM Team wert ist, gemessen am Preis, den ein
+ *                    gleichwertiger Ersatz am Markt kostet (Kauf zum Marktwert).
+ *     Leistungsanteil = 1 + 0,25 x (Leistungsfaktor − 1) bei Ueber-, 1 + 0,5 x (Leistungsfaktor − 1) bei Unterleistung. Der
+ *                    Leistungsfaktor ist der Rang im eigenen MW-Bracket (Verkaufsfaktor ohne Marktlage): wer ueberperformt,
+ *                    bringt mehr — aber nur ein Viertel davon gilt als bestaendig, der Rest als Form/Glueck. Ein Angebot, das NUR die Ueberleistung bezahlt, lohnt sich deshalb nicht.
+ *     Team-Bedeutung  = Staerke im Team (Qualitaet nach den Achsen, die DIESES Team braucht) gegen den Median des Kaders:
+ *                    darueber linear (Top-Spieler sind dem Team mehr wert als dem Markt), darunter fallend (Bankspieler weniger).
+ *   Ersatzrisiko   = ERSATZ_RISIKO x Haltewert x max(1, Team-Bedeutung): keine Garantie, dass der Ersatz so gut passt; je wichtiger, desto teurer.
+ *   Wechselkosten  = WECHSEL_GEHALT x Gehalt: Ersatz suchen, Handgeld, Eingewoehnung.
+ *   Gehaltsbilanz  = Gehalt x (1 − Leistungsanteil x Team-Bedeutung): wer weniger bringt, als sein Gehalt kostet, spart beim Abgang
+ *                    Gehalt (ein Ersatz mit demselben Wert kostet weniger); ein Leistungstraeger ist im Verhaeltnis billig.
+ *   Tiefenkosten   = TIEFE_KOSTEN x ((Bedarf / (n − 1))^2 − (Bedarf / n)^2): Belastung je Spieler steigt mit weniger Koerpern
+ *                    (Bedarf = Spieler je Spieltag laut Spielplan), mehr Ermuedung und Verletzungen bis zum Nachkauf. Klein bei 12
+ *                    bis 14 Spielern, steil unter 8 — eine Kostenkurve, keine Grenze.
+ *   Liquiditaet    = LIQUIDITAET x Erloes in Finanznot (Kasse unter dem Puffer): Geld ist dann mehr wert.
+ *   Marge          = MARGE x Haltewert x Haltefreude(Team): ein Abschluss muss einen kleinen Gewinn ueber dem Wert bringen. Ehrgeizige
+ *                    Teams (wWin) halten lieber, Haendler (wProfit) verkaufen lieber.
+ *   Verlustscheu   = VERLUST x Verlust^2 / (Verlust + 4 C), Verlust = MW − Erloes: ein kleiner Verlust in C geht (Chris: „gerade wenn
+ *                    das absolut kein grosser Verlust ist in Credits“), ein grosser kaum; in Finanznot keine.
+ *   Bauchgefuehl   = ± BAUCHGEFUEHL x Haltewert, reproduzierbar aus Saat und Spieler: manche Teams zocken, manche halten.
+ *
+ * Zahlenbeispiele (Bedarf 8, Kader 12, Gehalt 0,27 x MW): Top-Spieler 10 C MW, Leistungsfaktor 1,2, Staerke 1,25 x Median: zu 11 C
+ * bleibt er (Vorteil −5,5), zu 18 C geht er (+1,5), die Linie liegt bei etwa 16,5 C. Mittelfeld 20 C, Leistung 1,0: geht ab etwa
+ * 1,16 x MW. Schwacher Spieler 6 C MW, Leistung 0,67, Staerke 0,75 x Median: geht schon zu 4 C (+0,25, Linie bei etwa 3,8 C).
+ */
+export const VERKAUFS_ABWAEGUNG = {
+  /**
+   * Anteil der Ueber-/Unterleistung (Leistungsfaktor − 1), der als bestaendig gilt: Ueberleistung nur zu einem Viertel (vorsichtig
+   * bewertet, ein Teil ist Form/Glueck — man verkauft hoch), Unterleistung zur Haelfte (wer ein Jahr unter seinem Bracket bleibt,
+   * bestaetigt es eher).
+   */
+  LEISTUNG_OBEN: 0.25,
+  LEISTUNG_UNTEN: 0.5,
+  /** Team-Bedeutung oberhalb des Medians: Staerke-Verhaeltnis linear. */
+  BEDEUTUNG_MAX: 1.6,
+  /** Team-Bedeutung unterhalb des Medians: 1 − BEDEUTUNG_UNTEN x (1 − Verhaeltnis)^2, mindestens BEDEUTUNG_MIN. */
+  BEDEUTUNG_UNTEN: 6,
+  BEDEUTUNG_MIN: 0.35,
+  ERSATZ_RISIKO: 0.04,
+  WECHSEL_GEHALT: 0.25,
+  TIEFE_KOSTEN: 4,
+  /** Spieler je Spieltag, wenn der Spielplan nichts sagt (zwei Disziplinen, 4 bis 12, im Mittel etwa 8). */
+  BEDARF_STANDARD: 8,
+  LIQUIDITAET: 0.2,
+  MARGE: 0.03,
+  /** Verlustscheu: VERLUST x Verlust^2 / (Verlust + VERLUST_KNIE), Verlust = MW − Erloes in C (klein bei 1 bis 2 C, gross ab 5 C). */
+  VERLUST: 0.5,
+  VERLUST_KNIE: 4,
+  BAUCHGEFUEHL: 0.06,
+} as const;
+
+export type VerkaufsAbwaegungEingabe = {
+  marktwert: number;
+  /** Realisierter Verkaufspreis (Angebot) bei einem Kader von `kaderVorher − 1`. */
+  preis: number;
+  restgehalt: number;
+  gehalt: number;
+  /** Verkaufsfaktor aus dem MW-Bracket (Leistung), ohne Marktlage; 1 ohne Rangliste. */
+  leistungsFaktor: number;
+  /** Staerke im Team gegen den Kader-Median (1 = Median). */
+  staerkeVerhaeltnis: number;
+  kaderVorher: number;
+  spieltagsBedarf: number;
+  finanznot: boolean;
+  /** Gewichte des Teams (Charakter). */
+  wWin: number;
+  wProfit: number;
+  /** Reproduzierbarer Zufall 0..1 (0,5 = neutral). */
+  zufall: number;
+};
+
+export type VerkaufsAbwaegung = {
+  vorteil: number;
+  erloes: number;
+  halteWert: number;
+  ersatzRisiko: number;
+  wechselKosten: number;
+  gehaltsBilanz: number;
+  tiefenKosten: number;
+  liquiditaet: number;
+  marge: number;
+  verlustScheu: number;
+  bauchgefuehl: number;
+  teamBedeutung: number;
+  leistungsAnteil: number;
+};
+
+/** Team-Bedeutung aus dem Staerke-Verhaeltnis zum Kader-Median (siehe VERKAUFS_ABWAEGUNG). */
+export function teamBedeutung(staerkeVerhaeltnis: number): number {
+  const k = VERKAUFS_ABWAEGUNG;
+  const x = Number.isFinite(staerkeVerhaeltnis) ? Math.max(0, staerkeVerhaeltnis) : 1;
+  if (x >= 1) return Math.min(k.BEDEUTUNG_MAX, x);
+  return Math.max(k.BEDEUTUNG_MIN, 1 - k.BEDEUTUNG_UNTEN * (1 - x) ** 2);
+}
+
+/** Belastung je Spieler bei `kader` Koerpern: (Bedarf / Kader)^2. */
+export function kaderBelastung(kader: number, bedarf: number): number {
+  return (bedarf / Math.max(0.5, kader)) ** 2;
+}
+
+/** Die Abwaegung fuer EINEN Spieler, rein (keine Spielstand-Lesung). */
+export function verkaufsAbwaegung(e: VerkaufsAbwaegungEingabe): VerkaufsAbwaegung {
+  const k = VERKAUFS_ABWAEGUNG;
+  const mw = Math.max(0, e.marktwert);
+  const gehalt = Math.max(0, e.gehalt);
+  const erloes = e.preis - Math.max(0, e.restgehalt);
+  const leistung = (Number.isFinite(e.leistungsFaktor) ? e.leistungsFaktor : 1) - 1;
+  const leistungsAnteil = Math.max(0.2, 1 + (leistung >= 0 ? k.LEISTUNG_OBEN : k.LEISTUNG_UNTEN) * leistung);
+  const bedeutung = teamBedeutung(e.staerkeVerhaeltnis);
+  const halteWert = mw * leistungsAnteil * bedeutung;
+  const ersatzRisiko = k.ERSATZ_RISIKO * halteWert * Math.max(1, bedeutung);
+  const wechselKosten = k.WECHSEL_GEHALT * gehalt;
+  const gehaltsBilanz = gehalt * (1 - leistungsAnteil * bedeutung);
+  const bedarf = e.spieltagsBedarf > 0 ? e.spieltagsBedarf : k.BEDARF_STANDARD;
+  const tiefenKosten = k.TIEFE_KOSTEN * (kaderBelastung(e.kaderVorher - 1, bedarf) - kaderBelastung(e.kaderVorher, bedarf));
+  const liquiditaet = e.finanznot ? k.LIQUIDITAET * Math.max(0, erloes) : 0;
+  const haltefreude = clamp(0.6 + 0.4 * e.wWin - 0.5 * (e.wProfit - 0.1), 0.25, 1.8);
+  const marge = e.finanznot ? 0 : k.MARGE * halteWert * haltefreude;
+  const verlust = Math.max(0, mw - erloes);
+  const verlustScheu = e.finanznot ? 0 : (k.VERLUST * verlust * verlust) / (verlust + k.VERLUST_KNIE);
+  const bauchgefuehl = k.BAUCHGEFUEHL * halteWert * 2 * ((Number.isFinite(e.zufall) ? e.zufall : 0.5) - 0.5);
+  const vorteil =
+    erloes - halteWert - ersatzRisiko - wechselKosten + gehaltsBilanz - tiefenKosten + liquiditaet - marge - verlustScheu + bauchgefuehl;
+  return {
+    vorteil,
+    erloes,
+    halteWert,
+    ersatzRisiko,
+    wechselKosten,
+    gehaltsBilanz,
+    tiefenKosten,
+    liquiditaet,
+    marge,
+    verlustScheu,
+    bauchgefuehl,
+    teamBedeutung: bedeutung,
+    leistungsAnteil,
+  };
+}

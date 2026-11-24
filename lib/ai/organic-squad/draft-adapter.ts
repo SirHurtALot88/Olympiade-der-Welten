@@ -39,7 +39,14 @@ import {
   type OrganicTeamState,
   type OrganicUtilityWeights,
 } from "@/lib/ai/organic-squad/types";
-import { DEPTH_REF_COST, sellUtility } from "@/lib/ai/organic-squad/utility";
+import {
+  DEPTH_REF_COST,
+  sellUtility,
+  VERKAUFS_ABWAEGUNG,
+  verkaufsAbwaegung,
+  type VerkaufsAbwaegung,
+} from "@/lib/ai/organic-squad/utility";
+import { resolveMatchdayPlayerDemand } from "@/lib/fatigue/matchday-player-demand";
 import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 import { computePlayerQuality } from "@/lib/ai/organic-squad/quality";
 import { deriveUtilityWeights, resolveRenewalContractLength } from "@/lib/ai/organic-squad/weights";
@@ -550,6 +557,38 @@ export type OrganicDraftFrame = {
  */
 export const SAISON_EINS_RUECKLAGE_FAKTOR = 0.5;
 
+/**
+ * TIEFEN-AUFSTOCKUNG im Fenster (Stempel `verkaufSchwellen`, s. `buildOrganicDraftFrame`): Belastungsziel = Spieler je Spieltag / Kader,
+ * ueber dem der GM bei Geld einen weiteren Platz plant (bei 8 Spielern je Spieltag: 13 Koerper), und wie weit er ueber den
+ * Identitaets-Opt gehen darf. Gegenstueck zur Senkung um hoechstens `GM_OPT_SENKUNG_MAX`.
+ */
+export const TIEFE_EINSATZ_ZIEL = 0.62;
+export const TIEFE_AUFSTOCKUNG_MAX = 2;
+
+/**
+ * Tiefen-Aufstockung, rein: hebt `opt` um je einen Platz, solange die Einsatzquote (Spieler je Spieltag / Kader) ueber dem
+ * Belastungsziel des Teams liegt und der Rahmen den naechsten Platz zum Platzpreis mit Luft traegt (`traegt`), hoechstens
+ * `TIEFE_AUFSTOCKUNG_MAX` ueber den Identitaets-Opt und nie ueber `rosterMax`. Belastungsziel = `TIEFE_EINSATZ_ZIEL`, ein Tiefen-GM
+ * (rosterDepthPreference) senkt es bis 0,05, ein Elite-GM (eliteSmallRosterPreference) hebt es bis 0,05.
+ */
+export function planeTiefenAufstockung(input: {
+  opt: number;
+  identitaetsOpt: number;
+  rosterMax: number;
+  spieltagsBedarf: number;
+  bias: { rosterDepthPreference?: number; eliteSmallRosterPreference?: number } | null;
+  traegt: (opt: number) => boolean;
+}): { opt: number; belastungsZiel: number; einsatzVorher: number } {
+  const neigung = (wert: number | undefined) =>
+    typeof wert === "number" && Number.isFinite(wert) ? Math.min(1, Math.max(0, (wert - 1) / 9)) - 0.5 : 0;
+  const belastungsZiel =
+    TIEFE_EINSATZ_ZIEL - 0.1 * neigung(input.bias?.rosterDepthPreference) + 0.1 * neigung(input.bias?.eliteSmallRosterPreference);
+  const obergrenze = Math.min(input.rosterMax, input.identitaetsOpt + TIEFE_AUFSTOCKUNG_MAX);
+  let opt = input.opt;
+  while (opt < obergrenze && input.spieltagsBedarf / opt > belastungsZiel && input.traegt(opt + 1)) opt += 1;
+  return { opt, belastungsZiel, einsatzVorher: input.spieltagsBedarf / Math.max(1, input.opt) };
+}
+
 export function istSaisonEins(gameState: Pick<GameState, "season">): boolean {
   return /(\d+)\s*$/.exec(gameState.season?.id ?? "")?.[1] === "1";
 }
@@ -715,27 +754,27 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
   // 12), senkt der GM das Ziel — hoechstens bis zur bestehenden Grenze (Identitaets-Opt − 2, nie unter Minimum + 1) — auf das groesste
   // Ziel, das der Rahmen ganz zum Platzpreis traegt, und kauft dafuer staerkere Spieler. Nur im Fenster ab Saison 2: der
   // Saison-1-Draft plant aus dem vollen Startbudget und bleibt unveraendert. `docs/design/fenster-auf-opt-18-11.md` Abschnitt 3a.
+  // Feinschliff (19.11.): mit EINEM Platz Luft — das Ziel gilt nur als getragen, wenn der Rahmen auch noch einen weiteren Platz
+  // zum Platzpreis traegt. Der Planer kauft vor dem letzten Platz staerkere (teurere) Spieler als die reservierten billigsten
+  // 12er; auf Kante gerechnet reichte es fuer den letzten Platz dann nur fuer einen Fueller (gemessen 3 / 5 `fueller_rueckfall`).
+  const rosterMax = ctx.rosterMax ?? ROSTER_MAX;
+  const traegtZumPlatzpreis = (opt: number): boolean => {
+    if (startingSquad.length >= opt) return true;
+    const mitLuft = Math.min(opt + 1, rosterMax);
+    const probe: OrganicSquadPlanInput = {
+      startingSquad,
+      candidates,
+      identityAxisWeights: ctx.identityAxisWeights,
+      disciplines: ctx.disciplines,
+      economy: economyFuer({ ...planWeights, optTarget: mitLuft }, undefined),
+      draftSeed: null,
+      kaderplan: { gmOptGesenkt: true },
+    };
+    return kaderplanRahmen(probe, createOrganicPlanStepState(probe)).plaetze >= mitLuft;
+  };
   if (kaderplan && optEntscheidung && !istSaisonEins(input.gameState) && startingSquad.length < planWeights.optTarget) {
     const identitaetsOpt = optEntscheidung.identitaetsOpt;
     const boden = Math.max(identitaetsOpt - GM_OPT_SENKUNG_MAX, Math.min(identitaetsOpt, ROSTER_MIN + 1));
-    // Feinschliff (19.11.): mit EINEM Platz Luft — das Ziel gilt nur als getragen, wenn der Rahmen auch noch einen weiteren Platz
-    // zum Platzpreis traegt. Der Planer kauft vor dem letzten Platz staerkere (teurere) Spieler als die reservierten billigsten
-    // 12er; auf Kante gerechnet reichte es fuer den letzten Platz dann nur fuer einen Fueller (gemessen 3 / 5 `fueller_rueckfall`).
-    const rosterMax = ctx.rosterMax ?? ROSTER_MAX;
-    const traegtZumPlatzpreis = (opt: number): boolean => {
-      if (startingSquad.length >= opt) return true;
-      const mitLuft = Math.min(opt + 1, rosterMax);
-      const probe: OrganicSquadPlanInput = {
-        startingSquad,
-        candidates,
-        identityAxisWeights: ctx.identityAxisWeights,
-        disciplines: ctx.disciplines,
-        economy: economyFuer({ ...planWeights, optTarget: mitLuft }, undefined),
-        draftSeed: null,
-        kaderplan: { gmOptGesenkt: true },
-      };
-      return kaderplanRahmen(probe, createOrganicPlanStepState(probe)).plaetze >= mitLuft;
-    };
     const vorher = planWeights.optTarget;
     let opt = vorher;
     while (opt > boden && !traegtZumPlatzpreis(opt)) opt -= 1;
@@ -748,6 +787,44 @@ export function buildOrganicDraftFrame(input: OrganicDraftPlanInput): OrganicDra
         optTarget: opt,
         gmDelta: opt - identitaetsOpt,
         grund: optEntscheidung.grund ? `${optEntscheidung.grund}; ${rahmenText}` : `GM ${rahmenText}`,
+      };
+    }
+  }
+
+  /**
+   * TIEFEN-AUFSTOCKUNG (Chris 24.11., Stempel `verkaufSchwellen`): „Wichtig ist nur, dass die Teams das auf dem Schirm haben mit den
+   * Verletzungen und dass es anstrengend wird, wenn du nur 9 oder 10 Spieler hast. Und dass es einfacher ist, wenn du deine Last ein
+   * bisschen verteilen kannst mit zum Beispiel 14 Spielern. … Das soll ja dann der Planner bestimmen.“ Das Gegenstueck zur Senkung
+   * oben: traegt der Rahmen (Kasse, Toepfe, Vorstand, Kaderpflicht-Grenze) einen weiteren Platz zum Platzpreis MIT Luft, und liegt die
+   * Einsatzquote (Spieler je Spieltag / Kader) noch ueber dem Belastungsziel des Teams, hebt der GM das Ziel um einen Platz — hoechstens
+   * `TIEFE_AUFSTOCKUNG_MAX` ueber den Identitaets-Opt und nie ueber das Kader-Maximum. Das Belastungsziel folgt dem Charakter: ein
+   * Tiefen-GM will mehr Koerper, ein Elite-GM weniger. Nur im Fenster ab Saison 2, nie nach einer Senkung; der Saison-1-Draft bleibt.
+   * Ein Team, das viel verkauft hat und Geld hat, fuellt so auf 12 bis 14 auf; ein knappes bleibt bei seinem Opt.
+   */
+  if (
+    kaderplan &&
+    optEntscheidung &&
+    !gmOptGesenkt &&
+    !istSaisonEins(input.gameState) &&
+    wirtschaftsRegel(input.gameState, "verkaufSchwellen") === "neu"
+  ) {
+    const vorher = planWeights.optTarget;
+    const aufstockung = planeTiefenAufstockung({
+      opt: vorher,
+      identitaetsOpt: optEntscheidung.identitaetsOpt,
+      rosterMax,
+      spieltagsBedarf: mittlererSpieltagsBedarf(input.gameState),
+      bias: getTeamGeneralManager(input.gameState, input.team.teamId)?.profile?.bias ?? null,
+      traegt: traegtZumPlatzpreis,
+    });
+    if (aufstockung.opt > vorher) {
+      planWeights = { ...planWeights, optTarget: aufstockung.opt };
+      const text = `Tiefe: Einsatzquote ${aufstockung.einsatzVorher.toFixed(2)} ueber Ziel ${aufstockung.belastungsZiel.toFixed(2)}, Rahmen traegt mehr: Opt ${vorher} -> ${aufstockung.opt}`;
+      optEntscheidung = {
+        ...optEntscheidung,
+        optTarget: aufstockung.opt,
+        gmDelta: aufstockung.opt - optEntscheidung.identitaetsOpt,
+        grund: optEntscheidung.grund ? `${optEntscheidung.grund}; ${text}` : `GM ${text}`,
       };
     }
   }
@@ -964,34 +1041,20 @@ export function kernAngebotGenuegt(rang: number, faktor: number | null): boolean
   return faktor != null && faktor >= KERN_ANGEBOT_FAKTOR[Math.min(Math.max(0, rang), KERN_ANGEBOT_FAKTOR.length - 1)]!;
 }
 /**
- * ABGANG NUR NACH SCHWELLEN (24.11., Regel-Stempel `verkaufSchwellen`, docs/design/verkauf-restgehalt-24-11.md Abschnitt 7).
+ * VERKAUF ALS KOSTEN-NUTZEN-ABWAEGUNG (24.11., Regel-Stempel `verkaufSchwellen`, docs/design/verkauf-restgehalt-24-11.md Abschnitt 9).
  *
- * Chris (24.11.): „Bei schlechtem Verkaufswert sollen die Teams ihre Spieler natuerlich behalten. Manchmal will man aber auch
- * schwache Spieler loswerden.“ Und: „Bei mehrjaehrigen Vertraegen muss die Hemmung viel groesser sein — 8 C Gehalt, noch 4 Jahre,
- * 25 C Marktwert: niemand zahlt 32 C Restgehalt, um ihn loszuwerden, und verschenkt die 25 C obendrauf.“
+ * Chris (24.11.): „Das muss balanciert sein zwischen, okay, das ist ein gutes Angebot, aber der Spieler hat ja auch in seinem Bracket
+ * ueberperformt. … es ist immer Kosten-Nutzen-Verhaeltnis.“ Die starre Gewinnmitnahme ab 1,1 x Marktwert (Abschnitt 8) und die
+ * Vertragsende-Schwellen (klar schwach, Ueberschuss ueber Opt, Abschnitt 7) sind ersetzt durch EINE Abwaegung je Spieler in Credits
+ * (`verkaufsAbwaegung` in utility.ts): Erloes gegen Haltewert (Marktwert x Leistung x Team-Bedeutung), Ersatzrisiko, Wechselkosten,
+ * Gehaltsbilanz, Kadertiefe als Belastungskosten, Liquiditaet in Finanznot, Marge und Bauchgefuehl nach Team-Charakter. Sie gilt im
+ * Fenster und am Vertragsende gleich.
  *
- * Der Verkaufsplaner war auf einen Kader MIT laufenden Vertraegen geeicht: im Fenster vor der neuen Saison zog das Restgehalt jedes
- * (gerade verlaengerten) Vertrags den Verkaufswert in `sellUtility` herunter und bremste. Am Vertragsende (`vertragsende`) gibt es
- * kein Restgehalt — ohne zusaetzliche Schwelle markierte der Planer dort 116 Spieler je Liga (8 bis 11 von 12 bis 14 bei einzelnen
- * Teams). Deshalb geht am Vertragsende ein Spieler nur, wenn sich der Abgang nach seinem WERT lohnt —
- *   - Gewinnmitnahme: der realisierte Verkaufspreis (netto nach Restgehalt) liegt mindestens `GEWINNMITNAHME_FAKTOR` x Marktwert, oder
- *   - klar schwach: seine Qualitaet liegt hoechstens bei `KLAR_SCHWACH_ANTEIL` x Median des Kaders (Kader-Qualitaet zu Beginn), oder
- *   - Ueberschuss ueber Opt (zusaetzliche Erlaubnis, keine Bremse): solange der Kader ueber Opt steht, darf ein Spieler mit
- *     Nutzen ueber `OPT_SURPLUS_SELL_THRESHOLD` gehen — der Platz ueber dem Ziel ist Bank, das Geld ist mehr wert.
- * Wer nicht geht, wird im Tick nach Kosten-Rechnung verlaengert.
- *
- * KEINE KADERGROESSEN-BREMSE (Chris 24.11., „fuer immer“): „Es ist immer erlaubt, alle moeglichen Spieler zu verkaufen. Es gibt
- * keine Groesse, die sagt, du darfst nicht unter die Soll-Kadergroesse gehen.“ Ob ein Spieler geht, entscheidet allein der Wert
- * (Preis gegen Marktwert, klar schwach, Restgehalt netto, Finanzlage) — nie Opt, Soll, Minimum oder Pflichtkader. Die Kadergroesse
- * steuert nur, wie viel das Team danach nachkauft (Kaufrunde und Nachrunde des Fensters fuellen bis Opt). Mit Stempel gibt es
- * deshalb keine Untergrenze im Planer (auch nicht `ROSTER_MIN`), keine Hoechstzahl an Abgaengen und eine Gewinnmitnahme-Runde, die
- * nicht am Nutzen haengt: ein Angebot ab `GEWINNMITNAHME_FAKTOR` x Marktwert nimmt das Team mit, auch wenn der Kader dabei klein
- * wird (der Kaderdruck-Abschlag im Preis ist Teil des Angebots, keine Sperre). Kernschutz (Angebot 1,5 / 1,4 / 1,3 x MW fuer die
- * besten drei) und „frisch verlaengert“ gelten weiter — beides Wert-Regeln. docs/design/verkauf-restgehalt-24-11.md Abschnitt 8.
+ * KEINE KADERGROESSEN-BREMSE (Chris 24.11., „fuer immer“): „Es ist immer erlaubt, alle moeglichen Spieler zu verkaufen.“ Keine
+ * Untergrenze, keine Hoechstzahl; die Kadertiefe steckt nur als Kostenkurve in der Abwaegung (Belastung je Spieler), Verkaeufe unter
+ * Marktwert sind erlaubt. Kernschutz (Angebot 1,5 / 1,4 / 1,3 x MW fuer die besten drei), Restgehalt netto und „frisch verlaengert“
+ * bleiben Wert-Regeln.
  */
-export const GEWINNMITNAHME_FAKTOR = 1.1;
-/** Klar schwach = Qualitaet hoechstens dieser Anteil am Median-Spieler des eigenen Kaders. */
-export const KLAR_SCHWACH_ANTEIL = 0.8;
 /**
  * Verkauf mit offenem Restgehalt (Stempel `verkaufSchwellen`): netto (realisierter Preis minus Rest-Buyout) mindestens dieser Anteil
  * am Marktwert — der Brutto-Preis muss also klar ueber dem Marktwert liegen (Chris: „wenn der Verkaufswert deutlich ueber dem MW
@@ -1045,10 +1108,12 @@ export type OrganicSellDecision = {
   /** Optional tag: "upgrade_churn" for a weak-team hoarder swap-out (see UPGRADE_SWAP docs), else undefined. */
   reason?: "upgrade_churn";
   /**
-   * Warum der Abgang sich lohnt (nur mit Stempel `verkaufSchwellen`): Gewinnmitnahme (immer), am Vertragsende ausserdem klar schwach
-   * oder Ueberschuss ueber Opt. Fuer Protokoll und Messung.
+   * Warum der Abgang sich lohnt (nur mit Stempel `verkaufSchwellen`): `kosten_nutzen` = die Abwaegung (`abwaegung`) ergab einen
+   * positiven Vorteil; `upgrade_churn` = Upgrade-Tausch. Fuer Protokoll und Messung.
    */
-  abgangsGrund?: "ueberschuss_opt" | "gewinnmitnahme" | "klar_schwach" | "upgrade_churn";
+  abgangsGrund?: "kosten_nutzen" | "upgrade_churn";
+  /** Die Abwaegung im Moment der Entscheidung (nur mit Stempel `verkaufSchwellen`), alle Posten in C. */
+  abwaegung?: VerkaufsAbwaegung;
 };
 
 export type OrganicSellPlanInput = {
@@ -1080,8 +1145,8 @@ export type OrganicSellPlanInput = {
   draftSeed?: string | null;
   /**
    * Plan fuer die Entscheidung am VERTRAGSENDE (Verkaufsabsicht vor dem Vertrags-Tick, `lib/contracts/ki-verkaufsabsicht-saisonende.ts`).
-   * Mit Stempel `verkaufSchwellen: neu` geht ein Spieler dann nur bei Gewinnmitnahme, wenn er klar schwach ist oder als Ueberschuss
-   * ueber Opt (siehe `GEWINNMITNAHME_FAKTOR`), unabhaengig davon, ob der Kader danach unter Opt oder Minimum liegt. Ohne Stempel ohne Wirkung.
+   * Nur Kennzeichnung: mit Stempel `verkaufSchwellen: neu` gilt am Vertragsende dieselbe Kosten-Nutzen-Abwaegung wie im Fenster (das
+   * Angebot ist dort der Abgangswert, Restgehalt gibt es keins); ohne Stempel ohne Wirkung.
    */
   vertragsende?: boolean;
 };
@@ -1111,14 +1176,30 @@ function estimateRealizedSellPrice(
   rosterEntry: RosterEntry | null,
   rosterAfter: number,
 ): number | null {
+  return schaetzeVerkaufsAngebot(gameState, teamId, player, rosterEntry, rosterAfter).preis;
+}
+
+/**
+ * Das Angebot fuer einen Spieler: realisierter Preis wie `estimateRealizedSellPrice` und der LEISTUNGSFAKTOR daraus — der Verkaufsfaktor
+ * aus dem Rang im eigenen MW-Bracket (`buildTransfermarktSaleFactorBreakdown`, Ueber-/Unterleistung), ohne die Marktlage
+ * (Saisonstart, Zeitpunkt, Kaderdruck, Passung). Fuer die Kosten-Nutzen-Abwaegung (`verkaufsAbwaegung`). Ohne Rangliste Faktor 1.
+ */
+function schaetzeVerkaufsAngebot(
+  gameState: GameState,
+  teamId: string,
+  player: Player | null,
+  rosterEntry: RosterEntry | null,
+  rosterAfter: number,
+): { preis: number | null; leistungsFaktor: number } {
   if (!player || !rosterEntry) {
-    return null;
+    return { preis: null, leistungsFaktor: 1 };
   }
   try {
     const base = buildTransfermarktSaleFactorBreakdown(gameState, player, rosterEntry);
     if (base.baseMarketValue == null) {
-      return null;
+      return { preis: null, leistungsFaktor: 1 };
     }
+    const leistungsFaktor = base.saleFactor != null && Number.isFinite(base.saleFactor) && base.saleFactor > 0 ? base.saleFactor : 1;
     const priced = applySellPricingPolicyToBreakdown({
       gameState,
       teamId,
@@ -1128,10 +1209,24 @@ function estimateRealizedSellPrice(
       rosterAfter,
     });
     const realized = priced.preFloorSalePrice ?? priced.breakdown.salePrice ?? null;
-    return realized != null && Number.isFinite(realized) ? realized : null;
+    return { preis: realized != null && Number.isFinite(realized) ? realized : null, leistungsFaktor };
   } catch {
-    return null;
+    return { preis: null, leistungsFaktor: 1 };
   }
+}
+
+/**
+ * Spieler je Spieltag im Mittel ueber den Spielplan (`resolveMatchdayPlayerDemand`, Summe beider Disziplinen). Grundlage der
+ * Belastung je Spieler in der Verkaufs-Abwaegung (Tiefenkosten) und der Tiefen-Aufstockung im Kaufplan. Ohne Spielplan der
+ * Standard aus `VERKAUFS_ABWAEGUNG.BEDARF_STANDARD`.
+ */
+export function mittlererSpieltagsBedarf(gameState: Pick<GameState, "seasonState">): number {
+  const werte: number[] = [];
+  for (const zeile of gameState.seasonState?.disciplineSchedule ?? []) {
+    const bedarf = resolveMatchdayPlayerDemand(gameState, zeile.matchdayId);
+    if (bedarf != null) werte.push(bedarf);
+  }
+  return werte.length > 0 ? werte.reduce((a, b) => a + b, 0) / werte.length : VERKAUFS_ABWAEGUNG.BEDARF_STANDARD;
 }
 
 /**
@@ -1182,16 +1277,14 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       input.gameState,
     );
   });
-  // VERKAUFS-SCHWELLEN (24.11., Stempel `verkaufSchwellen`): Restgehalt-Verkauf nur klar ueber dem Marktwert, frisch Verlaengerte nie,
-  // am Vertragsende nur Gewinnmitnahme, klar schwach oder Ueberschuss ueber Opt (Doku an GEWINNMITNAHME_FAKTOR).
+  // VERKAUF ALS KOSTEN-NUTZEN-ABWAEGUNG (Chris 24.11., Stempel `verkaufSchwellen`, Doku an `verkaufsAbwaegung` in utility.ts):
+  // mit Stempel entscheidet je Spieler die Abwaegung in Credits, ob er geht; Restgehalt-Verkauf nur klar ueber dem Marktwert,
+  // frisch Verlaengerte nie. Ohne Stempel die alte Nutzen-Runde (`sellUtility` + Schwellen), unveraendert.
   const schwellen = wirtschaftsRegel(input.gameState, "verkaufSchwellen") === "neu";
   // Ohne Stempel: am Saisonende darf der Kader leer werden, sonst haelt der Plan ROSTER_MIN. Mit Stempel gibt es KEINE
-  // Kadergroessen-Untergrenze (Chris 24.11., „fuer immer“): ob ein Spieler geht, entscheidet der Wert; nachgekauft wird im Fenster.
+  // Kadergroessen-Untergrenze (Chris 24.11., „fuer immer“): die Kadertiefe ist ein Kostenposten der Abwaegung (Belastung), keine Grenze.
   const rosterMin = schwellen || input.allowBelowMin ? 0 : ROSTER_MIN;
   const frischVerlaengert = schwellen ? frischVerlaengerteSpieler(input.gameState, input.team.teamId) : new Set<string>();
-  const abgangPruefen = schwellen && input.vertragsende === true;
-  let qualitaetMedian: number | null = null;
-  let qualitaetGewichte: Record<"pow" | "spe" | "men" | "soc", number> | null = null;
 
   let cash = ctx.cash;
   let salaryTotal = held.reduce((sum, view) => sum + Math.max(0, view.salary), 0);
@@ -1244,15 +1337,91 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
             .map((view, index) => [view.playerId, index] as const)
         : [],
     );
-  while (held.length > rosterMin) {
+  if (schwellen) {
+    /**
+     * KOSTEN-NUTZEN-RUNDE (Stempel `verkaufSchwellen`, Chris 24.11.: „es ist immer Kosten-Nutzen-Verhaeltnis. Wenn du jetzt einen
+     * Top-Spieler weghaust, musst du den Slot ja auch erstmal fuellen … Klar, wenn das Angebot so unverschaemt gut ist, dass du
+     * richtig viel Kohle damit machst, dann lohnt sich das auch.“). Je Schritt wird fuer jeden gehaltenen Spieler die Abwaegung
+     * (`verkaufsAbwaegung`) mit dem AKTUELLEN Kader gerechnet — Preis mit dem Kaderdruck des kleineren Kaders, Staerke mit der
+     * aktuellen Disziplin-Abdeckung, Tiefenkosten mit der aktuellen Groesse — und der Spieler mit dem groessten Vorteil geht, solange
+     * der Vorteil positiv ist. Keine Hoechstzahl, keine Untergrenze: wer viele gute Angebote hat, verkauft viele und kauft im Fenster
+     * nach; wer nur maessige hat, behaelt. Kernschutz, Restgehalt netto und „frisch verlaengert“ gelten weiter.
+     */
+    const bedarf = mittlererSpieltagsBedarf(input.gameState);
+    const angebotCache = new Map<string, { preis: number | null; leistungsFaktor: number }>();
+    const angebot = (view: OrganicPlayerView, kaderNachher: number) => {
+      const key = `${view.playerId}:${kaderNachher}`;
+      let wert = angebotCache.get(key);
+      if (!wert) {
+        wert = schaetzeVerkaufsAngebot(
+          input.gameState,
+          input.team.teamId,
+          playerById.get(view.playerId) ?? null,
+          rosterEntryByPlayerId.get(view.playerId) ?? null,
+          kaderNachher,
+        );
+        angebotCache.set(key, wert);
+      }
+      return wert;
+    };
+    let referenzMedian: number | null = null;
+    while (held.length > 0) {
+      const state = buildState();
+      if (kernRang == null) kernRang = bestimmeKern(state);
+      // Staerke im Team = Qualitaet nach den Achsen, die DIESES Team braucht (Disziplin-Bedarf des aktuellen Kaders), gegen den Median
+      // des Kaders zu Beginn des Plans. Der Bezug bleibt fest: ein Abgang macht die Uebrigen nicht schwaecher oder staerker, nur die
+      // Tiefenkosten und der Kaderdruck im Preis steigen — so bremst der Kader sich ueber Kosten, nicht ueber eine Groesse.
+      const staerke = new Map(held.map((view) => [view.playerId, computePlayerQuality(view, state.needAxisWeights)] as const));
+      if (referenzMedian == null) {
+        const sortiert = [...staerke.values()].sort((a, b) => a - b);
+        referenzMedian = sortiert.length > 0 ? Math.max(1e-6, sortiert[Math.floor((sortiert.length - 1) / 2)]!) : 1;
+      }
+      const finanznot = teamDistressed || state.cash < ctx.cashBuffer;
+      let best: OrganicPlayerView | null = null;
+      let bestAbwaegung: VerkaufsAbwaegung | null = null;
+      for (const view of held) {
+        if (frischVerlaengert.has(view.playerId)) continue; // gerade verlaengert: kein Verkauf mit dem Restgehalt des neuen Vertrags
+        if (!(view.marketValue > 0)) continue;
+        const { preis, leistungsFaktor } = angebot(view, Math.max(0, held.length - 1));
+        if (preis == null) continue; // ohne Preis kein Angebot
+        const rang = kernRang.get(view.playerId);
+        if (rang != null && !finanznot && !kernAngebotGenuegt(rang, preis / view.marketValue)) continue; // Kernschutz
+        const restgehalt = buyoutByPlayerId.get(view.playerId) ?? 0;
+        if (!restgehaltVerkaufLohnt({ marketValue: view.marketValue, realizedPrice: preis, openBuyout: restgehalt })) continue;
+        const a = verkaufsAbwaegung({
+          marktwert: view.marketValue,
+          preis,
+          restgehalt,
+          gehalt: view.salary,
+          leistungsFaktor,
+          staerkeVerhaeltnis: (staerke.get(view.playerId) ?? 0) / referenzMedian,
+          kaderVorher: held.length,
+          spieltagsBedarf: bedarf,
+          finanznot,
+          wWin: ctx.weights.wWin,
+          wProfit: ctx.weights.wProfit,
+          zufall: input.draftSeed ? draftUnit(`${input.draftSeed}:${view.playerId}:abwaegung`) : 0.5,
+        });
+        if (!bestAbwaegung || a.vorteil > bestAbwaegung.vorteil) {
+          best = view;
+          bestAbwaegung = a;
+        }
+      }
+      if (!best || !bestAbwaegung || bestAbwaegung.vorteil <= 0) break;
+      const verkaufterKernRang = kernRang.get(best.playerId);
+      if (verkaufterKernRang != null && process.env.OLY_KERN_VERKAUF_LOG === "1") {
+        KERN_VERKAUF_LOG.push({ teamId: input.team.teamId, playerId: best.playerId, rang: verkaufterKernRang + 1, faktor: bestAbwaegung.erloes / best.marketValue, grund: finanznot ? "finanznot" : "gutes_angebot" });
+      }
+      held.splice(held.indexOf(best), 1);
+      cash += Math.max(0, bestAbwaegung.erloes);
+      salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
+      decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestAbwaegung.vorteil, abgangsGrund: "kosten_nutzen", abwaegung: bestAbwaegung });
+    }
+  }
+  while (!schwellen && held.length > rosterMin) {
     const state = buildState();
     // Kernschutz (Befund 3): einmal je Plan aus dem Kader zu Beginn bestimmt; faellt weg, sobald das Team in Finanznot ist.
     if (kernRang == null) kernRang = bestimmeKern(state);
-    if (abgangPruefen && qualitaetMedian == null) {
-      qualitaetGewichte = state.needAxisWeights;
-      const qs = held.map((view) => computePlayerQuality(view, state.needAxisWeights)).sort((a, b) => a - b);
-      qualitaetMedian = qs.length > 0 ? qs[Math.floor((qs.length - 1) / 2)]! : 0;
-    }
     const finanznot = teamDistressed || state.cash < ctx.cashBuffer;
     const angebotFaktor = (view: OrganicPlayerView): number | null => {
       if (!kernFaktor.has(view.playerId)) {
@@ -1317,40 +1486,6 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       }
     }
 
-    let abgangsGrund: OrganicSellDecision["abgangsGrund"] = undefined;
-    if (schwellen) {
-      const offenesRestgehalt = buyoutByPlayerId.get(best.playerId) ?? 0;
-      const ueberOpt = held.length > ctx.weights.optTarget;
-      if (offenesRestgehalt > 0 || abgangPruefen) {
-        const realized =
-          estimateRealizedSellPrice(
-            input.gameState,
-            input.team.teamId,
-            playerById.get(best.playerId) ?? null,
-            rosterEntryByPlayerId.get(best.playerId) ?? null,
-            Math.max(0, held.length - 1),
-          ) ?? best.marketValue;
-        // Restgehalt: Verkauf nur, wenn netto mindestens 90 % des Marktwerts bleibt — auch ueber Opt und in Finanznot.
-        if (!restgehaltVerkaufLohnt({ marketValue: best.marketValue, realizedPrice: realized, openBuyout: offenesRestgehalt })) {
-          blockedFloorPlayerIds.add(best.playerId);
-          continue;
-        }
-        if (abgangPruefen) {
-          // Nur der Wert entscheidet, nie die Kadergroesse (keine Hoechstzahl, keine Untergrenze; Chris 24.11.). Der Ueberschuss ueber
-          // Opt ist eine zusaetzliche Erlaubnis, keine Bremse darunter.
-          const qualitaet = computePlayerQuality(best, qualitaetGewichte ?? state.needAxisWeights);
-          if (best.marketValue > 0 && realized - offenesRestgehalt >= GEWINNMITNAHME_FAKTOR * best.marketValue) abgangsGrund = "gewinnmitnahme";
-          else if (qualitaetMedian != null && qualitaet <= KLAR_SCHWACH_ANTEIL * qualitaetMedian) abgangsGrund = "klar_schwach";
-          else if (ueberOpt) abgangsGrund = "ueberschuss_opt";
-          else {
-            // Lohnt sich nicht: er bleibt, der Tick verlaengert ihn nach Kosten-Rechnung.
-            blockedFloorPlayerIds.add(best.playerId);
-            continue;
-          }
-        }
-      }
-    }
-
     const verkaufterKernRang = kernRang.get(best.playerId);
     if (verkaufterKernRang != null && process.env.OLY_KERN_VERKAUF_LOG === "1") {
       KERN_VERKAUF_LOG.push({ teamId: input.team.teamId, playerId: best.playerId, rang: verkaufterKernRang + 1, faktor: kernFaktor.get(best.playerId) ?? null, grund: finanznot ? "finanznot" : "gutes_angebot" });
@@ -1358,58 +1493,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     held.splice(held.indexOf(best), 1);
     cash += Math.max(0, nettoPruefung ? best.netSaleProceeds ?? best.marketValue : best.marketValue);
     salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
-    decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility, ...(abgangsGrund ? { abgangsGrund } : {}) });
-  }
-
-  /**
-   * GEWINNMITNAHME-RUNDE (Stempel `verkaufSchwellen`, Chris 24.11.: „Wenn ich 12 Spieler habe und 10 davon haben ein richtig gutes
-   * Angebot und ich soll mindestens 10 Spieler haben, dann verkaufe ich ja nicht nur 2, dann verkaufe ich 8 oder so und kaufe mir ein
-   * viel besseres oder gleichwertiges Team und habe viel mehr Cash.“). Die Nutzen-Runde oben hoert auf, sobald ein weiterer Abgang den
-   * Kader spuerbar schwaecht (`sellUtility` rechnet den Staerkeverlust ohne Nachkauf). Ein Angebot ab `GEWINNMITNAHME_FAKTOR` x Marktwert
-   * (netto nach Restgehalt) ist aber fuer sich ein Gewinn: das Team bekommt mehr, als derselbe Spieler am Markt kostet (Kauf zum
-   * Marktwert), und kauft im selben Fenster nach. Deshalb geht jedes solche Angebot, hoechstes zuerst, ohne Kadergroessen-Grenze. Der
-   * Preis jedes weiteren Abgangs wird mit dem dann kleineren Kader neu gerechnet (Kaderdruck-Abschlag am bzw. unter dem Minimum) —
-   * die Runde endet, wenn kein Angebot mehr ueber der Schwelle liegt. Kernschutz und „frisch verlaengert“ gelten weiter.
-   */
-  if (schwellen) {
-    while (held.length > 0) {
-      const state = buildState();
-      if (kernRang == null) kernRang = bestimmeKern(state);
-      const finanznot = teamDistressed || state.cash < ctx.cashBuffer;
-      let kandidat: OrganicPlayerView | null = null;
-      let kandidatNetto = -Infinity;
-      let kandidatBrutto: number | null = null;
-      for (const view of held) {
-        if (frischVerlaengert.has(view.playerId) || !(view.marketValue > 0)) continue;
-        const realized = estimateRealizedSellPrice(
-          input.gameState,
-          input.team.teamId,
-          playerById.get(view.playerId) ?? null,
-          rosterEntryByPlayerId.get(view.playerId) ?? null,
-          Math.max(0, held.length - 1),
-        );
-        if (realized == null) continue;
-        const brutto = realized / view.marketValue;
-        const rang = kernRang.get(view.playerId);
-        if (rang != null && !finanznot && !kernAngebotGenuegt(rang, brutto)) continue; // Kernschutz
-        const netto = (realized - (buyoutByPlayerId.get(view.playerId) ?? 0)) / view.marketValue;
-        if (netto > kandidatNetto) {
-          kandidatNetto = netto;
-          kandidat = view;
-          kandidatBrutto = brutto;
-        }
-      }
-      if (!kandidat || kandidatNetto < GEWINNMITNAHME_FAKTOR) break;
-      const verkaufterKernRang = kernRang.get(kandidat.playerId);
-      if (verkaufterKernRang != null && process.env.OLY_KERN_VERKAUF_LOG === "1") {
-        KERN_VERKAUF_LOG.push({ teamId: input.team.teamId, playerId: kandidat.playerId, rang: verkaufterKernRang + 1, faktor: kandidatBrutto, grund: finanznot ? "finanznot" : "gutes_angebot" });
-      }
-      const utility = sellUtility(kandidat, state);
-      held.splice(held.indexOf(kandidat), 1);
-      cash += Math.max(0, nettoPruefung ? kandidat.netSaleProceeds ?? kandidat.marketValue : kandidat.marketValue);
-      salaryTotal = Math.max(0, salaryTotal - Math.max(0, kandidat.salary));
-      decisions.push({ playerId: kandidat.playerId, step: decisions.length, utility, abgangsGrund: "gewinnmitnahme" });
-    }
+    decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility });
   }
 
   // WEAK-TEAM UPGRADE SWAP (see UPGRADE_SWAP docs above). Season-end only (allowBelowMin) so the freed slot
@@ -1458,7 +1542,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
         step: decisions.length,
         utility: weakestUtility,
         reason: "upgrade_churn",
-        ...(abgangPruefen ? { abgangsGrund: "upgrade_churn" as const } : {}),
+        ...(schwellen ? { abgangsGrund: "upgrade_churn" as const } : {}),
       });
       swapsRemaining -= 1;
     }

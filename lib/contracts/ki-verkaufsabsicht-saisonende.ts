@@ -88,8 +88,8 @@ export function ermittleKiVerkaufsabsichtAmSaisonende(save: PersistedSaveGame): 
       purchasePriceByPlayerId,
       allowBelowMin: true,
       draftSeed: saltOrganicSeed(`${save.saveId}:${team.teamId}`),
-      // Entscheidung am Vertragsende (24.11., Stempel `verkaufSchwellen`): es geht nur, wer sich nach seinem Wert lohnt
-      // (Gewinnmitnahme, klar schwach, Ueberschuss ueber Opt); ohne den Stempel ist das der unveraenderte Plan der Verkaufsrunde.
+      // Entscheidung am Vertragsende (24.11., Stempel `verkaufSchwellen`): dieselbe Kosten-Nutzen-Abwaegung wie im Fenster (Angebot =
+      // Abgangswert, kein Restgehalt); ohne den Stempel ist das der unveraenderte Plan der Verkaufsrunde.
       vertragsende: true,
     });
     // Wie die Verkaufsrunde im gemeinsamen Fenster: ohne „Fenster auf Opt" nur bis max(8, playerMin) — aber nur im alten Stand.

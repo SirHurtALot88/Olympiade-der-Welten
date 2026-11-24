@@ -430,7 +430,7 @@ describe("Verkaufsabsicht am Saisonende", () => {
 // ---------------------------------------------------------------------------------------------------------------------
 // Verkaufs-Schwellen (24.11., Stempel `verkaufSchwellen`, verkauf-restgehalt-24-11.md Abschnitt 7)
 // ---------------------------------------------------------------------------------------------------------------------
-describe("Verkaufs-Schwellen: Restgehalt bremst, Vertragsende nur nach Schwellen", () => {
+describe("Verkaufs-Schwellen: Restgehalt bremst, Vertragsende nach derselben Kosten-Nutzen-Abwaegung", () => {
   afterEach(() => {
     delete process.env.OLY_KI_VERKAUF_SCHWELLEN;
   });
@@ -473,29 +473,29 @@ describe("Verkaufs-Schwellen: Restgehalt bremst, Vertragsende nur nach Schwellen
     expect(plan.decisions.length).toBeGreaterThan(0);
   });
 
-  it("am Vertragsende geht nur, wer sich lohnt: Gewinnmitnahme und Ueberschuss ueber Opt ja, Stammspieler ohne gutes Angebot nein", () => {
+  it("am Vertragsende gilt dieselbe Kosten-Nutzen-Abwaegung wie im Fenster: jeder Abgang mit positivem Vorteil, weniger als ohne Stempel", () => {
     // 18 gleich starke Spieler, Opt 8, Ein-Jahres-Vertraege ohne Restgehalt; die Leistungs-Rangfolge gibt p0 … p6 ein Angebot
-    // ueber 1,1 x MW, den anderen nicht.
+    // ueber dem Marktwert, den anderen darunter.
     const ohne = gateState("neu", 1, { schwellen: "alt" });
     const mit = gateState("neu", 1, { schwellen: "neu" });
     const planOhne = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(ohne.gameState), team: ohne.team, identity: IDENTITY, roster: ohne.players, allowBelowMin: true, vertragsende: true });
     const planMit = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(mit.gameState), team: mit.team, identity: IDENTITY, roster: mit.players, allowBelowMin: true, vertragsende: true });
+    const planFenster = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(mit.gameState), team: mit.team, identity: IDENTITY, roster: mit.players, allowBelowMin: true });
     expect(planOhne.decisions.length).toBeGreaterThan(18 - planOhne.optTarget);
-    // Mit Schwellen: der Planer haelt die Spieler ohne gutes Angebot, sobald der Ueberschuss weg ist.
     expect(planMit.decisions.length).toBeGreaterThan(0);
     expect(planMit.decisions.length).toBeLessThan(planOhne.decisions.length);
+    expect(planMit.decisions.map((d) => d.playerId)).toEqual(planFenster.decisions.map((d) => d.playerId));
     let kader = mit.players.length;
     for (const d of planMit.decisions) {
       kader -= 1;
-      expect(["gewinnmitnahme", "ueberschuss_opt"]).toContain(d.abgangsGrund);
-      // Ueberschuss nur, solange der Kader ueber Opt stand; Gewinnmitnahme nur mit Angebot ab 1,1 x MW.
-      if (d.abgangsGrund === "ueberschuss_opt") expect(kader + 1).toBeGreaterThan(planMit.optTarget);
-      if (d.abgangsGrund === "gewinnmitnahme") expect(nettoErloes(mitGehaltsAbzug(mit.gameState), d.playerId, kader)).toBeGreaterThanOrEqual(1.1 * 40 - 1e-9);
+      expect(d.abgangsGrund).toBe("kosten_nutzen");
+      expect(d.abwaegung!.vorteil).toBeGreaterThan(0);
+      // Gleich starke Spieler: es geht nur, wer ein Angebot ueber dem Marktwert hat (die Abwaegung verlangt Ersatz, Risiko, Marge).
+      expect(nettoErloes(mitGehaltsAbzug(mit.gameState), d.playerId, kader)).toBeGreaterThan(40);
     }
-    expect(planMit.finalRosterSize).toBeGreaterThanOrEqual(planMit.optTarget);
   });
 
-  it("am Vertragsende darf unter Opt nur ein klar schwacher Spieler (oder eine Gewinnmitnahme) gehen", () => {
+  it("schwache Spieler duerfen auch unter Marktwert gehen; Stammspieler ohne gutes Angebot bleiben", () => {
     // 8 Spieler bei Opt 8: zwei sind klar schwaecher (POW 20 statt 75) und billig.
     const { gameState, team: t, players } = gateState("neu", 1, {
       schwellen: "neu",
@@ -504,9 +504,13 @@ describe("Verkaufs-Schwellen: Restgehalt bremst, Vertragsende nur nach Schwellen
       mw: (i) => (i >= 6 ? 12 : 40),
     });
     const plan = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(gameState), team: t, identity: IDENTITY, roster: players, allowBelowMin: true, vertragsende: true });
+    const verkauft = new Map(plan.decisions.map((d) => [d.playerId, d] as const));
+    expect(verkauft.has("p6")).toBe(true);
+    expect(verkauft.has("p7")).toBe(true);
+    expect(Math.min(verkauft.get("p6")!.abwaegung!.erloes, verkauft.get("p7")!.abwaegung!.erloes)).toBeLessThan(12);
     for (const d of plan.decisions) {
-      expect(["klar_schwach", "gewinnmitnahme"]).toContain(d.abgangsGrund);
-      if (d.abgangsGrund === "klar_schwach") expect(["p6", "p7"]).toContain(d.playerId);
+      if (d.playerId === "p6" || d.playerId === "p7") continue;
+      expect(d.abwaegung!.erloes).toBeGreaterThan(40);
     }
   });
 

@@ -284,6 +284,9 @@ Tick-Bremse zaehlt geplante Abgaenge mit Stempel; Stempel und Rueckweg. Die Rest
 
 ## 8. Keine Kadergroessen-Bremse (Chris, 24.11.)
 
+> **Teilweise ueberholt durch Abschnitt 9 (Chris, 24.11.):** die Gewinnmitnahme-Runde ab 1,1 x MW und die Vertragsende-Schwellen (klar
+> schwach, Ueberschuss ueber Opt) sind durch die Kosten-Nutzen-Abwaegung ersetzt. Die Regel „keine Kadergroessen-Bremse“ bleibt.
+
 Chris, woertlich: „Nee, unterhalb der Soll-Kadergroesse einen Spieler nur gehen zu lassen, ist schon der falsche Weg. Weil es ist ja
 okay, wenn ein Team unter Minimum verkauft, weil sie dann ja neue Spieler kaufen koennen. … Wenn ich jetzt zum Beispiel 12 Spieler habe
 und 10 davon haben ein richtig gutes Angebot und ich soll mindestens 10 Spieler haben, dann verkaufe ich ja nicht nur 2, dann verkaufe
@@ -407,3 +410,160 @@ Groessen-Regel; ohne gutes Angebot verkauft dasselbe Team unter Opt nichts; ohne
 Rest-Kader (3) bis Opt 10; Tick ohne Freigabe-Hoechstzahl und ohne `hard_min_retention`; Aufloesung `rosterFactor` ≤ 1; Fenster-Grenze
 nur ohne Stempel. `tests/verkauf-restgehalt.test.ts`: der Vertragsende-Test prueft jetzt Wert-Gruende statt „hoechstens Ueberschuss“,
 der Tick-Test „geplante Abgaenge zaehlen gegen die Bremse“ ist umgestellt auf „keine Bremse mit Stempel, drei ohne“.
+
+## 9. Verkauf als Kosten-Nutzen-Abwaegung (Chris, 24.11.)
+
+Chris, woertlich (gekuerzt): „Ich habe dir doch gerade noch gesagt, dass es eine alte Berechnung dafuer gab und das schoen abgewaegt
+wurde. Und jetzt machst du ab 1,1-fachen Marktwert, haust du einfach alle Spieler raus. Das muss balanciert sein zwischen, okay, das ist
+ein gutes Angebot, aber der Spieler hat ja auch in seinem Bracket ueberperformt. … es ist immer Kosten-Nutzen-Verhaeltnis. Wenn du jetzt
+einen Top-Spieler weghaust, musst du den Slot ja auch erstmal fuellen und du hast keine Garantie, dass ein gleichwertiger Spieler perfekt
+in dein Team reinpasst. Klar, wenn das Angebot so unverschaemt gut ist, dass du richtig viel Kohle damit machst, dann lohnt sich das auch.
+… Du hast einen Spieler, der 10 Millionen kostet. Und den wuerdest du jetzt fuer 11 verkaufen … Das waere doch total daemlich. … Es muss
+halt moeglich sein, auch zum Beispiel 8 Spieler zu verkaufen, die alle ein gutes Angebot haben und vielleicht kaufst du dir dafuer 12
+neue … Wichtig ist nur, dass die Teams das auf dem Schirm haben mit den Verletzungen und dass es anstrengend wird, wenn du nur 9 oder 10
+Spieler hast. … es muessen ja auch mal Spieler verkauft werden, die unter Marktwert sind … Ohne Limitationen … dynamisch und organisch,
+so wie der Draft an sich. Es muss halt auch zum Team passen.“
+
+### 9.1 Der Bestand, auf dem das aufsetzt
+
+| Baustein | Wo | Was er schon abwaegt |
+|---|---|---|
+| `sellUtility` | `lib/ai/organic-squad/utility.ts` | `wThrift x Verkaufswert − wWin x Staerkeverlust + wPatience x Geldwert + wProfit x Gewinn + Gehaltsentlastung in Not`, Gewichte aus Identitaet und GM, Jitter 8 je Saat. Nutzen-Einheiten, kein C. Der Verkaufswert zaehlt voll als Nutzen, ein Ersatz kostet nichts. |
+| Schwellen | `draft-adapter.ts` | 0 (bei/unter Opt), −18 (ueber Opt), Kernschutz 1,5 / 1,4 / 1,3 x MW fuer die besten drei, „think twice“ (Verlust > max(25 % MW, 5 C)). |
+| Angebot | `estimateRealizedSellPrice` → `buildTransfermarktSaleFactorBreakdown` + `applySellPricingPolicyToBreakdown` | Preis = MW x Leistungsfaktor (Rang im MW-Bracket nach Saisonleistung, 0,65 bis 1,65) x Marktlage (Saisonstart, Zeitpunkt, Kaderdruck am/unter dem Minimum 0,95 / 0,9, Passung). |
+| Kaufplaner | `buildOrganicDraftFrame`, `kaderplanRahmen` | Ziel = Identitaets-Opt; der GM darf um hoechstens 2 senken (Elite-Neigung, Rahmen traegt nur Fueller), nie heben. |
+| Kredit | `resolveAiLoanDecision`, Kreditprobe der Fenster-Sitzung | bedarfsgetrieben (Kader unter der Zwischenstufe Min + halber Weg zu Opt, Kasse reicht nicht), Persoenlichkeit, Tragfaehigkeit, Vorstands-Sperre (`pruefeKreditAufnahme`). Saison 1 nie. |
+| Belastung | `lib/fatigue/` | Last 16 je Einsatz, Erholung 28, Risikokurve ab Fatigue 25; Spieltagsbedarf = Summe beider Disziplinen (4 bis 12, im Spielplan im Mittel 8). |
+
+Die Gewinnmitnahme-Runde aus Abschnitt 8 hing an keinem dieser Bausteine: jedes Angebot ab 1,1 x MW ging, ohne zu fragen, was der Spieler
+dem Team bringt und was ein Ersatz kostet.
+
+### 9.2 Die Abwaegung
+
+Mit Stempel `verkaufSchwellen: neu` rechnet die Verkaufsschleife (`planOrganicSellsForTeam`, im Fenster und am Vertragsende gleich) je
+Schritt fuer jeden gehaltenen Spieler den Vorteil in C und verkauft den mit dem groessten, solange er positiv ist. Preis, Kaderdruck und
+Tiefenkosten werden nach jedem Abgang mit dem kleineren Kader neu gerechnet. Die alte Nutzen-Runde, die Gewinnmitnahme-Runde und die
+Vertragsende-Schwellen (klar schwach, Ueberschuss) entfallen mit dem Stempel; ohne Stempel laeuft die alte Nutzen-Runde unveraendert.
+
+    Vorteil = Erloes − Haltewert − Ersatzrisiko − Wechselkosten + Gehaltsbilanz − Tiefenkosten + Liquiditaet − Marge − Verlustscheu
+              ± Bauchgefuehl
+
+| Posten | Formel | Begruendung |
+|---|---|---|
+| Erloes | Angebot − Restgehalt | das Angebot wie bisher (Leistung, Angebot/Nachfrage, Kaderdruck); am Vertragsende der Abgangswert |
+| Haltewert | MW x Leistungsanteil x Team-Bedeutung | was ein gleichwertiger Ersatz am Markt kostet (Kauf zum MW) |
+| Leistungsanteil | 1 + 0,25 x (Leistungsfaktor − 1) bei Ueber-, 1 + 0,5 x (…) bei Unterleistung | Ueberleistung im Bracket zaehlt zu einem Viertel als bestaendig (Rest Form/Glueck: man verkauft hoch), Unterleistung zur Haelfte (wer ein Jahr unter seinem Bracket bleibt, bestaetigt es eher). Der Leistungstraeger bleibt trotzdem, weil er dem Team mehr bedeutet (naechste Zeile; Chris: „hat ja auch in seinem Bracket ueberperformt“). |
+| Team-Bedeutung | Staerke / Kader-Median: darueber linear (bis 1,6), darunter 1 − 6 x (1 − x)^2 (ab 0,35) | Staerke = Qualitaet nach den Achsen, die DIESES Team braucht (`computePlayerQuality` mit dem Disziplin-Bedarf). Ein Leistungstraeger ist dem Team mehr wert als dem Markt, ein Bankspieler weniger. |
+| Ersatzrisiko | 0,04 x Haltewert x max(1, Bedeutung) | „keine Garantie, dass ein gleichwertiger Spieler perfekt reinpasst“, je wichtiger, desto teurer |
+| Wechselkosten | 0,25 x Gehalt | Ersatz suchen, Handgeld, Eingewoehnung |
+| Gehaltsbilanz | Gehalt x (1 − Leistungsanteil x Bedeutung) | wer weniger bringt, als er kostet, spart beim Abgang Gehalt; ein Leistungstraeger ist im Verhaeltnis billig |
+| Tiefenkosten | 4 x ((Bedarf/(n−1))^2 − (Bedarf/n)^2) | Belastung je Spieler bis zum Nachkauf (Bedarf = Spieler je Spieltag laut Spielplan, im Mittel 8): bei 12 → 11 0,34 C, 10 → 9 0,6, 8 → 7 1,2, 6 → 5 3,1, 5 → 4 5,8, 4 → 3 12,4 C. Eine Kostenkurve, keine Grenze. |
+| Liquiditaet | 0,2 x Erloes in Finanznot | Geld ist dann mehr wert; die Marge entfaellt |
+| Marge | 0,03 x Haltewert x Haltefreude | Haltefreude = 0,6 + 0,4 x wWin − 0,5 x (wProfit − 0,1), 0,25 bis 1,8: ehrgeizige Teams halten, Haendler verkaufen |
+| Verlustscheu | 0,5 x Verlust^2 / (Verlust + 4 C), Verlust = MW − Erloes | ein kleiner Verlust in C geht (2 C kosten 0,33), ein grosser kaum (7 C kosten 2,2); in Finanznot keine (Chris: „gerade wenn das absolut kein grosser Verlust ist in Credits“) |
+| Bauchgefuehl | ± 0,06 x Haltewert | reproduzierbar aus Saat und Spieler: manche Teams zocken, manche halten |
+
+Weiter gelten: Kernschutz (Angebot 1,5 / 1,4 / 1,3 x MW fuer die besten drei, ausser in Finanznot), Restgehalt netto ≥ 0,9 x MW
+(`restgehaltVerkaufLohnt`), nie ein frisch verlaengerter Vertrag. Die „think twice“-Sperre entfaellt mit dem Stempel: ein Verlust
+steht jetzt als Betrag in der Rechnung (Chris: „Manchmal hat man halt einen Verlust oder geht ein Gamble ein“). Keine Untergrenze, keine
+Hoechstzahl.
+
+**Zahlenbeispiele** (neutrales Team, Kader 12, 8 Spieler je Spieltag, Gehalt 0,27 x MW wie im Liga-Median; Waechter
+`tests/verkauf-kosten-nutzen.test.ts`):
+
+| Fall | Haltewert | Vorteil | Urteil |
+|---|---:|---:|---|
+| Top-Performer, 10 C MW, Leistungsfaktor 1,2, Staerke 1,25 x Median, Angebot 11 C | 13,1 | −5,0 | bleibt |
+| derselbe, Angebot 18 C | 13,1 | +2,0 | geht (Linie bei etwa 16 C = 1,6 x MW, passend zum Kernschutz 1,5 / 1,4 / 1,3) |
+| Mittelfeld, 20 C MW, Leistung 1,0, Staerke = Median, Angebot 20 / 22 / 24 C | 20 | −3,1 / −1,1 / +0,9 | geht ab etwa 1,16 x MW |
+| schwacher Spieler, 6 C MW, Leistung 0,67, Staerke 0,75 x Median, Angebot 4 C | 3,1 | +0,35 | geht unter Marktwert (Linie bei etwa 3,8 C) |
+| 12 Spieler (je 30 C MW), zehn Angebote 1,5 x MW | | | 8 gehen (12 → 4), p2/p3 haelt die Tiefe (Chris: „dann verkaufe ich 8 oder so“) |
+| dieselben zehn Angebote 1,25 x MW | | | 4 gehen (12 → 8); unter dem Minimum kostet der Kaderdruck 10 % im Preis, dazu die Tiefe |
+| dieselben Angebote 1,0 x MW | | | keiner |
+
+### 9.3 Kaufseite: Tiefen-Aufstockung
+
+Das Gegenstueck zur bestehenden Senkung um hoechstens 2 (`buildOrganicDraftFrame`, nur im Fenster ab Saison 2, nur mit Stempel):
+traegt der Rahmen (Kasse, Toepfe, Vorstands-Freigabe, Kaderpflicht-Grenze) einen weiteren Platz zum Platzpreis mit einem Platz Luft, und
+liegt die Einsatzquote (Spieler je Spieltag / Ziel) noch ueber dem Belastungsziel des Teams, hebt der GM das Ziel um einen Platz —
+hoechstens 2 ueber den Identitaets-Opt, nie ueber 14 (`planeTiefenAufstockung`, `TIEFE_EINSATZ_ZIEL` 0,62, Tiefen-GM bis 0,57, Elite-GM
+bis 0,67). Bei 8 Spielern je Spieltag heisst das: wer Geld hat, plant 12 bis 13 Koerper (Elite 12, Tiefe bis 14), wer knapp ist, bleibt
+bei seinem Opt. Kein Notkauf, kein Auffuellen mit Billigst-Spielern: gekauft wird weiter nur, was der Planer nach Nutzen will.
+
+**Finanzierung.** Die KI nimmt schon heute Kredite fuer Kaeufe auf (`resolveAiLoanDecision` in der Kreditprobe der Fenster-Sitzung und im
+Kassensturz): sobald der Kader unter der Zwischenstufe Min + halber Weg zu Opt steht und die Kasse den Bedarf nicht traegt, im Rahmen der
+Tragfaehigkeit und der Vorstands-Sperre. Daran wurde nichts geaendert (siehe Messung).
+
+### 9.4 Messung
+
+Derselbe Messweg wie 8.3 (`miss-teamfinanzen-saison.ts --stop-after spieltage --keep`, 32 KI von Anfang an, Saat 1 ohne Mischen bzw.
+`--mischen 7`; je Kopie Saisonabschluss → Saisonende-Kette → Saisonwechsel → `fuehreKiPreseasonLaufAus`), auf **neu angelegten** Basen,
+alle drei Staende auf derselben Basis: „main“ = `origin/main` (ohne Abschnitte 7 bis 9), „PR“ = Stand von Abschnitt 8 (`d05d19c5d`,
+Gewinnmitnahme ab 1,1 x MW), „Abwaegung“ = dieser Stand. Stempel `verkaufSchwellen: neu` ab Saison 1. Kasse in C, Σ ueber 32 Teams.
+Preis/MW = Abgangswert bzw. Verkaufspreis gegen den Marktwert nach der Abrechnung von S1. Top-3 = die drei besten Spieler des Teams nach
+Rating vor dem Wechsel. Staerke = Mittel der besten 6 nach Rating (CLAUDE.md „beste 6“), Aenderung je Team.
+
+| | S1 main | S1 PR | **S1 Abwaegung** | S7 main | S7 PR | **S7 Abwaegung** |
+|---|---:|---:|---:|---:|---:|---:|
+| Abgaenge gesamt | 133 | 106 | **88** | 152 | 117 | **96** |
+| je Team min / Median / max | 0 / 3,5 / 11 | 0 / 3 / 6 | **0 / 3 / 6** | 0 / 5 / 10 | 0 / 3,5 / 7 | **1 / 3 / 5** |
+| davon Planer / Tick (schlechter Vertrag, Moral, Heuristik) | 116 / 17 | 89 / 17 | **72 / 16** | 127 / 25 | 87 / 30 | **66 / 30** |
+| Preis/MW Median (alle) | 0,86 | 1,14 | **0,88** | 0,87 | 1,10 | **0,92** |
+| Preis/MW Median (Planer), Quartile | 0,86 (0,73–1,08) | 1,19 (0,84–1,30) | **0,96 (0,67–1,29)** | 0,87 (0,68–1,09) | 1,17 (0,87–1,32) | **1,05 (0,72–1,28)** |
+| Planer-Abgaenge unter MW | 82 | 31 | **39** | 81 | 26 | **29** |
+| Abgaenge ab 1,2 x MW (alle) | 18 | 44 | **25** | 19 | 40 | **22** |
+| Top-3 unter den Planer-Abgaengen (Preis/MW) | 11 (0,75–1,18) | 4 (1,14–1,46) | **0** | 9 (0,65–1,31) | 5 (1,12–1,39) | **1 (1,07)** |
+| Top-3 unter allen Abgaengen | 17 | 9 | **5** | 13 | 11 | **6** |
+| Nachkaeufe (n / C) | 123 / 2582,57 | 109 / 2477,60 | **88 / 1972,59** | 150 / 2953,16 | 123 / 2580,95 | **105 / 2171,90** |
+| Kader vor dem Kauf: Teams unter 8 | 17 | 12 | **10** | 22 | 13 | **12** |
+| **Kader am 1. Spieltag S2** min / Median / max | 8 / 11 / 14 | 9 / 11 / 14 | **9 / 11 / 14** | 9 / 11 / 14 | 8 / 11,5 / 14 | **8 / 11,5 / 14** |
+| davon Teams mit 13 / 14 | 2 / 5 | 0 / 10 | **2 / 7** | 5 / 4 | 1 / 10 | **6 / 8** |
+| Kredite fuer Kaeufe | 0 | 0 | **0** | 0 | 0 | **0** |
+| Δ Kasse | −1149,00 | −1079,57 | **−1128,07** | −1333,51 | −1082,34 | **−1294,74** |
+| Δ Kaderwert (Σ MW) | +702,68 | +878,44 | **+798,50** | +788,52 | +822,70 | **+871,58** |
+| **Δ Kasse + Kaderwert** | −446,32 | −201,13 | **−329,57** | −544,99 | −259,64 | **−423,16** |
+| Δ Staerke (beste 6) je Team, Mittel | +2,60 | +2,96 | **+2,30** | +2,35 | +2,53 | **+2,04** |
+| Verlaengert im Tick | 231 | 257 | **275** | 214 | 247 | **268** |
+
+Verteilung der Abgaenge je Team (Anzahl Teams): S1 Abwaegung {0: 1, 1: 5, 2: 9, 3: 8, 4: 5, 5: 3, 6: 1}, S7 {1: 5, 2: 8, 3: 8, 4: 4,
+5: 7}. Kader am 1. Spieltag S2: S1 {9: 6, 10: 6, 11: 6, 12: 5, 13: 2, 14: 7}, S7 {8: 1, 9: 3, 10: 7, 11: 5, 12: 2, 13: 6, 14: 8}.
+
+**Lesart.**
+
+- Keine Leistungstraeger mehr zu 1,1 bis 1,5 x MW: unter den Planer-Abgaengen ist hoechstens ein Top-3-Spieler (Saat 7, 1,07 x MW;
+  nach Rating Top-3, nach der Bedarfs-Qualitaet des Teams nicht). Mit #1745 (PR) waren es 4 / 5, auf `main` 11 / 9 (dort auch unter MW).
+  Die Top-3-Abgaenge, die bleiben (5 / 6), kommen aus dem Vertrags-Tick (schlechter Vertrag, Moral), nicht aus dem Verkaufsplan.
+- Beide Richtungen kommen vor: rund ein Viertel der Planer-Abgaenge geht zu 1,2 x MW und mehr (Gewinn, Ueberleister ohne
+  Schluesselrolle), etwas ueber die Haelfte (S1) bzw. 44 % (S7) unter MW — fast alles Bankspieler mit schwacher Saison (Rating der
+  Abgaenge 27, der Zugaenge 36 bis 38), zum Boden des Verkaufsfaktors (0,65). Grosse Verluste in C bremst die Verlustscheu.
+- Weniger Umschlag als PR und main (88 / 96 statt 106 / 117 bzw. 133 / 152), entsprechend weniger Nachkaeufe; die Spitze eines Teams
+  liegt bei 5 bis 6. Wer viele richtig gute Angebote hat, kann aber weit mehr abgeben (Waechter: 8 von 12 bei 1,5 x MW).
+- Kader am 1. Spieltag: keines unter 8, 9 / 14 Teams mit 13 bis 14 (main 7 / 9, PR 10 / 11).
+- Vermoegen (Kasse + Kaderwert) liegt zwischen main und PR (−330 / −423 C gegen −201 / −260 PR und −446 / −545 main), ebenso die
+  Staerke der besten 6 (+2,3 / +2,0 gegen +3,0 / +2,5 PR, +2,6 / +2,4 main): wer weniger umschlaegt, hebt weniger Gewinn ab, und
+  Abgaenge unter MW kosten Buchwert. Das ist der Preis der Vorsicht, die Chris verlangt (Top-Spieler nicht fuer 1 C Gewinn); die
+  Stellschrauben stehen in `VERKAUFS_ABWAEGUNG` (Abschnitt 9.6).
+- Kredite: in keinem der sechs Laeufe — kein Team stand nach dem Fenster knapp (niedrigste Kasse nach dem Fenster rund 20 C, Teams am
+  Minimum mit 100 C und mehr waren GMs mit kleinem Ziel). Die KI nimmt Kredite fuer Kaeufe nur, wenn die Kasse den Kaderbedarf nicht
+  traegt (`resolveAiLoanDecision`); siehe offene Frage 3.
+
+### 9.5 Tests
+
+`tests/verkauf-kosten-nutzen.test.ts` (neu): die drei Zahlenbeispiele (10 C zu 11 C bleibt, zu 18 C geht; 6 C zu 4 C geht) und das
+Mittelfeld; Verlustscheu; Tiefenkosten als Kurve; Finanznot; Charakter und Bauchgefuehl; Chris' 8-raus/12-rein (zehn Angebote zu 1,5 x
+MW ⇒ 8 von 12 gehen, am Vertragsende wie im Fenster; danach hebt die Tiefen-Aufstockung das Ziel 10 → 12 und der Kaufplaner kauft
+mindestens 8 nach); Aufstockung ohne Geld, Elite- gegen Tiefen-GM. `tests/verkauf-keine-groessenbremse.test.ts`: Chris' Beispiel jetzt
+mit 1,5 (8 gehen) und 1,25 (4 gehen, Kaderdruck und Tiefe beenden), ohne gutes Angebot keiner. `tests/verkauf-restgehalt.test.ts`:
+Vertragsende = Fenster-Abwaegung, schwache Spieler unter MW. `tests/wirtschafts-regeln-runde2.test.ts`: Kernschutz-Waechter misst die
+Nutzen-Runde (`verkaufSchwellen: alt`).
+
+### 9.6 Offene Fragen an Chris
+
+1. **Zahlen der Abwaegung.** Ueberleistung zaehlt zu 25 %, Unterleistung zu 50 % als bestaendig; Team-Bedeutung linear darueber, steil
+   darunter; Ersatzrisiko 4 %, Wechselkosten ein Viertel Jahresgehalt, Marge 3 %, Verlustscheu 0,5 x V²/(V + 4), Tiefe 4 C x
+   Belastungsdifferenz, Bauchgefuehl ± 6 %. Gesetzt nach den Beispielen und zwei Messlaeufen, nicht abgestimmt.
+2. **Wie viel Umschlag?** Jetzt 88 / 96 Abgaenge je Liga (PR 106 / 117), Preis-Median 0,96 / 1,05 im Plan. Soll die KI mehr Gewinn
+   mitnehmen (z. B. Marge/Ersatzrisiko senken), auf Kosten von etwas mehr Abgaengen guter Mittelfeldspieler?
+3. **Kredite.** Die KI leiht nur bei echter Kassenluecke; im Fenster S1 → S2 hatte kein Team eine. Soll es einen „Investitionskredit“
+   geben (gutes Upgrade am Markt, Kasse reicht knapp nicht, Tragfaehigkeit da), der auch bei voller Kasse fuer einen Zusatzkauf greift?
+4. **Tiefen-Aufstockung.** Belastungsziel 0,62 Spieler je Spieltag pro Kopf (bei 8 je Spieltag: 13 Koerper), hoechstens +2 ueber den Opt.

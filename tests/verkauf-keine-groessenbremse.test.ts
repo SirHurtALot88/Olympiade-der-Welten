@@ -7,10 +7,11 @@
  * die sagt, du darfst nicht unter die Soll-Kadergroesse gehen.“
  *
  * Die Waechter hier:
- *  1. Chris' Beispiel im Planer: 12 Spieler, Opt 10, 10 mit Angebot ueber 1,1 x MW — die KI verkauft deutlich mehr als 2 (auch unter
- *     das Minimum), am Vertragsende wie im Fenster. Kernschutz (Angebot 1,5 / 1,4 / 1,3 x MW) bleibt eine Wert-Regel.
+ *  1. Chris' Beispiel im Planer: 12 Spieler, Opt 10, 10 mit richtig gutem Angebot — die KI verkauft deutlich mehr als 2 (auch unter
+ *     das Minimum), am Vertragsende wie im Fenster. Ob einer geht, entscheidet die Kosten-Nutzen-Abwaegung (Abschnitt 9); die
+ *     Kadertiefe ist darin ein Kostenposten, keine Grenze. Kernschutz (Angebot 1,5 / 1,4 / 1,3 x MW) bleibt eine Wert-Regel.
  *  2. Der Kaufplaner fuellt einen so geschrumpften Kader im selben Fenster wieder bis Opt.
- *  3. Ohne gutes Angebot (Faktor unter 1,1) verkauft dasselbe Team unter Opt nichts — der Wert entscheidet, nicht die Groesse.
+ *  3. Ohne gutes Angebot verkauft dasselbe Team keinen gleich starken Stammspieler — der Wert entscheidet, nicht die Groesse.
  *  4. Vertrags-Tick: keine Hoechstzahl an Freigaben, keine Halte-Signale nach Kadergroesse (mit Stempel); ohne Stempel wie vorher.
  *  5. Vertragsaufloesung: ein Kader unter Opt macht den Spieler nicht wertvoller (mit Stempel).
  *  6. Die Fenster-Grenze max(8, playerMin) im alten Stand (`OLY_FENSTER_AUF_OPT=0`) gilt mit Stempel nicht.
@@ -45,7 +46,7 @@ vi.mock("@/lib/market/transfermarkt-sell-pricing-policy", async (importOriginal)
   };
 });
 
-const { planOrganicSellsForTeam, GEWINNMITNAHME_FAKTOR } = await import("@/lib/ai/organic-squad/draft-adapter");
+const { planOrganicSellsForTeam } = await import("@/lib/ai/organic-squad/draft-adapter");
 const { buildOrganicSquadPlan } = await import("@/lib/ai/organic-squad/draft-builder");
 const { deriveUtilityWeights } = await import("@/lib/ai/organic-squad/weights");
 const { computeSeasonEndContractTick } = await import("@/lib/contracts/contract-renewal-service");
@@ -126,51 +127,56 @@ function chrisKader(schwellen: "alt" | "neu") {
 }
 
 describe("Chris' Beispiel: 12 Spieler, Opt 10, 10 mit richtig gutem Angebot", () => {
-  const angebote = () => {
-    // Die beiden Besten haben kein Angebot ueber dem Marktwert, die anderen zehn 1,25 x MW.
-    for (let i = 0; i < 12; i++) ANGEBOT.set(`p${i}`, i < 2 ? 0.95 : 1.25);
+  const angebote = (faktor: number) => {
+    // Die beiden Besten haben kein Angebot ueber dem Marktwert, die anderen zehn `faktor` x MW.
+    for (let i = 0; i < 12; i++) ANGEBOT.set(`p${i}`, i < 2 ? 0.95 : faktor);
   };
 
   for (const vertragsende of [true, false]) {
     it(`die KI verkauft deutlich mehr als 2 — auch unter Opt und Minimum (${vertragsende ? "Vertragsende" : "Fenster"})`, () => {
-      angebote();
+      angebote(1.5);
       const { gameState, team, players } = chrisKader("neu");
       const plan = planOrganicSellsForTeam({ gameState, team, identity: IDENTITY, roster: players, allowBelowMin: true, vertragsende });
       expect(plan.optTarget).toBeGreaterThanOrEqual(9);
-      // p3 … p11 gehen (9 Spieler); p2 ist dritter Kernspieler und braucht 1,3 x MW, p0/p1 haben kein gutes Angebot.
+      // p4 … p11 gehen (8 Spieler, Chris: „dann verkaufe ich 8 oder so“); p0/p1 haben kein gutes Angebot, p2/p3 haelt die Tiefe.
       expect(plan.decisions.length).toBeGreaterThanOrEqual(8);
       expect(plan.finalRosterSize).toBeLessThan(IDENTITY.playerMin as number);
       const verkauft = new Set(plan.decisions.map((d) => d.playerId));
-      for (const id of ["p0", "p1", "p2"]) expect(verkauft.has(id)).toBe(false);
-      // Am Vertragsende traegt jeder Abgang seinen Grund; im Fenster hat die Nutzen-Runde keinen, die Gewinnmitnahme-Runde schon.
-      if (vertragsende) for (const d of plan.decisions) expect(d.abgangsGrund).toBe("gewinnmitnahme");
+      for (const id of ["p0", "p1"]) expect(verkauft.has(id)).toBe(false);
+      // Jeder Abgang traegt seine Abwaegung, im Fenster wie am Vertragsende.
+      for (const d of plan.decisions) {
+        expect(d.abgangsGrund).toBe("kosten_nutzen");
+        expect(d.abwaegung!.vorteil).toBeGreaterThan(0);
+      }
     });
   }
 
-  it("auch unter dem Minimum bleibt es ein Wert-Urteil: der Kaderdruck-Abschlag im Preis gehoert zum Angebot", () => {
-    // 1,15 x MW: ab dem Minimum (0,95) faellt das Angebot unter 1,1 — dann ist Schluss, ohne Groessen-Regel.
-    for (let i = 0; i < 12; i++) ANGEBOT.set(`p${i}`, i < 2 ? 0.95 : 1.15);
+  it("auch unter dem Minimum bleibt es eine Kosten-Frage: Kaderdruck im Preis und Tiefenkosten beenden den Abverkauf", () => {
+    // 1,25 x MW: vier gehen (bis zum Minimum 8); der naechste Abgang kostet 10 % im Preis (unter dem Minimum) und mehr Belastung.
+    angebote(1.25);
     const { gameState, team, players } = chrisKader("neu");
     const plan = planOrganicSellsForTeam({ gameState, team, identity: IDENTITY, roster: players, allowBelowMin: true, vertragsende: true });
-    expect(plan.finalRosterSize).toBe(9);
-    expect(1.15 * 0.95).toBeLessThan(GEWINNMITNAHME_FAKTOR);
+    expect(plan.finalRosterSize).toBe(8);
+    const tiefen = plan.decisions.map((d) => d.abwaegung!.tiefenKosten);
+    for (let i = 1; i < tiefen.length; i++) expect(tiefen[i]).toBeGreaterThan(tiefen[i - 1]!);
   });
 
-  it("ohne gutes Angebot verkauft dasselbe Team unter Opt nichts — der Wert entscheidet, nicht die Groesse", () => {
+  it("ohne gutes Angebot verkauft dasselbe Team keinen gleich starken Stammspieler — der Wert entscheidet, nicht die Groesse", () => {
     for (let i = 0; i < 12; i++) ANGEBOT.set(`p${i}`, 1.0);
     const { gameState, team, players } = chrisKader("neu");
     const plan = planOrganicSellsForTeam({ gameState, team, identity: IDENTITY, roster: players, allowBelowMin: true, vertragsende: true });
-    for (const d of plan.decisions) expect(["ueberschuss_opt", "klar_schwach"]).toContain(d.abgangsGrund);
-    expect(plan.decisions.filter((d) => d.abgangsGrund === "ueberschuss_opt").length).toBeLessThanOrEqual(Math.max(0, 12 - plan.optTarget));
+    expect(plan.decisions).toHaveLength(0);
   });
 
-  it("ohne Stempel (alter Stand) bleibt es bei der Nutzen-Runde: deutlich weniger Abgaenge", () => {
-    angebote();
-    const neu = chrisKader("neu");
+  it("ohne Stempel (alter Stand) bleibt es bei der Nutzen-Runde (`sellUtility`), ohne Abwaegung", () => {
+    angebote(1.25);
     const alt = chrisKader("alt");
-    const planNeu = planOrganicSellsForTeam({ gameState: neu.gameState, team: neu.team, identity: IDENTITY, roster: neu.players, allowBelowMin: true, vertragsende: true });
     const planAlt = planOrganicSellsForTeam({ gameState: alt.gameState, team: alt.team, identity: IDENTITY, roster: alt.players, allowBelowMin: true, vertragsende: true });
-    expect(planAlt.decisions.length).toBeLessThan(planNeu.decisions.length);
+    expect(planAlt.decisions.length).toBeGreaterThan(0);
+    for (const d of planAlt.decisions) {
+      expect(d.abwaegung).toBeUndefined();
+      expect(d.abgangsGrund).toBeUndefined();
+    }
   });
 
   it("danach kauft die KI nach: der Kaufplaner fuellt den Rest-Kader im selben Fenster bis Opt", () => {
