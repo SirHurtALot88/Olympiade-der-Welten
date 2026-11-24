@@ -11,6 +11,20 @@ Chris hat keinen Steuerberater und macht EÜR und Meldungen selbst. Chris' Ziel 
 
 ---
 
+## 0. Entscheidung von Chris (23./24.11.2026): Pfad B, „all out"
+
+Chris hat entschieden, den Wechsel zur Regelbesteuerung zum 1.1.2027 zu gehen, im Dezember durchzuverkaufen, die 25.000 € zu überschreiten und ab 2027 zu wachsen (Ziel auch 50.000 € Umsatz). Daraus folgt:
+
+- **Pausentermin und Umsatzlinien aus `STEUER_UND_UMSATZGRENZE.md` entfallen.** 2026 bleibt Chris Kleinunternehmer (Vorjahr 2025: 24.181 € unter 25.000 €), Dezember-Verkäufe bekommen noch keine Umsatzsteuer.
+- **Klar über 25.000 € landen, nicht knapp.** Der Zufluss 2026 liegt bei Weiterverkauf wahrscheinlich bei 24.800 bis 25.200 €, das wäre die Grauzone. Verkauf bis 28.12. durchlaufen lassen und die **Auszahlung am 29.12.** auslösen, damit alles in 2026 steht. Ziel: Zufluss 2026 deutlich über 25.000 € (möglichst ab 26.000 €). Landet er doch knapp darunter und Chris will wechseln: Verzicht nach § 19 Abs. 3 UStG (bindet mindestens fünf Jahre).
+- **Lieferdatum entscheidet:** Was am 31.12. verschickt wird, ist 2026 (ohne Umsatzsteuer), was ab 2.1. verschickt wird, ist 2027 (mit Umsatzsteuer) **[Wissen]**.
+- **Einkäufe:** große Einkäufe, auch das Yu-Gi-Oh-Pack für Januar und das Dezember-Pack, erst im **Januar 2027** kaufen. Rechnung, Lieferung und Zahlung alle in 2027, nur bei gewerblichen Lieferanten mit ausgewiesener Umsatzsteuer, keine Anzahlung im Dezember. Der Grund: Kein Vorsteuerabzug für Leistungen vor dem Wechsel, auch nicht bei absehbarem Wechsel und Anzahlungen **[Quelle: [Steuerschroeder zum BMF-Schreiben vom 10.11.2025](https://www.steuerschroeder.de/blog/vorsteuerabzug-beim-wechsel-zwischen-kleinunternehmer-und-regelbesteuerung-neues-bmf-schreiben-schafft-klarheit/)]**. Bleibt Chris doch Kleinunternehmer, entsteht dadurch kein Nachteil.
+- **Preise 2027:** vor dem 1.1. entscheiden, ob eine Anhebung um etwa 3 bis 4 % nötig ist, damit die Zahllast den Gewinn nicht auffrisst.
+- **Diese Woche (Priorität):** Lieferanten und Umsatzsteuer-Rechnungen klären, Lexoffice und Billbee prüfen (Probe-Rechnung mit 19 %), ELSTER-Zugang, Telefonat mit dem Finanzamt (Fragen in Abschnitt 5).
+- **Realismus:** B liegt bei 27.500 € etwa 1.000 € Gewinn hinter dem Deckel-Fall A und holt A erst bei etwa 36.000 € ein (siehe Abschnitt 1). Das Wachstum braucht Bestand, Zeit und Marge.
+
+---
+
 ## 1. Die Entscheidung in Zahlen
 
 ### Annahmen (aus EÜR 2025/2026 abgeleitet)
@@ -103,6 +117,7 @@ Aufwand für Voranmeldungen und Belegprüfung, einmalige Beratung, Vorsteuer auf
 - ☐ **ELSTER-Zugang** prüfen (Zertifikat gültig, Voranmeldung als Formular verfügbar).
 - ☐ **Billbee:** Steuersätze je Lieferland anlegen (Schweiz, Israel, USA 0 % Ausfuhr, übrige EU und Inland 19 %). Rechnungsvorlage mit Platz für Steuernummer, ohne Kleinunternehmer-Hinweis, Sendungsnummer-Platzhalter prüfen. Test: Wird die Sendungsnummer an eBay übertragen? Markierung „Ausfuhr" für Drittland-Bestellungen.
 - ☐ **eBay:** Auszahlungsrhythmus **nicht** ändern, bis geklärt ist, ob Gutschrift oder Auszahlung für die Grenze zählt. USt-IdNr. im Konto ist schon hinterlegt.
+- ☐ **Verpackung:** Lizenz 2027 (Reclay) und Planmengenmeldung 2027 (LUCID) erledigen, siehe Abschnitt 5a.
 - ☐ **Lagerbestand** zum Stichtag erfassen (Menge und Einkaufswert, möglichst nach Quelle) für die Frage der Vorsteuerberichtigung.
 - ☐ **Preise:** prüfen, ob eine Anhebung um etwa 3 bis 4 % nötig ist, damit Marge und Gewinn nach der Steuer stimmen.
 
@@ -139,6 +154,23 @@ Laut BMF-Schreiben vom 10.11.2025 gibt es beim Wechsel **keinen nachträglichen 
 6. Wie wurden mein Status 2024 und 2025 veranlagt (Kleinunternehmer ja/nein)? Steht das im Bescheid?
 7. Welche Privatverkäufe müssen in die EÜR, welche nicht (Gegenstände, die je in der EÜR standen, etwa Arbeitsmittel)?
 8. Soll ich auf Istversteuerung nach § 20 UStG umstellen?
+
+## 5a. Verpackungsgesetz (LUCID, Reclay) — Stand 24.11.2026
+
+Anlass: eBay-Mail „Angabe von PPWR-Verpackungsregistrierungsnummern möglicherweise erforderlich" (23./24.11.2026). Chris verschickt nur Briefe, bringt aber eigenes Versandmaterial (Umschläge, Toploader, Schutzhüllen) in Umlauf und gilt damit als Hersteller dieser Versandverpackung **[Quelle: [Verpackungsregister LUCID](https://verpackungsregister.org/ich-bin-versand-und-onlinehaendler), [Händlerbund](https://www.haendlerbund.de/de/wissen/verpackungsgesetz)]**. Eine Ausnahme für Briefe wurde nicht gefunden. Registrierung ist ohne Bagatellgrenze Pflicht, Marktplätze dürfen Händlern ohne Nachweis den Verkauf beschränken, Bußgelder bis 200.000 € vorgesehen.
+
+**Stand (aus Chris' LUCID-Dashboard, eBay-Konto und Mails):**
+- LUCID-Registrierung seit **20.06.2022**, Status „Registriert", Name „Lord Enterich Cards", Stammdaten zuletzt am 20.12.2025 aktualisiert (Bescheid der Zentralen Stelle vom 20.12.2025).
+- Duales System: **Reclay (activate)**. Bestellbestätigung, Rechnung #R1000178445 und Teilnahmebestätigung vom 20.12.2025 (Lizenz 2026).
+- Datenmeldungen in LUCID: Unterjährige Mengenmeldung 2022, Initiale Planmengenmeldung 2023, Jahresabschlussmengenmeldung 2023, Unterjährige Mengenmeldung 2024, Jahresabschlussmengenmeldung 2024, Initiale Planmengenmeldung 2025, **Jahresabschlussmengenmeldung 2025**, **Initiale Planmengenmeldung 2026** (abgegeben 20.12.2025).
+- eBay-Konto, Angaben zum Unternehmen: Eintrag Deutschland, Verpackung (LUCID/PPWR) mit Registrierungsnummer ist hinterlegt. Die Mail von eBay verlangt dann nichts weiter.
+- Lizenzero-Mails im Postfach sind Werbung eines Wettbewerbers, keine Mahnung.
+
+**Termine:**
+- ☐ **Dezember 2026: Lizenz 2027 bei Reclay und Initiale Planmengenmeldung 2027 in LUCID.** Letztes Jahr am 20.12. erledigt, Reclay erinnerte an die Planmengenmeldung bis 31.12. (Frist für 2027 ist **[offen]**, nicht bestätigt). Rabatte für Frühlizenzierer beachten.
+- ☐ **Bis 15.5.2027: Jahresabschlussmengenmeldung 2026** in LUCID.
+- ☐ Lizenzentgelt ist Betriebsausgabe, ab Regelbesteuerung mit Vorsteuer, wenn die Rechnung Umsatzsteuer ausweist (Rechnung für 2027 im Januar, wenn möglich).
+- Die Vollständigkeitserklärung ist nur nötig, wenn die Bagatellgrenze überschritten wird **[Quelle: Recherche 23.11.2026]**, bei Chris' Mengen vermutlich nicht.
 
 ## 6. Offene Anpassungen in LEC (nur Vorschläge, nichts gebaut)
 - **Marge netto:** Bei Regelbesteuerung rechnet LEC die Deckungsbeiträge mit Netto-Verkaufspreis (VK/1,19) und netto Einkaufspreis nur dort, wo der Einkauf Umsatzsteuer enthält. Je Artikel ein Feld „Einkauf mit USt" oder die Quelle (gewerblich/privat). Der Marge-Korridor 25 bis 33 % muss neu geeicht werden.
