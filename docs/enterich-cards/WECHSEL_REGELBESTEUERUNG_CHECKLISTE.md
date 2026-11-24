@@ -112,6 +112,28 @@ Beispiel 100 % Diff: Differenz 20.282 − 8.062 = 12.220 € → USt 1.951 € �
 - Jeder Privatkauf braucht einen **Beleg** (Kaufbestätigung oder Eigenbeleg mit Datum und Betrag), jede Eingangsrechnung wird nach „USt ausgewiesen" oder „§ 25a" markiert.
 - Die Entscheidung für die Gesamtdifferenz gilt für das Jahr, ein Wechsel geht nur zum 1. Januar. Wer 2027 nicht sofort startet, verliert nichts und kann 2028 einsteigen.
 
+## 1b. Belege und Töpfe, Nachricht ans Finanzamt (Stand 24.11.2026)
+
+**Arbeitsweise ab 2027 (Chris):** einmal im Monat die Cardmarket-Käufe importieren; im Postfach nach Rechnungen mit ausgewiesener USt schauen und direkt zuweisen; alle anderen Käufe (privat, Kleinunternehmer, Händler mit Differenzbesteuerung) landen ohne Steuer auf dem Wareneinkaufskonto.
+
+- **Topf 1:** Einkauf mit ausgewiesener USt: Rechnung anhängen, Vorsteuer ziehen, Verkauf mit 19 %.
+- **Topf 2:** Einkauf ohne ausgewiesene USt: Differenzbesteuerung, Zahllast 19/119 × (Verkäufe − Einkäufe).
+- **Sonstige Rechnungen** (eBay, Billbee, Lexoffice, Telefon): wie bisher anhängen, Vorsteuer bleibt.
+- Die Zahllast insgesamt ist nach eigener Rechnung gleich, egal wie Ware auf die Töpfe verteilt wird (Rechnung, keine Quelle).
+- **Einzelfall mit USt-Rechnung im Topf 2 mitbuchen:** wirtschaftlich gleich (19/119 vom Einkaufspreis entspricht der Vorsteuer), formal aber nicht sauber (UStAE 25a.1: nur Ware ohne Vorsteuerabzugsrecht). Nur bei Kleinbeträgen und nach Rückfrage beim Finanzamt.
+- **Händler-Einkauf ohne Rechnung:** keine Vorsteuer, aber der Einkaufspreis fließt in die Differenz; kein Beinbruch, besser die Rechnung besorgen.
+- Zahlen für die Gesamtdifferenz: Verkaufspreis je Artikel im Schnitt ca. 9 bis 10 €, Einkauf ca. 3,5 bis 4 € (Wareneinkauf 2026 Jan–Okt 8.061,97 € bei 20.282,04 € Umsatz, rund 40 %), über 2.500 Artikel pro Jahr; Grenze je Gegenstand laut Quellen 500 oder 750 €.
+
+**Am 24.11.2026 abgesendet:** „Sonstige Nachricht an das Finanzamt" in Mein ELSTER (ein Formular für Änderungen gab es nicht; der Fragebogen zur steuerlichen Erfassung ist nur für die Neuaufnahme). Gefragt wurde:
+1. Zeitpunkt des Wechsels (1.1.2027) und ob eine bestimmte Form nötig ist,
+2. Voranmeldungszeitraum 2027 und Dauerfristverlängerung,
+3. fallen Sammelkarten und ausgepackte Displays unter § 25a,
+4. Gesamtdifferenz erlaubt.
+
+Die Aufteilung der Verkäufe auf die Töpfe in der Voranmeldung hat Chris selbst geregelt und wurde nicht gefragt. Die Antwort kommt in „Mein Posteingang". Eintragen: Datum der Antwort, Inhalt, Folgeschritte. Übertragungsprotokoll als PDF ablegen (nicht im Repo; Steuernummer und Steuer-ID gehören nicht ins Repo).
+
+Offene Rückfragen für später: Rechnungen an Privatkäufer mit Hinweis auf Differenzbesteuerung, Unterstützung in Lexoffice und Billbee, Cardmarket-Verkäufertyp prüfen, negative Differenz, Versandanteil im Verkaufspreis.
+
 ## 2. Rechtlicher Rahmen
 
 - **Grenzen seit 2025:** Gesamtumsatz im Vorjahr höchstens 25.000 €, im laufenden Jahr höchstens 100.000 € **[Quelle: [§ 19 UStG](https://www.gesetze-im-internet.de/ustg_1980/__19.html)]**.
