@@ -1,0 +1,122 @@
+{
+ "geraet-hockeyschlaeger.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet hockeyschlaeger",
+  "saat": 9410,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 69.41,
+  "guthaben_nachher": 68.41,
+  "prompt": "ice hockey stick, long wooden shaft with a curved blade, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-kufe.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet kufe",
+  "saat": 9411,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 68.41,
+  "guthaben_nachher": 67.41,
+  "prompt": "single ice skate with a long steel blade, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-staffelstab.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet staffelstab",
+  "saat": 9412,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 67.41,
+  "guthaben_nachher": 66.41,
+  "prompt": "relay baton, a short smooth red cylinder stick, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-tennisschlaeger.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet tennisschlaeger",
+  "saat": 9413,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 66.41,
+  "guthaben_nachher": 65.41,
+  "prompt": "tennis racket with a white string frame, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-degen.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet degen",
+  "saat": 9414,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 65.41,
+  "guthaben_nachher": 64.41,
+  "prompt": "fencing epee sword with a bell guard, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-showcase-bogen.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet showcase-bogen",
+  "saat": 9415,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 64.41,
+  "guthaben_nachher": 63.41,
+  "prompt": "curved wooden bow with a bowstring, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-zeitfahr-weste.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet zeitfahr-weste",
+  "saat": 9416,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 63.41,
+  "guthaben_nachher": 62.41,
+  "prompt": "cycling aero vest jersey in yellow, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-spikes.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet spikes",
+  "saat": 9417,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 62.41,
+  "guthaben_nachher": 61.41,
+  "prompt": "pair of track running spike shoes, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-mikrofon.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet mikrofon",
+  "saat": 9418,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 61.41,
+  "guthaben_nachher": 60.41,
+  "prompt": "retro stage microphone with a grill head, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "geraet-lupe.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Handgeraet lupe",
+  "saat": 9419,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 60.41,
+  "guthaben_nachher": 59.41,
+  "prompt": "magnifying glass with a wooden handle, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ }
+}

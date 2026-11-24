@@ -1,0 +1,74 @@
+{
+ "teller.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Essens-Abo/Kabine",
+  "saat": 8400,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 148.54,
+  "guthaben_nachher": 147.54,
+  "prompt": "plate with a healthy meal of chicken, rice and broccoli, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "proteinshake.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Essens-Abo/Kabine",
+  "saat": 8401,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 147.54,
+  "guthaben_nachher": 146.54,
+  "prompt": "protein shake in a tall bottle with a lid, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "obstkorb.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Essens-Abo/Kabine",
+  "saat": 8402,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 146.54,
+  "guthaben_nachher": 145.54,
+  "prompt": "wicker basket full of fresh fruit, apples, oranges and bananas, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "spind.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Essens-Abo/Kabine",
+  "saat": 8403,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 145.54,
+  "guthaben_nachher": 144.54,
+  "prompt": "tall metal locker with a door and vents, dark green, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "bank.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Essens-Abo/Kabine",
+  "saat": 8404,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 144.54,
+  "guthaben_nachher": 143.54,
+  "prompt": "wooden locker room bench, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "massageliege.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Essens-Abo/Kabine",
+  "saat": 8405,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 143.54,
+  "guthaben_nachher": 142.54,
+  "prompt": "massage table with a folded white towel, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ }
+}

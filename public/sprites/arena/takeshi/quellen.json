@@ -1,0 +1,14 @@
+{
+ "takeshi-trittsteine.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x64",
+  "zweck": "Takeshi: Trittsteine",
+  "saat": 9317,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 77.41,
+  "guthaben_nachher": 76.41,
+  "prompt": "row of round grey stepping stones sticking out of murky water, mossy stone pillars, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ }
+}

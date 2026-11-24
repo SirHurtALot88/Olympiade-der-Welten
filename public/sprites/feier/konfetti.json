@@ -1,0 +1,651 @@
+{
+ "frames": [
+  {
+   "filename": "konfetti 0.png",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 1.png",
+   "frame": {
+    "x": 160,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 2.png",
+   "frame": {
+    "x": 320,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 3.png",
+   "frame": {
+    "x": 480,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 4.png",
+   "frame": {
+    "x": 640,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 5.png",
+   "frame": {
+    "x": 0,
+    "y": 120,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 6.png",
+   "frame": {
+    "x": 160,
+    "y": 120,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 7.png",
+   "frame": {
+    "x": 320,
+    "y": 120,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 8.png",
+   "frame": {
+    "x": 480,
+    "y": 120,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 9.png",
+   "frame": {
+    "x": 640,
+    "y": 120,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 10.png",
+   "frame": {
+    "x": 0,
+    "y": 240,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 11.png",
+   "frame": {
+    "x": 160,
+    "y": 240,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 12.png",
+   "frame": {
+    "x": 320,
+    "y": 240,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 13.png",
+   "frame": {
+    "x": 480,
+    "y": 240,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 14.png",
+   "frame": {
+    "x": 640,
+    "y": 240,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 15.png",
+   "frame": {
+    "x": 0,
+    "y": 360,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 16.png",
+   "frame": {
+    "x": 160,
+    "y": 360,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 17.png",
+   "frame": {
+    "x": 320,
+    "y": 360,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 18.png",
+   "frame": {
+    "x": 480,
+    "y": 360,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 19.png",
+   "frame": {
+    "x": 640,
+    "y": 360,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 20.png",
+   "frame": {
+    "x": 0,
+    "y": 480,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 21.png",
+   "frame": {
+    "x": 160,
+    "y": 480,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 22.png",
+   "frame": {
+    "x": 320,
+    "y": 480,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  },
+  {
+   "filename": "konfetti 23.png",
+   "frame": {
+    "x": 480,
+    "y": 480,
+    "w": 160,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 120
+   },
+   "pivot": {
+    "x": 0.5,
+    "y": 0.5
+   },
+   "duration": 83
+  }
+ ],
+ "meta": {
+  "app": "PixelLab VFX Creator",
+  "image": "konfetti.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 800,
+   "h": 600
+  },
+  "scale": "1",
+  "anchor": {
+   "kind": "origin",
+   "x": 80,
+   "y": 60
+  },
+  "frameTags": [
+   {
+    "name": "konfetti",
+    "from": 0,
+    "to": 23,
+    "direction": "forward"
+   }
+  ]
+ }
+}

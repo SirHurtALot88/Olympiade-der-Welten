@@ -1,0 +1,14 @@
+{
+ "tennis-netz.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "160x64",
+  "zweck": "Tennis: Netz",
+  "saat": 9318,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 76.41,
+  "guthaben_nachher": 75.41,
+  "prompt": "tennis net on two posts, white tape on top and a green mesh net, front view, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ }
+}

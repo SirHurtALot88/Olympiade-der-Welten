@@ -1,0 +1,50 @@
+{
+ "hockey-tor.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x96",
+  "zweck": "Hockey: Tor",
+  "saat": 8801,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 124.54,
+  "guthaben_nachher": 123.54,
+  "prompt": "ice hockey goal with a red frame and white net, seen from the front at a slight angle, standing on ice, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "hockey-strafbank.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x64",
+  "zweck": "Hockey: Strafbank",
+  "saat": 8802,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 113.54,
+  "guthaben_nachher": 112.54,
+  "prompt": "penalty box bench for ice hockey, a long wooden bench inside a small glass enclosure with a door, 3/4 top-down view, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "hockey-puck.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "32x32",
+  "zweck": "Hockey: Puck",
+  "saat": 8803,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 112.54,
+  "guthaben_nachher": 111.54,
+  "prompt": "single black rubber ice hockey puck with a white highlight, 3/4 view, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 view"
+ },
+ "hockey-schiedsrichter-pfeife.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "32x32",
+  "zweck": "Hockey: Pfeife",
+  "saat": 9004,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 106.54,
+  "guthaben_nachher": 105.54,
+  "prompt": "silver referee whistle on a black lanyard cord, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 view"
+ }
+}

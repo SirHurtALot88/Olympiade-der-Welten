@@ -1,0 +1,26 @@
+{
+ "spurt-kopfstreifen.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "400x64",
+  "zweck": "Spurt: Kopfstreifen Breitformat",
+  "saat": 9402,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 71.41,
+  "guthaben_nachher": 70.41,
+  "prompt": "running stadium upper strip, long wide row of advertising boards with a plain roof edge, abstract coloured panels, no text, seen from the front, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ },
+ "spurt-fussstreifen.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "400x64",
+  "zweck": "Spurt: Fussstreifen Breitformat",
+  "saat": 9403,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 70.41,
+  "guthaben_nachher": 69.41,
+  "prompt": "running track bottom strip, long wide row of low barrier boards in front of the track with small cheer banners, abstract coloured panels, no text, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "kiss-and-cry.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x80",
+  "zweck": "Eiskunstlauf: Kiss-and-Cry",
+  "saat": 9320,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 74.41,
+  "guthaben_nachher": 73.41,
+  "prompt": "kiss and cry bench area for figure skating, a small padded bench with a low glass barrier and a small plain sign board, no text, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ }
+}

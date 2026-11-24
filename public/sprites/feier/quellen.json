@@ -1,0 +1,170 @@
+{
+ "pokal-liga1.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x128",
+  "zweck": "Saisonende-Feier: Pokal Liga 1",
+  "saat": 8101,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 182.54,
+  "guthaben_nachher": 181.54,
+  "prompt": "tall golden champion trophy cup with two big handles, a small globe on top, on a dark marble base with a plain gold plate, front view, shining, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters"
+ },
+ "schale-liga2.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x128",
+  "zweck": "Saisonende-Feier: Meisterschale Liga 2",
+  "saat": 8112,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 179.54,
+  "guthaben_nachher": 178.54,
+  "prompt": "large shallow round silver championship salver dish tilted upright toward the viewer on a small black pedestal foot, wide engraved laurel rim, polished silver with a blue sapphire in the centre, seen from slightly above, looks like a big platter not a drum, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters"
+ },
+ "podest.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "192x112",
+  "zweck": "Saisonende-Feier: Siegerpodest 1/2/3",
+  "saat": 9211,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 98.54,
+  "guthaben_nachher": 97.54,
+  "prompt": "winners podium in three clearly different heights: tall block in the middle with the number 1, medium block on the left with the number 2, short low block on the right with the number 3, the middle block is twice as tall as the right one, white marble with golden silver and bronze top plates, front view, no objects on top, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, numerals 1 2 3 only"
+ },
+ "buehne-banner.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "400x224",
+  "zweck": "Saisonende-Feier: Buehne/Hintergrund fuer das Meisterfoto",
+  "saat": 8104,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 177.54,
+  "guthaben_nachher": 176.54,
+  "prompt": "festive victory celebration stage backdrop, wide dark arena hall with spotlights from above, a large empty red and gold banner hanging from the ceiling in the centre, red curtains on both sides, polished wooden stage floor in front, warm golden light, empty stage without any people, pixel art background scene, 2D HD remake look, 16-bit RPG style, rich shading, no text, no letters, no people"
+ },
+ "konfetti.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/vfx",
+  "artist": "lite",
+  "zweck": "Saisonende-Feier: Konfetti",
+  "datum": "2026-11-24",
+  "job": "9a8c0737-80aa-4e91-82a0-9b9920ee1a7e",
+  "quoted": 1,
+  "generationen": 1.13,
+  "canvas": {
+   "h": 120,
+   "w": 160
+  },
+  "frames": 24,
+  "fps": 12,
+  "loop": true,
+  "prompt": "dense heavy confetti shower, hundreds of large bright red gold blue green pink paper pieces and streamers falling and spinning across the whole frame, celebration, transparent background"
+ },
+ "feuerwerk.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/vfx",
+  "artist": "lite",
+  "zweck": "Saisonende-Feier: Feuerwerk",
+  "datum": "2026-11-24",
+  "job": "410d096b-e9b8-48ce-b105-d39774ca8ead",
+  "quoted": 1,
+  "generationen": 1.0,
+  "canvas": {
+   "h": 208,
+   "w": 153
+  },
+  "frames": 16,
+  "fps": 12,
+  "loop": false,
+  "prompt": "firework rocket explosion in the night sky, golden and red sparks bursting outward and fading, transparent background"
+ },
+ "lorbeerkranz.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Feier: Lorbeerkranz",
+  "saat": 9101,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 105.54,
+  "guthaben_nachher": 104.54,
+  "prompt": "golden laurel wreath circle with a red ribbon bow at the bottom, front view, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters"
+ },
+ "sektflasche.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Feier: Sektflasche",
+  "saat": 9102,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 104.54,
+  "guthaben_nachher": 103.54,
+  "prompt": "champagne bottle spraying foam from the neck, dark green glass with gold foil, 3/4 view, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters"
+ },
+ "roter-teppich.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "192x64",
+  "zweck": "Feier: Roter Teppich",
+  "saat": 9214,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 95.54,
+  "guthaben_nachher": 94.54,
+  "prompt": "red carpet runway lying on the floor receding diagonally in perspective, seen from above at a steep angle, with golden stanchion posts and velvet ropes along both sides, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters"
+ },
+ "siegermedaille.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Feier: Siegermedaille",
+  "saat": 9104,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 102.54,
+  "guthaben_nachher": 101.54,
+  "prompt": "gold winner medal on a red white ribbon, front view, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters"
+ },
+ "feier-banner.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "160x96",
+  "zweck": "Feier: leeres Banner fuer den Teamnamen",
+  "saat": 9105,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 101.54,
+  "guthaben_nachher": 100.54,
+  "prompt": "wide empty red banner with golden fringe and gold border hanging from two poles, no text, front view, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters"
+ },
+ "scheinwerfer.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x96",
+  "zweck": "Feier: Scheinwerfer",
+  "saat": 9106,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 100.54,
+  "guthaben_nachher": 99.54,
+  "prompt": "stage spotlight lamp on a black tripod stand, pointing up, bright warm light, 3/4 view, pixel art game asset, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters"
+ },
+ "buehne-liga2.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "400x224",
+  "zweck": "Feier: zweite Buehne fuer Liga 2 (Silber/Blau)",
+  "saat": 9501,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 59.41,
+  "guthaben_nachher": 58.41,
+  "prompt": "festive silver victory celebration stage backdrop, wide dark arena hall with cool blue and silver spotlights, a large empty silver and blue banner hanging from the ceiling in the centre, dark blue curtains on both sides, polished stone stage floor, calm cold light, empty stage without any people, pixel art background scene, 2D HD remake look, 16-bit RPG style, rich shading, no text, no letters, no people"
+ }
+}
