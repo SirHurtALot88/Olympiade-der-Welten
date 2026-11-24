@@ -63,6 +63,7 @@ export function sponsorRegelFuerNeueSaison(
     kaderErsatz: 1,
     betriebsteilVorjahr: vorher?.eingefroren?.betriebsteil ?? vorher?.betriebsteilVorjahr ?? null,
     uebertrag,
+    ...(vorher != null && vorher.version !== "topf" ? { ohneBremse: true } : {}),
     ligaWertVorjahr: vorher?.eingefroren?.ligaWert ?? vorher?.ligaWertVorjahr ?? null,
     ligaWertKorrektur: vorher?.eingefroren?.wertKorrektur ?? vorher?.ligaWertKorrektur ?? 0,
     vorlaeufig: null,

@@ -320,3 +320,28 @@ describe("Sponsor-Topf: Ziel und KI-Wahl", () => {
     expect(kiFarben({ pow: 3, spe: 3, men: 3, soc: 3 }, "soc")[0]).toBe("soc");
   });
 });
+
+describe("Sponsor-Topf: Haertung (Review 24.11.)", () => {
+  it("NaN-Wache: ein kaputtes Team vergiftet den Topf nicht", () => {
+    const e = eingabe();
+    e.teams[3] = { ...e.teams[3]!, kosten: Number.NaN, erwartungsrang: Number.NaN, passungRoh: Number.NaN };
+    const r = berechneTopf(e);
+    expect(Number.isFinite(r.topf)).toBe(true);
+    for (const t of Object.values(r.teams)) expect(Number.isFinite(t.grundbetrag)).toBe(true);
+  });
+
+  it("ohneBremse: die erste Topf-Saison eines migrierten Spielstands wird nicht auf 85 bis 115 % der Vorsaison geklemmt", () => {
+    const vor = 100;
+    const mit = berechneTopf(eingabe({ betriebsteilVorjahr: vor }));
+    const ohne = berechneTopf(eingabe({ betriebsteilVorjahr: vor, ohneBremse: true }));
+    expect(mit.betriebsteil).toBeLessThanOrEqual(vor * SPONSOR_TOPF.bremse[1] + 0.1);
+    expect(mit.betriebsteil).toBeGreaterThanOrEqual(vor * SPONSOR_TOPF.bremse[0] - 0.1);
+    expect(ohne.betriebsteil).toBeCloseTo(ohne.betriebsteilRoh, 6);
+  });
+
+  it("Wertkorrektur ist auf den Deckel begrenzt", () => {
+    const r = berechneTopf(eingabe({ wertKorrektur: 1e9 }));
+    const deckel = SPONSOR_TOPF.wertKorrekturDeckel * (r.betriebsteil + r.kaderErsatz);
+    expect(r.wertKorrektur).toBeLessThanOrEqual(deckel + 0.1);
+  });
+});

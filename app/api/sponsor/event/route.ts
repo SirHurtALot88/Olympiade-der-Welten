@@ -140,7 +140,11 @@ export async function POST(request: Request) {
 }
 
 async function beantworteTerminRoute(body: SponsorEventBody, saveId: string, terminId: string, source: "sqlite" | "prisma", dryRun: boolean) {
-  const antwort = body.antwort === "absagen" || body.antwort === "ki" ? body.antwort : "zusagen";
+  // `antwort` ist Pflicht: ein fehlendes oder falsches Feld darf nie als Zusage (Geld, Form-Abzug) gelten.
+  if (body.antwort !== "zusagen" && body.antwort !== "absagen" && body.antwort !== "ki") {
+    return NextResponse.json({ success: false, error: "sponsor_antwort_ungueltig" }, { status: 400 });
+  }
+  const antwort = body.antwort;
   if (!saveId) return NextResponse.json({ success: false, error: "saveId is required." }, { status: 400 });
   const persistence = createPersistenceService();
   const save = persistence.getSaveById(saveId);

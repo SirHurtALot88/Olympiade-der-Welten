@@ -14,7 +14,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { estimateTeamAnnualRevenue } from "@/lib/finance/loan-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
-import { topfPlanungSponsor } from "@/lib/sponsors/sponsor-topf-stichtag";
+import { topfPlanungSponsor } from "@/lib/sponsors/sponsor-topf-planung";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 /** Gemessene Realisationsquote Auszahlung / Anker (Median ueber 93 Team-Laeufe). */
@@ -23,6 +23,16 @@ export const SPONSOR_REALISATION = 0.92;
 /** A/B-Schalter: `OLY_KI_FORECAST_SPONSOR=0` laesst den Forecast bei 0 wie vor Finanzkonzept V2. */
 export function istSponsorForecastAktiv(): boolean {
   return process.env.OLY_KI_FORECAST_SPONSOR !== "0";
+}
+
+/**
+ * KI-KAUFPLANUNG (Draft-Adapter, einzige Stelle): wie `erwarteterSponsorFuerPlanung`, unter dem Topf-Stempel aber zusaetzlich mit den vom Topf
+ * verdraengten Einnahmen (Tickets, Marketing, Medaillen, erwarteter Farb-Anteil). Die Planung zaehlt diese Posten sonst nirgends. Vorstand-Freigabe und
+ * Kreditpruefung rufen bewusst die reine Fassung unten (nur Sponsor), damit nichts doppelt gezaehlt wird.
+ */
+export function erwarteterSponsorFuerKaufplanung(gameState: GameState, teamId: string): number {
+  const topf = topfPlanungSponsor(gameState, teamId, { mitVerdraengtem: true });
+  return topf != null ? topf : erwarteterSponsorFuerPlanung(gameState, teamId);
 }
 
 export function erwarteterSponsorFuerPlanung(gameState: GameState, teamId: string): number {

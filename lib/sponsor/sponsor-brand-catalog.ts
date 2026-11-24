@@ -76,6 +76,8 @@ function pickParentForSlot(input: {
   archetype: SponsorArchetype;
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
+  /** SPONSOR-TOPF: die Marke des auslaufenden Vertrags darf als Verlaengerungs-Angebot wiederkehren (genau ein Slot, der erste, der sie traegt). */
+  renewalParentId?: string | null;
   globalParentUsage?: Record<string, number>;
 }): SponsorBrandParent {
   const archetype = input.archetype;
@@ -90,6 +92,12 @@ function pickParentForSlot(input: {
   });
 
   const supportsSlot = (parent: SponsorBrandParent) => parentSupportsArchetype(parent.id, archetype);
+
+  // Verlaengerung: die Vorjahresmarke, wenn dieser Slot sie traegt und sie noch frei ist (nicht schon in einem Slot dieses Teams).
+  if (input.renewalParentId && !usedParentBrandIds.has(input.renewalParentId)) {
+    const erneut = SPONSOR_BRAND_PARENTS.find((parent) => parent.id === input.renewalParentId);
+    if (erneut && supportsSlot(erneut) && (globalParentUsage[erneut.id] ?? 0) < GLOBAL_PARENT_MAX_TEAMS) return erneut;
+  }
 
   let candidates = SPONSOR_BRAND_PARENTS.filter(
     (parent) => supportsSlot(parent) && isParentAvailable({ parent, usedParentBrandIds, globalParentUsage }),
@@ -152,6 +160,8 @@ function pickBrandForSlot(input: {
   rarity: SponsorRarity;
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
+  /** SPONSOR-TOPF: die Marke des auslaufenden Vertrags darf als Verlaengerungs-Angebot wiederkehren (genau ein Slot, der erste, der sie traegt). */
+  renewalParentId?: string | null;
   globalParentUsage?: Record<string, number>;
   forcePremiumElite?: boolean;
 }): { parent: SponsorBrandParent; brand: SponsorBrandTemplate } {
@@ -216,6 +226,8 @@ export function pickSponsorBrandForOffer(input: {
   slotIndex: number;
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
+  /** SPONSOR-TOPF: die Marke des auslaufenden Vertrags darf als Verlaengerungs-Angebot wiederkehren (genau ein Slot, der erste, der sie traegt). */
+  renewalParentId?: string | null;
   globalParentUsage?: Record<string, number>;
   forcePremiumElite?: boolean;
   specialMode?: "standard" | "challenge";

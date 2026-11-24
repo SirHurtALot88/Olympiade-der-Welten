@@ -9,6 +9,7 @@
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { summeSpieltagBuchungen, spieltageDerSaison } from "@/lib/finance/finanzen-je-spieltag";
+import { isScoutingNebelAus } from "@/lib/market/transfermarkt-nebel-einstellung";
 import { gueltigerSponsorStempel, sponsorLeistungAktiv, sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import {
@@ -28,13 +29,16 @@ import {
   zTreue,
   type SponsorLiga,
 } from "@/lib/sponsors/sponsor-topf-modell";
-import { kaderBeliebtheit, treueSaisonsFuerMarke, werbegeldMittel } from "@/lib/sponsors/sponsor-topf-eingaben";
+import { kaderBeliebtheit, ligaGroesseVon, treueSaisonsFuerMarke, werbegeldMittel } from "@/lib/sponsors/sponsor-topf-eingaben";
 import {
   topfFarbVerteilung,
   topfLeistungJetzt,
   topfStandFuer,
   topfZielAuszahlung,
+  leihVerzichtJahr,
+  RANG_ABSCHLAG_QUOTE_TOPF,
 } from "@/lib/sponsors/sponsor-topf-buchung";
+import { fuelleFehlendeVertraege } from "@/lib/sponsors/sponsor-topf-stichtag";
 import { sponsorTermine } from "@/lib/sponsors/sponsor-topf-termine";
 import type { SponsorFarbe, SponsorTermin, SponsorVertragsart } from "@/lib/sponsors/sponsor-topf-typen";
 
@@ -54,6 +58,8 @@ export type SponsorUebersicht = {
   gebuchteSpieltage: number;
   /** true = Stichtag war; false = Vorschau, Zahlen koennen sich bis zur ersten Wertung noch bewegen. */
   eingefroren: boolean;
+  /** true = vor dem Stichtag: die Zahlen sind die Rechnung, die der Stichtag bucht (inkl. Vorab-Zusage), aber noch nicht gesperrt. */
+  vorlaeufig: boolean;
   notbremse: boolean;
   faktor: number;
   vertrag: null | {
@@ -71,8 +77,8 @@ export type SponsorUebersicht = {
     treueBonus: number;
     /** Die vier Zeilen der Vertragskarte. */
     zeilen: {
-      grund: UebersichtZeile & { treue: number };
-      leistung: UebersichtZeile & { satzJePlatz: number; platzJetzt: number | null; erwartungsrang: number; abstand: number | null };
+      grund: UebersichtZeile & { treue: number; leihVerzicht: number };
+      leistung: UebersichtZeile & { abrechnungshinweis: string; satzJePlatz: number; platzJetzt: number | null; erwartungsrang: number; abstand: number | null };
       farbe: UebersichtZeile;
       ziel: UebersichtZeile & { einsatz: number; erfuellung: number };
     };
@@ -131,14 +137,16 @@ export type SponsorUebersicht = {
     kosten: number;
     planEinnahmen: number;
     /** GuV bei "alle auf Erwartungsrang": Grund + Farb-Mittel - (Kosten - Plan-Einnahmen) - Kader-Ersatz. */
-    guvBeiErwartung: number;
+    guvBeiErwartung: number | null;
   }>;
   rechnung: {
-    schritte: Array<{ id: "betrieb" | "ersatz" | "faktor" | "verteilung"; titel: string; formel: string; wert: number }>;
+    schritte: Array<{ id: "betrieb" | "ersatz" | "wertkorrektur" | "faktor" | "verteilung"; titel: string; formel: string; wert: number }>;
     betriebsteil: number;
     betriebsteilRoh: number;
     kaderErsatz: number;
     uebertrag: number;
+    /** Liga-Wert-Korrektur (Rueckkopplung, wirkt neben dem Uebertrag; Doppelreaktion siehe Bau-Doku Abschnitt 13). */
+    wertKorrektur: number;
     topf: number;
     farbToepfe: { liga1: number; liga2: number };
     treueSumme: number;
@@ -153,7 +161,10 @@ function teamName(gameState: GameState, id: string): string {
 
 export function baueSponsorUebersicht(gameState: GameState, teamId: string): SponsorUebersicht | null {
   if (!sponsorTopfAktiv(gameState)) return null;
-  const stand = topfStandFuer(gameState, { live: true });
+  // Vor dem Stichtag zeigt die Seite, was der Stichtag buchen wird: dieselbe Rechnung (fehlende Vertraege gefuellt, Vorab-Zusage 90 % mit
+  // anteiliger Kuerzung) auf demselben Weg wie `sichereSponsorTopf`.
+  const eingefroren = Boolean(gueltigerSponsorStempel(gameState)?.eingefroren);
+  const stand = topfStandFuer(eingefroren ? gameState : fuelleFehlendeVertraege(gameState), { live: true });
   const t = stand?.teams[teamId];
   if (!stand || !t) return null;
   const stempel = gueltigerSponsorStempel(gameState)!;
@@ -171,7 +182,8 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
   const ziel = contract ? topfZielAuszahlung(gameState, contract) : { betrag: 0, erfuellung: 0, einsatz: 0 };
   const leistungHeute = leistung.leistung[teamId] ?? 0;
   const farbHeute = farbe.jeTeam[teamId] ?? 0;
-  const grundJahr = runde1(t.grundbetrag + t.treue);
+  const verzicht = contract ? leihVerzichtJahr(contract) : 0;
+  const grundJahr = runde1(t.grundbetrag + t.treue - verzicht);
   const gebuchteSpieltage = summeSpieltagBuchungen(gameState, teamId).anzahl;
   const vertrag = contract
     ? {
@@ -188,11 +200,13 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
         passung: { wert: t.passung, text: passungText(t.passung, 0, contract.sponsorTopf?.treueSaisons ?? 0) },
         treueBonus: t.treue,
         zeilen: {
-          grund: { saison: grundJahr, jeSpieltag: runde1(grundJahr / n), gebucht: gebucht.sponsorBasis, treue: t.treue },
+          grund: { saison: grundJahr, jeSpieltag: runde1(grundJahr / n), gebucht: gebucht.sponsorBasis, treue: t.treue, leihVerzicht: verzicht },
           leistung: {
             saison: leistungHeute,
-            jeSpieltag: runde1(leistungHeute / n),
+            // Gebucht wird je Spieltag nur RANG_ABSCHLAG_QUOTE (80 %) des Leistungsteils / N; der Rest wird zum Saisonende ausgeglichen.
+            jeSpieltag: runde1((RANG_ABSCHLAG_QUOTE_TOPF * leistungHeute) / n),
             gebucht: gebucht.rangAbschlag,
+            abrechnungshinweis: "Je Spieltag werden 80 % des Leistungsteils gebucht; der Rest wird zum Saisonende ausgeglichen.",
             satzJePlatz: satz,
             platzJetzt: leistung.rang[teamId] ?? null,
             erwartungsrang: t.erwartungsrang,
@@ -270,7 +284,7 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
           hebel: h,
           zielEinsatz: einsatz,
           satzJePlatz: s,
-          spannweite: { besterRang: bei(1), beiErwartung: bei(t.erwartungsrang), schlechtesterRang: bei(16) },
+          spannweite: { besterRang: bei(1), beiErwartung: bei(t.erwartungsrang), schlechtesterRang: bei(ligaGroesseVon(gameState, teamId)) },
         };
       }),
       laufzeiten: ([1, 2, 3] as const).map((l) => ({ laufzeit: l, treueBonusJahr: Array.from({ length: l }, (_, i) => treueBonus(i + 1)) })),
@@ -281,8 +295,11 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
   const ligaTeams = Object.values(stand.teams).filter((x) => x.liga === liga);
   const farbMittel = (4 * stand.farbTopf[liga - 1]!) / Math.max(1, ligaTeams.length);
   const kaderErsatzJeTeam = stand.rechnung.kaderErsatz / Math.max(1, Object.keys(stand.teams).length);
+  const nebelAn = !isScoutingNebelAus(gameState);
+  const grob5 = (v: number) => Math.round(v / 5) * 5;
   const liga_vergleich = ligaTeams
     .map((x) => {
+      const fremd = x.teamId !== teamId && nebelAn;
       const c = getTeamSponsorContract(gameState, x.teamId);
       const z = c ? topfZielAuszahlung(gameState, c) : { betrag: 0, erfuellung: 0, einsatz: 0 };
       const l = leistung.leistung[x.teamId] ?? 0;
@@ -292,26 +309,26 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
         teamId: x.teamId,
         teamName: teamName(gameState, x.teamId),
         liga: x.liga,
-        nebel: x.teamId !== teamId,
+        nebel: fremd,
         markeName: c?.name ?? null,
         vertragsart: x.vertragsart,
         farben: x.farben,
-        erwartungsrang: x.erwartungsrang,
+        erwartungsrang: fremd ? Math.round(x.erwartungsrang / 4) * 4 || 4 : x.erwartungsrang,
         platz: leistung.rang[x.teamId] ?? null,
         grund,
         leistungHeute: l,
         farbHeute: f,
         zielHeute: z.betrag,
         summeHeute: runde1(grund + l + f + z.betrag),
-        kosten: runde1(x.kosten),
-        planEinnahmen: runde1(x.planEinnahmen),
-        guvBeiErwartung: runde1(grund + farbMittel - (x.kosten - x.planEinnahmen) - kaderErsatzJeTeam),
+        kosten: fremd ? grob5(x.kosten) : runde1(x.kosten),
+        planEinnahmen: fremd ? grob5(x.planEinnahmen) : runde1(x.planEinnahmen),
+        guvBeiErwartung: fremd ? null : runde1(grund + farbMittel - (x.kosten - x.planEinnahmen) - kaderErsatzJeTeam),
       };
     })
     .sort((a, b) => (a.platz ?? 99) - (b.platz ?? 99) || a.teamName.localeCompare(b.teamName));
 
   const r = stand.rechnung;
-  const ligaMittelBeiErwartung = runde1(liga_vergleich.reduce((s, x) => s + x.guvBeiErwartung, 0) / Math.max(1, liga_vergleich.length));
+  const ligaMittelBeiErwartung = runde1(ligaTeams.reduce((sum, x) => sum + (x.grundbetrag + x.treue + farbMittel - (x.kosten - x.planEinnahmen) - kaderErsatzJeTeam), 0) / Math.max(1, ligaTeams.length));
   return {
     teamId,
     seasonId,
@@ -319,6 +336,7 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
     spieltage: n,
     gebuchteSpieltage,
     eingefroren: stand.eingefroren,
+    vorlaeufig: !stand.eingefroren,
     notbremse: !aktiv,
     faktor: stand.faktor,
     vertrag,
@@ -329,15 +347,17 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
     liga_vergleich,
     rechnung: {
       schritte: [
-        { id: "betrieb", titel: "Kosten der Liga abzueglich uebriger Einnahmen", formel: "K_B = Summe (Gehaelter + Unterhalt + Zins - Tickets - Marketing - Medaillen - Ziele - Gebaeude), 85 bis 115 % der Vorsaison", wert: r.betriebsteil },
-        { id: "ersatz", titel: "Kader-Ersatz", formel: "K_E = 10 % des Kaderwerts der Liga (ab Saison 2)", wert: r.kaderErsatz },
-        { id: "faktor", titel: "Saisonfaktor", formel: "Topf T = F x (K_B + K_E) - Uebertrag", wert: stand.topf },
+        { id: "betrieb", titel: "Kosten der Liga abzueglich uebriger Einnahmen", formel: `K_B = Summe (Gehaelter + Unterhalt + Zins - Tickets - Marketing - Medaillen - Ziele - Gebaeude), ${Math.round(SPONSOR_TOPF.bremse[0] * 100)} bis ${Math.round(SPONSOR_TOPF.bremse[1] * 100)} % der Vorsaison`, wert: r.betriebsteil },
+        { id: "ersatz", titel: "Kader-Ersatz", formel: `K_E = ${Math.round(SPONSOR_TOPF.kaderErsatzAnteil * 100)} % des Kaderwerts der Liga (Saison 1: +${Math.round(SPONSOR_TOPF.kaderErsatzZuschlagSaison1 * 100)} %)`, wert: r.kaderErsatz },
+        { id: "wertkorrektur", titel: "Liga-Wert-Korrektur", formel: `Rueckkopplung ${SPONSOR_TOPF.wertRueckkopplung} x Wertaenderung der Liga, fortgeschrieben, Deckel ${Math.round(SPONSOR_TOPF.wertKorrekturDeckel * 100)} % des Topfs`, wert: r.wertKorrektur ?? 0 },
+        { id: "faktor", titel: "Saisonfaktor", formel: "Topf T = F x (K_B + K_E) - Uebertrag - Korrektur", wert: stand.topf },
         { id: "verteilung", titel: "Verteilung", formel: "Hauptsponsor-Topf = T - Farb-Toepfe - Treueboni; Grundbetrag nach Liga-Anteil, Erwartungsrang, Beliebtheit, Passung", wert: stand.hauptTopf },
       ],
       betriebsteil: r.betriebsteil,
       betriebsteilRoh: r.betriebsteilRoh,
       kaderErsatz: r.kaderErsatz,
       uebertrag: r.uebertrag,
+      wertKorrektur: r.wertKorrektur ?? 0,
       topf: stand.topf,
       farbToepfe: { liga1: stand.farbTopf[0], liga2: stand.farbTopf[1] },
       treueSumme: r.treueSumme,

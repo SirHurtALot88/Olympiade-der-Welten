@@ -11,6 +11,7 @@
 import type { GameState, TeamSponsorContract } from "@/lib/data/olyDataTypes";
 import { buildSeasonPointsLedger } from "@/lib/foundation/season-points-ledger";
 import { buildTeamSeasonOverviewRows } from "@/lib/foundation/team-management-overview";
+import { summeSpieltagBuchungen } from "@/lib/finance/finanzen-je-spieltag";
 import { gueltigerSponsorStempel, sponsorLeistungAktiv, sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
 import { evaluateSpecialComponentStage } from "@/lib/sponsor/sponsor-objective-evaluator";
 import {
@@ -25,7 +26,7 @@ import {
   zielAuszahlung,
   type TopfErgebnis,
 } from "@/lib/sponsors/sponsor-topf-modell";
-import { berechneTopfLive, istErsteSaison, type TopfSammlung } from "@/lib/sponsors/sponsor-topf-eingaben";
+import { berechneTopfLive, istErsteSaison, ligaGroesseVon, type TopfSammlung } from "@/lib/sponsors/sponsor-topf-eingaben";
 import type { SponsorFarbe, SponsorTopfTeamStand } from "@/lib/sponsors/sponsor-topf-typen";
 
 export const RANG_ABSCHLAG_QUOTE_TOPF = 0.8;
@@ -45,7 +46,7 @@ export type TopfStand = {
   hauptTopf: number;
   farbTopf: [number, number];
   teams: Record<string, SponsorTopfTeamStand>;
-  rechnung: Pick<TopfErgebnis, "betriebsteil" | "betriebsteilRoh" | "kaderErsatz" | "uebertrag" | "treueSumme">;
+  rechnung: Pick<TopfErgebnis, "betriebsteil" | "betriebsteilRoh" | "kaderErsatz" | "uebertrag" | "treueSumme" | "wertKorrektur">;
 };
 
 const liveCache = new WeakMap<object, { ergebnis: TopfErgebnis; sammlung: TopfSammlung }>();
@@ -121,7 +122,7 @@ export function topfStandFuer(gameState: GameState, opts: { live?: boolean } = {
       hauptTopf: f.hauptTopf,
       farbTopf: f.farbTopf,
       teams: f.teams,
-      rechnung: { betriebsteil: f.betriebsteil, betriebsteilRoh: f.betriebsteilRoh, kaderErsatz: f.kaderErsatz, uebertrag: f.uebertrag, treueSumme: f.treueSumme },
+      rechnung: { betriebsteil: f.betriebsteil, betriebsteilRoh: f.betriebsteilRoh, kaderErsatz: f.kaderErsatz, uebertrag: f.uebertrag, treueSumme: f.treueSumme, wertKorrektur: f.wertKorrektur },
     };
   }
   if (opts.live) {
@@ -134,7 +135,7 @@ export function topfStandFuer(gameState: GameState, opts: { live?: boolean } = {
       hauptTopf: ergebnis.hauptTopf,
       farbTopf: ergebnis.farbTopf,
       teams: teamStandenAusLive(ergebnis, sammlung),
-      rechnung: { betriebsteil: ergebnis.betriebsteil, betriebsteilRoh: ergebnis.betriebsteilRoh, kaderErsatz: ergebnis.kaderErsatz, uebertrag: ergebnis.uebertrag, treueSumme: ergebnis.treueSumme },
+      rechnung: { betriebsteil: ergebnis.betriebsteil, betriebsteilRoh: ergebnis.betriebsteilRoh, kaderErsatz: ergebnis.kaderErsatz, uebertrag: ergebnis.uebertrag, treueSumme: ergebnis.treueSumme, wertKorrektur: ergebnis.wertKorrektur },
     };
   }
   return vorlaeufigerStand(gameState, stempel);
@@ -153,7 +154,7 @@ function vorlaeufigerStand(gameState: GameState, stempel: NonNullable<ReturnType
     teams[team.teamId] = {
       teamId: team.teamId,
       liga: gameState.seasonState.leagueByTeamId?.[team.teamId] === "liga2" ? 2 : 1,
-      erwartungsrang: 8.5,
+      erwartungsrang: (ligaGroesseVon(gameState, team.teamId) + 1) / 2,
       beliebtheit: gameState.teamIdentities.find((i) => i.teamId === team.teamId)?.popularity ?? 5,
       hebel: vertragsartHebel(tv?.vertragsart),
       vertragsart: tv?.vertragsart ?? null,
@@ -174,7 +175,7 @@ function vorlaeufigerStand(gameState: GameState, stempel: NonNullable<ReturnType
     hauptTopf: vorl?.topf ?? 0,
     farbTopf: [runde1(SPONSOR_TOPF.farbTopf[1]), runde1(SPONSOR_TOPF.farbTopf[2])],
     teams,
-    rechnung: { betriebsteil: 0, betriebsteilRoh: 0, kaderErsatz: 0, uebertrag: stempel.uebertrag, treueSumme: 0 },
+    rechnung: { betriebsteil: 0, betriebsteilRoh: 0, kaderErsatz: 0, uebertrag: stempel.uebertrag, treueSumme: 0, wertKorrektur: stempel.ligaWertKorrektur ?? 0 },
   };
   vorlaeufigCache.set(gameState, aus);
   return aus;
@@ -185,8 +186,19 @@ export function topfGrundJahr(gameState: GameState, teamId: string): number {
   if (topfRechnetGerade) return runde1(gueltigerSponsorStempel(gameState)?.vorlaeufig?.grund[teamId] ?? 0);
   const stand = topfStandFuer(gameState);
   const t = stand?.teams[teamId];
-  if (!t || !gameState.seasonState.sponsorContractsByTeamId?.[teamId]) return 0;
-  return runde1(t.grundbetrag + t.treue);
+  const vertrag = gameState.seasonState.sponsorContractsByTeamId?.[teamId];
+  if (!t || !vertrag) return 0;
+  return runde1(t.grundbetrag + t.treue - leihVerzichtJahr(vertrag));
+}
+
+/**
+ * Cash-Verzicht einer Gebaeude-Leihe je Saison (`sponsorV3.leihVerzicht`, vom Lebenszyklus je Vertragsjahr fortgeschrieben): der Sponsor stellt das
+ * Gebaeude gegen weniger Geld, das Geld fehlt also im Grundbetrag. Ohne Leihe 0.
+ */
+export function leihVerzichtJahr(vertrag: TeamSponsorContract | null | undefined): number {
+  if (!vertrag?.sponsorLeihe) return 0;
+  const v = vertrag.sponsorV3?.leihVerzicht ?? vertrag.sponsorLeihe.verzichtJeSaison?.[0] ?? 0;
+  return Number.isFinite(v) && v > 0 ? v : 0;
 }
 
 // ── Leistungsteil ───────────────────────────────────────────────────────────────────────────────────
@@ -207,7 +219,15 @@ export function topfLeistungJetzt(gameState: GameState): LeistungJetzt | null {
     return leer;
   }
   const rows = buildTeamSeasonOverviewRows({ gameState });
-  const rangVon = new Map(rows.map((r) => [r.teamId, r.rank ?? r.startplatz ?? null] as const));
+  // Nur ein Platz der EIGENEN Liga (1 bis Ligagroesse) zaehlt. Ein fehlender oder ligafremder Rang (z. B. der globale Budget-Rang 1..32 als Startplatz)
+  // faellt auf den Erwartungsrang zurueck: der Leistungsteil ist dann 0, nie ein Geisterbetrag aus einem falschen Rangraum.
+  const rangVon = new Map(
+    rows.map((r) => {
+      const n = ligaGroesseVon(gameState, r.teamId);
+      const rang = r.rank;
+      return [r.teamId, typeof rang === "number" && Number.isFinite(rang) && rang >= 1 && rang <= n ? rang : null] as const;
+    }),
+  );
   const eingabe = Object.values(stand.teams).map((t) => ({
     teamId: t.teamId,
     liga: t.liga,
@@ -305,13 +325,17 @@ export function topfSaisonendeZeilen(gameState: GameState, contract: TeamSponsor
   const stand = topfStandFuer(gameState);
   const t = stand?.teams[contract.teamId];
   if (!stand || !t) return [];
-  const grund = runde1(t.grundbetrag + t.treue);
-  const leistung = topfLeistungJetzt(gameState)?.leistung[contract.teamId] ?? 0;
+  const verzicht = leihVerzichtJahr(contract);
+  const grund = topfGrundJahr(gameState, contract.teamId);
+  // NOTBREMSE: der Leistungsteil friert ein. Was je Spieltag gezahlt ist, bleibt; die Zeile am Saisonende ist genau dieser Betrag (kein Ausgleich, keine Rueckforderung).
+  const leistung = sponsorLeistungAktiv(gameState)
+    ? topfLeistungJetzt(gameState)?.leistung[contract.teamId] ?? 0
+    : runde1(summeSpieltagBuchungen(gameState, contract.teamId).rangAbschlag);
   const rang = topfLeistungJetzt(gameState)?.rang[contract.teamId] ?? null;
   const farbe = topfFarbVerteilung(gameState)?.jeTeam[contract.teamId] ?? 0;
   const ziel = topfZielAuszahlung(gameState, contract);
   const zeilen: TopfAbrechnungsZeile[] = [
-    { key: "base", label: "Grundbetrag", cashDelta: grund, reason: `Grundbetrag ${t.grundbetrag.toFixed(1)} C${t.treue > 0 ? ` + Treuebonus ${t.treue.toFixed(1)} C` : ""}` },
+    { key: "base", label: "Grundbetrag", cashDelta: grund, reason: `Grundbetrag ${t.grundbetrag.toFixed(1)} C${t.treue > 0 ? ` + Treuebonus ${t.treue.toFixed(1)} C` : ""}${verzicht > 0 ? ` - Leih-Verzicht ${verzicht.toFixed(1)} C` : ""}` },
     {
       key: "rank",
       label: "Leistungsteil",

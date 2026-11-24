@@ -34,7 +34,9 @@ import {
 } from "@/lib/sponsor/sponsor-offer-service";
 import { applySponsorSettlement, getSeasonSponsorCashByTeam, previewSponsorSettlement, sponsorBasisJahr } from "@/lib/sponsor/sponsor-settlement-service";
 import { topfFarbVerteilung, topfLeistungJetzt, topfStandFuer } from "@/lib/sponsors/sponsor-topf-buchung";
-import { berechneVorlaeufig, sichereSponsorTopf, stempleVorlaeufig, topfPlanungSponsor, uebertragFuerSaisonwechsel } from "@/lib/sponsors/sponsor-topf-stichtag";
+import { berechneVorlaeufig, sichereSponsorTopf, stempleVorlaeufig } from "@/lib/sponsors/sponsor-topf-stichtag";
+import { topfPlanungSponsor } from "@/lib/sponsors/sponsor-topf-planung";
+import { uebertragFuerSaisonwechsel } from "@/lib/sponsors/sponsor-topf-uebertrag";
 import { baueSponsorUebersicht } from "@/lib/sponsors/sponsor-uebersicht";
 import { erzeugeTermine, entscheideTermin, offeneSponsorTermine, beantworteTermineDerKi, sponsorTermine, terminSpieltage } from "@/lib/sponsors/sponsor-topf-termine";
 import { pruefeTopfWahl, ueberfuehreAltvertraege } from "@/lib/sponsors/sponsor-topf-wahl";
@@ -424,7 +426,7 @@ describe("Sponsorentermin: Entscheidung statt Wuerfel", () => {
     expect(ab.gameState.playerFormState).toBe(gs.playerFormState);
   });
 
-  it("KI und delegierte Teams beantworten sofort, ein Mensch ohne Delegation bleibt offen und verfaellt nach zwei Spieltagen", () => {
+  it("KI und delegierte Teams beantworten sofort, ein Mensch ohne Delegation bleibt offen und verfaellt nach zwei Spieltagen (die KI entscheidet)", () => {
     let gs = sichereSponsorTopf(topfSpiel());
     const mensch = gs.teams[1]!.teamId;
     gs = { ...gs, seasonState: { ...gs.seasonState, teamControlSettings: { ...(gs.seasonState.teamControlSettings ?? {}), [mensch]: { controlMode: "manual" } as never } } };
@@ -438,6 +440,10 @@ describe("Sponsorentermin: Entscheidung statt Wuerfel", () => {
     let spaeter = nachKi;
     for (let i = 4; i <= n; i += 1) spaeter = erzeugeTermine(spaeter, i);
     expect(offeneSponsorTermine(spaeter).filter((t) => t.nachSpieltag <= n - 2)).toHaveLength(0);
+    // der verfallene Termin des Menschen ist von der KI entschieden (nicht still abgesagt): Status zugesagt oder abgesagt, entschiedenVon "ki"
+    const seine = sponsorTermine(spaeter).filter((t) => t.teamId === mensch && t.nachSpieltag <= n - 2);
+    expect(seine.length).toBeGreaterThan(0);
+    expect(seine.every((t) => t.entschiedenVon === "ki" && t.status !== "offen")).toBe(true)
   });
 });
 
@@ -451,7 +457,7 @@ describe("Sponsor-Uebersicht: das eine View-Modell der Seite", () => {
     expect(u.farbPartner).toHaveLength(2);
     expect(u.liga_vergleich).toHaveLength(16);
     expect(u.liga_vergleich.filter((x) => !x.nebel)).toHaveLength(1);
-    expect(u.rechnung.schritte.map((s) => s.id)).toEqual(["betrieb", "ersatz", "faktor", "verteilung"]);
+    expect(u.rechnung.schritte.map((s) => s.id)).toEqual(["betrieb", "ersatz", "wertkorrektur", "faktor", "verteilung"]);
     expect(u.rechnung.topf).toBeCloseTo(gs.seasonState.sponsorRegel!.eingefroren!.topf, 6);
     expect(u.angebote).toHaveLength(0);
     // ohne Vertrag: drei Vertragsarten je Angebot mit Passungszeile
@@ -464,6 +470,31 @@ describe("Sponsor-Uebersicht: das eine View-Modell der Seite", () => {
       expect(a.passung.text).toMatch(/^Passung [+−±]\d+ %/);
       expect(a.laufzeiten.map((l) => l.laufzeit)).toEqual([1, 2, 3]);
     }
+  });
+
+  it("vor dem Stichtag: vorlaeufig=true, Zahlen = die Rechnung des Stichtags (inkl. Zusage), fremde Teams im Nebel", () => {
+    const gs0 = stempleVorlaeufig(topfSpiel());
+    const team = gs0.teams[0]!.teamId;
+    const vor = baueSponsorUebersicht(gs0, team)!;
+    expect(vor.vorlaeufig).toBe(true);
+    expect(vor.eingefroren).toBe(false);
+    const nach = baueSponsorUebersicht(sichereSponsorTopf(gs0), team)!;
+    expect(nach.vorlaeufig).toBe(false);
+    expect(vor.vertrag!.zeilen.grund.saison).toBeCloseTo(nach.vertrag!.zeilen.grund.saison, 1);
+    const fremd = vor.liga_vergleich.find((x) => x.nebel)!;
+    expect(fremd.guvBeiErwartung).toBeNull();
+    expect(fremd.kosten % 5).toBe(0);
+    const eigen = vor.liga_vergleich.find((x) => !x.nebel)!;
+    expect(eigen.guvBeiErwartung).not.toBeNull();
+  });
+
+  it("Leistungsteil je Spieltag = 80 % von L / N, mit Hinweis; Rechnung traegt die Liga-Wert-Korrektur", () => {
+    const gs = sichereSponsorTopf(topfSpiel());
+    const u = baueSponsorUebersicht(gs, gs.teams[0]!.teamId)!;
+    const z = u.vertrag!.zeilen.leistung;
+    expect(z.jeSpieltag).toBeCloseTo((0.8 * z.saison) / u.spieltage, 1);
+    expect(z.abrechnungshinweis).toMatch(/80 %/);
+    expect(typeof u.rechnung.wertKorrektur).toBe("number");
   });
 
   it("unter dem alten System: null (die alte Seite bleibt zustaendig)", () => {

@@ -16,7 +16,7 @@ import {
   zTreue,
 } from "@/lib/sponsors/sponsor-topf-modell";
 import type { SponsorFarbe, SponsorTopfVertrag, SponsorVertragsart } from "@/lib/sponsors/sponsor-topf-typen";
-import { berechneErwartungsraenge, treueSaisonsFuerMarke } from "@/lib/sponsors/sponsor-topf-eingaben";
+import { berechneErwartungsraenge, ligaGroesseVon, treueSaisonsFuerMarke } from "@/lib/sponsors/sponsor-topf-eingaben";
 
 export type TopfWahl = {
   vertragsart?: SponsorVertragsart;
@@ -101,10 +101,10 @@ export function baueTopfWahlKontext(gameState: GameState): TopfWahlKontext {
 /** Die vollstaendige KI-Wahl eines Teams (Vertragsart, Laufzeit, Farben) nach Konzept 7. */
 export function kiTopfWahl(gameState: GameState, teamId: string, kontext?: TopfWahlKontext): Required<Omit<TopfWahl, "von">> {
   const identity = gameState.teamIdentities.find((x) => x.teamId === teamId);
-  const e = (kontext?.erwartung ?? berechneErwartungsraenge(gameState))[teamId] ?? 8.5;
+  const e = (kontext?.erwartung ?? berechneErwartungsraenge(gameState))[teamId] ?? (ligaGroesseVon(gameState, teamId) + 1) / 2;
   const finanzwert = identity?.finances ?? 5;
   return {
-    vertragsart: kiVertragsart({ erwartungsrang: e, finanzwert, ambition: identity?.ambition ?? 5 }),
+    vertragsart: kiVertragsart({ erwartungsrang: e, finanzwert, ambition: identity?.ambition ?? 5, ligaGroesse: ligaGroesseVon(gameState, teamId) }),
     laufzeit: kiLaufzeit(finanzwert),
     farben: kiFarbenFuerTeam(gameState, teamId, kontext?.farbRaenge),
   };
@@ -117,14 +117,20 @@ export function ergaenzeTopfWahl(
   wahl: TopfWahl | null | undefined,
   standardVon: SponsorTopfVertrag["gewaehltVon"],
   kontext?: TopfWahlKontext,
-): Required<TopfWahl> {
+): Required<TopfWahl> & { kiFelder: Array<"vertragsart" | "laufzeit" | "farben"> } {
   const vollstaendig = wahl?.vertragsart != null && wahl.laufzeit != null && wahl.farben != null;
   const ki = vollstaendig ? null : kiTopfWahl(gameState, teamId, kontext);
+  // Felder, die die KI gefuellt hat, stehen einzeln am Vertrag (`kiFelder`): ein Mensch, der nur die Vertragsart setzt, hat Laufzeit und Farben nicht gewaehlt.
+  const kiFelder: Array<"vertragsart" | "laufzeit" | "farben"> = [];
+  if (wahl?.vertragsart == null) kiFelder.push("vertragsart");
+  if (wahl?.laufzeit == null) kiFelder.push("laufzeit");
+  if (wahl?.farben == null) kiFelder.push("farben");
   return {
     vertragsart: wahl?.vertragsart ?? ki!.vertragsart,
     laufzeit: wahl?.laufzeit ?? ki!.laufzeit,
     farben: wahl?.farben ?? ki!.farben,
     von: wahl?.von ?? standardVon,
+    kiFelder,
   };
 }
 
@@ -132,7 +138,7 @@ export function ergaenzeTopfWahl(
  * Haengt die Wahl an den eben unterschriebenen Vertrag. Setzt Laufzeit und Restlaufzeit des Vertrags (die alte Lebenszyklus-Logik rollt
  * den Vertrag danach wie jeden Mehrjahresvertrag). Ohne Topf-Regel oder ohne Vertrag: dieselbe Referenz zurueck.
  */
-export function wendeTopfWahlAn(gameState: GameState, teamId: string, wahl: Required<TopfWahl>, treueSaisons: number): GameState {
+export function wendeTopfWahlAn(gameState: GameState, teamId: string, wahl: Required<TopfWahl> & { kiFelder?: Array<"vertragsart" | "laufzeit" | "farben"> }, treueSaisons: number): GameState {
   if (!sponsorTopfAktiv(gameState)) return gameState;
   const contract = getTeamSponsorContract(gameState, teamId);
   if (!contract) return gameState;
@@ -145,6 +151,7 @@ export function wendeTopfWahlAn(gameState: GameState, teamId: string, wahl: Requ
     treueSaisons: Math.min(3, Math.max(0, treueSaisons)),
     gewaehltVon: wahl.von,
     zielEinsatz: vertragsartZielEinsatz(wahl.vertragsart),
+    ...(wahl.kiFelder && wahl.kiFelder.length > 0 ? { kiFelder: wahl.kiFelder } : {}),
   };
   const neu: TeamSponsorContract = { ...contract, termSeasons: laufzeit as SponsorTermSeasons, seasonsRemaining: laufzeit, sponsorTopf: topf };
   return {

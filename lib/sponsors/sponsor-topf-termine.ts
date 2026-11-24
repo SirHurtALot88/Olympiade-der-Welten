@@ -4,7 +4,7 @@
  *
  * Wann ein Termin entsteht: deterministisch aus Saison und Team (zwei feste Spieltage, einer je Saisonhaelfte). `erzeugeTermine` laeuft beim
  * Spieltagsabschluss; die Entscheidung kommt vom Menschen (`entscheideTermin`, Route `/api/sponsor/topf`), von der delegierten KI (Bereich
- * "sponsor") oder von der KI. Ein Mensch, der nicht antwortet, haelt nichts auf: nach zwei Spieltagen verfaellt der Termin als "abgesagt".
+ * "sponsor") oder von der KI. Ein Mensch, der nicht antwortet, haelt nichts auf: nach zwei Spieltagen entscheidet die KI nach derselben Regel wie bei KI-Teams.
  *
  * Gebucht wird als `SponsorEventRecord` (Typ "sponsor_termin", status "resolved"): damit steht er in derselben GuV-Zeile wie die frueheren
  * Sponsor-Ereignisse (`sponsor-event-cash-source.ts`). Die Kasse bewegt sich nur bei Zusage.
@@ -83,15 +83,16 @@ export function erzeugeTermine(gameState: GameState, index: number): GameState {
       neue.push({ id, seasonId, teamId: team.teamId, nachSpieltag: nach, status: "offen", spielerId: terminSpieler(gameState, team.teamId, id), betrag: SPONSOR_TOPF.terminBetrag });
     }
   }
-  let geaendert = neue.length > 0;
-  const verfallen = bisher.map((t) => {
-    if (t.seasonId === seasonId && t.status === "offen" && index - t.nachSpieltag >= 2) {
-      geaendert = true;
-      return { ...t, status: "abgesagt" as const, entschiedenVon: "ki" as const };
-    }
-    return t;
-  });
-  return geaendert ? schreibeTermine(gameState, [...verfallen, ...neue]) : gameState;
+  const verfallen = bisher.filter((t) => t.seasonId === seasonId && t.status === "offen" && index - t.nachSpieltag >= 2).map((t) => t.id);
+  if (neue.length === 0 && verfallen.length === 0) return gameState;
+  let g = schreibeTermine(gameState, [...bisher, ...neue]);
+  // Ein unbeantworteter Termin verfaellt nie still: nach zwei Spieltagen entscheidet die KI nach derselben Regel wie bei KI-Teams (Konzept 7).
+  // So steht ein Mensch, der ihn ignoriert, nie schlechter da als ein KI-Team; der Planwert (1,5 C) bleibt.
+  for (const id of verfallen) {
+    const r = entscheideTermin(g, id, "ki", "ki");
+    if (!r.error) g = r.gameState;
+  }
+  return g;
 }
 
 /**

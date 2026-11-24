@@ -642,6 +642,8 @@ async function main() {
       farbToepfe: sponsorRegelFuer(nachComp) === "topf" ? topfFarbVerteilung(nachComp)?.toepfe ?? null : null,
     };
     schreibe();
+    // Flip-Lauf (--flip-sponsor): Saison 1 lief im alten System (OLY_SPONSOR_REGEL=aus beim Anlegen), ab dem Saisonwechsel gilt die Topf-Regel.
+    if (process.argv.includes("--flip-sponsor")) delete process.env.OLY_SPONSOR_REGEL;
     // Saisonende-Kette
     for (let hop = 1; hop <= 12; hop += 1) {
       const aktuell = get();

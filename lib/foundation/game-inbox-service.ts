@@ -33,6 +33,7 @@ import { buildFormCardSeasonUsageAudit } from "@/lib/lineups/legacy-lineup-modif
 import { isTeamMatchdayLineupComplete, isTeamMatchdayLineupSubmitted } from "@/lib/foundation/matchday-lineup-readiness";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { listOpenSponsorEvents } from "@/lib/sponsor/sponsor-event-service";
+import { offeneSponsorTermine } from "@/lib/sponsors/sponsor-topf-termine";
 import { getTransferWindowStatus } from "@/lib/market/transfer-window-policy";
 import { buildCaptainCandidateProfiles, hasPersistedTeamCaptain } from "@/lib/morale/team-captain-service";
 import { buildContractDissolutionOffers, buildTeamMoraleMap } from "@/lib/morale/contract-dissolution-service";
@@ -865,6 +866,50 @@ function buildTeamTasks(input: BuildGameInboxInput, visibleTeamIds: Set<string>,
           createdAt: event.createdAt,
         }),
       );
+    }
+
+    // SPONSOR-TOPF (24.11.): wer bis zum Stichtag nicht unterschrieben hat, bekommt den Leistungsvertrag des Angebots mit der besten Passung
+    // (Laufzeit 1, KI-Farben). Der Hinweis steht NUR im Postfach dieses Teams. Dazu offene Sponsorentermine des Teams.
+    if (controlMode === "manual") {
+      const auto = getTeamSponsorContract(input.gameState, team.teamId);
+      if (auto?.sponsorTopf?.gewaehltVon === "auto") {
+        items.push(
+          createItem({
+            itemId: `sponsor_auto_signed:${input.saveId}:${input.gameState.season.id}:${team.teamId}`,
+            saveId: input.saveId,
+            seasonId: input.gameState.season.id,
+            teamId: team.teamId,
+            category: "sponsor",
+            severity: "warning",
+            title: "Sponsor automatisch unterschrieben",
+            description: `${team.shortCode}: Zum Stichtag lag keine Wahl vor. ${auto.name} wurde als Leistungsvertrag (1 Saison, Farben ${auto.sponsorTopf.farben.map((f) => f.toUpperCase()).join(" + ")}) unterschrieben.`,
+            targetView: "teams",
+            targetParams: { team: team.teamId, panel: "sponsor-choice" },
+            ctaLabel: "Vertrag ansehen",
+            source: "sponsor_topf_auto_signed",
+            createdAt,
+          }),
+        );
+      }
+      for (const termin of offeneSponsorTermine(input.gameState, team.teamId)) {
+        items.push(
+          createItem({
+            itemId: `sponsor_termin:${input.saveId}:${termin.id}`,
+            saveId: input.saveId,
+            seasonId: input.gameState.season.id,
+            teamId: team.teamId,
+            category: "sponsor",
+            severity: "info",
+            title: "Sponsorentermin",
+            description: `${team.shortCode}: Zusagen bringt ${termin.betrag.toFixed(1)} C, ein benannter Spieler hat dafuer am naechsten Spieltag Form -1. Ohne Antwort entscheidet nach zwei Spieltagen die KI.`,
+            targetView: "teams",
+            targetParams: { team: team.teamId, panel: "sponsor-choice", sponsorTerminId: termin.id },
+            ctaLabel: "Termin beantworten",
+            source: "sponsor_topf_termin",
+            createdAt,
+          }),
+        );
+      }
     }
 
     const missingTraining = teamTrainingMissingCount(input.gameState, team.teamId);

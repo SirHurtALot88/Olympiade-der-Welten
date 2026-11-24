@@ -10,6 +10,7 @@ import {
   getTeamSponsorContract,
   getTeamSponsorOffers,
 } from "@/lib/sponsor/sponsor-offer-service";
+import { pruefeTopfWahl } from "@/lib/sponsors/sponsor-topf-wahl";
 import { notifyRoomGameplayWrite } from "@/lib/room/room-gameplay-write-notifier";
 import { authorizeServerRoomWrite } from "@/lib/room/server-authoritative-write-guard";
 import { resolveAuthoritativeWriteOwnerId } from "@/lib/auth/session";
@@ -58,6 +59,16 @@ export async function POST(request: Request) {
     }
     if (!saveId || !teamId || !offerId) {
       return NextResponse.json({ success: false, error: "saveId, teamId and offerId are required.", summary: null }, { status: 400 });
+    }
+
+    // SPONSOR-TOPF: Eingaben der Wahl pruefen, bevor irgendetwas gelesen wird (400 statt stiller KI-Ersatzwahl).
+    const wahlFehler = pruefeTopfWahl({
+      vertragsart: body.vertragsart,
+      laufzeit: body.laufzeit,
+      farben: body.farben,
+    });
+    if (wahlFehler || (body.farben !== undefined && !Array.isArray(body.farben))) {
+      return NextResponse.json({ success: false, error: wahlFehler ?? "sponsor_farben_ungueltig", summary: null }, { status: 400 });
     }
 
     const persistence = createPersistenceService();

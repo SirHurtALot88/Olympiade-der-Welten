@@ -209,3 +209,28 @@ Neue Dateien: `tests/sponsor-topf-modell.test.ts` (27), `tests/sponsor-topf-rege
 3. **Die Konstanten sind aus zwei Seeds und drei Saisons gemessen** (Kader-Ersatz 6 % + 8 % in Saison 1, Steigung 1,8 / 1,6, Plan Vorstandsziele 6,5 C). Die Liga-Wert-Rückkopplung fängt Abweichungen auf, ersetzt aber keine Nachmessung: nach den ersten drei echten Saisons (mit Menschen, die anders kaufen als die KI) sollte `scripts/auswerte-sponsor-topf.ts` über die Live-Abbilder laufen.
 4. **Form −1 beim Sponsorentermin** ist als eine Anzeige-Stufe (15 Formpunkte) gebaut, nicht als −1 Punkt.
 
+## 9. Review-Runde (PR #1740, 24.11.): was sich geändert hat
+
+Entscheidungen des PM nach unabhängigem Opus-Review, alle gebaut und mit Tests belegt (`tests/sponsor-topf-regel.test.ts`, `tests/sponsor-topf-modell.test.ts`).
+
+| Nr. | Änderung |
+|---|---|
+| 1 | **Sponsorentermin, Verfall:** ein offener Termin, dessen Frist verstreicht, wird von der KI entschieden (`entscheideTermin(..., "ki", "ki")`, absagen nur, wenn der benannte Spieler zu den besten vier gehört), nicht still abgesagt. |
+| 3 | **Notbremse `aus-sofort`:** der Leistungsteil friert ein; die Saisonend-Zeile „Rang“ ist genau der bereits gebuchte Abschlag, es gibt keinen Ausgleich mehr. |
+| 4 | **Treue** zählt Saisonen je Marke (`sponsorMarkenSaisonenByTeamId`, im Saisonwechsel fortgeschrieben). Der Verlängerungs-Slot trägt die Marke des auslaufenden Vertrags (`renewalParentId` im Markenkatalog, genau ein Slot). |
+| 5 | **Erste Topf-Saison eines migrierten Spielstands:** `stempel.ohneBremse`: die Bremse 85 bis 115 % entfällt, weil kein Vorjahr im Topf-System existiert; vorläufig gelten die heutigen Kosten. |
+| 6 | **KI-Planung:** `erwarteterSponsorFuerKaufplanung` (nur der Draft-Adapter, Zusage + verdrängte Einnahmen) gegen die reine `erwarteterSponsorFuerPlanung` (Vorstands-Freigabe, Kreditprüfung). `topfPlanungSponsor` liegt in einer reinen Datei (`sponsor-topf-planung.ts`), der Saisonwechsel-Übertrag in `sponsor-topf-uebertrag.ts` (keine Zyklen, nichts Server-seitiges im Client-Bündel). |
+| 7 | **View-Modell:** `leistung.jeSpieltag` = 80 % von L / N (so wird je Spieltag gebucht, der Rest zum Saisonende) mit `abrechnungshinweis`; Rechnungsschritte lesen ihre Zahlen aus `SPONSOR_TOPF` (neu: Schritt `wertkorrektur`, Feld `rechnung.wertKorrektur`); fremde Teams im Scouting-Nebel serverseitig gröber (Erwartungsrang auf Vierer, Kosten und Plan-Einnahmen auf Fünfer, `guvBeiErwartung` null), außer bei ausgeschaltetem Nebel; `leihVerzicht` in der Grundzeile. Verträge fremder Teams bleiben exakt sichtbar (Konzept 8: öffentlich). |
+| 8 | **Rang-Rückfall:** `topfLeistungJetzt` akzeptiert nur ligalokale Ränge 1 bis n. |
+| 9, 10 | **Routen:** `/api/sponsor/event` verlangt `antwort` (400 `sponsor_antwort_ungueltig`); `/api/sponsor/choose` prüft die Wahl mit `pruefeTopfWahl`, bevor der Spielstand gelesen wird (400). |
+| 11 | `topfGrundJahr` zieht den Leih-Verzicht ab (gebucht = gezeigt). |
+| 12 | `applySponsorSettlement` ruft `sichereSponsorTopf` zuerst auf, wenn die Topf-Regel gilt. |
+| 13 | **Doppelreaktion Übertrag + Liga-Wert-Korrektur:** beide reagieren auf dieselbe Ursache (Liga-Wert wächst oder schrumpft). Der Übertrag trägt den Rest-Saldo der Vorsaison einmal in die nächste; die Korrektur integriert 0,75 × (Wert am Stichtag − Wert Vorjahr), wird fortgeschrieben und ist auf ±6 % des Topfs gedeckelt. Läuft die Liga um x aus dem Ruder, senkt die Korrektur den Topf der Folgesaison um 0,75·x; steht der Wert danach wieder, bleibt die Korrektur stehen (integrierend) und nur eine weitere Abweichung ändert sie. Der Übertrag klingt dagegen ab, weil er nur einmal verbucht wird. Beide zusammen sind durch ihre Deckel begrenzt. |
+| 14 | **NaN-Wache:** `bereinige()` setzt nicht endliche Eingaben auf 0 (Passung auf 1), `berechneTopf` bleibt endlich. |
+| 15 | Fest verdrahtete 16 und 8,5 sind durch die Ligagröße (`ligaGroesseVon`) und `SPONSOR_TOPF`-Konstanten ersetzt. |
+| 16 | **Posteingang:** Hinweis „automatisch unterschrieben“ und offene Sponsortermine (nur manuelle Teams). |
+| Typ | `FinanceSponsorComponentRow.kind` erlaubt `"farbe"`; `tsc -p tsconfig.next.json` ist fehlerfrei. |
+| Nachtrag PM | Vor dem Stichtag zeigt das View-Modell denselben Weg wie der Stichtag (`fuelleFehlendeVertraege` + Vorab-Zusage mit anteiliger Kürzung) und setzt `vorlaeufig: true`. `ligaBilanz` kommt mit der Seiten-PR (Merge). |
+
+**Client-Bündel-Regel:** nichts, was Client-Komponenten erreichen, darf Persistenz oder `node:`-Module importieren. Prüfung: `npx esbuild app/foundation/FoundationPageClient.tsx --bundle ... | grep 'node:'` bleibt leer.
+

@@ -216,6 +216,8 @@ export type TopfEingabe = {
   /** K_B der Vorsaison (Bezug der Bremse); `null` in Saison 1 (Richtwert). */
   betriebsteilVorjahr: number | null;
   uebertrag: number;
+  /** Erste Topf-Saison nach dem alten System: Betriebsteil ohne 15-%-Bremse (kein Bezug vorhanden). */
+  ohneBremse?: boolean;
   /** Fortgeschriebene Liga-Wert-Korrektur (roh, vor dem Deckel); siehe `SPONSOR_TOPF.wertRueckkopplung`. */
   wertKorrektur?: number;
   /** Untergrenze je Team (Vorab-Zusage = 90 % des vorlaeufigen Grundbetrags). */
@@ -249,12 +251,42 @@ export function richtwertSaison1(teams: ReadonlyArray<Pick<TopfTeamEingabe, "pla
   return teams.reduce((s, x) => s + SPONSOR_TOPF.richtwertKostenSaison1 - x.planEinnahmen, 0);
 }
 
-export function berechneTopf(e: TopfEingabe): TopfErgebnis {
+/** Nicht endliche Eingaben (NaN, Infinity) zaehlen als 0 und werden einmal je Aufruf gemeldet: ein einziges kaputtes Team darf nie den Topf der Liga vergiften. */
+function bereinige(e: TopfEingabe): TopfEingabe {
+  const gemeldet: string[] = [];
+  const f = (wert: number, name: string, id: string): number => {
+    if (Number.isFinite(wert)) return wert;
+    gemeldet.push(`${id}.${name}`);
+    return 0;
+  };
+  const teams = e.teams.map((x) => ({
+    ...x,
+    erwartungsrang: f(x.erwartungsrang, "erwartungsrang", x.teamId),
+    beliebtheit: f(x.beliebtheit, "beliebtheit", x.teamId),
+    passungRoh: Number.isFinite(x.passungRoh) && x.passungRoh > 0 ? x.passungRoh : (gemeldet.push(`${x.teamId}.passungRoh`), 1),
+    treue: f(x.treue, "treue", x.teamId),
+    kosten: f(x.kosten, "kosten", x.teamId),
+    planEinnahmen: f(x.planEinnahmen, "planEinnahmen", x.teamId),
+    kaderwert: f(x.kaderwert, "kaderwert", x.teamId),
+  }));
+  const rein: TopfEingabe = {
+    ...e,
+    teams,
+    faktor: Number.isFinite(e.faktor) ? e.faktor : (gemeldet.push("faktor"), 1),
+    uebertrag: f(e.uebertrag, "uebertrag", "liga"),
+    ...(e.wertKorrektur != null ? { wertKorrektur: f(e.wertKorrektur, "wertKorrektur", "liga") } : {}),
+  };
+  if (gemeldet.length > 0) console.warn(`[sponsor-topf] nicht endliche Eingaben als 0 gerechnet: ${gemeldet.slice(0, 8).join(", ")}${gemeldet.length > 8 ? " ..." : ""}`);
+  return rein;
+}
+
+export function berechneTopf(eingabe: TopfEingabe): TopfErgebnis {
+  const e = bereinige(eingabe);
   const t = SPONSOR_TOPF;
   const F = e.faktor;
   const betriebsteilRoh = e.teams.reduce((s, x) => s + (x.kosten - x.planEinnahmen), 0);
   const vor = e.betriebsteilVorjahr ?? richtwertSaison1(e.teams);
-  const betriebsteil = Math.min(vor * t.bremse[1], Math.max(vor * t.bremse[0], betriebsteilRoh));
+  const betriebsteil = e.ohneBremse ? betriebsteilRoh : Math.min(vor * t.bremse[1], Math.max(vor * t.bremse[0], betriebsteilRoh));
   const kaderErsatz = e.kaderErsatz === 1 ? (t.kaderErsatzAnteil + (e.saison1 ? t.kaderErsatzZuschlagSaison1 : 0)) * e.teams.reduce((s, x) => s + x.kaderwert, 0) : 0;
   const deckel = t.wertKorrekturDeckel * F * (betriebsteil + kaderErsatz);
   const wertKorrektur = Math.round(Math.min(deckel, Math.max(-deckel, e.wertKorrektur ?? 0)) * 10) / 10;
@@ -413,10 +445,12 @@ export function erwarteterEndrang(erwartungsrang: number, ligaGroesse = 16): num
  * (ab 7 Fest, unter 4 Praemie, sonst Leistung). Eine ambitionierte Fuehrung (>= 7) verschiebt die Grenzen um einen Rang Richtung
  * Wagnis (Praemie ab 10, Fest bis 3), eine vorsichtige (<= 3) Richtung Sicherheit (Praemie ab 12, Fest bis 5).
  */
-export function kiVertragsart(input: { erwartungsrang: number; finanzwert: number; ambition: number }): SponsorVertragsart {
+export function kiVertragsart(input: { erwartungsrang: number; finanzwert: number; ambition: number; ligaGroesse?: number }): SponsorVertragsart {
+  // Die Grenzen (11 / 4) sind fuer 16 Teams gemessen und skalieren mit der Ligagroesse (2 x 20 geplant).
+  const skala = (input.ligaGroesse ?? 16) / 16;
   const verschub = input.ambition >= 7 ? -1 : input.ambition <= 3 ? 1 : 0;
-  const praemieAb = 11 + verschub;
-  const festBis = 4 + verschub;
+  const praemieAb = Math.round(11 * skala) + verschub;
+  const festBis = Math.round(4 * skala) + verschub;
   if (input.erwartungsrang >= praemieAb) return "praemie";
   if (input.erwartungsrang <= festBis) return "fest";
   if (input.finanzwert >= 7) return "fest";

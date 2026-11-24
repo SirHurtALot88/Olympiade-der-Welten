@@ -32,7 +32,8 @@ export const FINANCE_SPONSOR_INCOME_COMPONENT_KINDS: SponsorOfferComponentKind[]
 
 /** One sponsor-contract component contributing to the "Sponsor"-Einnahme, for the hover breakdown. */
 export type FinanceSponsorComponentRow = {
-  kind: SponsorOfferComponentKind;
+  /** `farbe` = Farb-Partner des Sponsor-Topfs (24.11.), sonst die Komponentenart des Vertrags. */
+  kind: SponsorOfferComponentKind | "farbe";
   label: string;
   rewardCash: number;
 };
