@@ -14,6 +14,11 @@
  *              naechsten Fenster ohnehin verkaufen wuerde (er geht als abloesefreier Verkauf am Vertragsende), nimmt fuer einen solchen
  *              Spieler eine Vertragsaufloesung an, und ihre Verkaufspruefung rechnet mit dem Erloes NACH Rest-Buyout; "alt" = vorher.
  *              Fehlt im Altstempel = "alt".
+ *   verkaufSchwellen "neu" (24.11., docs/design/verkauf-restgehalt-24-11.md Abschnitt 7) = am Vertragsende geht ein Spieler nur, wenn
+ *              sich der Abgang nach den Schwellen der Verkaufslogik lohnt (Ueberschuss ueber Opt, klar schwach, Gewinnmitnahme, Upgrade-
+ *              Tausch); sonst wird verlaengert. Ein Verkauf mit offenem Restgehalt braucht netto (nach Buyout) mindestens 90 % des
+ *              Marktwerts (auch in Finanznot), und ein gerade verlaengerter Vertrag wird nicht freiwillig verkauft.
+ *              "alt" = wie mit `restgehalt` allein. Fehlt im Altstempel = "alt".
  *   (Die Verkaufs-Sperre fuer alle Teams ist KEIN Stempel: bestehende Spielregel, gilt sofort — lib/market/transfer-sold-cooldown.ts.)
  *
  * `vorjahr` (Anker): je Team die Platzierung der abgelaufenen Saison als Anteil 0..1 (0 = Erster, 1 = Letzter) IN DER LIGA, in der
@@ -21,7 +26,7 @@
  * als 0 (Erster der neuen Liga: wer absteigt, soll oben erwartet werden und nicht belohnt werden). Liga-Rang 1 aus Liga 2 ist
  * KEIN Rang 1 in Liga 1.
  *
- * SCHALTER (Server, im Browser `NEXT_PUBLIC_…`): `OLY_QUOTE_UEBER_PFLICHTKADER`, `OLY_BOARD_ERWARTUNG_ANKER`, `OLY_KI_KERNSCHUTZ`, `OLY_KI_RESTGEHALT`. Leer = neu. "0" / "aus" / "alt" = neue Saisons bekommen "alt"; gestempelte Saisons rechnen wie gestempelt.
+ * SCHALTER (Server, im Browser `NEXT_PUBLIC_…`): `OLY_QUOTE_UEBER_PFLICHTKADER`, `OLY_BOARD_ERWARTUNG_ANKER`, `OLY_KI_KERNSCHUTZ`, `OLY_KI_RESTGEHALT`, `OLY_KI_VERKAUF_SCHWELLEN`. Leer = neu. "0" / "aus" / "alt" = neue Saisons bekommen "alt"; gestempelte Saisons rechnen wie gestempelt.
  */
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
 import { findLeagueMovementLog } from "@/lib/season/league-movement-service";
@@ -38,10 +43,12 @@ export type WirtschaftsRegelnStempel = {
   toepfeS1?: WirtschaftsRegel;
   /** 24.11.: KI verlaengert nicht, was sie verkaufen wuerde, und prueft Verkaeufe netto nach Rest-Buyout. Fehlt im Altstempel = "alt". */
   restgehalt?: WirtschaftsRegel;
+  /** 24.11.: Abgang am Vertragsende nur nach den Schwellen der Verkaufslogik, Restgehalt-Verkauf praktisch gesperrt. Fehlt = "alt". */
+  verkaufSchwellen?: WirtschaftsRegel;
   vorjahr?: Record<string, number>;
 };
 
-export type WirtschaftsRegelName = "quote" | "anker" | "kernschutz" | "toepfeS1" | "restgehalt";
+export type WirtschaftsRegelName = "quote" | "anker" | "kernschutz" | "toepfeS1" | "restgehalt" | "verkaufSchwellen";
 
 function leseSchalter(wert: string | undefined): WirtschaftsRegel | null {
   const w = (wert ?? "").trim().toLowerCase();
@@ -62,6 +69,8 @@ function schalter(name: WirtschaftsRegelName): WirtschaftsRegel {
       return leseSchalter(process.env.NEXT_PUBLIC_OLY_TOEPFE_AB_SAISON_1) ?? leseSchalter(process.env.OLY_TOEPFE_AB_SAISON_1) ?? "neu";
     case "restgehalt":
       return leseSchalter(process.env.NEXT_PUBLIC_OLY_KI_RESTGEHALT) ?? leseSchalter(process.env.OLY_KI_RESTGEHALT) ?? "neu";
+    case "verkaufSchwellen":
+      return leseSchalter(process.env.NEXT_PUBLIC_OLY_KI_VERKAUF_SCHWELLEN) ?? leseSchalter(process.env.OLY_KI_VERKAUF_SCHWELLEN) ?? "neu";
   }
 }
 
@@ -73,6 +82,7 @@ export function wirtschaftsRegelnFuerNeueSaison(seasonId: string, vorjahr?: Reco
     kernschutz: schalter("kernschutz"),
     toepfeS1: schalter("toepfeS1"),
     restgehalt: schalter("restgehalt"),
+    verkaufSchwellen: schalter("verkaufSchwellen"),
     ...(vorjahr && Object.keys(vorjahr).length > 0 ? { vorjahr } : {}),
   };
 }

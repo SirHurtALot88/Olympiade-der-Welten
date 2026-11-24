@@ -18,7 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { GameState, Player, RosterEntry, Team, TeamIdentity } from "@/lib/data/olyDataTypes";
 import { computeSeasonEndContractTick } from "@/lib/contracts/contract-renewal-service";
 import { ermittleKiVerkaufsabsichtAmSaisonende } from "@/lib/contracts/ki-verkaufsabsicht-saisonende";
-import { planOrganicSellsForTeam } from "@/lib/ai/organic-squad/draft-adapter";
+import { frischVerlaengerteSpieler, planOrganicSellsForTeam, restgehaltVerkaufLohnt } from "@/lib/ai/organic-squad/draft-adapter";
 import { saltOrganicSeed } from "@/lib/ai/ai-transfer-window-session-service";
 import { decideAiContractDissolution } from "@/lib/morale/ai-contract-dissolution-service";
 import { wirtschaftsRegel, wirtschaftsRegelnFuerNeueSaison } from "@/lib/resolve/wirtschafts-regeln";
@@ -255,19 +255,34 @@ const IDENTITY = {
   soc: 12,
 } as unknown as TeamIdentity;
 
-function gateState(regel: "alt" | "neu" | null, vertragsJahre = 2) {
+type GateOptionen = {
+  /** Marktwert je Spieler (Standard 40); als Funktion je Index. */
+  mw?: number | ((i: number) => number);
+  /** Gehalt je Saison (Standard 8). */
+  gehalt?: number;
+  /** Stempel `verkaufSchwellen` (Standard "alt", damit die Restgehalt-Waechter oben genau die Regel `restgehalt` messen). */
+  schwellen?: "alt" | "neu";
+  /** POW je Index (Standard 75): steuert die Qualitaet im Kader. */
+  pow?: (i: number) => number;
+  /** Anzahl Spieler (Standard 18). */
+  anzahl?: number;
+};
+
+function gateState(regel: "alt" | "neu" | null, vertragsJahre = 2, opt: GateOptionen = {}) {
+  const mwVon = (i: number) => (typeof opt.mw === "function" ? opt.mw(i) : opt.mw ?? 40);
+  const gehalt = opt.gehalt ?? 8;
   const players: Player[] = [];
   const rosters: RosterEntry[] = [];
   const perfs: unknown[] = [];
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < (opt.anzahl ?? 18); i++) {
     const pid = `p${i}`;
     players.push({
       id: pid,
       name: pid,
-      coreStats: { pow: 75, spe: 50, men: 50, soc: 50 },
+      coreStats: { pow: opt.pow ? opt.pow(i) : 75, spe: 50, men: 50, soc: 50 },
       disciplineRatings: { tdm: 60 },
-      marketValue: 40,
-      salaryDemand: 8,
+      marketValue: mwVon(i),
+      salaryDemand: gehalt,
       potential: 0,
       className: "Hero",
       race: "Human",
@@ -282,10 +297,10 @@ function gateState(regel: "alt" | "neu" | null, vertragsJahre = 2) {
       teamId: "team-test",
       playerId: pid,
       contractLength: vertragsJahre,
-      salary: 8,
-      upkeep: 8,
+      salary: gehalt,
+      upkeep: gehalt,
       purchasePrice: 10,
-      currentValue: 40,
+      currentValue: mwVon(i),
       roleTag: "starter",
       joinedSeasonId: "season-2",
     } as RosterEntry);
@@ -324,7 +339,9 @@ function gateState(regel: "alt" | "neu" | null, vertragsJahre = 2) {
       matchdayResults: [{ id: "result-1", seasonId: "season-2", status: "preview_applied" }],
       playerDisciplinePerformances: perfs,
       seasonSnapshots: [],
-      ...(regel ? { wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), kernschutz: "alt", restgehalt: regel } } : {}),
+      ...(regel
+        ? { wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), kernschutz: "alt", restgehalt: regel, verkaufSchwellen: opt.schwellen ?? "alt" } }
+        : {}),
     },
   } as unknown as GameState;
   return { gameState, team: t, players };
@@ -407,5 +424,134 @@ describe("Verkaufsabsicht am Saisonende", () => {
     // Altstempel ohne Feld gilt als "alt".
     const altStempel = { season: { id: "season-3" }, seasonState: { seasonId: "season-3", wirtschaftsRegeln: { seasonId: "season-3", quote: "neu", anker: "neu", kernschutz: "neu" } } };
     expect(wirtschaftsRegel(altStempel as never, "restgehalt")).toBe("alt");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Verkaufs-Schwellen (24.11., Stempel `verkaufSchwellen`, verkauf-restgehalt-24-11.md Abschnitt 7)
+// ---------------------------------------------------------------------------------------------------------------------
+describe("Verkaufs-Schwellen: Restgehalt bremst, Vertragsende nur nach Schwellen", () => {
+  afterEach(() => {
+    delete process.env.OLY_KI_VERKAUF_SCHWELLEN;
+  });
+
+  /** Das Gehalt der laufenden Saison ist gebucht: ein Ein-Jahres-Vertrag hat dann kein Restgehalt (Vertragsende). */
+  const mitGehaltsAbzug = (gameState: GameState) =>
+    ({
+      ...gameState,
+      seasonState: { ...gameState.seasonState, sponsorPayoutLogs: [{ seasonId: "season-2", teamId: "team-test", componentId: "salary_deduct" }] },
+    }) as unknown as GameState;
+
+  it("Chris' Beispiel: 8 C je Saison, noch 4 Jahre, 25 C Marktwert — die KI behaelt ihn (auch in Finanznot)", () => {
+    // Reine Regel: 32 C Restgehalt gegen hoechstens ~25 C Erloes — netto negativ, also nie.
+    expect(restgehaltVerkaufLohnt({ marketValue: 25, realizedPrice: 25, openBuyout: 32 })).toBe(false);
+    // Selbst ein Angebot deutlich ueber dem Marktwert reicht nicht, solange netto unter 90 % des Marktwerts bleibt.
+    expect(restgehaltVerkaufLohnt({ marketValue: 25, realizedPrice: 40, openBuyout: 32 })).toBe(false);
+    // Erst ein Preis, der das Restgehalt UND fast den ganzen Marktwert traegt, waere eine Gewinnmitnahme (55 C fuer 25 C MW).
+    expect(restgehaltVerkaufLohnt({ marketValue: 25, realizedPrice: 55, openBuyout: 32 })).toBe(true);
+    // Ohne Restgehalt greift die Regel nicht.
+    expect(restgehaltVerkaufLohnt({ marketValue: 25, realizedPrice: 20, openBuyout: 0 })).toBe(true);
+
+    // Im Planer: ein Kader aus solchen Spielern (18 bei Opt 8, also eigentlich Ueberschuss) — mit Stempel geht keiner.
+    const { gameState, team: t, players } = gateState("neu", 4, { mw: 25, gehalt: 8, schwellen: "neu" });
+    expect(resolveOpenBuyoutCostForRoster({ rosterEntry: gameState.rosters[0]!, gameState })).toBeCloseTo(32, 1);
+    const plan = planOrganicSellsForTeam({ gameState, team: t, identity: IDENTITY, roster: players, allowBelowMin: true });
+    expect(plan.decisions).toHaveLength(0);
+    // Auch im Vertragsende-Plan (Verkaufsabsicht vor dem Tick) bleibt er: sein Vertrag laeuft noch.
+    const planEnde = planOrganicSellsForTeam({ gameState, team: t, identity: IDENTITY, roster: players, allowBelowMin: true, vertragsende: true });
+    expect(planEnde.decisions).toHaveLength(0);
+    // Finanznot (Kasse unter 0) hebt die Sperre nicht auf: Bargeld zahlen, um ihn loszuwerden, bringt keine Liquiditaet.
+    const pleite = { ...gameState, teams: gameState.teams.map((x) => ({ ...x, cash: -5 })) } as GameState;
+    const planPleite = planOrganicSellsForTeam({ gameState: pleite, team: { ...t, cash: -5 }, identity: IDENTITY, roster: players, allowBelowMin: true });
+    expect(planPleite.decisions).toHaveLength(0);
+  });
+
+  it("ohne Stempel (vorher) verkaufte ein Team in Finanznot denselben Kader trotz 32 C Restgehalt", () => {
+    const { gameState, team: t, players } = gateState("neu", 4, { mw: 25, gehalt: 8, schwellen: "alt" });
+    const pleite = { ...gameState, teams: gameState.teams.map((x) => ({ ...x, cash: -5 })) } as GameState;
+    const plan = planOrganicSellsForTeam({ gameState: pleite, team: { ...t, cash: -5 }, identity: IDENTITY, roster: players, allowBelowMin: true });
+    expect(plan.decisions.length).toBeGreaterThan(0);
+  });
+
+  it("am Vertragsende geht unter Opt nur, wer sich lohnt: Ueberschuss ueber Opt ja, gleich starke Stammspieler nein", () => {
+    // 18 gleich starke Spieler, Opt 8, Ein-Jahres-Vertraege ohne Restgehalt.
+    const ohne = gateState("neu", 1, { schwellen: "alt" });
+    const mit = gateState("neu", 1, { schwellen: "neu" });
+    const planOhne = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(ohne.gameState), team: ohne.team, identity: IDENTITY, roster: ohne.players, allowBelowMin: true, vertragsende: true });
+    const planMit = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(mit.gameState), team: mit.team, identity: IDENTITY, roster: mit.players, allowBelowMin: true, vertragsende: true });
+    expect(planOhne.decisions.length).toBeGreaterThan(18 - planOhne.optTarget);
+    // Mit Schwellen: hoechstens der Ueberschuss ueber Opt (niemand ist klar schwach, keine Gewinnmitnahme ueber 1,1 x MW).
+    expect(planMit.decisions.length).toBeGreaterThan(0);
+    expect(planMit.decisions.length).toBeLessThanOrEqual(18 - planMit.optTarget);
+    for (const d of planMit.decisions) expect(d.abgangsGrund).toBe("ueberschuss_opt");
+    expect(planMit.finalRosterSize).toBeGreaterThanOrEqual(planMit.optTarget);
+  });
+
+  it("am Vertragsende darf unter Opt nur ein klar schwacher Spieler (oder eine Gewinnmitnahme) gehen", () => {
+    // 8 Spieler bei Opt 8: zwei sind klar schwaecher (POW 20 statt 75) und billig.
+    const { gameState, team: t, players } = gateState("neu", 1, {
+      schwellen: "neu",
+      anzahl: 8,
+      pow: (i) => (i >= 6 ? 20 : 75),
+      mw: (i) => (i >= 6 ? 12 : 40),
+    });
+    const plan = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(gameState), team: t, identity: IDENTITY, roster: players, allowBelowMin: true, vertragsende: true });
+    for (const d of plan.decisions) {
+      expect(["klar_schwach", "gewinnmitnahme"]).toContain(d.abgangsGrund);
+      if (d.abgangsGrund === "klar_schwach") expect(["p6", "p7"]).toContain(d.playerId);
+    }
+  });
+
+  it("ein gerade verlaengerter Vertrag wird nicht freiwillig verkauft", () => {
+    // Billiges Restgehalt (3 x 1 C auf 40 C MW): netto ueber 90 % waere moeglich — aber alle wurden gerade verlaengert.
+    const { gameState, team: t, players } = gateState("neu", 3, { mw: 40, gehalt: 1, schwellen: "neu" });
+    const verlaengert = {
+      ...gameState,
+      seasonState: {
+        ...gameState.seasonState,
+        contractEvents: players.map((p) => ({
+          eventId: `e-${p.id}`, seasonId: "season-1", teamId: "team-test", playerId: p.id, eventType: "contract_renewed",
+          oldSalary: 1, newSalary: 1, oldLength: 1, newLength: 3, source: "ai_contract_renewal", timestamp: "2026-06-01T00:00:00.000Z",
+        })),
+      },
+    } as unknown as GameState;
+    expect(frischVerlaengerteSpieler(verlaengert, "team-test").size).toBe(18);
+    const plan = planOrganicSellsForTeam({ gameState: verlaengert, team: t, identity: IDENTITY, roster: players, allowBelowMin: true });
+    expect(plan.decisions).toHaveLength(0);
+    // Ist der Vertrag seither gealtert (Laufzeit 2 statt 3), gilt er nicht mehr als frisch verlaengert.
+    const gealtert = { ...verlaengert, rosters: verlaengert.rosters.map((r) => ({ ...r, contractLength: 2 })) } as GameState;
+    expect(frischVerlaengerteSpieler(gealtert, "team-test").size).toBe(0);
+  });
+
+  it("Stempel: neue Saisons bekommen `verkaufSchwellen: neu`, OLY_KI_VERKAUF_SCHWELLEN=aus stellt `alt` ein, Altstempel = alt", () => {
+    expect(wirtschaftsRegelnFuerNeueSaison("season-3").verkaufSchwellen).toBe("neu");
+    process.env.OLY_KI_VERKAUF_SCHWELLEN = "aus";
+    expect(wirtschaftsRegelnFuerNeueSaison("season-3").verkaufSchwellen).toBe("alt");
+    const altStempel = { season: { id: "season-3" }, seasonState: { seasonId: "season-3", wirtschaftsRegeln: { seasonId: "season-3", quote: "neu", anker: "neu", kernschutz: "neu", restgehalt: "neu" } } };
+    expect(wirtschaftsRegel(altStempel as never, "verkaufSchwellen")).toBe("alt");
+  });
+});
+
+describe("Vertrags-Tick mit Stempel `verkaufSchwellen`: geplante Abgaenge zaehlen gegen die Freigabe-Bremse", () => {
+  it("zwei geplante Abgaenge + Bremse 3 ⇒ nur noch eine weitere heuristische Freigabe, der Rest wird brueckenverlaengert", () => {
+    const teuer = (id: string) => spieler(id, { rating: 50 });
+    const ids = ["g1", "g2", "s1", "s2", "s3", "s4", "s5"];
+    const players = ids.map((id) => (id.startsWith("g") ? spieler(id) : teuer(id)));
+    const rosters = ids.map((id) => kader(id, "A-A", id.startsWith("g") ? {} : { salary: 0.5, roleTag: "bench" }));
+    const mitStempel = (gs: GameState) =>
+      ({
+        ...gs,
+        seasonState: { ...gs.seasonState, wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), verkaufSchwellen: "neu" } },
+      }) as GameState;
+    const tick = computeSeasonEndContractTick(save(mitStempel(tickState([team("A-A")], players, rosters))), undefined, {
+      kiVerkaufsabsicht: new Map([["A-A", new Set(["g1", "g2"])]]),
+    });
+    const ereignisse = tick.gameState.seasonState.contractEvents ?? [];
+    const geplant = ereignisse.filter((e) => e.decisionReason === "ki_verkauf_geplant").length;
+    const freigegeben = ereignisse.filter((e) => e.eventType === "contract_expired_exit" && e.decisionReason !== "ki_verkauf_geplant").length;
+    expect(geplant).toBe(2);
+    expect(freigegeben).toBe(1);
+    expect(geplant + freigegeben).toBe(3);
+    expect(tick.renewedPlayers).toBe(4);
   });
 });

@@ -80,6 +80,7 @@ import { gehaltMitKlausel, klauselErlaubt, type Werbeklausel } from "@/lib/marke
 import { werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
 import { moralOhneWerbung } from "@/lib/morale/player-morale-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 
 // Weiterexport: die Abwaegung „Verlust realisieren oder ueberbruecken" ist in eine eigene Datei
 // gewandert (siehe dort), damit die KI-Aufloesung sie nutzen kann, ohne einen Import-Zyklus mit
@@ -1627,6 +1628,20 @@ export function computeSeasonEndContractTick(
   const cashDeltaByTeamId = new Map<string, number>();
   const teamReleaseCounts = new Map<string, number>();
   const MAX_RELEASES_PER_TEAM_PER_TICK = 3;
+  /**
+   * VERKAUFS-SCHWELLEN (24.11., Stempel `verkaufSchwellen`, verkauf-restgehalt-24-11.md Abschnitt 7): die geplanten Abgaenge am
+   * Vertragsende zaehlen von Anfang an gegen die Freigabe-Bremse. Die Bremse selbst haelt sie nicht auf (sie sind gewollt und schon
+   * durch die Schwellen des Planers gegangen), aber eine weitere „heuristic“-Freigabe desselben Teams wird dann fuer ein Jahr
+   * brueckenverlaengert statt obendrauf zu gehen. Geschaetzt ohne das: bis 6 Abgaenge je Team. Ohne Stempel wie am 24.11. (#1743).
+   */
+  const abgaengeZaehlenMit = wirtschaftsRegel(sourceState, "verkaufSchwellen") === "neu";
+  if (abgaengeZaehlenMit && kiVerkaufsabsicht) {
+    for (const row of preview.rows) {
+      if (row.controlMode !== "ai" || row.statusAfterTick !== "out_of_contract") continue;
+      if (!istVerkaufGeplant(kiVerkaufsabsicht, row.teamId, row.playerId)) continue;
+      teamReleaseCounts.set(row.teamId, (teamReleaseCounts.get(row.teamId) ?? 0) + 1);
+    }
+  }
 
   /**
    * HIER STAND EIN SCHUTZ FUER „FRISCH UNTERSCHRIEBENE" VERTRAEGE — er ist weg, und das ist die

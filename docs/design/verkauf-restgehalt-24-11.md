@@ -159,5 +159,121 @@ ab Saison 1 (wie ein neues Spiel). Fenster A = nach der Abrechnung S1, B = nach 
    Abgang; einzelne Teams tauschen 8 bis 11 von 12 bis 14 Spielern. Das ist die bestehende Verkaufslogik (Ueberschuss ueber Opt,
    Gewinnmitnahme, Upgrade-Tausch, „Fenster auf Opt“ ohne Minimum). Soll ein Abgang am Vertragsende zusaetzlich an „Verkaufswert
    deutlich ueber Marktwert“ gebunden sein (dann blieben mehr Spieler, und die Verlaengerung nach Kosten-Rechnung entschiede)?
+   **Entschieden (Chris, 24.11.): ja, mit den bestehenden Schwellen — umgesetzt in Abschnitt 7.**
 3. **Rueckweg-Schalter auf dem Server.** `OLY_KI_RESTGEHALT` muss in `deploy/hetzner/docker-compose.yml` und `.env` eingetragen
    werden, wenn der Rueckweg gebraucht wird.
+
+## 7. Nachtrag: Abgang am Vertragsende nur nach Schwellen (Stempel `verkaufSchwellen`, 24.11.)
+
+**Anlass.** Mit Abschnitt 3 liess die KI 116 bis 141 Spieler je Liga am Vertragsende gehen (Saat 1: 136 statt 34), einzelne Teams 8
+bis 11 von 12 bis 14, und kaufte entsprechend mehr (92 → 136). Chris: Bei schlechtem Verkaufswert sollen die Teams ihre Spieler
+behalten, manchmal will man schwache Spieler loswerden; es gab schon ein ausgewogenes Kauf-/Verkaufssystem mit verschiedenen
+Schwellen, das soll wieder greifen. Und: bei mehrjaehrigen Vertraegen muss die Hemmung viel groesser sein (8 C Gehalt, 4 Jahre,
+25 C MW: niemand zahlt 32 C Restgehalt und verschenkt die 25 C obendrauf).
+
+### 7.1 Das bestehende System (vor #1743)
+
+Zwei Stufen, beide mit eigenen Schwellen:
+
+1. **Vertrags-Tick** (`previewSeasonEndContracts` → `computeSeasonEndContractTick`, `lib/contracts/contract-renewal-service.ts`):
+   je auslaufendem Vertrag `shouldAiRenewContract` (Rollen-, Leistungs-, Marktwert-Signale, `extend_core`/`market_test`-Strategie
+   des GM, Mindestkader) plus Kassen-Tor (`buildAiRenewalCashGate`) und Kosten-Rechnung `resolveContractRenewalTco` (Verlaengern =
+   Gehalt x Jahre gegen Abgang = Erloes + Ersatz-Abloese mindestens 15 C + realisierter Verlust + Mindestkader-Risiko, Marge 8 %;
+   `resolveContractExitRenewBias` haelt gegen einen Verlust unter Einkaufspreis). Freigaben nur bei `bad_value_contract`
+   (Gehalt > 0,42 x MW bei schwacher Wertung), Moral, Kassen-Tor oder Heuristik; je Team hoechstens 3 heuristische Freigaben
+   (`MAX_RELEASES_PER_TEAM_PER_TICK`), der Rest wird fuer ein Jahr brueckenverlaengert. Gemessen (Code `main` vor #1743): **328 / 341
+   verlaengert, 34 / 30 Vertragsenden** (Saat 1 / 7), im Mittel ~1 je Team.
+2. **Verkaufsrunde im Fenster** (`planOrganicSellsForTeam`, `lib/ai/organic-squad/draft-adapter.ts`): Nutzen `sellUtility`
+   (`wThrift x Verkaufswert − wWin x Staerkeverlust + wPatience x Geldwert + wProfit x Gewinn + Gehaltsentlastung in Not`, Gewichte
+   aus Identitaet und GM), verkauft wird ueber Opt ab −18 (`OPT_SURPLUS_SELL_THRESHOLD`), bei/unter Opt ab 0 (`SELL_THRESHOLD`),
+   „think twice“-Sperre bei grossem Abschlag (Verlust > max(25 % MW, 5 C), `isBigHaircut`), Kernschutz der besten drei (Angebot
+   1,5 / 1,4 / 1,3 x MW), Upgrade-Tausch (standardmaessig aus). Der Verkaufswert war **netto nach Restgehalt** — und im Fenster hatte
+   jeder Spieler gerade einen frisch verlaengerten Vertrag. Diese Abloese war die eigentliche Bremse: gemessen 61 / 59 Verkaeufe.
+   Summe vorher: **95 / 89 Abgaenge, Median 2 je Team, Spitze 9 / 8**.
+
+### 7.2 Warum #1743 die Schwellen aushebelte
+
+#1743 stellte die Frage der Verkaufsrunde vor den Tick, mit derselben Eingabe — aber am Vertragsende hat ein auslaufender Vertrag kein
+Restgehalt. Damit fiel die Bremse weg, die den Planer im Fenster geeicht hatte: der volle Marktwert ging als Verkaufswert in
+`sellUtility`, und jeder Abgang war gratis. Diagnose am Stand direkt vor `player_development` (Code #1743): alle Kader lagen bei oder
+unter Opt, also kamen **alle 111 / 117 geplanten Abgaenge aus der Schwelle 0 unter Opt** (kein einziger Ueberschuss); 102 / 110
+davon wollte die Kosten-Rechnung des Ticks eigentlich verlaengern (`tco_prefers_renew`). Nur 27 / 27 lagen mit dem Verkaufspreis
+ueber 1,1 x MW (Median des realisierten Preises 0,86 / 0,89 x MW). Die Liste des Planers war also ein Verkaufswunsch unter der Annahme
+„spaeter Verkauf mit Abloese“, nicht die Entscheidung „lohnt sich der Abgang“.
+
+### 7.3 Was jetzt gilt (Stempel `seasonState.wirtschaftsRegeln.verkaufSchwellen`)
+
+Neues Spiel ab Saison 1 „neu“, bestehender Spielstand ab dem naechsten Saisonwechsel (der Tick fragt den Stempel der endenden Saison).
+Rueckweg `OLY_KI_VERKAUF_SCHWELLEN=aus` (neue Saisons; nur Server, in `deploy/hetzner/docker-compose.yml` noch nicht durchgereicht).
+
+1. **Abgang am Vertragsende nur, wenn er sich lohnt** (`planOrganicSellsForTeam` mit `vertragsende: true`, nur aus
+   `ermittleKiVerkaufsabsichtAmSaisonende`): ueber Opt bleibt die Ueberschuss-Schwelle unveraendert (`ueberschuss_opt`); bei/unter
+   Opt geht ein Spieler nur bei **Gewinnmitnahme** (realisierter Preis ≥ `GEWINNMITNAHME_FAKTOR` 1,1 x MW) oder wenn er **klar
+   schwach** ist (Qualitaet ≤ `KLAR_SCHWACH_ANTEIL` 0,8 x Median des eigenen Kaders), und zusammen hoechstens `ABGANG_UNTER_OPT_MAX`
+   = 3 je Team. Alle anderen bleiben im Kader und gehen in die gewohnte Verlaengern-oder-Freigeben-Entscheidung des Ticks. Jeder Abgang
+   traegt seinen Grund (`OrganicSellDecision.abgangsGrund`).
+2. **Bremse im Tick** (`computeSeasonEndContractTick`): die geplanten Abgaenge zaehlen von Anfang an gegen
+   `MAX_RELEASES_PER_TEAM_PER_TICK`; eine weitere heuristische Freigabe desselben Teams wird dann brueckenverlaengert statt obendrauf
+   zu gehen. (Mit #1743 allein zaehlten sie nicht.)
+3. **Restgehalt-Verkauf praktisch gesperrt** (`restgehaltVerkaufLohnt`, gilt fuer jede Verkaufsrunde des Planers, auch ueber Opt und
+   in Finanznot): mit offenem Restgehalt nur, wenn netto (Preis − Restgehalt) mindestens `RESTGEHALT_NETTO_MINDESTANTEIL` 0,9 x MW
+   bleibt. Chris' Beispiel: 25 C MW, 32 C Restgehalt ⇒ netto negativ ⇒ behalten; selbst 40 C Angebot reicht nicht, erst ~55 C. In
+   Finanznot hilft der Kassensturz (Ruecklage, Kredit, Notkredit, Notverkauf), nicht ein Verkauf, der Bargeld kostet. Der
+   Upgrade-Tausch nimmt nie einen Spieler mit Restgehalt.
+4. **Nie ein frisch verlaengerter Vertrag** (`frischVerlaengerteSpieler`): letztes Vertragsereignis `contract_renewed` und die Laufzeit
+   steht noch auf der neuen Laufzeit ⇒ der Planer verkauft ihn nicht freiwillig (Schutz aus #1743 bleibt, jetzt auch ausdruecklich).
+
+### 7.4 Messung
+
+Paarweise auf derselben Basis (`miss-teamfinanzen-saison.ts --stop-after spieltage --keep`, 32 KI, Saat 1 ohne Mischen bzw.
+`--mischen 7`), je Kopie Saisonabschluss → Saisonende-Kette → Saisonwechsel → `fuehreKiPreseasonLaufAus`. Fenster A = nach der
+Abrechnung von S1, B = Stichtag S2 (nach der Kaufphase). „vor #1743“ = Code `origin/main` vor dem Merge, „#1743“ = PR-Stand,
+„Schwellen“ = dieser Stand mit Stempel `verkaufSchwellen: neu` in Saison 1 (wie ein neues Spiel). Kasse in C, Σ ueber 32 Teams.
+Die Basen sind neu angelegt, deshalb weichen die Werte leicht von Abschnitt 4 ab.
+
+| Fluss | S1 vor #1743 | S1 #1743 | **S1 Schwellen** | S7 vor #1743 | S7 #1743 | **S7 Schwellen** |
+|---|---:|---:|---:|---:|---:|---:|
+| Kauf extern (n / C) | 92 / −1916,22 | 136 / −2742,00 | **87 / −1954,16** | 77 / −1499,95 | 130 / −2596,39 | **68 / −1612,56** |
+| Verkauf extern brutto (n / C) | 61 / +773,99 | 2 / +27,74 | **0 / 0** | 59 / +784,39 | 1 / +14,26 | **0 / 0** |
+| davon Restgehalt-Abloese | −383,52 | −6,75 | **0** | −376,98 | −1,76 | **0** |
+| Vertragsende abloesefrei (n / C) | 34 / +506,25 | 136 / +1738,44 | **82 / +989,85** | 30 / +405,41 | 140 / +1778,60 | **74 / +964,27** |
+| davon geplant (`ki_verkauf_geplant`) | – | 111 | **58** | – | 117 | **51** |
+| Gebaeude (n / C) | 46 / −396,00 | 38 / −307,70 | **35 / −296,42** | 45 / −441,85 | 38 / −289,05 | **36 / −293,29** |
+| **Δ Kasse** | −1415,50 | −1290,27 | **−1260,73** | −1128,98 | −1094,34 | **−941,58** |
+| **Δ Kaderwert (Σ MW)** | +523,64 | +811,21 | **+900,52** | +151,59 | +590,87 | **+572,27** |
+| **Δ Kasse + Kaderwert** | −891,86 | −479,06 | **−360,21** | −977,39 | −503,47 | **−369,31** |
+| Verlaengert im Tick | 328 | 226 | **280** | 341 | 231 | **297** |
+| davon im Fenster gleich wieder verkauft | 61 | 2 | **0** | 59 | 1 | **0** |
+| **Abgaenge je Team min / Median / max** | 0 / 2 / 9 | 0 / 4 / 10 | **0 / 3 / 5** | 0 / 2 / 8 | 0 / 5 / 11 | **0 / 2 / 6** |
+| Abgaenge gesamt | 95 | 138 | **82** | 89 | 141 | **74** |
+| Kader am Stichtag min / Median / max | 9 / 11 / 14 | 9 / 11 / 14 | 9 / 11 / 14 | 8 / 11 / 14 | 8 / 11 / 14 | 8 / 11 / 14 |
+
+Verteilung der Abgaenge je Team (Anzahl Teams): Saat 1 Schwellen {0: 3, 1: 5, 2: 7, 3: 7, 4: 8, 5: 2} (vorher {… 7: 2, 8: 1, 9: 2},
+#1743 {… 8: 2, 10: 2}); Saat 7 Schwellen {0: 2, 1: 9, 2: 8, 3: 6, 4: 5, 5: 1, 6: 1}.
+
+**Lesart.**
+
+- Ein typisches KI-Team tauscht jetzt 2 bis 4 Spieler je Saisonwechsel (22 / 19 von 32 Teams), Spitze 5 / 6 statt 9 bis 11. Das ist
+  die Groessenordnung vor #1743 (Median 2), nur ohne dessen Ausreisser — und ohne einen Cent Restgehalt-Abloese.
+- Externe Kaeufe fallen auf das Niveau vor #1743 zurueck (87 / 68 statt 136 / 130).
+- Vermoegen (Kasse + Kaderwert) im Fenster: −360 / −369 C, besser als vorher (−892 / −977) und als #1743 (−479 / −503). Die Kasse
+  bleibt hoeher als mit #1743, weil weniger nachgekauft werden muss.
+- Was jetzt geht: 58 / 51 geplante Abgaenge (Ueberschuss, Gewinnmitnahme, klar schwach) plus 24 / 23 Freigaben des Ticks selbst
+  (`bad_value_contract`, Moral, Heuristik).
+
+### 7.5 Tests
+
+`tests/verkauf-restgehalt.test.ts` (neu): Chris' Beispiel 8 C x 4 Jahre, 25 C MW (reine Regel, Planer, Vertragsende-Plan, Finanznot —
+immer behalten; ohne Stempel verkaufte ein Team in Finanznot denselben Kader); Vertragsende mit 18 gleich starken Spielern bei Opt 8:
+nur Ueberschuss ueber Opt; klar schwache gehen auch unter Opt; frisch verlaengert wird nicht verkauft, gealtert schon wieder pruefbar;
+Tick-Bremse zaehlt geplante Abgaenge mit Stempel; Stempel und Rueckweg. Die Restgehalt-Waechter aus Abschnitt 5 setzen
+`verkaufSchwellen: alt`, damit sie weiter genau die Regel `restgehalt` messen.
+
+### 7.6 Offene Fragen an Chris
+
+1. **Schwellen-Zahlen.** Gewinnmitnahme ab 1,1 x MW, klar schwach ab 0,8 x Kader-Median, hoechstens 3 Abgaenge unter Opt je Team,
+   Restgehalt-Verkauf erst ab netto 0,9 x MW. Gesetzt nach der Diagnose oben, nicht abgestimmt.
+2. **Finanznot und Restgehalt.** Ein Team mit Kasse unter 0 verkauft im Planer jetzt auch keinen Spieler mehr, dessen Restgehalt den
+   Preis frisst; Liquiditaet kommt ueber den Kassensturz (Kredit, Notverkauf). Passt das?
+3. **Rueckweg-Schalter auf dem Server.** `OLY_KI_VERKAUF_SCHWELLEN` (wie `OLY_KI_RESTGEHALT`) muss in `deploy/hetzner/docker-compose.yml`
+   und `.env` eingetragen werden, wenn der Rueckweg gebraucht wird.

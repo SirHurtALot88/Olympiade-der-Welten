@@ -88,6 +88,9 @@ export function ermittleKiVerkaufsabsichtAmSaisonende(save: PersistedSaveGame): 
       purchasePriceByPlayerId,
       allowBelowMin: true,
       draftSeed: saltOrganicSeed(`${save.saveId}:${team.teamId}`),
+      // Entscheidung am Vertragsende (24.11., Stempel `verkaufSchwellen`): unter Opt geht nur, wer sich klar lohnt
+      // (Gewinnmitnahme, klar schwach); ohne den Stempel ist das der unveraenderte Plan der Verkaufsrunde.
+      vertragsende: true,
     });
     // Wie die Verkaufsrunde im gemeinsamen Fenster: ohne „Fenster auf Opt" nur bis max(8, playerMin).
     let spielraum = Number.POSITIVE_INFINITY;

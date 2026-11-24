@@ -963,6 +963,70 @@ export const KERN_ANGEBOT_FAKTOR = [1.5, 1.4, 1.3] as const;
 export function kernAngebotGenuegt(rang: number, faktor: number | null): boolean {
   return faktor != null && faktor >= KERN_ANGEBOT_FAKTOR[Math.min(Math.max(0, rang), KERN_ANGEBOT_FAKTOR.length - 1)]!;
 }
+/**
+ * ABGANG NUR NACH SCHWELLEN (24.11., Regel-Stempel `verkaufSchwellen`, docs/design/verkauf-restgehalt-24-11.md Abschnitt 7).
+ *
+ * Chris (24.11.): „Bei schlechtem Verkaufswert sollen die Teams ihre Spieler natuerlich behalten. Manchmal will man aber auch
+ * schwache Spieler loswerden.“ Und: „Bei mehrjaehrigen Vertraegen muss die Hemmung viel groesser sein — 8 C Gehalt, noch 4 Jahre,
+ * 25 C Marktwert: niemand zahlt 32 C Restgehalt, um ihn loszuwerden, und verschenkt die 25 C obendrauf.“
+ *
+ * Der Verkaufsplaner war auf einen Kader MIT laufenden Vertraegen geeicht: im Fenster vor der neuen Saison zog das Restgehalt jedes
+ * (gerade verlaengerten) Vertrags den Verkaufswert in `sellUtility` herunter und bremste. Am Vertragsende (`vertragsende`) gibt es
+ * kein Restgehalt — ohne zusaetzliche Schwelle markierte der Planer dort 116 Spieler je Liga (8 bis 11 von 12 bis 14 bei einzelnen
+ * Teams). Deshalb gilt am Vertragsende unterhalb von Opt: ein Spieler geht nur, wenn sich der Abgang klar lohnt —
+ *   - Gewinnmitnahme: der realisierte Verkaufspreis liegt mindestens `GEWINNMITNAHME_FAKTOR` x Marktwert, oder
+ *   - klar schwach: seine Qualitaet liegt hoechstens bei `KLAR_SCHWACH_ANTEIL` x Median des Kaders (Kader-Qualitaet zu Beginn),
+ * und zusammen hoechstens `ABGANG_UNTER_OPT_MAX` je Team. Ueber Opt bleibt die Ueberschuss-Schwelle (`OPT_SURPLUS_SELL_THRESHOLD`) unveraendert: Ueberschuss ueber Opt darf gehen.
+ * Wer nicht geht, wird im Tick nach Kosten-Rechnung verlaengert.
+ */
+export const GEWINNMITNAHME_FAKTOR = 1.1;
+/** Klar schwach = Qualitaet hoechstens dieser Anteil am Median-Spieler des eigenen Kaders. */
+export const KLAR_SCHWACH_ANTEIL = 0.8;
+/**
+ * Hoechstens so viele Abgaenge unterhalb von Opt je Team und Vertragsende (Gewinnmitnahme + klar schwach) — dieselbe Zahl wie die
+ * Freigabe-Bremse des Vertrags-Ticks (`MAX_RELEASES_PER_TEAM_PER_TICK`). Ein Kader wird am Saisonende umgebaut, nicht ausgetauscht.
+ */
+export const ABGANG_UNTER_OPT_MAX = 3;
+/**
+ * Verkauf mit offenem Restgehalt (Stempel `verkaufSchwellen`): netto (realisierter Preis minus Rest-Buyout) mindestens dieser Anteil
+ * am Marktwert — der Brutto-Preis muss also klar ueber dem Marktwert liegen (Chris: „wenn der Verkaufswert deutlich ueber dem MW
+ * liegt“). Das gilt auch in Finanznot: der Planer zahlt nie Restgehalt vor, um Liquiditaet zu schaffen; dafuer gibt es den
+ * Kassensturz (Ruecklage, Kredit, Notkredit, Notverkauf).
+ */
+export const RESTGEHALT_NETTO_MINDESTANTEIL = 0.9;
+
+/** Lohnt sich ein Verkauf mit offenem Restgehalt? Rein, fuer Planer und Waechter. */
+export function restgehaltVerkaufLohnt(input: { marketValue: number; realizedPrice: number; openBuyout: number }): boolean {
+  if (!(input.openBuyout > 0)) return true;
+  const netto = input.realizedPrice - input.openBuyout;
+  return netto > 0 && netto >= RESTGEHALT_NETTO_MINDESTANTEIL * Math.max(0, input.marketValue);
+}
+
+/**
+ * Spieler, deren Vertrag seit der letzten Verlaengerung nicht gealtert ist (letztes Vertragsereignis = `contract_renewed` und die
+ * Laufzeit steht noch auf der neuen Laufzeit). Die KI verkauft sie nicht freiwillig: Verlaengern und sofort verkaufen hiesse, das
+ * Gehalt des gerade unterschriebenen Vertrags als Abloese zu zahlen (verkauf-restgehalt-24-11.md Abschnitt 1).
+ */
+export function frischVerlaengerteSpieler(gameState: GameState, teamId: string): Set<string> {
+  const letztes = new Map<string, { eventType: string; newLength: number | null; timestamp: string }>();
+  for (const e of gameState.seasonState?.contractEvents ?? []) {
+    if (e.teamId !== teamId) continue;
+    const vorher = letztes.get(e.playerId);
+    if (!vorher || (e.timestamp ?? "") >= vorher.timestamp) {
+      letztes.set(e.playerId, { eventType: e.eventType, newLength: e.newLength ?? null, timestamp: e.timestamp ?? "" });
+    }
+  }
+  const aus = new Set<string>();
+  for (const entry of gameState.rosters ?? []) {
+    if (entry.teamId !== teamId) continue;
+    const e = letztes.get(entry.playerId);
+    if (e?.eventType === "contract_renewed" && e.newLength != null && Math.max(0, Math.round(entry.contractLength ?? 0)) === e.newLength) {
+      aus.add(entry.playerId);
+    }
+  }
+  return aus;
+}
+
 /** Messspur (Prozess-global, nur mit `OLY_KERN_VERKAUF_LOG=1`, fuer Messskripte): jeder geplante Verkauf eines Kernspielers samt Faktor und Grund. */
 export const KERN_VERKAUF_LOG: Array<{ teamId: string; playerId: string; rang: number; faktor: number | null; grund: "gutes_angebot" | "finanznot" }> = [];
 
@@ -975,6 +1039,11 @@ export type OrganicSellDecision = {
   utility: number;
   /** Optional tag: "upgrade_churn" for a weak-team hoarder swap-out (see UPGRADE_SWAP docs), else undefined. */
   reason?: "upgrade_churn";
+  /**
+   * Warum der Abgang sich lohnt (nur mit Stempel `verkaufSchwellen` und `vertragsende`): Ueberschuss ueber Opt, Gewinnmitnahme oder
+   * klar schwach. Fuer Protokoll und Messung.
+   */
+  abgangsGrund?: "ueberschuss_opt" | "gewinnmitnahme" | "klar_schwach" | "upgrade_churn";
 };
 
 export type OrganicSellPlanInput = {
@@ -1003,6 +1072,12 @@ export type OrganicSellPlanInput = {
   };
   /** Optional per-(save, team) seed for the reproducible sell-utility jitter (see ORGANIC_SELL_JITTER). */
   draftSeed?: string | null;
+  /**
+   * Plan fuer die Entscheidung am VERTRAGSENDE (Verkaufsabsicht vor dem Vertrags-Tick, `lib/contracts/ki-verkaufsabsicht-saisonende.ts`).
+   * Mit Stempel `verkaufSchwellen: neu` geht ein Spieler unterhalb von Opt dann nur bei Gewinnmitnahme oder wenn er klar schwach ist
+   * (siehe `GEWINNMITNAHME_FAKTOR`). Ohne Stempel ohne Wirkung.
+   */
+  vertragsende?: boolean;
 };
 
 export type OrganicSellPlanResult = {
@@ -1103,6 +1178,14 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
   });
   // Season-end may empty the roster (rebuild in preseason); in-season keeps a fieldable floor.
   const rosterMin = input.allowBelowMin ? 0 : ROSTER_MIN;
+  // VERKAUFS-SCHWELLEN (24.11., Stempel `verkaufSchwellen`): Restgehalt-Verkauf nur klar ueber dem Marktwert, frisch Verlaengerte nie,
+  // am Vertragsende unter Opt nur Gewinnmitnahme oder klar schwach (Doku an GEWINNMITNAHME_FAKTOR).
+  const schwellen = wirtschaftsRegel(input.gameState, "verkaufSchwellen") === "neu";
+  const frischVerlaengert = schwellen ? frischVerlaengerteSpieler(input.gameState, input.team.teamId) : new Set<string>();
+  const abgangPruefen = schwellen && input.vertragsende === true;
+  let qualitaetMedian: number | null = null;
+  let abgaengeUnterOpt = 0;
+  let qualitaetGewichte: Record<"pow" | "spe" | "men" | "soc", number> | null = null;
 
   let cash = ctx.cash;
   let salaryTotal = held.reduce((sum, view) => sum + Math.max(0, view.salary), 0);
@@ -1159,6 +1242,11 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
           : [],
       );
     }
+    if (abgangPruefen && qualitaetMedian == null) {
+      qualitaetGewichte = state.needAxisWeights;
+      const qs = held.map((view) => computePlayerQuality(view, state.needAxisWeights)).sort((a, b) => a - b);
+      qualitaetMedian = qs.length > 0 ? qs[Math.floor((qs.length - 1) / 2)]! : 0;
+    }
     const finanznot = teamDistressed || state.cash < ctx.cashBuffer;
     const angebotFaktor = (view: OrganicPlayerView): number | null => {
       if (!kernFaktor.has(view.playerId)) {
@@ -1183,6 +1271,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     let bestUtility = -Infinity;
     for (const view of held) {
       if (blockedFloorPlayerIds.has(view.playerId)) continue; // kept by the think-twice floor gate
+      if (frischVerlaengert.has(view.playerId)) continue; // gerade verlaengert: kein Verkauf mit dem Restgehalt des neuen Vertrags
       if (kernRang.has(view.playerId) && kernGesperrt(view)) continue; // Kernschutz (gutes Angebot oder Finanznot heben ihn auf)
       const jitter =
         input.draftSeed && ORGANIC_SELL_JITTER > 0
@@ -1222,6 +1311,41 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       }
     }
 
+    let abgangsGrund: OrganicSellDecision["abgangsGrund"] = undefined;
+    if (schwellen) {
+      const offenesRestgehalt = buyoutByPlayerId.get(best.playerId) ?? 0;
+      const ueberOpt = held.length > ctx.weights.optTarget;
+      if (offenesRestgehalt > 0 || abgangPruefen) {
+        const realized =
+          estimateRealizedSellPrice(
+            input.gameState,
+            input.team.teamId,
+            playerById.get(best.playerId) ?? null,
+            rosterEntryByPlayerId.get(best.playerId) ?? null,
+            Math.max(0, held.length - 1),
+          ) ?? best.marketValue;
+        // Restgehalt: Verkauf nur, wenn netto mindestens 90 % des Marktwerts bleibt — auch ueber Opt und in Finanznot.
+        if (!restgehaltVerkaufLohnt({ marketValue: best.marketValue, realizedPrice: realized, openBuyout: offenesRestgehalt })) {
+          blockedFloorPlayerIds.add(best.playerId);
+          continue;
+        }
+        if (abgangPruefen) {
+          // Unter Opt nur bis zur Bremse; danach bleibt jeder weitere (der Kader schrumpft nur, also endet der Plan hier).
+          if (!ueberOpt && abgaengeUnterOpt >= ABGANG_UNTER_OPT_MAX) break;
+          const qualitaet = computePlayerQuality(best, qualitaetGewichte ?? state.needAxisWeights);
+          if (ueberOpt) abgangsGrund = "ueberschuss_opt";
+          else if (best.marketValue > 0 && realized >= GEWINNMITNAHME_FAKTOR * best.marketValue) abgangsGrund = "gewinnmitnahme";
+          else if (qualitaetMedian != null && qualitaet <= KLAR_SCHWACH_ANTEIL * qualitaetMedian) abgangsGrund = "klar_schwach";
+          else {
+            // Lohnt sich nicht: er bleibt, der Tick verlaengert ihn nach Kosten-Rechnung.
+            blockedFloorPlayerIds.add(best.playerId);
+            continue;
+          }
+          if (!ueberOpt) abgaengeUnterOpt += 1;
+        }
+      }
+    }
+
     const verkaufterKernRang = kernRang.get(best.playerId);
     if (verkaufterKernRang != null && process.env.OLY_KERN_VERKAUF_LOG === "1") {
       KERN_VERKAUF_LOG.push({ teamId: input.team.teamId, playerId: best.playerId, rang: verkaufterKernRang + 1, faktor: kernFaktor.get(best.playerId) ?? null, grund: finanznot ? "finanznot" : "gutes_angebot" });
@@ -1229,7 +1353,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
     held.splice(held.indexOf(best), 1);
     cash += Math.max(0, nettoPruefung ? best.netSaleProceeds ?? best.marketValue : best.marketValue);
     salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
-    decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility });
+    decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility, ...(abgangsGrund ? { abgangsGrund } : {}) });
   }
 
   // WEAK-TEAM UPGRADE SWAP (see UPGRADE_SWAP docs above). Season-end only (allowBelowMin) so the freed slot
@@ -1256,6 +1380,8 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       let weakestUtility = -Infinity;
       for (const view of held) {
         if (kernRang?.has(view.playerId) && !(teamDistressed || state.cash < ctx.cashBuffer)) continue; // Kernschutz (Befund 3): Upgrade-Tausch nie ueber Kernspieler
+        if (frischVerlaengert.has(view.playerId)) continue; // gerade verlaengert (Stempel `verkaufSchwellen`)
+        if (schwellen && (buyoutByPlayerId.get(view.playerId) ?? 0) > 0) continue; // Upgrade-Tausch nie mit Restgehalt (Stempel `verkaufSchwellen`)
         const utility = sellUtility(view, state);
         if (utility > weakestUtility) {
           weakestUtility = utility;
@@ -1276,6 +1402,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
         step: decisions.length,
         utility: weakestUtility,
         reason: "upgrade_churn",
+        ...(abgangPruefen ? { abgangsGrund: "upgrade_churn" as const } : {}),
       });
       swapsRemaining -= 1;
     }
