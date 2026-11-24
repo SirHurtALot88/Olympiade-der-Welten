@@ -1,4 +1,5 @@
-import { computeSeasonEndContractTick, hasSeasonEndContractTickApplied } from "@/lib/contracts/contract-renewal-service";
+import { hasSeasonEndContractTickApplied } from "@/lib/contracts/contract-renewal-service";
+import { computeSeasonEndContractTickMitVerkaufsabsicht } from "@/lib/contracts/ki-verkaufsabsicht-saisonende";
 import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 
@@ -42,7 +43,7 @@ export function zieheVertragsalterungNach(input: {
   }
 
   try {
-    const alterung = computeSeasonEndContractTick(save);
+    const alterung = computeSeasonEndContractTickMitVerkaufsabsicht(save);
     if (!alterung.applied) {
       return { save, nachgezogen: false, warnungen: [] };
     }

@@ -1079,11 +1079,20 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
   // clause from its live roster entry (same resolveOpenBuyoutCostForRoster the real sale uses — the
   // laufende Vertragsjahr faellt dort am Spielstand raus, siehe contract-buyout-season-window) so
   // sellUtility scores what the club actually banks.
+  /**
+   * REST-BUYOUT AUCH IN DER VERKAUFSPRUEFUNG (24.11., Regel-Stempel `restgehalt`, docs/design/verkauf-restgehalt-24-11.md).
+   * `sellUtility` rechnete schon mit dem Netto, die Pruefung danach nicht: die „think twice"-Sperre verglich den BRUTTO-Erloes
+   * mit dem Marktwert, und Kasse wie Upgrade-Tausch buchten den vollen Marktwert gut. Ein Verkauf mit 15,5 C Erloes und 5,8 C
+   * Restgehalt (netto 9,7 C bei 15,6 C Marktwert) galt damit als „kein grosser Abschlag". Mit der Regel zaehlt das Netto.
+   */
+  const nettoPruefung = wirtschaftsRegel(input.gameState, "restgehalt") === "neu";
+  const buyoutByPlayerId = new Map<string, number>();
   const held = input.roster.map((player) => {
     const rosterEntry = rosterEntryByPlayerId.get(player.id) ?? null;
     const openBuyoutCost = rosterEntry
       ? resolveOpenBuyoutCostForRoster({ rosterEntry, gameState: input.gameState })
       : 0;
+    if (openBuyoutCost > 0) buyoutByPlayerId.set(player.id, openBuyoutCost);
     return toOrganicPlayerView(
       player,
       undefined,
@@ -1206,7 +1215,8 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
         rosterEntryByPlayerId.get(best.playerId) ?? null,
         Math.max(0, held.length - 1),
       );
-      if (realized != null && isBigHaircut(best.marketValue, realized)) {
+      const pruefErloes = realized != null && nettoPruefung ? realized - (buyoutByPlayerId.get(best.playerId) ?? 0) : realized;
+      if (pruefErloes != null && isBigHaircut(best.marketValue, pruefErloes)) {
         blockedFloorPlayerIds.add(best.playerId);
         continue;
       }
@@ -1217,7 +1227,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       KERN_VERKAUF_LOG.push({ teamId: input.team.teamId, playerId: best.playerId, rang: verkaufterKernRang + 1, faktor: kernFaktor.get(best.playerId) ?? null, grund: finanznot ? "finanznot" : "gutes_angebot" });
     }
     held.splice(held.indexOf(best), 1);
-    cash += Math.max(0, best.marketValue);
+    cash += Math.max(0, nettoPruefung ? best.netSaleProceeds ?? best.marketValue : best.marketValue);
     salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
     decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestUtility });
   }
@@ -1255,7 +1265,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       if (!weakest) break;
       // Only swap when the hoarded cash can fund a MEANINGFUL upgrade over the shed body: after banking the
       // sale proceeds and holding the solvency buffer, the free budget must clear an uplift over the sold MW.
-      const proceeds = Math.max(0, weakest.marketValue);
+      const proceeds = Math.max(0, nettoPruefung ? weakest.netSaleProceeds ?? weakest.marketValue : weakest.marketValue);
       const replacementBudget = cash + proceeds - ctx.cashBuffer;
       if (replacementBudget < weakest.marketValue * UPGRADE_SWAP_UPLIFT + UPGRADE_SWAP_MIN_HEADROOM) break;
       held.splice(held.indexOf(weakest), 1);

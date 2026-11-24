@@ -62,7 +62,8 @@ export type TransferWindowPhase = "preseason" | "season_end" | "fenster_verkauf"
 // reproducible jitter pattern, the same salt → identical results. Empty (production default) leaves the
 // draftSeed exactly as before, so nothing changes unless a run explicitly opts in.
 const ORGANIC_SEED_SALT = process.env.OLY_ORGANIC_SEED_SALT?.trim() || "";
-const saltOrganicSeed = (base: string) => (ORGANIC_SEED_SALT ? `${ORGANIC_SEED_SALT}:${base}` : base);
+/** Exportiert fuer die Verkaufsabsicht am Saisonende (`lib/contracts/ki-verkaufsabsicht-saisonende.ts`): dieselbe Saat wie die Verkaufsrunde. */
+export const saltOrganicSeed = (base: string) => (ORGANIC_SEED_SALT ? `${ORGANIC_SEED_SALT}:${base}` : base);
 
 export type TransferWindowSessionInput = {
   saveId: string;

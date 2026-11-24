@@ -5,7 +5,8 @@ import { randomUUID } from "node:crypto";
 import { AI_MARKET_APPLY_CONFIRM_TOKEN } from "@/lib/ai/ai-market-plan-apply-contract";
 import { applyAiMarketPlanLocally } from "@/lib/ai/ai-market-plan-apply-service";
 import { buildAiTeamManagementPreview } from "@/lib/ai/ai-team-management-preview-service";
-import { applySeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
+import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
+import { applySeasonEndContractTickMitVerkaufsabsicht } from "@/lib/contracts/ki-verkaufsabsicht-saisonende";
 import type {
   AiManagerTrainingSettingRecord,
   FacilityEventRecord,
@@ -1728,7 +1729,7 @@ function runContracts(run: AdminSeasonSimulationRunState, save: PersistedSaveGam
     preview.blockingReasons.slice(0, 10).forEach((reason) => log(run, "yellow", "contracts", reason, "contract_warning"));
   }
   if (run.mode === "apply") {
-    const result = applySeasonEndContractTick(moraleSave, preview.confirmToken, persistence);
+    const result = applySeasonEndContractTickMitVerkaufsabsicht(moraleSave, preview.confirmToken, persistence);
     if (!result.applied) {
       markBlocked(run, "contracts", result.blockingReasons[0] ?? "Contracts blockiert.", "contracts_blocked");
       return;

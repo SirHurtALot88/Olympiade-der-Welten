@@ -13,7 +13,7 @@ import { createPersistenceService } from "@/lib/persistence/persistence-service"
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { applySeasonEndPotentialUpdates } from "@/lib/progression/player-potential-service";
 import { runSeasonEndProgressionBatch } from "@/lib/progression/season-end-progression-batch";
-import { computeSeasonEndContractTick } from "@/lib/contracts/contract-renewal-service";
+import { computeSeasonEndContractTickMitVerkaufsabsicht } from "@/lib/contracts/ki-verkaufsabsicht-saisonende";
 import { patchSeasonSnapshotMarketValueAfterProgression } from "@/lib/season/season-snapshot-service";
 import { buildSeasonReview, type SeasonReview } from "@/lib/season/season-review-service";
 import { getNextStepAfter, getPhaseAfterStep, isStepBehind } from "@/lib/season/season-transition-chain";
@@ -602,7 +602,9 @@ function computeSeasonTransitionAdvance(
   let vertragsWarnungen: string[] = [];
   if (currentStep === "player_development") {
     try {
-      const alterung = computeSeasonEndContractTick(progressionSave);
+      // Mit der Verkaufsabsicht der KI (24.11., verkauf-restgehalt-24-11.md): wer im Fenster ohnehin verkauft wuerde, wird
+      // nicht erst verlaengert und dann mit dem Restgehalt des neuen Vertrags abgeloest — sein Vertrag endet hier.
+      const alterung = computeSeasonEndContractTickMitVerkaufsabsicht(progressionSave);
       if (alterung.applied) {
         progressionSave = { ...progressionSave, gameState: alterung.gameState };
         vertragsWarnungen = [

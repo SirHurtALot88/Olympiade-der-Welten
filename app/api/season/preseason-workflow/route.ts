@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
-import { applySeasonEndContractTick } from "@/lib/contracts/contract-renewal-service";
+import { applySeasonEndContractTickMitVerkaufsabsicht } from "@/lib/contracts/ki-verkaufsabsicht-saisonende";
 import {
   applyPreSeasonNextSeasonSetup,
   buildPreSeasonWorkflowPreview,
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       : body.stepId === "next_season_setup"
         ? await applyPreSeasonNextSeasonSetup(save, body.confirmToken, persistence)
         : body.stepId === "contract_renewal"
-          ? applySeasonEndContractTick(save, body.confirmToken, persistence)
+          ? applySeasonEndContractTickMitVerkaufsabsicht(save, body.confirmToken, persistence)
         : null;
 
     if (!summary) {

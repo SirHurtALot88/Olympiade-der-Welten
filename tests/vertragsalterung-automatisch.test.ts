@@ -27,7 +27,7 @@ describe("Die Alterung läuft beim Betreten der Saisonende-Phase", () => {
   it("fährt den Tick im Schritt, der auf season_end_management schaltet", () => {
     // `player_development` ist der Hop, dessen Folgephase `season_end_management` ist — die Phase,
     // in der verlängert und verkauft wird.
-    expect(UEBERGANG).toContain("computeSeasonEndContractTick(progressionSave)");
+    expect(UEBERGANG).toContain("computeSeasonEndContractTickMitVerkaufsabsicht(progressionSave)");
     const block = UEBERGANG.slice(
       UEBERGANG.indexOf("DIE VERTRAEGE ALTERN, BEVOR UEBER SIE ENTSCHIEDEN WIRD"),
       UEBERGANG.indexOf("const transition: SeasonTransitionState"),
@@ -39,7 +39,7 @@ describe("Die Alterung läuft beim Betreten der Saisonende-Phase", () => {
     // Der Freeze hält den Stand vor der Marktöffnung fest; der Tick bucht Abgangs-Cash. Erst
     // einfrieren, dann buchen hält die Reihenfolge, die der Saisonstart ohnehin voraussetzt.
     expect(UEBERGANG.indexOf("patchSeasonSnapshotMarketValueAfterProgression")).toBeLessThan(
-      UEBERGANG.indexOf("computeSeasonEndContractTick(progressionSave)"),
+      UEBERGANG.indexOf("computeSeasonEndContractTickMitVerkaufsabsicht(progressionSave)"),
     );
   });
 
