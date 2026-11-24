@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Spielplan – modern (Mockup 24.11.)</title>
+<!--
+  SPIELPLAN IM NEUEN STIL (Fable, 24.11.): Saison-Leiste, Spieltag mit Paarungen und Vierergruppen, Kalender 16 x 20, Disziplinen.
+  Erklaerung: docs/design/spieler-teams-modern-24-11.md (Abschnitt Spielplan)
+  Loest app/foundation/ranks-v2/FoundationDiszisNewLook.tsx (View "diszis") ab. Chris: "sehr unuebersichtlich".
+  ECHT (Live-Abbild 24.11., Saison 1, Spieltag 12): Paarungen mit Heim/Auswaerts fuer alle 20 Spieltage beider Ligen, Disziplinen und
+        Plaetze je Spieltag, Ergebnisse der 11 gewerteten Spieltage (Rohwert und E1-Ergebnis 0 bis 10), Vierergruppen mit Plaetzen, Punkte.
+  BEISPIEL: Vierergruppen kuenftiger Spieltage (je zwei Paarungen verschmolzen), Ticket-Einnahmen, Fans. Mutatoren: in diesem Spielstand keine.
+  URL: ?ansicht=saison|kalender|disziplinen  ?st=1..20  ?liga=1|2  ?team=<Kuerzel> (Blick auf ein Team)  ?d=0..19 (Disziplin-Filter)
+       ?achse=0..3  ?sort=<spalte>&dir=-1|1  ?nebel=aus  ?ich=V-W  ?still=1
+-->
+<link rel="stylesheet" href="modern-24-11/rahmen.css">
+<link rel="stylesheet" href="modern-24-11/bausteine.css">
+<style>
+.seite.pl1{grid-template-columns:minmax(0,1fr) 29rem;grid-template-rows:auto auto minmax(0,1fr)}
+.seite.pl1>#f-leiste,.seite.pl1>#p-band{grid-column:1/3}
+.seite.pl2{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+.seite.pl3{grid-template-columns:minmax(0,1fr) 24rem;grid-template-rows:auto minmax(0,1fr)}
+.seite.pl3>#f-leiste3{grid-column:1/3}
+.fbar{display:flex;align-items:center;gap:.6rem;padding:.4rem .8rem;white-space:nowrap;flex-direction:row!important;overflow:hidden}
+.fbar .gk{font-size:.62rem}
+.fbar .tw{display:flex;gap:.12rem} .fbar .tw a{width:1.75rem;height:1.75rem;border-radius:.25rem;border:1px solid transparent;opacity:.5;cursor:pointer;display:block}
+.fbar .tw a img{width:100%;height:100%;object-fit:cover;border-radius:.2rem;display:block} .fbar .tw a:hover{opacity:1} .fbar .tw a.an{opacity:1;border-color:var(--gold);box-shadow:0 0 .5rem rgba(240,195,90,.6)} .fbar .tw a.ich{opacity:.95;outline:1px solid var(--heim)}
+.fbar .dw{display:flex;gap:.12rem} .fbar .dw a{height:1.55rem;padding:0 .3rem;display:grid;place-items:center;border-radius:.2rem;font-size:.64rem;font-weight:700;letter-spacing:.03em;background:var(--flaeche-2);border:1px solid var(--linie);color:var(--leise);cursor:pointer}
+.fbar .dw a.a0{border-bottom:.14rem solid var(--pow)} .fbar .dw a.a1{border-bottom:.14rem solid var(--spe)} .fbar .dw a.a2{border-bottom:.14rem solid var(--men)} .fbar .dw a.a3{border-bottom:.14rem solid var(--soc)}
+.fbar .dw a.an{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.fbar .seg{display:inline-flex;border:1px solid var(--linie);border-radius:.4rem;overflow:hidden;flex:none}
+.fbar .seg a{height:1.75rem;padding:0 .6rem;display:inline-flex;align-items:center;font-size:.8rem;font-weight:600;color:var(--leise);background:var(--flaeche-2);cursor:pointer}
+.fbar .seg a+a{border-left:1px solid var(--linie)} .fbar .seg a.an{background:var(--gold);color:#17120a}
+.fbar .sp{flex:1}
+/* Saison-Leiste: 20 Spieltage */
+.leiste{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:.3rem;padding:.55rem .7rem .6rem;flex-direction:row!important}
+.stk{position:relative;display:flex;flex-direction:column;gap:.22rem;padding:.3rem .32rem .35rem;border:1px solid var(--linie);border-radius:.45rem;background:var(--flaeche-2);cursor:pointer;min-width:0}
+.stk:hover{border-color:var(--linie-2)}
+.stk.gew{background:rgba(255,255,255,.02)}
+.stk.heute{border-color:var(--gold);box-shadow:inset 0 .16rem 0 var(--gold)}
+.stk.an{background:linear-gradient(180deg,rgba(240,195,90,.24),rgba(240,195,90,.05));border-color:var(--gold)}
+.stk.matt{opacity:.33}
+.stk .ko{display:flex;align-items:baseline;justify-content:space-between;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--leise);font-weight:700}
+.stk .ko b{font-size:1.05rem;letter-spacing:0;color:var(--creme)}
+.stk .dz{display:flex;gap:.16rem} .stk .dz .dt{flex:1;justify-content:center;padding:0;font-size:.64rem;height:1.15rem;min-width:0}
+.stk .dz .dt.pod{background:rgba(255,255,255,.12)}
+.stk .geg{display:flex;align-items:center;gap:.2rem;font-size:.74rem;font-weight:700;color:var(--tinte);white-space:nowrap}
+.stk .geg img.wap{width:1.35rem;height:1.35rem}
+.stk .ha{font-size:.6rem;letter-spacing:.06em;font-weight:700;padding:0 .22rem;border-radius:.15rem;line-height:1.5}
+.ha.h{background:rgba(242,160,61,.22);color:var(--heim)} .ha.a{background:rgba(69,176,201,.16);color:var(--gast)}
+.stk .er{display:flex;align-items:center;justify-content:space-between;font-size:.72rem;color:var(--leise);height:1rem;white-space:nowrap}
+.stk .er b{font-size:.95rem} .stk .e1{font-size:.7rem;color:var(--leise);white-space:nowrap;text-align:center;font-weight:600} .p4{color:var(--gut)} .p3{color:var(--gut)} .p2{color:var(--leise)} .p1{color:var(--warn)} .p0{color:var(--warn)}
+/* Spieltag-Detail */
+.dkopf{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;padding:.6rem .7rem 0;flex:none}
+.dk{position:relative;display:flex;align-items:center;gap:.7rem;height:4rem;padding:0 .8rem;border-radius:.45rem;overflow:hidden;isolation:isolate;border:1px solid var(--linie-2)}
+.dk::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.95) 0%,rgba(6,8,12,.72) 55%,rgba(6,8,12,.35) 100%)}
+.dk .bg{position:absolute;inset:0;z-index:-2;background-size:cover;background-position:center 40%}
+.dk img.dic{width:2rem;height:2rem}
+.dk b{font:400 1.45rem/1 var(--haus);color:#fff;display:block} .dk small{font-size:.8rem;color:var(--creme);white-space:nowrap}
+.dk .sp{flex:1} .dk .tag{background:rgba(6,8,12,.7)}
+.dliste{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;padding:.5rem .7rem .6rem;flex:1;min-height:0}
+.dsp{display:grid;grid-auto-rows:minmax(0,1fr);gap:.22rem;min-height:0}
+.du{display:grid;grid-template-columns:minmax(0,1fr) 9.4rem minmax(0,1fr);gap:.4rem;align-items:center;padding:0 .5rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2);min-height:0;white-space:nowrap}
+.du.ich{border-color:var(--heim);background:linear-gradient(90deg,rgba(242,160,61,.16),rgba(242,160,61,.04))}
+.du.blick{border-color:var(--gold)}
+.du .tm2{display:flex;align-items:center;gap:.4rem;min-width:0} .du .tm2.g{flex-direction:row-reverse;text-align:right}
+.du .tm2 b{font:400 .98rem/1.1 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis} .du .tm2.verl b{color:var(--leise)}
+.du .tm2 img.wap{width:1.7rem;height:1.7rem} .du .tm2 svg{font-size:.8rem;color:var(--heim);flex:none}
+.du .mi{text-align:center;line-height:1.05}
+.du .mi strong{display:block;font-size:1.3rem;color:var(--creme);letter-spacing:.02em} .du .mi small{display:block;font-size:.68rem;color:var(--stumm);font-weight:600}
+.du .mi .pf{font-size:.84rem;color:var(--leise);font-weight:600} .du .mi .pf b{color:var(--tinte)}
+.pd{display:grid;grid-template-rows:auto repeat(4,minmax(0,1fr));border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2);min-height:0;overflow:hidden}
+.pd.ich{border-color:var(--heim)}
+.pd .pko{display:flex;justify-content:space-between;padding:.12rem .5rem;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:700;background:rgba(255,255,255,.03)}
+.pd .pz{display:grid;grid-template-columns:1.4rem 1.5rem minmax(0,1fr) auto auto;gap:.4rem;align-items:center;padding:0 .5rem;font-size:.9rem;white-space:nowrap;border-top:1px solid rgba(244,230,196,.06);min-height:0}
+.pd .pz.ich{background:rgba(242,160,61,.14)} .pd .pz img.wap{width:1.4rem;height:1.4rem}
+.pd .pz b.n{font:400 .95rem/1 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis} .pd .pz .pl{font-weight:700;color:var(--leise)} .pd .pz .pl.e{color:var(--gold)}
+.pd .pz small{font-size:.74rem;color:var(--stumm)} .pd .pz strong{font-size:.95rem;width:2.6rem;text-align:right}
+.dsp.pods{grid-template-rows:repeat(4,minmax(0,1fr));gap:.3rem}
+/* Rechte Tafel */
+.nk{position:relative;height:8.2rem;flex:none;overflow:hidden;isolation:isolate;border-bottom:1px solid var(--linie);display:flex;align-items:center;gap:.9rem;padding:0 1rem}
+.nk::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(6,8,12,.94),rgba(6,8,12,.6))}
+.nk .bg{position:absolute;inset:0;z-index:-2;background-size:cover;background-position:center}
+.nk img.wap{width:4.6rem;height:4.6rem;border-radius:.6rem;border:2px solid var(--gast)}
+.nk em{font-style:normal;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.nk h3{margin:.1rem 0 .2rem;font:400 1.7rem/1 var(--haus);color:#fff} .nk small{font-size:.86rem;color:var(--creme)}
+.pform{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:.5rem;align-items:center;padding:.35rem 0;border-top:1px solid rgba(244,230,196,.07);white-space:nowrap}
+.pform .l{text-align:right} .pform b{font-size:1.25rem;color:var(--creme)} .pform b.vorn{color:var(--gut)} .pform b.hint{color:var(--warn)} .pform small{font-size:.74rem;color:var(--leise);display:block}
+.pform .m{text-align:center;line-height:1.1} .pform .m small{color:var(--stumm)}
+.wk{margin:.7rem 0 .2rem;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600;display:flex;gap:.4rem;align-items:baseline} .wk small{letter-spacing:0;text-transform:none;color:var(--stumm);font-size:.76rem;font-weight:500}
+.wz{display:grid;grid-template-columns:2.9rem auto 1.5rem minmax(0,1fr) auto;gap:.45rem;align-items:center;padding:.24rem 0;border-top:1px solid rgba(244,230,196,.07);white-space:nowrap;cursor:pointer;font-size:.9rem} .wz:hover{background:var(--flaeche-2)} .wz img.wap{width:1.5rem;height:1.5rem} .wz .nn{font:400 .98rem/1.1 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis} .wz b{color:var(--creme)} .wz .ha{font-size:.62rem;font-weight:700;padding:0 .25rem;border-radius:.15rem;line-height:1.5}
+.koepfe{display:flex;gap:.25rem;flex:none} .koepfe img{width:2.1rem;height:2.4rem;border-radius:.25rem;object-fit:cover;object-position:center 18%;border:1px solid var(--linie-2)}
+/* Kalender */
+.kal{display:grid;grid-template-columns:16.5rem repeat(20,minmax(0,1fr));grid-template-rows:4.4rem repeat(16,minmax(0,1fr));gap:.14rem;flex:1;min-height:0;padding:.5rem .7rem .5rem}
+.kal .ek{display:flex;align-items:flex-end;padding:0 .3rem .3rem;font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--stumm);font-weight:600}
+.kal .sk2{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:.14rem;padding-bottom:.25rem;border-radius:.3rem;cursor:pointer;min-width:0}
+.kal .sk2 b{font-size:.98rem;color:var(--creme)} .kal .sk2 .dt{font-size:.6rem;height:1rem;padding:0 .2rem;width:92%;justify-content:center}
+.kal .sk2.heute{background:rgba(240,195,90,.14);box-shadow:inset 0 .14rem 0 var(--gold)} .kal .sk2.matt{opacity:.3} .kal .sk2:hover b{color:var(--gold)}
+.kal .tn{display:flex;align-items:center;gap:.4rem;padding:0 .4rem;font:400 .95rem/1 var(--haus);color:#fff;white-space:nowrap;border-radius:.3rem;cursor:pointer;min-width:0;overflow:hidden}
+.kal .tn span.r{font:700 .86rem var(--zahl);color:var(--stumm);width:1.2rem;flex:none} .kal .tn img.wap{width:1.6rem;height:1.6rem} .kal .tn span.nn{overflow:hidden;text-overflow:ellipsis}
+.kal .tn.ich{background:rgba(242,160,61,.18);box-shadow:inset .18rem 0 0 var(--heim)} .kal .tn.blick{background:rgba(240,195,90,.2);box-shadow:inset .18rem 0 0 var(--gold)}
+.kz2{position:relative;display:flex;align-items:center;justify-content:center;gap:.2rem;border-radius:.25rem;background:rgba(255,255,255,.03);font-size:.78rem;font-weight:700;color:var(--leise);white-space:nowrap;min-width:0;min-height:0;overflow:hidden}
+.kz2 i{position:absolute;left:0;top:0;bottom:0;width:.16rem} .kz2.h i{background:var(--heim)} .kz2.a i{background:var(--gast);opacity:.6}
+.kz2.q4{background:rgba(98,211,148,.34);color:#fff} .kz2.q3{background:rgba(98,211,148,.18);color:var(--tinte)} .kz2.q2{background:rgba(255,255,255,.07);color:var(--tinte)} .kz2.q1{background:rgba(255,96,88,.16);color:var(--tinte)} .kz2.q0{background:rgba(255,96,88,.32);color:#fff}
+.kz2 small{font-size:.64rem;font-weight:600;opacity:.75}
+.kz2.zeile{outline:1px solid rgba(242,160,61,.55)} .kz2.zb{outline:1px solid rgba(240,195,90,.7)} .kz2.matt{opacity:.25} .kz2.jetzt{box-shadow:inset 0 0 0 1px rgba(240,195,90,.5)}
+.kz2.geg{box-shadow:inset 0 0 0 2px var(--gold)}
+/* Disziplinen */
+.pbal{display:flex;align-items:center;gap:.4rem;width:100%} .pbal b{width:1rem;flex:none;text-align:right}
+.dname{display:flex;align-items:center;gap:.5rem;font:400 1.08rem/1 var(--haus);color:#fff} .dname img.dic{width:1.4rem;height:1.4rem}
+.bz2{display:inline-flex;align-items:baseline;gap:.35rem} .bz2 b{font-size:1.02rem} .bz2 small{font-size:.74rem;color:var(--stumm)}
+.balk{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:.14rem;align-items:end;height:6rem;flex:none}
+.balk div{display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:.1rem} .balk i{display:block;border-radius:1px}
+.balkx{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:.14rem;font-size:.5rem;color:var(--stumm);text-align:center;font-weight:600;margin-top:.15rem;flex:none}
+</style>
+</head>
+<body>
+<script src="modern-24-11/daten.js"></script>
+<script src="modern-24-11/rahmen.js"></script>
+<script src="modern-24-11/tabelle.js"></script>
+<script>
+"use strict";
+RAHMEN.bau({seite:"spielplan",demoTitel:"Mockup 24.11. · Spielplan",demo:'<span>Ansicht</span><span id="d-ans"></span><i class="tr"></i><span>Spieltag</span><span id="d-st"></span>',
+  demoHinweis:"Paarungen, Heim/Auswärts, Disziplinen, Plätze, Ergebnisse, Gruppen echt (Live-Abbild 24.11.) · künftige Gruppen, Tickets Beispiel."});
+var Z={ans:q.get("ansicht")||"saison",st:+(q.get("st")||HEUTE),blick:TC[q.get("team")]||ICH,d:q.get("d")==null?null:+q.get("d"),achse:q.get("achse")==null?null:+q.get("achse"),sort:q.get("sort")||"nr",dir:+(q.get("dir")||1)};
+Z.liga=+(q.get("liga")||Z.blick.liga);
+$("buehne").innerHTML='<div class="seite pl1" id="s-saison"></div><div class="seite pl2" id="s-kalender"></div><div class="seite pl3" id="s-disziplinen"></div>';
+
+function dis(st){var x=ECHT.DIS[st-1];return [[x[0],x[1]],[x[2],x[3]]]}
+function hat(st,d){var x=dis(st);return d==null||x[0][0]===d||x[1][0]===d}
+function durchgang(st,d){for(var i=1;i<st;i++)if(hat(i,d))return 2;return 1}
+function termine(d){var r=[];for(var i=1;i<=20;i++){var x=dis(i);if(x[0][0]===d)r.push([i,x[0][1]]);if(x[1][0]===d)r.push([i,x[1][1]])}return r}
+function gewertet(st){return st<=GEWERTET}
+/* Vierergruppen: echt aus den Ergebnissen; kuenftige Spieltage BEISPIEL (je zwei Paarungen des Spieltags verschmelzen, Leitdisziplin D1) */
+function gruppen(st,l,seite){var f=ECHT.FIX[st-1][String(l)],G=[],gesehen={};
+  if(gewertet(st)){TEAMS.forEach(function(T){if(T.liga!==l||gesehen[T.c])return;var e=erg(T,st,seite);if(!e||!e.pod)return;e.pod.forEach(function(c){gesehen[c]=1});G.push({teams:e.pod.slice(),echt:true})});return G}
+  for(var i=0;i<f.length;i+=2)G.push({teams:[f[i][0],f[i][1],f[i+1][0],f[i+1][1]],echt:false});return G}
+function ergT(e){if(!e)return "";if(e.pod)return e.pl+". Platz";return e.e?e.e[0]+" : "+e.e[1]:"–"}
+function hausS(T){var n=0;for(var i=1;i<=20;i++)if(heim(T,i)[0])n++;return n}
+
+/* ---------- Filterleiste (Saison und Kalender) ---------- */
+function fbar(id){var L=TEAMS.filter(function(T){return T.liga===Z.liga});
+  return '<section class="pan fbar" id="'+id+'"><span class="gk">Liga</span><span class="seg">'+[1,2].map(function(l){return '<a class="'+(Z.liga===l?"an":"")+'" data-liga="'+l+'">Liga '+l+'</a>'}).join("")+'</span>'+
+    '<span class="gk">Blick auf</span><span class="tw">'+L.map(function(T){return '<a class="'+(Z.blick===T?"an ":"")+(T===ICH?"ich":"")+'" data-blick="'+T.c+'" title="'+T.n+(T===ICH?" · dein Team":"")+'"><img src="../team-logos/'+T.c+'.jpg" alt=""></a>'}).join("")+'</span>'+
+    '<span class="gk">Disziplin</span><span class="dw">'+DK.map(function(k,i){return '<a class="a'+DA[i]+(Z.d===i?" an":"")+'" data-d="'+i+'" title="'+DN[i][0]+(POD[i]?" · Vierergruppe":"")+'">'+k+'</a>'}).join("")+'</span>'+
+    '<span class="sp"></span><span class="seg">'+[["saison","Spieltag"],["kalender","Kalender"],["disziplinen","Disziplinen"]].map(function(a){return '<a class="'+(Z.ans===a[0]?"an":"")+'" data-ans="'+a[0]+'">'+a[1]+'</a>'}).join("")+'</span></section>'}
+
+/* ---------- (1) Saison: Leiste + Spieltag + Blick-Team ---------- */
+function kachel(st){var B=Z.blick,h=heim(B,st),x=dis(st),g=gewertet(st),p=g?B.tag[st-1]:null,e1=erg(B,st,0),e2=erg(B,st,1);
+  return '<a class="stk '+(st===Z.st?"an ":"")+(st===HEUTE?"heute ":"")+(g?"gew ":"")+(hat(st,Z.d)?"":"matt")+'" data-st="'+st+'" title="Spieltag '+st+': '+DN[x[0][0]][0]+' und '+DN[x[1][0]][0]+'">'+
+    '<span class="ko"><span>ST</span><b class="t">'+st+'</b></span>'+
+    '<span class="dz">'+x.map(function(d){return '<span class="dt a'+DA[d[0]]+(POD[d[0]]?" pod":"")+'">'+DK[d[0]]+'</span>'}).join("")+'</span>'+
+    '<span class="geg">'+logo(h[1].c)+'<span class="ha '+(h[0]?"h":"a")+'">'+(h[0]?"H":"A")+'</span><span class="t">'+h[1].c+'</span></span>'+
+    '<span class="er">'+(g?'<span class="fm">'+[e1,e2].map(function(e){return '<i class="'+(e&&e.p>=2?"":e&&e.p===1?"u":"n")+'" title="'+ergT(e)+'"></i>'}).join("")+'</span><b class="t p'+p+'">'+p+' P</b>':st===HEUTE?'<span style="color:var(--gold);font-weight:700">als Nächstes</span>':'<span>offen</span>')+'</span>'+
+    '<span class="e1 t">'+(g?[e1,e2].map(function(e){return e?(e.pod?e.pl+". Pl.":e.e?e.e[0]+":"+e.e[1]:"–"):"–"}).join(" · "):"&nbsp;")+'</span></a>'}
+function duell(f,st,seite,d){var H=TC[f[0]],G=TC[f[1]],g=gewertet(st),e=g?erg(H,st,seite):null,mein=H===ICH||G===ICH,bl=H===Z.blick||G===Z.blick,mi;
+  if(e&&e.e){mi='<strong class="t">'+e.e[0]+' : '+e.e[1]+'</strong><small class="t">'+(e.s?tsd(e.s[0])+' : '+tsd(e.s[1])+' → E1':"")+'</small>'}
+  else{var rh=rang(H,d),rg=rang(G,d);mi='<span class="pf t"><b class="'+(rh<rg?"plus":"")+'">'+rh+'.</b> gegen <b class="'+(rg<rh?"plus":"")+'">'+rg+'.</b></span><small>Kaderstärke-Rang '+DK[d]+'</small>'}
+  var sieg=e&&e.e?(e.e[0]>e.e[1]?1:e.e[0]<e.e[1]?-1:0):0;
+  return '<div class="du '+(mein?"ich ":"")+(bl&&!mein?"blick":"")+'"><span class="tm2 '+(sieg<0?"verl":"")+'">'+logo(H.c)+'<b>'+H.n+'</b>'+ic("haus")+'</span><span class="mi">'+mi+'</span><span class="tm2 g '+(sieg>0?"verl":"")+'">'+logo(G.c)+'<b>'+G.n+'</b></span></div>'}
+function gruppe(G,i,st,seite,d){var g=gewertet(st),L=G.teams.map(function(c){var T=TC[c],e=g?erg(T,st,seite):null;return {T:T,e:e}});
+  if(g)L.sort(function(a,b){return a.e.pl-b.e.pl});
+  var mein=G.teams.indexOf(ICH.c)>=0;
+  return '<div class="pd '+(mein?"ich":"")+'"><div class="pko"><span>Gruppe '+"ABCD"[i]+'</span><span>'+(g?"Platz · Wert · Punkte":G.echt?"":"Beispiel-Auslosung · Kaderstärke-Rang")+'</span></div>'+
+    L.map(function(x,k){return '<div class="pz '+(x.T===ICH?"ich":"")+'"><span class="pl '+(g&&x.e.pl===1?"e":"")+' t">'+(g?x.e.pl+".":"")+'</span>'+logo(x.T.c)+'<b class="n">'+x.T.n+'</b>'+(g?'<small class="t">Wert '+x.e.w+'</small><strong class="t p'+(x.e.p*2)+'">'+x.e.p+' P</strong>':'<small></small><strong class="t">'+rang(x.T,d)+'.</strong>')+'</div>'}).join("")+'</div>'}
+function zeichneSaison(){
+  var st=Z.st,x=dis(st),g=gewertet(st),B=Z.blick,h=heim(B,st),G=h[1];
+  var kopf='<div class="pk"><h2>Spieltag '+st+'</h2><span class="tag '+(g?"g":st===HEUTE?"go":"")+'">'+(g?"gewertet":st===HEUTE?"als Nächstes · in Planung":"offen")+'</span><span class="tag">Liga '+Z.liga+'</span><span class="sp"></span>'+
+    '<small class="u">'+(g?"Rohwert → Ergebnis 0 bis 10 je Seite (E1) · Sieg 2, Remis 1 Punkt je Disziplin":"Vor dem Spiel: Kaderstärke-Rang beider Teams in der Disziplin · "+ic("haus")+" = Heimrecht")+'</small>'+
+    '<a data-st="'+Math.max(1,st-1)+'" style="cursor:pointer">'+ic("l")+'</a><a data-st="'+Math.min(20,st+1)+'" style="cursor:pointer">'+ic("r")+'</a></div>';
+  var dk='<div class="dkopf">'+x.map(function(d,i){return '<div class="dk"><i class="bg" style="background-image:url('+kul(d[0])+')"></i>'+dIcon(d[0])+'<span><b>'+DN[d[0]][0]+'</b><small><span class="ac'+DA[d[0]]+'" style="font-weight:700">'+AX[DA[d[0]]]+'</span> · '+d[1]+' Plätze je Team · '+durchgang(st,d[0])+'. Durchgang der Saison</small></span><span class="sp"></span><span class="tag '+(POD[d[0]]?"go":"")+'">'+(POD[d[0]]?"Vierergruppe":"Duell")+'</span><span class="tag">D'+(i+1)+'</span></div>'}).join("")+'</div>';
+  var f=ECHT.FIX[st-1][String(Z.liga)];
+  var li='<div class="dliste">'+x.map(function(d,i){if(POD[d[0]]){return '<div class="dsp pods">'+gruppen(st,Z.liga,i).map(function(G2,k){return gruppe(G2,k,st,i,d[0])}).join("")+'</div>'}
+    return '<div class="dsp">'+f.map(function(p){return duell(p,st,i,d[0])}).join("")+'</div>'}).join("")+'</div>';
+  /* rechte Tafel: der Spieltag aus Sicht des Blick-Teams */
+  var eig=B===ICH,e=[erg(B,st,0),erg(B,st,1)],heimN=hausS(B),heimRest=0;for(var i=HEUTE;i<=20;i++)if(heim(B,i)[0])heimRest++;
+  var frueher=null;for(i=1;i<st;i++){var hh=heim(B,i);if(hh[1]===G){frueher=[i,hh[0]];break}}
+  var r='<div class="nk"><i class="bg" style="background-image:url('+kul(x[0][0])+')"></i>'+logo(G.c)+'<span><em>'+(g?"Ergebnis":st===HEUTE?"Als Nächstes":"Vorschau")+' · '+(eig?"dein Team":B.n)+'</em><h3>'+(h[0]?"Heim gegen ":"Auswärts bei ")+G.n+'</h3><small>'+G.st.rank+'. der Liga '+G.liga+' · Kaderstärke '+rangGes(G)+'. · '+bezTag(bez(B,G))+'</small></span></div><div class="pb">'+
+    x.map(function(d,k){var rb=rang(B,d[0]),rg=rang(G,d[0]),ee=e[k],best=B.K.filter(function(p){return !p.verl}).sort(function(a,b){return sw(b.d[d[0]],b)-sw(a.d[d[0]],a)||(a.n<b.n?-1:1)}).slice(0,Math.min(d[1],6));
+      return '<div class="pform"><span class="l"><b class="t '+(rb<rg?"vorn":rb>rg?"hint":"")+'">'+rb+'.</b><small>'+(eig?"du":B.c)+' · Kaderstärke</small></span><span class="m">'+dTag(d[0])+'<small>'+d[1]+' Plätze'+(POD[d[0]]?" · Gruppe":"")+'</small>'+(ee?'<b class="t" style="font-size:1.05rem;color:var(--creme)">'+ergT(ee)+' · '+ee.p+' P</b>':"")+'</span><span><b class="t '+(rg<rb?"vorn":rg>rb?"hint":"")+'">'+rg+'.</b><small>'+G.c+' · Kaderstärke</small></span></div>'+
+        (!g&&(eig||NEBEL_AUS)?'<div style="display:flex;align-items:center;gap:.5rem;padding:0 0 .4rem"><span class="gk" style="font-size:.6rem">Deine besten '+best.length+'</span><span class="koepfe">'+best.map(function(p){return '<img src="../portraits/'+p.s+'.jpg" title="'+esc(p.n)+' · Eignung '+p.d[d[0]]+'" alt="">'}).join("")+'</span></div>':"")}).join("")+
+    '<div class="zeile2"><span>'+ic("ticket")+' '+(h[0]?"Heimspiel: Ticket-Einnahme":"Auswärts: keine Ticket-Einnahme")+' <i class="bsp">Beispiel</i></span><b class="t '+(h[0]?"plus":"null")+'">'+(h[0]?(eig||NEBEL_AUS?"+"+de(B.ticket)+" C":"öffentlich: "+B.auslast+" % voll"):"–")+'</b></div>'+
+    '<div class="zeile2"><span>Heimspiele der Saison</span><b class="t">'+heimN+' von 20 · noch '+heimRest+'</b></div>'+
+    '<div class="zeile2"><span>'+(frueher?"Hinspiel":"Erste Begegnung der Saison")+'</span><b class="t">'+(frueher?"Spieltag "+frueher[0]+" · "+(frueher[1]?"Heim":"Auswärts")+" · "+B.tag[frueher[0]-1]+" von 4 P":"kein früheres Spiel")+'</b></div>'+
+    (g?'<div class="zeile2"><span>Tabellenplatz danach</span><b class="t">'+B.rangV[st-1]+'. · '+B.verlauf[st-1]+' Punkte</b></div>':'<div class="zeile2"><span>Tabellenplatz heute</span><b class="t">'+B.st.rank+'. · '+B.st.pts+' Punkte</b></div>')+
+    '<h4 class="wk">Was danach kommt <small>'+(eig?"dein Weg":"Weg von "+B.n)+'</small></h4>'+[1,2,3,4,5].map(function(k){var s=Math.max(st,HEUTE-1)+k;if(s>20)return "";var hh=heim(B,s),xx=dis(s);
+      return '<a class="wz" data-st="'+s+'"><b class="t">ST '+s+'</b><span class="ha '+(hh[0]?"h":"a")+'">'+(hh[0]?"H":"A")+'</span>'+logo(hh[1].c)+'<span class="nn">'+hh[1].n+'</span><span>'+dTag(xx[0][0],' <small>'+xx[0][1]+'</small>')+' '+dTag(xx[1][0],' <small>'+xx[1][1]+'</small>')+'</span></a>'}).join("")+
+    '<span style="flex:1"></span><div class="akt" style="display:flex;gap:.45rem">'+(st===HEUTE&&eig?'<a class="knopf haupt" style="flex:1" href="einsatzliste-modern-17-11.html">Einsatzliste setzen</a>':g?'<a class="knopf haupt" style="flex:1" href="arena-spieltag-modern-18-11.html">Spieltag ansehen</a>':'<a class="knopf" style="flex:1" href="teams-modern-24-11.html?ansicht=kader&team='+G.c+'">Gegner ansehen</a>')+'<a class="knopf" href="kader-teams-modern-18-11.html?ansicht=duell&team=T-G">Duell</a></div></div>';
+  $("s-saison").innerHTML=fbar("f-leiste")+'<section class="pan leiste" id="p-band">'+Array.apply(null,Array(20)).map(function(_,i){return kachel(i+1)}).join("")+'</section>'+
+    '<section class="pan" id="p-tag">'+kopf+dk+li+'</section><section class="pan" id="p-blick">'+r+'</section>';
+  RAHMEN.kulisse(x[0][0],x[1][0])}
+
+/* ---------- (2) Kalender: 16 Teams x 20 Spieltage ---------- */
+function zeichneKalender(){var L=TEAMS.filter(function(T){return T.liga===Z.liga}).sort(function(a,b){return a.st.rank-b.st.rank});
+  var h='<span class="ek">Platz · Team</span>';
+  for(var st=1;st<=20;st++){var x=dis(st);h+='<a class="sk2 '+(st===HEUTE?"heute ":"")+(hat(st,Z.d)?"":"matt")+'" data-st="'+st+'" data-geh="saison" title="Spieltag '+st+': '+DN[x[0][0]][0]+' ('+x[0][1]+' Plätze) und '+DN[x[1][0]][0]+' ('+x[1][1]+' Plätze)"><b class="t">'+st+'</b>'+x.map(function(d){return '<span class="dt a'+DA[d[0]]+'">'+DK[d[0]]+'</span>'}).join("")+'</a>'}
+  L.forEach(function(T){h+='<a class="tn '+(T===ICH?"ich ":"")+(T===Z.blick&&T!==ICH?"blick":"")+'" data-blick="'+T.c+'" title="'+T.n+'"><span class="r t">'+T.st.rank+'</span>'+logo(T.c)+'<span class="nn">'+T.n+'</span></a>';
+    for(var st=1;st<=20;st++){var hm=heim(T,st),g=gewertet(st),p=g?T.tag[st-1]:null,gegenBlick=hm[1]===Z.blick;
+      h+='<span class="kz2 '+(hm[0]?"h ":"a ")+(g?"q"+p+" ":"")+(T===ICH?"zeile ":T===Z.blick?"zb ":"")+(hat(st,Z.d)?"":"matt ")+(st===HEUTE?"jetzt ":"")+(gegenBlick&&T!==Z.blick?"geg":"")+'" title="Spieltag '+st+': '+T.n+(hm[0]?" (Heim) gegen ":" (Auswärts) bei ")+hm[1].n+(g?" · "+p+" von 4 Punkten · "+ergT(erg(T,st,0))+" und "+ergT(erg(T,st,1)):"")+'"><i></i>'+hm[1].c+(g?'<small class="t">'+p+'</small>':"")+'</span>'}});
+  $("s-kalender").innerHTML=fbar("f-leiste2")+'<section class="pan" id="p-kal"><div class="pk"><h2>Kalender Liga '+Z.liga+'</h2><span class="tag go">16 Teams · 20 Spieltage</span><span class="sp"></span><small class="u">Zelle = Gegner · kleine Zahl = Punkte des Spieltags (0 bis 4) · Klick auf einen Spieltag öffnet ihn</small></div><div class="kal">'+h+'</div>'+
+    '<div class="tfuss"><span class="leg"><span><i style="background:var(--heim)"></i>Heimspiel (Ticket-Einnahme)</span><span><i style="background:var(--gast);opacity:.6"></i>Auswärts</span><span><i style="background:rgba(98,211,148,.5)"></i>4 und 3 Punkte</span><span><i style="background:rgba(255,255,255,.2)"></i>2 Punkte</span><span><i style="background:rgba(255,96,88,.5)"></i>1 und 0 Punkte</span><span><i style="background:none;border:2px solid var(--gold)"></i>Gegner von '+(Z.blick===ICH?"dir":Z.blick.n)+'</span></span><span class="sp"></span><span>Orange Zeile = dein Team · jede Paarung gilt für beide Disziplinen des Spieltags</span></div></section>'}
+
+/* ---------- (3) Disziplinen: Konfiguration der Saison ---------- */
+function bilanz(T,d){var s=0,u=0,n=0,pk=0,sp=0;termine(d).forEach(function(t){if(!gewertet(t[0]))return;var k=dis(t[0])[0][0]===d?0:1,e=erg(T,t[0],k);if(!e)return;sp++;pk+=e.p;if(e.p>=2)s++;else if(e.p===1)u++;else n++});return {sp:sp,pk:pk,txt:sp?pk+" P":"–"}}
+function zeichneDisziplinen(){
+  var rows=DN.map(function(d,i){var t=termine(i);return {i:i,n:d[0],nr:Math.min(t[0][0],t[1]?t[1][0]:99)*2+(dis(t[0][0])[0][0]===i?0:1),t:t,bil:bilanz(ICH,i),rg:rang(ICH,i),med:medRang(ICH,i)}}).filter(function(r){return Z.achse==null||DA[r.i]===Z.achse});
+  function termin(r,k){var t=r.t[k];if(!t)return '<span class="zu">–</span>';var g=gewertet(t[0]);return '<a data-st="'+t[0]+'" data-geh="saison" style="cursor:pointer;display:inline-flex;gap:.4rem;align-items:baseline"><b class="t" style="color:'+(t[0]===HEUTE?"var(--gold)":g?"var(--leise)":"var(--creme)")+'">ST '+t[0]+'</b><small style="color:var(--stumm)">'+(g?"gewertet":t[0]===HEUTE?"als Nächstes":"offen")+'</small></a>'}
+  function plz(r,k){var t=r.t[k];return t?'<span class="pbal"><b class="t">'+t[1]+'</b><span class="bal"><i style="width:'+t[1]/6*100+'%;background:'+AXF[DA[r.i]]+'"></i></span></span>':""}
+  var cols=[
+    {k:"orig",t:"Orig.",w:"3rem",tip:"Position in der offiziellen Matrix",wert:function(r){return r.i},html:function(r){return '<span class="t" style="color:var(--stumm)">'+(r.i+1)+'</span>'}},
+    {k:"nr",t:"Reihenfolge",w:"5rem",tip:"Erstes Vorkommen im Spielplan dieser Saison",wert:function(r){return r.nr},html:function(r){return '<span class="t">ab ST '+r.t[0][0]+'</span>'}},
+    {k:"n",t:"Disziplin",w:"minmax(9.4rem,1fr)",wert:function(r){return r.n},html:function(r){return '<span class="dname">'+dIcon(r.i)+r.n+'</span>'}},
+    {k:"achse",t:"Achse",w:"3.2rem",wert:function(r){return DA[r.i]},html:function(r){return '<b class="ac'+DA[r.i]+'">'+AX[DA[r.i]]+'</b>'}},
+    {k:"fmt",t:"Format",w:"6.6rem",tip:"Duell (zwei Teams) oder Vierergruppe (vier Teams, Plätze 1 bis 4)",wert:function(r){return POD[r.i]?1:0},html:function(r){return POD[r.i]?'<span class="tag go">Vierergruppe</span>':'<span class="tag">Duell</span>'}},
+    {k:"t1",t:"1. Durchgang",w:"7.6rem",wert:function(r){return r.t[0][0]},html:function(r){return termin(r,0)}},
+    {k:"p1",t:"Plätze",w:"4.8rem",tip:"Spieler je Team im 1. Durchgang",wert:function(r){return r.t[0][1]},html:function(r){return plz(r,0)}},
+    {k:"t2",t:"2. Durchgang",w:"7.6rem",wert:function(r){return r.t[1]?r.t[1][0]:99},html:function(r){return termin(r,1)}},
+    {k:"p2",t:"Plätze",w:"4.8rem",tip:"Spieler je Team im 2. Durchgang",wert:function(r){return r.t[1]?r.t[1][1]:0},html:function(r){return plz(r,1)}},
+    {k:"m1",t:"Mutator 1",w:"4.6rem",html:function(){return '<span class="zu">keiner</span>'}},
+    {k:"m2",t:"Mutator 2",w:"4.6rem",html:function(){return '<span class="zu">keiner</span>'}},
+    {k:"rg",t:"Dein Rang",w:"4.6rem",r:1,tip:"Kaderstärke-Rang deines Teams in der Liga. Rang 1 ist der beste.",wert:function(r){return -r.rg},html:function(r){return '<b class="t '+(r.rg<=4?"plus":r.rg>=13?"minus":"")+'">'+r.rg+'.</b>'}},
+    {k:"bil",t:"Deine Punkte",w:"5.8rem",r:1,tip:"Punkte deines Teams in dieser Disziplin (2 je Sieg)",wert:function(r){return r.bil.sp?r.bil.pk:-1},html:function(r){return '<span class="bz2"><b class="t">'+r.bil.txt+'</b><small>'+(r.bil.sp?"aus "+r.bil.sp:"noch offen")+'</small></span>'}},
+    {k:"med",t:"Medaillen-Kurs",w:"6.4rem",r:1,tip:"Platz deines Teams in der Disziplin-Wertung der Liga",wert:function(r){return r.med?-r.med:-99},html:function(r){return r.med?'<span class="bz2"><b class="t '+(r.med<=3?"plus":"")+'">'+r.med+'.</b><small>von 16</small></span>':'<span class="zu">noch offen</span>'}}];
+  var t=tafel({cols:cols,rows:rows,sort:Z.sort,dir:Z.dir,zeilen:20,zeile:function(r){return {cls:Z.d===r.i?"an":""}}});
+  var alleP=rows.reduce(function(a,r){return a+r.t[0][1]+(r.t[1]?r.t[1][1]:0)},0),pods=rows.filter(function(r){return POD[r.i]}).length;
+  $("s-disziplinen").innerHTML='<section class="pan fbar" id="f-leiste3"><span class="gk">Achse</span><span class="seg"><a class="'+(Z.achse==null?"an":"")+'" data-achse="">Alle</a>'+AX.map(function(a,i){return '<a class="'+(Z.achse===i?"an":"")+'" data-achse="'+i+'"><b class="'+(Z.achse===i?"":"ac"+i)+'">'+AXN[i]+'</b></a>'}).join("")+'</span>'+
+      '<span class="hin">Jede Disziplin kommt genau zweimal je Saison vor, mit eigener Platzzahl je Durchgang.</span><span class="sp"></span><span class="seg">'+[["saison","Spieltag"],["kalender","Kalender"],["disziplinen","Disziplinen"]].map(function(a){return '<a class="'+(Z.ans===a[0]?"an":"")+'" data-ans="'+a[0]+'">'+a[1]+'</a>'}).join("")+'</span></section>'+
+    '<section class="pan" id="p-dis"><div class="pk"><h2>Disziplinen der Saison</h2><span class="tag go">'+rows.length+' Disziplinen</span><span class="sp"></span><small class="u">Klick auf eine Spalte sortiert · Klick auf einen Termin öffnet den Spieltag</small></div>'+t.html+'<div class="tfuss"><span>Reihenfolge und Plätze stammen aus dem Saison-Seed · Mutatoren: in diesem Spielstand keine gesetzt</span></div></section>'+
+    '<section class="pan" id="p-uebers"><div class="pk"><h2>Überblick</h2></div><div class="pb">'+
+      '<div class="wert3" style="grid-template-columns:repeat(2,1fr);margin-bottom:.6rem"><div><small>Disziplinen</small><strong class="t">'+rows.length+'</strong><em>davon '+pods+' in Vierergruppen</em></div><div><small>Plätze gesamt</small><strong class="t">'+alleP+'</strong><em>über beide Durchgänge</em></div><div><small>Ø Plätze je Einsatz</small><strong class="t">'+de(alleP/Math.max(1,rows.length*2))+'</strong><em>zwischen 2 und 6</em></div><div><small>Ohne Mutator</small><strong class="t">'+rows.length+'</strong><em>von '+rows.length+'</em></div></div>'+
+      '<h4 style="margin:0 0 .3rem;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600">Plätze je Disziplin · 1. und 2. Durchgang</h4>'+
+      '<div class="balk">'+rows.map(function(r){return '<div title="'+r.n+': '+r.t[0][1]+' und '+(r.t[1]?r.t[1][1]:0)+' Plätze"><i style="height:'+(r.t[1]?r.t[1][1]:0)/12*100+'%;background:'+AXF[DA[r.i]]+';opacity:.5"></i><i style="height:'+r.t[0][1]/12*100+'%;background:'+AXF[DA[r.i]]+'"></i></div>'}).join("")+'</div><div class="balkx">'+rows.map(function(r){return '<span>'+DK[r.i]+'</span>'}).join("")+'</div>'+
+      '<div class="zeile2" style="margin-top:.7rem"><span>Wer viele Plätze braucht</span><b style="font-size:.86rem">breiter Kader zählt</b></div><div class="zeile2"><span>Vierergruppen</span><b style="font-size:.86rem">Mini DM · Battlefield · Staffel · Takeshi</b></div><div class="zeile2"><span>Paarung</span><b style="font-size:.86rem">gilt für beide Disziplinen des Spieltags</b></div>'+
+      '<span style="flex:1"></span><div class="nebelhin">'+ic("hist")+'<span><b>Technik:</b> Quelle „season_seed“, Seed-Schema „season-setup-v3-balanced-slot-buckets“. Der Spielplan steht mit dem Saisonstart fest und ändert sich nicht mehr.</span></div></div></section>'}
+
+function kopf(){var B=Z.blick,n=heim(B,HEUTE),x=dis(HEUTE);
+  RAHMEN.kopf('Welt <span>›</span> Saison 1 <span>›</span> 20 Spieltage · 2 × 16 Teams',"Spielplan","",
+    RAHMEN.kpi("Als Nächstes","ST "+HEUTE,DK[x[0][0]]+" + "+DK[x[1][0]],"zone")+RAHMEN.kpi(B===ICH?"Dein Gegner":"Gegner "+B.c,n[1].c,n[0]?"Heim":"Auswärts")+RAHMEN.kpi("Gewertet",GEWERTET,"von 20")+RAHMEN.kpi("Punkte",B.st.pts,B.st.rank+". Liga "+B.liga))}
+function demo(){
+  $("d-ans").innerHTML=[["saison","Spieltag"],["kalender","Kalender"],["disziplinen","Disziplinen"]].map(function(a){return '<a class="'+(Z.ans===a[0]?"an":"")+'" href="'+RAHMEN.link({ansicht:a[0],sort:null,dir:null})+'">'+a[1]+'</a>'}).join(" ");
+  $("d-st").innerHTML=[[12,"12 · als Nächstes (Gruppe + Duell)"],[11,"11 · gewertet (Duelle)"],[10,"10 · gewertet (zwei Gruppen)"],[16,"16 · offen"]].map(function(a){return '<a class="'+(Z.st===a[0]&&Z.ans==="saison"?"an":"")+'" href="'+RAHMEN.link({ansicht:"saison",st:a[0]})+'">'+a[1]+'</a>'}).join(" ")}
+function alles(){["saison","kalender","disziplinen"].forEach(function(a){$("s-"+a).classList.toggle("an",a===Z.ans);if(a!==Z.ans)$("s-"+a).innerHTML=""});kopf();
+  ({saison:zeichneSaison,kalender:zeichneKalender,disziplinen:zeichneDisziplinen})[Z.ans]();demo()}
+document.addEventListener("click",function(ev){var t=ev.target,e;
+  if(Z.ans==="disziplinen"&&sortKlick(ev,Z,{nr:1,orig:1,n:1,t1:1,t2:1,achse:1}))return alles();
+  if(e=t.closest("[data-st]")){Z.st=+e.getAttribute("data-st");if(e.getAttribute("data-geh"))Z.ans="saison";return alles()}
+  if(e=t.closest("[data-liga]")){Z.liga=+e.getAttribute("data-liga");if(Z.blick.liga!==Z.liga)Z.blick=Z.liga===ICH.liga?ICH:TEAMS.filter(function(T){return T.liga===Z.liga})[0];return alles()}
+  if(e=t.closest("[data-blick]")){Z.blick=TC[e.getAttribute("data-blick")];return alles()}
+  if(e=t.closest("[data-ans]")){Z.ans=e.getAttribute("data-ans");if(Z.ans==="disziplinen"){Z.sort="nr";Z.dir=1}return alles()}
+  if(e=t.closest("[data-achse]")){var a=e.getAttribute("data-achse");Z.achse=a===""?null:+a;return alles()}
+  if(e=t.closest("[data-d]")){var d=+e.getAttribute("data-d");Z.d=Z.d===d?null:d;if(Z.d!=null&&Z.ans==="saison"&&!hat(Z.st,Z.d)){var tt=termine(Z.d),n=tt.filter(function(x){return x[0]>=HEUTE})[0]||tt[0];Z.st=n[0]}return alles()}
+});
+alles();
+</script>
+</body>
+</html>

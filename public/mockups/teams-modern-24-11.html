@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Teams – modern (Mockup 24.11.)</title>
+<!--
+  TEAMS IM NEUEN STIL (Fable, 24.11.): Liga-Uebersicht 2 x 16, Team-Detail (Kader, Vertraege, Transfers), Team-Profil.
+  Erklaerung: docs/design/spieler-teams-modern-24-11.md
+  Loest app/foundation/teams-v2/FoundationTeamsNewLook.tsx, FoundationTeamsDetailPanel.tsx und team-profile/TeamProfileNewLook.tsx ab und
+  fuehrt kader-teams-modern-18-11.html weiter (Reiter Staerke und Duell bleiben dort unveraendert gueltig und sind von hier verlinkt).
+  ECHT (Live-Abbild 24.11., Saison 1, Spieltag 12): Teams, Liga, Tabelle, Punkte je Spieltag, Kasse, Identitaet, Thema, GM und Kaufstil,
+        Vorstand (Vertrauen, Druck, Ziele), Sponsor, Kapitaen, Kader, Vertraege, Gehaelter, Transfers, Player Points, Form, Moral, Verletzungen.
+  BEISPIEL: Scouting-Stand, Fans, Stimmung, Arena-Plaetze, Ticket-Einnahmen, Teammarke, Beziehungen, Verkaufs-Einschaetzung, Delegation.
+  URL: ?ansicht=liga|kader|vertrag|transfers|profil  ?team=D-P|C-C|…  ?liga=beide|1|2  ?sort=<spalte>&dir=-1|1  ?nebel=aus  ?ich=V-W  ?still=1
+-->
+<link rel="stylesheet" href="modern-24-11/rahmen.css">
+<link rel="stylesheet" href="modern-24-11/bausteine.css">
+<style>
+.seite.lg2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .seite.lg1{grid-template-columns:minmax(0,1fr)}
+.seite.td{grid-template-columns:minmax(0,1fr) 27.5rem}
+.seite.tp{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:minmax(0,.86fr) minmax(0,1fr)}
+.seite.td .tz .por{width:2.9rem;max-height:3.5rem}
+#s-liga.lg2 .tz{gap:.4rem;padding-right:.6rem} #s-liga.lg2 .tz .nm b{font-size:.97rem}
+.spalte{display:flex;flex-direction:column;gap:.72rem;min-width:0;min-height:0} .spalte>.pan{flex:1}
+.tz .pl{font-weight:700;color:var(--leise);font-size:1.02rem} .tz .pl.auf{color:var(--gut)} .tz .pl.ab{color:var(--warn)}
+.tz .wap{width:2.1rem;height:2.1rem}
+.tz b.pkt{font-size:1.25rem;color:var(--creme)}
+.stz{display:inline-flex;align-items:baseline;gap:.35rem} .stz b.rgz{font-size:1.08rem;color:var(--tinte)} .stz small{font-size:.72rem;color:var(--stumm)}
+.fwz{display:flex;align-items:center;gap:.35rem;width:100%} .fwz b{width:1.7rem;flex:none}
+.spo{display:flex;align-items:center;gap:.35rem;font-size:.86rem;color:var(--tinte);min-width:0} .spo i{width:.5rem;height:.5rem;border-radius:50%;flex:none} .spo span{overflow:hidden;text-overflow:ellipsis}
+.zw{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.05} .zw b{font-size:1.02rem} .zw small{font-size:.68rem;color:var(--stumm);font-weight:600}
+.mk{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:.02rem .3rem;border-radius:.2rem;background:rgba(242,160,61,.18);color:var(--heim);border:1px solid rgba(242,160,61,.5)}
+.mk.ki{background:none;color:var(--stumm);border-color:var(--linie)}
+.rtag{display:inline-flex;align-items:center;height:1.3rem;padding:0 .4rem;border-radius:.2rem;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;border:1px solid var(--linie-2);color:var(--leise)}
+.rtag.k{background:var(--gold);color:#17120a;border-color:var(--gold)} .rtag.s{color:var(--creme);border-color:var(--creme)} .rtag.e{color:var(--stumm);border-color:var(--linie)}
+.titelz{display:flex;align-items:center;gap:.6rem} .titelz img.wap{width:2.6rem;height:2.6rem;border:2px solid var(--heim)} .titelz img.wap.fr{border-color:var(--gast)}
+.titelz a.bl{width:1.7rem;height:1.7rem;display:grid;place-items:center;border:1px solid var(--linie-2);border-radius:.3rem;font-size:.9rem;color:var(--leise);font-family:var(--zahl)}
+.titelz a.bl:hover{color:var(--gold);border-color:var(--gold)}
+/* Seitenleisten */
+.ks2{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:minmax(0,1fr);gap:0 .9rem;flex:1;min-height:0}
+.ks2 a{display:grid;grid-template-columns:2.4rem minmax(0,1fr) auto;gap:.35rem;align-items:center;font-size:.86rem;white-space:nowrap;border-top:1px solid rgba(244,230,196,.06);min-height:0}
+.ks2 a b.r1{color:var(--gut)} .ks2 a b.r3{color:var(--warn)} .ks2 a b{font-size:.98rem;width:1.6rem;text-align:right;color:var(--leise)}
+.ks2 a .bal{height:.4rem}
+.kopfw{display:flex;align-items:flex-end;gap:.7rem;flex:none;margin-bottom:.45rem}
+.kopfw strong{font-size:2.3rem;line-height:.9;color:var(--creme);font-weight:700} .kopfw small{font-size:.84rem;color:var(--leise);line-height:1.2}
+.blk h4,.pb h4{margin:.1rem 0 .3rem;font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600;display:flex;gap:.4rem;align-items:baseline;white-space:nowrap}
+.pb h4 small{letter-spacing:0;text-transform:none;color:var(--stumm);font-size:.76rem;font-weight:500}
+.topf{flex:none;margin-bottom:.55rem} .topf .zl{display:flex;justify-content:space-between;align-items:baseline;font-size:.88rem;color:var(--leise);white-space:nowrap} .topf .zl b{font-size:1.15rem;color:var(--creme)}
+.topf .bn{position:relative;height:.7rem;background:rgba(255,255,255,.07);transform:skewX(-14deg);margin-top:.2rem;display:flex}
+.topf .bn i{height:100%} .topf .bn i.geb{background:var(--stumm)} .topf .bn i.frei{background:var(--gut)} .topf .bn i.gesp{background:repeating-linear-gradient(135deg,rgba(243,181,74,.75) 0 .3rem,rgba(243,181,74,.25) .3rem .6rem)}
+.ausl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.35rem;flex:none}
+.ausl div{padding:.35rem .5rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2);min-width:0} .ausl div.rot{border-color:rgba(255,96,88,.55);background:rgba(255,96,88,.08)}
+.ausl small{display:block;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap} .ausl strong{font-size:1.5rem;line-height:1;color:var(--creme)} .ausl em{display:block;font-style:normal;font-size:.72rem;color:var(--stumm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.saeul{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;align-items:end;flex:1;min-height:3rem}
+.saeul div{display:flex;flex-direction:column;justify-content:flex-end;height:100%;text-align:center;font-size:.78rem;color:var(--leise)} .saeul i{display:block;background:var(--heim);border-radius:2px 2px 0 0;min-height:2px} .saeul b{color:var(--tinte);font-size:.95rem}
+.aktz{display:flex;gap:.3rem;justify-content:flex-end} .aktz .knopf.klein{height:1.6rem;padding:0 .5rem;font-size:.7rem}
+/* Profil */
+.idz{display:grid;grid-template-columns:5.6rem 2.1rem minmax(0,1fr);gap:.5rem;align-items:center;font-size:.92rem;padding:.2rem 0;border-top:1px solid rgba(244,230,196,.07);white-space:nowrap}
+.idz b{font-size:1.15rem;color:var(--creme);text-align:right} .idz small{display:block;font-size:.76rem;color:var(--leise);overflow:hidden;text-overflow:ellipsis;margin-top:.12rem}
+.idz .bal i{background:var(--heim)}
+.lore{font-size:.88rem;line-height:1.3;color:var(--leise);flex:none;margin-bottom:.4rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden} .lore b{font:400 1.05rem/1.1 var(--haus);color:var(--creme);display:block}
+.wach{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.35rem;flex:none;margin-top:.5rem}
+.wach div{padding:.3rem .45rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2);font-size:.76rem;color:var(--leise);white-space:nowrap;overflow:hidden}
+.wach div b{display:block;font-size:.95rem;letter-spacing:.06em}
+.wach .bal{height:.3rem;margin:.15rem 0}
+.gmk{display:flex;gap:.8rem;align-items:center;flex:none;margin-bottom:.5rem}
+.gmk .rund{width:3.6rem;height:3.6rem;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;font:400 1.5rem/1 var(--haus);color:var(--gold);flex:none;background:rgba(240,195,90,.08)}
+.gmk b{font:400 1.35rem/1.05 var(--haus);color:#fff;display:block} .gmk small{font-size:.84rem;color:var(--leise);line-height:1.25;display:block}
+.stil{font-size:.84rem;line-height:1.28;color:var(--leise);padding:.22rem 0;border-top:1px solid rgba(244,230,196,.07);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden} .stil b{color:var(--tinte)}
+.kapz{display:flex;gap:.7rem;align-items:center;flex:none;margin-top:auto;padding-top:.4rem;border-top:1px solid var(--linie)}
+.kapz .fig{width:4.2rem;height:4.2rem} .kapz .por{width:3rem;height:3.8rem} .kapz b{font:400 1.2rem/1.05 var(--haus);color:#fff;display:block} .kapz small{font-size:.82rem;color:var(--leise);display:block;line-height:1.25}
+.stufen{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.2rem;flex:none;margin:.4rem 0 .5rem}
+.stufen span{text-align:center;font-size:.72rem;color:var(--stumm);padding-bottom:.25rem;border-bottom:.18rem solid var(--flaeche-3);white-space:nowrap} .stufen span b{display:block;font-size:.95rem;color:var(--leise)}
+.stufen span.an{border-color:var(--gold);color:var(--leise)} .stufen span.an b{color:var(--gold)}
+.zielz{display:grid;grid-template-columns:1.1rem minmax(0,1fr) auto;gap:.45rem;align-items:center;font-size:.9rem;padding:.2rem 0;border-top:1px solid rgba(244,230,196,.07);white-space:nowrap}
+.zielz span{overflow:hidden;text-overflow:ellipsis} .zielz svg{font-size:.95rem} .zielz.ok svg{color:var(--gut)} .zielz.risk svg{color:var(--acht)} .zielz.fail svg{color:var(--warn)} .zielz.offen svg{color:var(--stumm)} .zielz b{color:var(--tinte)}
+.verl2{position:relative;flex:1;min-height:4rem;margin:.3rem 1.6rem .2rem 0}
+.verl2 svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.verl2 .yp{position:absolute;right:-1.5rem;transform:translateY(-50%);font-size:.9rem;font-weight:700;color:var(--creme)}
+.medz{display:flex;flex-wrap:wrap;gap:.25rem;flex:none;max-height:3.1rem;overflow:hidden}
+.med{display:inline-flex;align-items:center;gap:.25rem;height:1.35rem;padding:0 .4rem;border-radius:.7rem;font-size:.72rem;font-weight:700;letter-spacing:.05em;border:1px solid var(--linie-2);color:var(--tinte)}
+.med i{width:.6rem;height:.6rem;border-radius:50%} .med.g i{background:#f0c35a} .med.s i{background:#c9d2de} .med.b i{background:#c98a52}
+.bzz .por{width:2.4rem;height:2.8rem} .idz .bal,.wach .bal{display:block}
+.bzz{display:grid;grid-template-columns:2.4rem minmax(0,1fr) auto;gap:.6rem;align-items:center;padding:.3rem 0;border-top:1px solid rgba(244,230,196,.07);white-space:nowrap;cursor:pointer}
+.bzz b{font:400 1.08rem/1.1 var(--haus);color:#fff;display:block;overflow:hidden;text-overflow:ellipsis} .bzz small{font-size:.78rem;color:var(--leise)}
+.skala2{display:block;position:relative;height:.28rem;margin-top:.2rem;background:rgba(255,255,255,.08);transform:skewX(-14deg)}
+.skala2::after{content:"";position:absolute;left:50%;top:-.15rem;bottom:-.15rem;width:1px;background:var(--linie-2)}
+.skala2 i{position:absolute;top:0;bottom:0} .skala2 i.neg{background:var(--warn)} .skala2 i.pos{background:var(--gut)}
+.arn{display:flex;height:.85rem;transform:skewX(-14deg);gap:.12rem;flex:none;margin:.25rem 0 .2rem}
+#u-id .pb{justify-content:space-between}
+.arn i{height:100%} .arn i.st{background:var(--stumm)} .arn i.si{background:var(--creme)} .arn i.lo{background:var(--gold)}
+</style>
+</head>
+<body>
+<script src="modern-24-11/daten.js"></script>
+<script src="modern-24-11/rahmen.js"></script>
+<script src="modern-24-11/tabelle.js"></script>
+<script>
+"use strict";
+RAHMEN.bau({seite:"teams",demoTitel:"Mockup 24.11. · Teams",demo:'<span>Ansicht</span><span id="d-ans"></span><i class="tr"></i><span>Team</span><span id="d-team"></span>',
+  demoHinweis:"Teams, Tabelle, Kasse, Identität, GM, Vorstand, Sponsor, Kader, Verträge, Transfers echt (Live-Abbild 24.11.) · Fans, Arena, Tickets, Beziehungen, Scouting Beispiel."});
+var Z={ans:q.get("ansicht")||"liga",team:TC[q.get("team")]||ICH,liga:q.get("liga")||"beide",sort:q.get("sort"),dir:+(q.get("dir")||0)};
+var STD={liga:["rang",1],kader:["pps",-1],vertrag:["geh",-1],transfers:["st",1]};
+if(!Z.sort){Z.sort=STD[Z.ans]?STD[Z.ans][0]:"rang";Z.dir=STD[Z.ans]?STD[Z.ans][1]:1}else if(!Z.dir)Z.dir=-1;
+var AUF={rang:1,name:1,sponsor:1,gm:1,st:1,vt:1};
+$("buehne").innerHTML='<div class="seite" id="s-liga"></div><div class="seite td" id="s-kader"></div><div class="seite td" id="s-vertrag"></div><div class="seite td" id="s-transfers"></div><div class="seite tp" id="s-profil"></div>';
+
+function fremd(T){return T!==ICH}
+function spKurz(n){if(n.length<=13)return n;var w=n.split(" "),z=w[0]+" "+(w[1]||"");return (w[0]==="Deutsche"||w[0]==="General"||w[0]==="Hannover"||w[0]==="Dr.")&&z.length<=14?z:w[0]}
+function kasseStufe(T){if(teamExakt(T)||!fremd(T))return null;var lo=Math.floor(T.cash/10)*10;return [lo,lo+10]}
+function kasseT(T){var b=kasseStufe(T);return b?'<span class="nb t" title="Fremdes Team: Kasse nur als 10er-Stufe">'+b[0]+'–'+b[1]+'</span>':'<b class="t '+(T.cash<0?"minus":"")+'">'+de(T.cash)+'</b>'}
+function kasseS(T){var b=kasseStufe(T);return b?(b[0]+b[1])/2:T.cash}
+function freigabe(v){return v>=7.5?100:v>=5?90:v>=3?80:v>=1.5?70:50}
+function vertrauenT(T){return fremd(T)&&!NEBEL_AUS?(T.board>=6.5?"hoch":T.board>=4?"mittel":"niedrig"):de(T.board)}
+function gmName(T){return (GM[T.gm]||[T.gm])[0]}
+function wer(T){return T.mensch?'<span class="mk">'+(T===ICH?"du · ":"")+werIst(T)+'</span>':'<span class="mk ki">KI</span>'}
+function teamLink(T,ans){return RAHMEN.link({ansicht:ans||"kader",team:T.c,sort:null,dir:null})}
+
+/* ---------- (a) Liga-Uebersicht ---------- */
+function ligaCols(breit){
+  var c=[
+    {k:"rang",t:"#",w:"1.7rem",tip:"Tabellenplatz in der Liga. Rang 1 ist der beste.",wert:function(T){return T.st.rank},html:function(T){var d=T.st.start-T.st.rank;return '<span class="pl '+(T.st.rank<=4?"auf":T.st.rank>=13?"ab":"")+'" title="Startplatz '+T.st.start+'">'+T.st.rank+'</span>'}},
+    {k:"wap",t:"",w:"2.1rem",html:function(T){return logo(T.c)}},
+    {k:"name",t:"Team · Manager",w:"minmax(8.6rem,1.4fr)",wert:function(T){return T.n},html:function(T){return '<span class="nm"><b>'+T.n+'</b><small>'+wer(T)+'<span>'+gmName(T)+'</span></small></span>'}},
+    {k:"pkt",t:"Pkt",w:"2.2rem",r:1,tip:"Punkte nach "+GEWERTET+" Spieltagen",wert:function(T){return T.st.pts},html:function(T){return '<b class="pkt t">'+T.st.pts+'</b>'}},
+    {k:"trend",t:"Trend",w:"6.3rem",tip:"Punkte der letzten fünf Spieltage (je höchstens 4) und Platz gegen den Startplatz",wert:function(T){return T.tag.slice(-5).reduce(function(a,b){return a+b},0)},html:function(T){var d=T.st.start-T.st.rank;return trend(T)+' <span class="'+(d>0?"plus":d<0?"minus":"null")+' t" style="font-size:.8rem;font-weight:700">'+(d>0?"▲"+d:d<0?"▼"+(-d):"–")+'</span>'}},
+    {k:"stk",t:"Kaderstärke",w:"6.3rem",tip:"Schnitt der besten sechs über alle 20 Disziplinen. Rang exakt (klein: unter allen 32), Wert fremder Teams als grobe Stufe.",wert:function(T){return -rangGes(T)},html:function(T){return '<span class="stz"><b class="rgz t">'+rangGes(T)+'.</b><small>'+rang32(T)+'/32</small>'+stkT(T,T.ges)+'</span>'}},
+    {k:"cash",t:"Kasse",w:"3.9rem",r:1,tip:"Kasse in C. Fremde Teams: 10er-Stufe.",wert:kasseS,html:kasseT},
+    {k:"fw",t:"Finanzw.",w:"3.4rem",tip:"Finanzwert der Team-Matrix, 1 bis 10. Öffentlich. Bestimmt die Rücklage.",wert:function(T){return T.id.finances},html:function(T){return '<span class="fwz"><b class="t">'+de(T.id.finances)+'</b><span class="bal"><i style="width:'+T.id.finances*10+'%"></i></span></span>'}},
+    {k:"fans",t:"Fans",w:"3.9rem",r:1,tip:"Fanbasis und Stimmung 0 bis 100 (Beispielwerte)",wert:function(T){return T.fans},html:function(T){return '<span class="zw"><b class="t">'+tsd(T.fans)+'</b><small style="color:'+moralFarbe(T.stimmung)+'">Stimmung '+T.stimmung+'</small></span>'}},
+    {k:"arena",t:"Arena",w:"3.9rem",r:1,tip:"Plätze und Auslastung der Heimspiele (Beispielwerte)",wert:function(T){return T.plaetze},html:function(T){return '<span class="zw"><b class="t">'+tsd(T.plaetze)+'</b><small>'+T.auslast+' % voll</small></span>'}},
+    {k:"sponsor",t:"Sponsor",w:breit?"10rem":"5.7rem",tip:"Sponsor und Seltenheit. Beträge nur beim eigenen Team.",wert:function(T){return T.sp.n||"zzz"},html:function(T){return '<span class="spo" title="'+esc(T.sp.n)+' · '+T.sp.rar+'"><i style="background:'+(RAR[T.sp.rar]||"#9aa7ba")+'"></i><span>'+esc(breit?T.sp.n:spKurz(T.sp.n))+'</span></span>'}}];
+  if(breit)c.splice(4,0,
+    {k:"sun",t:"S-U-N",w:"4.2rem",tip:"Siege, Unentschieden, Niederlagen über alle Disziplin-Begegnungen",wert:function(T){return T.suN[0]*2+T.suN[1]},html:function(T){return '<span class="t">'+T.suN.join("-")+'</span>'}},
+    {k:"verh",t:"Verh.",w:"3rem",r:1,tip:"Verhältnis (Tabellen-Zweitkriterium)",wert:function(T){return T.st.verh||0},html:function(T){return '<span class="t '+(T.st.verh>0?"plus":T.st.verh<0?"minus":"")+'">'+(T.st.verh>0?"+":"")+(T.st.verh||0)+'</span>'}});
+  if(breit)c.push(
+    {k:"kader",t:"Kader",w:"4.4rem",r:1,tip:"Spieler im Kader, davon verletzt",wert:function(T){return T.K.length},html:function(T){return '<span class="zw"><b class="t">'+T.K.length+'</b><small class="'+(T.verletzt?"minus":"")+'">'+(T.verletzt?T.verletzt+" verletzt":"alle fit")+'</small></span>'}},
+    {k:"moral",t:"Ø Moral",w:"4rem",tip:"Mittlere Moral des Kaders. Fremde Teams: nur das Gesicht.",wert:function(T){return fremd(T)&&!NEBEL_AUS?Math.floor(T.moral/20)*20:T.moral},html:function(T){return '<span class="mo" style="color:'+moralFarbe(T.moral)+'">'+gesicht(T.moral)+(fremd(T)&&!NEBEL_AUS?"":'<b class="t">'+T.moral+'</b>')+'</span>'}},
+    {k:"geh",t:"Gehälter / Saison",w:"6rem",r:1,tip:"Gehaltssumme je Saison, klein je Spieltag. Fremde Teams: Stufe.",wert:function(T){return fremd(T)&&!teamExakt(T)?Math.floor(T.gehalt/20)*20+10:T.gehalt},html:function(T){if(fremd(T)&&!teamExakt(T)){var lo=Math.floor(T.gehalt/20)*20;return '<span class="nb t">'+lo+'–'+(lo+20)+'</span>'}return '<span class="gh"><b class="t">'+de(T.gehalt)+'</b><small>'+de(T.gehalt/ST_SAISON,2)+' je ST</small></span>'}},
+    {k:"mw",t:"Marktwert Kader",w:"5.6rem",r:1,tip:"Summe der Marktwerte. Marktwert ist immer exakt sichtbar.",wert:function(T){return T.mwsum},html:function(T){return '<b class="t">'+de(T.mwsum,0)+'</b>'}},
+    {k:"vor",t:"Vorstand",w:"4.4rem",tip:"Vertrauen des Vorstands. Fremde Teams: Stufe.",wert:function(T){return fremd(T)&&!NEBEL_AUS?(T.board>=6.5?3:T.board>=4?2:1):T.board},html:function(T){return fremd(T)&&!NEBEL_AUS?'<span class="tag '+(T.board>=6.5?"g":T.board>=4?"":"w")+'">'+vertrauenT(T)+'</span>':'<b class="t">'+de(T.board)+'</b>'}},
+    {k:"bez",t:"Beziehung",w:"6.6rem",tip:"Beziehung zu deinem Team (Beispielwerte)",wert:function(T){return T===ICH?99:bez(ICH,T)},html:function(T){return T===ICH?'<span class="tag go">dein Team</span>':bezTag(bez(ICH,T))}});
+  return c}
+function zeichneLiga(){
+  var beide=Z.liga==="beide",ligen=beide?[1,2]:[+Z.liga],el=$("s-liga");el.className="seite an "+(beide?"lg2":"lg1");
+  var riv=liga(ICH).filter(function(T){return T!==ICH&&bez(ICH,T)<=-4}).length,verb=liga(ICH).filter(function(T){return T!==ICH&&bez(ICH,T)>=4}).length;
+  RAHMEN.kopf('Team <span>›</span> 32 Teams in zwei Ligen',"Teams",[["beide","Beide Ligen"],["1","Liga 1"],["2","Liga 2"]].map(function(l){return '<a class="'+(Z.liga===l[0]?"an":"")+'" data-liga="'+l[0]+'">'+l[1]+'</a>'}).join(""),
+    RAHMEN.kpi("Dein Platz",ICH.st.rank+".","Liga "+ICH.liga,"zone")+RAHMEN.kpi("Kaderstärke",rangGes(ICH)+".","von 16 · "+rang32(ICH)+"/32")+RAHMEN.kpi("Rivalen",riv)+RAHMEN.kpi("Verbündete",verb));
+  el.innerHTML=ligen.map(function(l){var rows=TEAMS.filter(function(T){return T.liga===l});
+    var t=tafel({cols:ligaCols(!beide),rows:rows,sort:Z.sort,dir:Z.dir,zeilen:16,zeile:function(T){return {cls:"klick"+(T===ICH?" ich":""),attr:'data-auf="'+T.c+'"'}}});
+    return '<section class="pan" id="l-'+l+'"><div class="pk"><h2>Liga '+l+'</h2><span class="tag go">16 Teams</span>'+(l===ICH.liga?'<span class="tag">deine Liga</span>':"")+'<span class="sp"></span><small class="u">'+(beide?"Klick auf eine Spalte sortiert beide Ligen · Klick auf ein Team öffnet es":"Kaderstärke = Ø der besten 6 über 20 Disziplinen · Rang 1 ist der beste · Klick öffnet das Team")+'</small></div>'+t.html+
+      '<div class="tfuss"><span>Grün = Plätze 1 bis 4 · rot = Plätze 13 bis 16</span>'+(NEBEL_AUS?'<span class="tag g">Nebel aus: alle Werte exakt</span>':'<span>Fremde Teams: Kaderstärke und Kasse als Stufe'+(beide?"":", Vorstand und Moral als Stufe")+'</span>')+'<span class="sp"></span><span class="bsp">Fans, Arena: Beispiel</span></div></section>'}).join("")}
+
+/* ---------- Kopf des Team-Details ---------- */
+function teamKopf(){var T=Z.team,L=liga(T).sort(function(a,b){return a.st.rank-b.st.rank}),i=L.indexOf(T),vor=L[(i+15)%16],nach=L[(i+1)%16];
+  var R=[["kader","Kader"],["vertrag","Verträge"],["transfers","Transfers"],["profil","Profil"]];
+  RAHMEN.kopf('<a href="'+RAHMEN.link({ansicht:"liga",team:null,sort:null,dir:null})+'">Teams</a> <span>›</span> Liga '+T.liga+' <span>›</span> '+T.st.rank+'. Platz <span>›</span> '+(fremd(T)?"fremdes Team · "+werIst(T):"dein Team"),
+    '<span class="titelz"><a class="bl" href="'+teamLink(vor,Z.ans)+'" title="'+vor.n+'">‹</a>'+logo(T.c,fremd(T)?"fr":"")+'<span>'+T.n+'</span><a class="bl" href="'+teamLink(nach,Z.ans)+'" title="'+nach.n+'">›</a></span>',
+    R.map(function(r){return '<a class="'+(Z.ans===r[0]?"an":"")+'" href="'+teamLink(T,r[0])+'">'+r[1]+'</a>'}).join("")+'<a href="kader-teams-modern-18-11.html?ansicht=staerke" title="Reiter Stärke: unverändert aus dem Mockup vom 18.11.">Stärke<small>18.11.</small></a>'+(fremd(T)?'<a href="kader-teams-modern-18-11.html?ansicht=duell&team=T-G" title="Reiter Duell: unverändert aus dem Mockup vom 18.11.">Duell<small>18.11.</small></a>':""),
+    RAHMEN.kpi("Kaderstärke",rangGes(T)+".","Liga · "+rang32(T)+"./32","zone")+RAHMEN.kpi("Kader",T.K.length,T.verletzt?T.verletzt+" verl.":"fit")+
+    (fremd(T)&&!teamExakt(T)?RAHMEN.kpi("Kasse",'<span class="nb">'+kasseStufe(T).join("–")+'</span>',"C · Stufe"):RAHMEN.kpi("Gehälter / Saison",de(T.gehalt),de(T.gehalt/ST_SAISON,2)+" je ST")))}
+
+/* ---------- (b1) Kader ---------- */
+function achsenZelle(p){return '<span class="ax4">'+p.ax.map(function(v,i){var b=ber(v,p);return b?'<i class="nbz">'+b[0]+'+</i>':'<i class="'+(i===p.hax?"h a"+i:"")+'">'+v+'</i>'}).join("")+'</span>'}
+var KCOLS=[
+  {k:"bild",t:"",w:"2.9rem",html:function(p){return por(p)}},
+  {k:"name",t:"Spieler",w:"minmax(9.5rem,1.4fr)",wert:function(p){return p.n},html:function(p){return '<span class="nm"><b>'+esc(p.n)+'</b><small>'+klasse(p)+rasse(p,true)+'</small></span>'}},
+  {k:"rolle",t:"Rolle",w:"5.4rem",tip:"Aus den Einsätzen dieser Saison: Stamm ab 8, Rotation ab 4",wert:function(p){return p.eins+(rolle(p)[0]==="k"?100:0)},html:function(p){var r=rolle(p);return '<span class="rtag '+r[0]+'">'+r[1]+'</span>'}},
+  {k:"ov",t:"Gesamt",w:"3.6rem",r:1,nebel:1,wert:function(p){return sw(p.ov,p)},html:function(p){return zg(p.ov,p,"gr")}},
+  {k:"ax",t:"POW · SPE · MEN · SOC",w:"8rem",nebel:1,tip:"Sortiert nach der stärksten Achse",wert:function(p){return sw(p.ax[p.hax],p)},html:achsenZelle},
+  {k:"best",t:"Beste Disziplinen",w:"9.1rem",nebel:1,wert:function(p){return sw(p.d[p.best],p)},html:function(p){if(!exakt(p)&&p.sc===0)return '<span class="zu">unbekannt</span>';if(!exakt(p))return dTag(p.best,' <small>'+zt(p.d[p.best],p)+'</small>');return p.top3.map(function(d){return dTag(d,' <b>'+p.d[d]+'</b>')}).join(" ")}},
+  {k:"eins",t:"Eins.",w:"2.5rem",r:1,wert:function(p){return p.eins},html:function(p){return '<span class="t">'+p.eins+'</span>'}},
+  {k:"pps",t:"PP Saison",w:"4.6rem",r:1,tip:"Player Points, klein der Rang in der Liga",wert:function(p){return p.pps},html:function(p){return '<span class="stz"><small>'+ppRang(p)+'.</small><b class="rgz t">'+de(p.pps)+'</b></span>'}},
+  {k:"form",t:"Form",w:"3.7rem",wert:function(p){return p.form},html:formZ},
+  {k:"moral",t:"Moral",w:"3.7rem",nebel:1,wert:moralSort,html:moralZ},
+  {k:"stat",t:"Zustand",w:"6.4rem",wert:function(p){return p.verl?-p.verl:p.bel>=60?0:1},html:status},
+  {k:"vt",t:"Vertrag",w:"3.4rem",tip:"Restlaufzeit in Saisons",wert:function(p){return p.rest},html:function(p){var s="";for(var i=1;i<=4;i++)s+='<i class="'+(i<=p.rest?(p.rest===1?"w":"v"):"")+'"></i>';return '<span class="pips" title="'+p.rest+' Saison(s)">'+s+'</span>'}},
+  {k:"geh",t:"Gehalt / Saison",w:"5.2rem",r:1,nebel:1,wert:gehSort,html:gehalt},
+  {k:"mw",t:"Marktwert",w:"4.2rem",r:1,wert:function(p){return p.mw},html:function(p){return '<b class="t">'+de(p.mw)+'</b>'}}];
+function staerkeTafel(T){
+  return '<div class="pk"><h2>Kaderstärke</h2><span class="sp"></span><small class="u">Ø beste 6 · Rang in Liga '+T.liga+'</small></div><div class="pb"><div class="kopfw"><strong class="t">'+rangGes(T)+'.</strong><small>von 16 in Liga '+T.liga+' · '+rang32(T)+'. von 32<br>Ø über 20 Disziplinen: '+stkT(T,T.ges)+'</small></div>'+
+    '<div class="ks2">'+DN.map(function(d,i){var r=rang(T,i);return '<a title="'+d[0]+': Rang '+r+' von 16">'+dTag(i)+'<span class="bal"><i style="width:'+(100-(r-1)/15*100)+'%;background:'+(r<=4?"var(--gut)":r>=13?"var(--warn)":"var(--creme)")+'"></i></span><b class="t '+(r<=4?"r1":r>=13?"r3":"")+'">'+r+'.</b></a>'}).join("")+'</div>'+
+    '<div class="hin" style="margin-top:.4rem">Balken = Rang in der Liga (lang = vorn). Verletzte zählen nicht mit.'+(fremd(T)&&!teamExakt(T)?" Werte fremder Teams stehen als grobe Stufe, der Rang ist exakt.":"")+'</div></div>'}
+function zeichneKader(){var T=Z.team;teamKopf();
+  var t=tafel({cols:KCOLS,rows:T.K,sort:Z.sort,dir:Z.dir,zeilen:Math.max(12,T.K.length),zeile:function(p){return {cls:"klick",attr:'data-profil="'+p.s+'"'}}});
+  var verl=T.K.filter(function(p){return p.verl}),kap=T.kap?ALLE[T.kap[0]]:null,ach=[0,0,0,0];T.K.forEach(function(p){ach[p.kf]++});
+  var deleg=T===ICH?'<div class="zeile2"><span>Steuerung</span><b>'+werIst(T)+' · voll selbst</b></div><div class="zeile2"><span>Delegierbar an die KI</span><b style="font-size:.84rem">Einsatzliste · Training · Käufe · Sponsor</b></div>':'<div class="zeile2"><span>Steuerung</span><b>'+(T.mensch?werIst(T):"KI · "+gmName(T))+'</b></div><div class="zeile2"><span>Gescoutet</span><b>'+T.gescoutet+' von '+T.K.length+' Spielern</b></div>';
+  $("s-kader").innerHTML='<section class="pan" id="k-tab"><div class="pk"><h2>Kader</h2><span class="tag go">'+T.K.length+' Spieler</span><span class="tag">Soll '+T.opt+' · Pflicht '+T.min+'</span><span class="sp"></span><small class="u">Klick auf eine Spalte sortiert · Klick auf einen Spieler öffnet das Profil</small></div>'+t.html+
+    '<div class="tfuss">'+(t.nebelSort?'<span class="tag a">im Nebel nach Stufe sortiert</span>':"")+'<span>Rolle aus den Einsätzen · Gehalt groß je Saison, klein je Spieltag · Verletzte sind nicht aufstellbar</span><span class="sp"></span>'+
+      (fremd(T)?'<a href="spieler-modern-24-11.html?umfang=alle&team='+T.c+'">In der Spieler-Liste zeigen '+ic("r")+'</a>':'<a href="einsatzliste-modern-17-11.html">Einsatzliste '+ic("r")+'</a><a href="training-modern-18-11.html">Training '+ic("r")+'</a>')+'</div></section>'+
+    '<div class="spalte"><section class="pan" id="k-stk" style="flex:1.75">'+staerkeTafel(T)+'</section>'+
+    '<section class="pan" id="k-blick"><div class="pk"><h2>Auf einen Blick</h2></div><div class="pb">'+
+      '<div class="wert3" style="grid-template-columns:repeat(3,1fr);margin-bottom:.4rem"><div><small>Ø Form</small><strong class="t">'+T.form+'</strong><em>Mitte 50</em></div><div><small>Ø Moral</small><strong class="t" style="color:'+moralFarbe(T.moral)+'">'+gesicht(T.moral)+' '+(fremd(T)&&!NEBEL_AUS?"":T.moral)+'</strong><em>'+moralWort(T.moral)+'</em></div><div><small>Verletzt</small><strong class="t '+(verl.length?"minus":"")+'">'+verl.length+'</strong><em>'+(verl.map(function(p){return p.n}).join(", ")||"niemand")+'</em></div></div>'+
+      '<div class="zeile2"><span>Klassen im Kader</span><b>'+ach.map(function(n,i){return '<span class="ac'+i+'" style="margin-left:.5rem">'+AX[i]+' '+n+'</span>'}).join("")+'</b></div>'+
+      '<div class="zeile2"><span>Kapitän</span><b>'+(kap?esc(kap.n):fremd(T)?"nicht bekannt":"noch keiner")+'</b></div>'+deleg+
+      '<span style="flex:1"></span><div class="akt" style="display:flex;gap:.45rem">'+(fremd(T)?'<a class="knopf haupt" style="flex:1" data-scoutteam="1">'+ic("scout")+'Kader scouten</a><a class="knopf" href="spielplan-modern-24-11.html?team='+T.c+'">Spielplan</a>':'<a class="knopf haupt" style="flex:1" href="einsatzliste-modern-17-11.html">Einsatzliste setzen</a><a class="knopf" href="transfermarkt-modern-18-11.html">Transfermarkt</a>')+'</div></div></section></div>'}
+
+/* ---------- (b2) Vertraege ---------- */
+function vk(p){return Math.round(p.mw*(.82+(p.form-50)/400)*10)/10}
+function zeichneVertrag(){var T=Z.team,eig=!fremd(T);teamKopf();
+  var cols=[KCOLS[0],KCOLS[1],
+    {k:"vt",t:"Laufzeit",w:"7.4rem",tip:"Restlaufzeit in Saisons. Öffentlich.",wert:function(p){return p.rest},html:function(p){var s="";for(var i=1;i<=4;i++)s+='<i class="'+(i<=p.rest?(p.rest===1?"w":"v"):"")+'"></i>';return '<span class="pips">'+s+'</span> <span class="'+(p.rest===1?"minus":"")+'" style="font-size:.84rem;font-weight:600">'+(p.rest===1?"läuft aus":p.rest+" Saisons")+'</span>'}},
+    {k:"geh",t:"Gehalt / Saison",w:"6.8rem",r:1,nebel:1,wert:gehSort,html:gehalt},
+    {k:"ant",t:"Anteil am Gehaltstopf",w:"8rem",nebel:1,tip:"Anteil an der Gehaltssumme des Kaders",wert:function(p){return gehSort(p)},html:function(p){return exakt(p)?'<span class="fwz"><b class="t" style="width:2.6rem">'+de(p.geh/T.gehalt*100,0)+' %</b><span class="bal heim"><i style="width:'+kl(p.geh/T.gehalt*100*4,0,100)+'%"></i></span></span>':'<span class="zu">verdeckt</span>'}},
+    {k:"dem",t:"Forderung neu",w:"6rem",r:1,nebel:1,tip:"Gehaltsforderung je Saison bei einer Verlängerung",wert:function(p){return exakt(p)?p.dem:-1},html:function(p){if(!exakt(p))return '<span class="zu">verdeckt</span>';var d=p.dem-p.geh;return '<span class="zw"><b class="t">'+de(p.dem)+'</b><small class="'+(d>.05?"minus":d<-.05?"plus":"")+'">'+vz(d)+' je Saison</small></span>'}},
+    {k:"vform",t:"Vertragsform",w:"6.2rem",nebel:1,wert:function(p){return exakt(p)?p.vform:"zzz"},html:function(p){return exakt(p)?({front_loaded:"vorne hoch",back_loaded:"hinten hoch",balanced:"gleichmäßig"})[p.vform]||"gleichmäßig":'<span class="zu">verdeckt</span>'}},
+    {k:"mw",t:"Marktwert",w:"4.4rem",r:1,wert:function(p){return p.mw},html:function(p){return '<b class="t">'+de(p.mw)+'</b>'}},
+    {k:"kauf",t:"Kaufpreis",w:"4.4rem",r:1,wert:function(p){return p.kauf},html:function(p){return '<span class="t">'+de(p.kauf)+'</span>'}},
+    {k:"vk",t:"Netto bei Verkauf",w:"6.6rem",r:1,nebel:1,tip:"Verkaufs-Einschätzung: erzielbarer Preis abzüglich offener Vertragsreste, klein gegen den Marktwert (Beispielrechnung)",wert:function(p){return eig||NEBEL_AUS?vk(p):-1},html:function(p){if(!eig&&!NEBEL_AUS)return '<span class="zu">–</span>';var v=vk(p);return '<span class="zw"><b class="t">'+de(v)+'</b><small class="'+(v<p.mw?"minus":"plus")+'">'+vz(v-p.mw)+' zum MW</small></span>'}},
+    {k:"akt",t:"Aktionen",w:eig?"11.4rem":"5.6rem",r:1,html:function(p){return eig?'<span class="aktz"><a class="knopf klein" href="transfermarkt-modern-18-11.html?ansicht=vertrag">Verlängern</a><a class="knopf klein rot" data-vkpeek="'+p.s+'">Verkaufen</a></span>':'<span class="aktz"><a class="knopf klein" href="transfermarkt-modern-18-11.html?ansicht=kauf">Anfragen</a></span>'}}];
+  var t=tafel({cols:cols,rows:T.K,sort:Z.sort,dir:Z.dir,zeilen:Math.max(12,T.K.length),zeile:function(p){return {cls:"klick",attr:'data-profil="'+p.s+'"'}}});
+  var B=[1,2,3,4].map(function(n){return T.K.filter(function(p){return Math.min(4,p.rest)===n})}),fq=freigabe(T.board);
+  var geb=[0,1,2,3].map(function(s){return T.K.filter(function(p){return p.rest>s}).reduce(function(a,p){return a+p.geh},0)}),gmax=Math.max.apply(null,geb.concat([1]));
+  var mix={front_loaded:0,balanced:0,back_loaded:0};T.K.forEach(function(p){mix[p.vform]=(mix[p.vform]||0)+1});
+  var soll=T.gehalt*1.08,invest=Math.max(0,T.cash)*fq/100;
+  $("s-vertrag").innerHTML='<section class="pan" id="c-tab"><div class="pk"><h2>Verträge</h2><span class="tag '+(B[0].length>=T.K.length/2?"w":"go")+'">'+B[0].length+' laufen aus</span><span class="sp"></span><small class="u">Gehalt groß je Saison, klein je Spieltag · ein Abgang durch Vertragsende ist ein ablösefreier Verkauf</small></div>'+t.html+
+    '<div class="tfuss">'+(eig?'<span>Verlängern führt in die Verhandlung des Transfermarkts · Verkaufen zeigt erst die Einschätzung</span>':'<span>Fremdes Team: Gehalt als Stufe, Forderung und Vertragsform erst nach dem Scouting · Laufzeit, Marktwert und Kaufpreis sind öffentlich</span>')+'<span class="sp"></span><span class="bsp">Netto bei Verkauf: Beispiel</span></div></section>'+
+    '<div class="spalte"><section class="pan" id="c-ausl" style="flex:.9"><div class="pk"><h2>Wer läuft wann aus</h2><span class="sp"></span><small class="u">Auslauf-Center</small></div><div class="pb">'+
+      '<div class="ausl">'+B.map(function(l,i){return '<div class="'+(i===0&&l.length?"rot":"")+'"><small>'+["nach Saison 1","nach Saison 2","nach Saison 3","später"][i]+'</small><strong class="t">'+l.length+'</strong><em>'+(l.length&&(eig||teamExakt(T))?de(l.reduce(function(a,p){return a+p.geh},0))+" C frei":l.length?"Gehalt verdeckt":"–")+'</em></div>'}).join("")+'</div>'+
+      '<div class="hin" style="margin-top:.5rem">'+(B[0].length?'<b class="minus">'+B[0].length+' von '+T.K.length+' Verträgen enden nach Spieltag 20.</b> Ohne Verlängerung gehen die Spieler ablösefrei.'+(eig?' Der Pflichtkader von '+T.min+' ist nie gesperrt.':""):"Kein Vertrag läuft in dieser Saison aus.")+'</div>'+
+      '<h4 style="margin-top:.6rem">Gebundene Gehälter je Saison <small>in C</small></h4><div class="saeul">'+geb.map(function(g,i){return '<div><b class="t">'+(fremd(T)&&!teamExakt(T)?(i===0?"Stufe":"–"):de(g,0))+'</b><i style="height:'+g/gmax*100+'%"></i>Saison '+(i+1)+'</div>'}).join("")+'</div></div></section>'+
+    '<section class="pan" id="c-geld"><div class="pk"><h2>'+(eig?"Zwei Budgets":"Geld-Lage")+'</h2><span class="sp"></span><small class="u">'+(eig?"Vorstand gibt "+fq+" % frei":"fremdes Team")+'</small></div><div class="pb">'+
+      (eig?'<div class="topf"><div class="zl"><span>Transfer- und Investitionstopf</span><b class="t">'+C(invest)+' frei</b></div><div class="bn"><i class="frei" style="width:'+kl(invest/Math.max(1,Math.abs(T.cash))*100,0,100)+'%"></i><i class="gesp" style="flex:1"></i></div><div class="hin">Kasse '+C(T.cash)+'. '+(T.cash<0?"Die Kasse ist im Minus: keine Ablöse, kein Ausbau.":"Der Rest bleibt als Puffer auf dem Konto.")+'</div></div>'+
+        '<div class="topf"><div class="zl"><span>Gehaltstopf je Saison</span><b class="t">'+C(Math.max(0,soll-T.gehalt))+' frei</b></div><div class="bn"><i class="geb" style="width:'+kl(T.gehalt/soll*100,0,100)+'%"></i><i class="frei" style="flex:1"></i></div><div class="hin">Gebunden '+C(T.gehalt)+' je Saison, das sind '+C(T.gehalt/ST_SAISON,2)+' je Spieltag.</div></div>'+
+        '<div class="zeile2"><span>Vertrauen des Vorstands</span><b class="t">'+de(T.board)+' von 10 → '+fq+' %</b></div><div class="zeile2"><span>Vertragsmix</span><b style="font-size:.84rem">'+mix.front_loaded+' vorne hoch · '+(mix.balanced||0)+' gleichmäßig · '+mix.back_loaded+' hinten hoch</b></div>'+
+        '<span style="flex:1"></span><div class="akt" style="display:flex;gap:.45rem"><a class="knopf haupt" style="flex:1" href="finanzen-modern-18-11.html">Finanzen öffnen</a></div>'
+      :'<div class="zeile2"><span>Kasse</span><b>'+kasseT(T)+' C</b></div><div class="zeile2"><span>Finanzwert (Team-Matrix)</span><b class="t">'+de(T.id.finances)+' von 10</b></div><div class="zeile2"><span>Gehälter je Saison</span><b>'+(teamExakt(T)?de(T.gehalt)+" C":'<span class="nb t">'+Math.floor(T.gehalt/20)*20+'–'+(Math.floor(T.gehalt/20)*20+20)+'</span> C')+'</b></div><div class="zeile2"><span>Vorstand</span><b>Vertrauen '+vertrauenT(T)+'</b></div><div class="zeile2"><span>Marktwert des Kaders</span><b class="t">'+de(T.mwsum,0)+' C</b></div>'+
+        '<span style="flex:1"></span><div class="nebelhin">'+ic("scout")+'<span>Budgets und Freigabe eines fremden Teams sind nicht einsehbar. Öffentlich sind Laufzeiten, Marktwerte und gezahlte Ablösen.</span></div>')+'</div></section></div>'}
+
+/* ---------- (b3) Transfers ---------- */
+var QUELLE={ai_roster_fill:"KI-Kauflauf",manual_transfermarkt_buy:"Transfermarkt",nula_mascot_rule_buy:"Maskottchen-Regel"};
+function zeichneTransfers(){var T=Z.team,eig=!fremd(T);teamKopf();
+  var L=ECHT.TR.filter(function(t){return t[3]===T.c||t[4]===T.c}).map(function(t){return {n:t[0],p:ALLE[t[1]],zu:t[4]===T.c,geg:t[4]===T.c?t[3]:t[4],fee:t[5],geh:t[6],st:t[7],q:t[8],lz:t[9]}});
+  var cols=[
+    {k:"st",t:"Spieltag",w:"4.2rem",wert:function(x){return x.st},html:function(x){return '<span class="t">ST '+x.st+'</span>'}},
+    {k:"art",t:"Art",w:"5rem",wert:function(x){return x.zu?1:0},html:function(x){return x.zu?'<span class="tag g">Zugang</span>':'<span class="tag w">Abgang</span>'}},
+    {k:"bild",t:"",w:"2.3rem",html:function(x){return x.p?por(x.p):""}},
+    {k:"name",t:"Spieler",w:"minmax(10rem,1.4fr)",wert:function(x){return x.n},html:function(x){return '<span class="nm"><b>'+esc(x.n)+'</b><small>'+(x.p?klasse(x.p)+rasse(x.p,true):"")+'</small></span>'}},
+    {k:"geg",t:"Von / an",w:"8rem",wert:function(x){return x.geg||"frei"},html:function(x){return x.geg?'<span class="tm">'+logo(x.geg)+' '+TC[x.geg].n+'</span>':'<span class="tag go">freier Markt</span>'}},
+    {k:"fee",t:"Ablöse",w:"4.6rem",r:1,tip:"Gezahlte Ablöse. Öffentlich.",wert:function(x){return x.fee},html:function(x){return '<b class="t">'+de(x.fee)+'</b>'}},
+    {k:"geh",t:"Gehalt / Saison",w:"5.4rem",r:1,nebel:1,wert:function(x){return x.p?gehSort(x.p):x.geh},html:function(x){return x.p?gehalt(x.p):'<span class="t">'+de(x.geh)+'</span>'}},
+    {k:"lz",t:"Laufzeit",w:"4.2rem",r:1,wert:function(x){return x.lz||0},html:function(x){return '<span class="t">'+(x.lz||1)+' S.</span>'}},
+    {k:"mw",t:"MW heute",w:"4.6rem",r:1,wert:function(x){return x.p?x.p.mw:0},html:function(x){return x.p?'<b class="t">'+de(x.p.mw)+'</b>':"–"}},
+    {k:"wert",t:"Wertänderung",w:"5.6rem",r:1,tip:"Marktwert heute gegen die gezahlte Ablöse",wert:function(x){return x.p?x.p.mw-x.fee:0},html:function(x){if(!x.p)return "–";var d=x.p.mw-x.fee;return '<b class="t '+(d>.05?"plus":d<-.05?"minus":"null")+'">'+vz(d)+'</b>'}},
+    {k:"pps",t:"PP seither",w:"4.6rem",r:1,tip:"Player Points seit dem Wechsel. Öffentlich.",wert:function(x){return x.p?x.p.pps:0},html:function(x){return x.p?'<b class="t">'+de(x.p.pps)+'</b>':"–"}},
+    {k:"q",t:"Weg",w:"7.4rem",wert:function(x){return x.q},html:function(x){return '<span style="font-size:.84rem;color:var(--leise)">'+(QUELLE[x.q]||x.q)+'</span>'}}];
+  var t=tafel({cols:cols,rows:L,sort:Z.sort,dir:Z.dir,zeilen:Math.max(12,L.length),zeile:function(x){return x.p?{cls:"klick",attr:'data-profil="'+x.p.s+'"'}:{}}});
+  var aus=L.filter(function(x){return x.zu}).reduce(function(a,x){return a+x.fee},0),ein=L.filter(function(x){return !x.zu}).reduce(function(a,x){return a+x.fee},0);
+  var top=L.filter(function(x){return x.zu&&x.p}).sort(function(a,b){return b.p.pps/Math.max(1,b.fee)-a.p.pps/Math.max(1,a.fee)})[0],ab=L.filter(function(x){return !x.zu})[0];
+  var bau=DN.map(function(_,i){return [rang(T,i),i]}).sort(function(a,b){return b[0]-a[0]}).slice(0,4);
+  $("s-transfers").innerHTML='<section class="pan" id="x-tab"><div class="pk"><h2>Transfers</h2><span class="tag go">Saison 1</span><span class="tag g">'+L.filter(function(x){return x.zu}).length+' Zugänge</span><span class="tag '+(L.some(function(x){return !x.zu})?"w":"")+'">'+L.filter(function(x){return !x.zu}).length+' Abgänge</span><span class="sp"></span><small class="u">Ablösen und Wechsel sind öffentlich · Klick öffnet das Profil</small></div>'+t.html+
+    '<div class="tfuss"><span>Ältere Saisons stehen in der Transfer-Historie des Transfermarkts</span><span class="sp"></span><a href="transfermarkt-modern-18-11.html">Zum Transfermarkt '+ic("r")+'</a></div></section>'+
+    '<div class="spalte"><section class="pan" id="x-bil"><div class="pk"><h2>Bilanz der Saison</h2></div><div class="pb">'+
+      '<div class="wert3" style="grid-template-columns:repeat(3,1fr);margin-bottom:.5rem"><div><small>Ausgaben</small><strong class="t minus">'+de(aus)+'</strong><em>C Ablöse</em></div><div><small>Einnahmen</small><strong class="t plus">'+de(ein)+'</strong><em>C</em></div><div><small>Saldo</small><strong class="t">'+vz(ein-aus)+'</strong><em>C</em></div></div>'+
+      '<h4>Top-Kauf <small>meiste Player Points je C Ablöse</small></h4>'+(top?'<div class="bzz" data-profil="'+top.p.s+'">'+por(top.p)+'<span style="min-width:0"><b>'+esc(top.n)+'</b><small>'+de(top.fee)+' C · '+de(top.p.pps)+' PP · Wert '+vz(top.p.mw-top.fee)+'</small></span>'+klasse(top.p,true)+'</div>':'<div class="hin">Kein Zugang gebucht.</div>')+
+      '<h4 style="margin-top:.5rem">Top-Verkauf</h4>'+(ab?'<div class="hin">'+esc(ab.n)+' für '+de(ab.fee)+' C</div>':'<div class="hin">Kein Abgang gebucht.</div>')+'</div></section>'+
+    '<section class="pan" id="x-bed" style="flex:1.25"><div class="pk"><h2>Transferbedarf</h2><span class="sp"></span><small class="u">Baustellen nach Liga-Rang</small></div><div class="pb">'+
+      bau.map(function(b){return '<div class="zeile2"><span>'+dTag(b[1])+' '+DN[b[1]][0]+'</span><b class="t '+(b[0]>=13?"minus":"")+'">'+b[0]+'. von 16</b></div>'}).join("")+
+      '<h4 style="margin-top:.6rem">So kauft und verkauft '+(eig?"dein Manager-Typ":"dieser Manager")+' <small>'+gmName(T)+'</small></h4><div class="stil"><b>Kauf:</b> '+esc(T.kauf)+'</div><div class="stil"><b>Verkauf:</b> '+esc(T.verkauf)+'</div><div class="stil"><b>Verträge:</b> '+esc(T.vertrag)+'</div>'+
+      '<span style="flex:1"></span><div class="akt" style="display:flex;gap:.45rem"><a class="knopf haupt" style="flex:1" href="transfermarkt-modern-18-11.html?ansicht=kauf">'+(eig?"Passende Spieler suchen":"Spieler dieses Teams anfragen")+'</a></div></div></section></div>'}
+
+/* ---------- (c) Profil ---------- */
+var IDW=[["ambition","Ambition",function(v,T){return "Der Vorstand erwartet Platz "+kl(Math.round(17-v*1.6),1,16)+" in Liga "+T.liga+"."}],["finances","Finanzwert",function(v){return "Rücklage "+(v>=7?"15 bis 25":v>=4?"10 bis 15":"5 bis 10")+" % des Budgets."}],["harmony","Harmonie",function(v){return v>=6?"Moral erholt sich schnell, Streit bleibt klein.":"Schlechte Stimmung hält länger an."}],
+  ["manners","Manieren",function(v){return v>=6?"Faire Deals: Verbündete werden leichter.":"Harte Verhandlungen, mehr Rivalen."}],["popularity","Beliebtheit",function(v){return "Trägt Fanbasis, Arena und Werbegeld."}],["cooperation","Kooperation",function(v){return v>=6?"Sucht Partner in der Liga.":"Macht sein eigenes Ding."}]];
+function zeichneProfil(){var T=Z.team,eig=!fremd(T),offen=eig||NEBEL_AUS;teamKopf();
+  var ach=[0,0,0,0];T.K.forEach(function(p){ach[p.kf]++});var ws=T.id.pow+T.id.spe+T.id.men+T.id.soc||1,wu=[T.id.pow,T.id.spe,T.id.men,T.id.soc].map(function(v){return Math.round(v/ws*100)});
+  var kap=T.kap?ALLE[T.kap[0]]:null,fq=freigabe(T.board);
+  var pts=T.rangV.map(function(r,i){return (i/(ST_SAISON-1)*100).toFixed(1)+","+((r-1)/15*100).toFixed(1)}).join(" "),jetztY=(T.st.rank-1)/15*100;
+  var meds=[[],[],[]];DN.forEach(function(_,d){var r=medRang(T,d);if(r>=1&&r<=3)meds[r-1].push(d)});
+  var rel=liga(T).filter(function(x){return x!==T}).map(function(x){return [bez(T,x),x]}).filter(function(x){return Math.abs(x[0])>=4}).sort(function(a,b){return a[0]-b[0]}).slice(0,5);
+  var lieb=T.K.slice().sort(function(a,b){return b.werb-a.werb}).slice(0,3),zOK={completed:["ok","check"],at_risk:["risk","flagge"],failed:["fail","x"],open:["offen","hist"]};
+  var ziele=T.obj.filter(function(o){return o[4]!=="sponsor"}).slice(0,5);
+  $("s-profil").innerHTML=
+   '<section class="pan" id="u-id"><div class="pk"><h2>Identität</h2><span class="sp"></span><small class="u">Team-Matrix 1 bis 10 · öffentlich</small></div><div class="pb"><div class="lore"><b>'+esc(T.thema)+'</b>'+esc(T.kaderstil)+'</div>'+
+     IDW.map(function(w){var v=T.id[w[0]];return '<div class="idz"><span>'+w[1]+'</span><b class="t">'+de(v)+'</b><span><span class="bal"><i style="width:'+v*10+'%"></i></span><small>'+w[2](v,T)+'</small></span></div>'}).join("")+
+     '<div class="wach">'+AX.map(function(a,i){return '<div><b class="ac'+i+'">'+a+'</b><span class="bal"><i style="width:'+wu[i]+'%;background:'+AXF[i]+'"></i></span>Wunsch '+wu[i]+' % · Kader '+ach[i]+'</div>'}).join("")+'</div></div></section>'+
+   '<section class="pan" id="u-gm"><div class="pk"><h2>Führung</h2><span class="sp"></span><small class="u">General Manager und Kapitän</small></div><div class="pb"><div class="gmk"><span class="rund">GM</span><span><b>'+gmName(T)+'</b><small>'+(GM[T.gm]||["",""])[1]+'</small></span></div>'+
+     '<div class="zeile2"><span>Steuerung</span><b>'+(T.mensch?werIst(T)+(eig?" · voll selbst":""):"KI")+'</b></div><div class="zeile2"><span>Einfluss des GM auf Käufe</span><b class="t">'+T.gmInf+' %</b></div><div class="zeile2"><span>Kaderziel</span><b class="t">'+T.opt+' Spieler · Pflicht '+T.min+'</b></div>'+
+     '<div class="stil"><b>Kauf:</b> '+esc(T.kauf)+'</div><div class="stil"><b>Verkauf:</b> '+esc(T.verkauf)+'</div><div class="stil"><b>Verträge:</b> '+esc(T.vertrag)+'</div><div class="stil"><b>Kaderbild:</b> '+esc(T.kaderstil)+'</div>'+
+     '<div class="kapz">'+(kap?figur(kap)+'<span><b>'+esc(kap.n)+'</b><small>Kapitän · '+kap.kl+' · Führung '+de(T.kap[2])+(offen?'<br>Moral-Puffer +'+de(T.kap[4].moraleBuffer)+', Rivalitäts-Druck −'+de(T.kap[4].rivalryPressureReductionPct,0)+' %':"")+'</small></span>'+(eig?'<span class="sp" style="flex:1"></span><a class="knopf klein">Wechseln</a>':""):'<span><b>Kapitän</b><small>'+(eig?"Noch kein Kapitän gewählt.":"Bei diesem Team nicht bekannt.")+'</small></span>')+'</div></div></section>'+
+   '<section class="pan" id="u-vor"><div class="pk"><h2>Vorstand</h2><span class="sp"></span>'+(eig?'<a href="office-vorstand-21-11.html">Gespräch '+ic("r")+'</a>':'<small class="u">fremdes Team: nur die Stufe</small>')+'</div><div class="pb"><div class="kopfw"><strong class="t">'+vertrauenT(T)+'</strong><small>Vertrauen'+(offen?" von 10":"")+'<br>'+(offen?'gibt <b style="color:var(--creme)">'+fq+' %</b> beider Budgets frei · Druck '+de(T.druck):"Budgets und Ziele sind nicht einsehbar")+'</small></div>'+
+     (offen?'<div class="stufen">'+[[50,"unter 1,5"],[70,"unter 3"],[80,"unter 5"],[90,"ab 5"],[100,"ab 7,5"]].map(function(s){return '<span class="'+(s[0]===fq?"an":"")+'"><b>'+s[0]+' %</b>'+s[1]+'</span>'}).join("")+'</div><h4>Ziele dieser Saison</h4>'+
+       ziele.map(function(o){var z=zOK[o[1]]||zOK.open;return '<div class="zielz '+z[0]+'">'+ic(z[1])+'<span title="'+esc(o[0])+'">'+esc(o[0])+'</span><b class="t">'+esc(String(o[3]).replace(/^player-.*/,"im Kader"))+'</b></div>'}).join("")+
+       '<span style="flex:1"></span><div class="hin">Der Vorstand verhängt keine Strafen. Er gibt weniger frei, das Geld bleibt auf dem Konto.</div>'
+     :'<span style="flex:1"></span><div class="nebelhin">'+ic("scout")+'<span>Vertrauen eines fremden Vorstands siehst du nur als <b>hoch, mittel oder niedrig</b>. Ziele und Freigabe bleiben intern.</span></div>')+'</div></section>'+
+   '<section class="pan" id="u-his"><div class="pk"><h2>Historie & Medaillen</h2><span class="sp"></span><small class="u">Tabellenplatz Liga '+T.liga+' · Saison 1</small></div><div class="pb">'+
+     '<div class="wert3" style="grid-template-columns:repeat(4,1fr)"><div><small>Platz</small><strong class="t">'+T.st.rank+'.</strong><em>Start '+T.st.start+'.</em></div><div><small>S-U-N</small><strong class="t">'+T.suN.join("-")+'</strong></div><div><small>Punkte</small><strong class="t">'+T.st.pts+'</strong><em>von '+GEWERTET*4+'</em></div><div><small>Letzte fünf</small><strong>'+trend(T)+'</strong></div></div>'+
+     '<div class="verl2"><svg viewBox="0 0 100 100" preserveAspectRatio="none"><rect x="0" y="0" width="100" height="20" fill="rgba(98,211,148,.08)"/><rect x="0" y="80" width="100" height="20" fill="rgba(255,96,88,.08)"/><line x1="'+((HEUTE-1.5)/(ST_SAISON-1)*100)+'" x2="'+((HEUTE-1.5)/(ST_SAISON-1)*100)+'" y1="0" y2="100" stroke="rgba(244,230,196,.25)" stroke-dasharray="2 2" vector-effect="non-scaling-stroke"/><polyline points="'+pts+'" fill="none" stroke="'+(eig?"#F2A03D":"#45B0C9")+'" stroke-width="2" vector-effect="non-scaling-stroke"/></svg><span class="yp" style="top:'+jetztY+'%">'+T.st.rank+'.</span></div>'+
+     '<h4>Medaillen-Kurs <small>Stand der Disziplin-Wertung, vergeben wird am Saisonende</small></h4><div class="medz">'+(meds[0].concat(meds[1],meds[2]).length?[0,1,2].map(function(m){return meds[m].map(function(d){return '<span class="med '+"gsb"[m]+'" title="'+DN[d][0]+': derzeit Platz '+(m+1)+'"><i></i>'+DK[d]+'</span>'}).join("")}).join(""):'<span class="hin">Derzeit in keiner Disziplin unter den ersten drei.</span>')+'</div>'+
+     '<div class="hin" style="margin-top:.35rem">Trophäenschrank: Saison 1 läuft, es gibt noch keine abgeschlossene Saison.</div></div></section>'+
+   '<section class="pan" id="u-bez"><div class="pk"><h2>Rivalen & Verbündete</h2><span class="bsp">Beispiel</span><span class="sp"></span><small class="u">Skala −10 bis +10 · ab ±4</small></div><div class="pb">'+
+     (rel.length?rel.map(function(r){var v=r[0],x=r[1];return '<a class="bzz" href="'+teamLink(x,"profil")+'">'+logo(x.c)+'<span style="min-width:0"><b>'+x.n+'</b><small>'+x.st.rank+'. Platz · Kaderstärke '+rangGes(x)+'.</small><span class="skala2"><i class="'+(v<0?"neg":"pos")+'" style="'+(v<0?"right:50%":"left:50%")+';width:'+Math.abs(v)*5+'%"></i></span></span>'+bezTag(v)+'</a>'}).join(""):'<div class="hin">Keine Beziehung über ±4.</div>')+
+     '<span style="flex:1"></span><div class="hin">Ein Sieg gegen einen Rivalen hebt Moral und Fan-Stimmung stärker, eine Niederlage drückt sie stärker.</div></div></section>'+
+   '<section class="pan" id="u-fan"><div class="pk"><h2>Fans, Arena & Sponsor</h2><span class="bsp">Fans, Arena: Beispiel</span></div><div class="pb">'+
+     '<div class="wert3" style="grid-template-columns:repeat(3,1fr)"><div><small>Fanbasis</small><strong class="t">'+tsd(T.fans)+'</strong><em style="color:'+moralFarbe(T.stimmung)+'">Stimmung '+T.stimmung+'</em></div><div><small>Arena</small><strong class="t">'+tsd(T.plaetze)+'</strong><em>'+T.auslast+' % voll</em></div><div><small>Teammarke</small><strong class="t">'+T.marke+'</strong><em>von 100</em></div></div>'+
+     '<div class="arn"><i class="st" style="flex:'+T.arena.steh+'"></i><i class="si" style="flex:'+T.arena.sitz+'"></i><i class="lo" style="flex:'+T.arena.loge*4+'"></i></div><div class="hin">Steh '+tsd(T.arena.steh)+' · Sitz '+tsd(T.arena.sitz)+' · Loge '+T.arena.loge+(offen?' · je Heimspiel rund <b>'+de(T.ticket)+' C</b>':"")+'</div>'+
+     '<div class="zeile2" style="margin-top:.4rem"><span>Sponsor</span><b><span class="spo" style="display:inline-flex"><i style="background:'+(RAR[T.sp.rar]||"#9aa7ba")+'"></i>'+esc(T.sp.n)+'</span><small>'+T.sp.rar+'</small></b></div>'+
+     (offen?'<div class="zeile2"><span>Sockel bis Spitze je Saison</span><b class="t">'+de(T.sp.base)+' bis '+de(T.sp.top)+' C</b></div><div class="zeile2"><span>Beim jetzigen Rang</span><b class="t">'+de(T.sp.jetzt)+' C · Laufzeit '+T.sp.term+' S.</b></div>':'<div class="zeile2"><span>Beträge</span><b class="zu" style="font-weight:500">nur beim eigenen Team</b></div>')+
+     '<div class="zeile2"><span>Aushängeschilder <small>höchster Werbewert</small></span><b style="font-size:.86rem">'+lieb.map(function(p){return esc(p.n)}).join(" · ")+'</b></div>'+
+     '<span style="flex:1"></span>'+(eig?'<div class="akt" style="display:flex;gap:.45rem"><a class="knopf" style="flex:1" href="sponsoren-modern-22-11.html">Sponsor</a><a class="knopf" style="flex:1" href="marketing-22-11.html">Marketing</a><a class="knopf" style="flex:1" href="finanzen-modern-18-11.html">Arena</a></div>':"")+'</div></section>'}
+
+function demo(){
+  $("d-ans").innerHTML=[["liga","Liga-Übersicht"],["kader","Kader"],["vertrag","Verträge"],["transfers","Transfers"],["profil","Profil"]].map(function(a){return '<a class="'+(Z.ans===a[0]?"an":"")+'" href="'+RAHMEN.link({ansicht:a[0],sort:null,dir:null})+'">'+a[1]+'</a>'}).join(" ");
+  $("d-team").innerHTML=[[ICH.c,"eigenes ("+ICH.n+")"],["C-C","fremd: Cash Creators"],["R-C","fremd: Royal Court"]].map(function(a){return '<a class="'+(Z.team.c===a[0]?"an":"")+'" href="'+RAHMEN.link({team:a[0],ansicht:Z.ans==="liga"?"kader":Z.ans,sort:null,dir:null})+'">'+a[1]+'</a>'}).join(" ")}
+function alles(){
+  ["liga","kader","vertrag","transfers","profil"].forEach(function(a){$("s-"+a).classList.toggle("an",a===Z.ans);if(a!==Z.ans)$("s-"+a).innerHTML=""});
+  ({liga:zeichneLiga,kader:zeichneKader,vertrag:zeichneVertrag,transfers:zeichneTransfers,profil:zeichneProfil})[Z.ans]();demo()}
+document.addEventListener("click",function(ev){var t=ev.target,e;
+  if(e=t.closest("[data-vkpeek]")){ev.preventDefault();ev.stopPropagation();var p=ALLE[e.getAttribute("data-vkpeek")];RAHMEN.melde("Verkaufs-Einschätzung · "+p.n,"Brutto "+de(vk(p))+" C · kein Buyout · netto "+de(vk(p))+" C ("+vz(vk(p)-p.mw)+" zum Marktwert). Erlös unterliegt der Vorstands-Quote.","");return}
+  if(t.closest(".aktz a[href]"))return;
+  if(e=t.closest("[data-scoutteam]")){Z.team.K.forEach(function(p){p.sc=Math.min(2,p.sc+1)});Z.team.gescoutet=Z.team.K.filter(function(p){return p.sc>=2}).length;RAHMEN.melde("Scouting gestartet","Der Nebel über "+Z.team.n+" lichtet sich um eine Stufe.","g");return alles()}
+  if(sortKlick(ev,Z,AUF))return alles();
+  if(e=t.closest("[data-liga]")){Z.liga=e.getAttribute("data-liga");return alles()}
+  if(e=t.closest("[data-auf]")){location.href=teamLink(TC[e.getAttribute("data-auf")],"kader");return}
+  if(e=t.closest("[data-profil]")){location.href=profilUrl(ALLE[e.getAttribute("data-profil")]);return}
+});
+alles();
+</script>
+</body>
+</html>
