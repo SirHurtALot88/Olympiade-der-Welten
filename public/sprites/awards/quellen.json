@@ -1,0 +1,325 @@
+{
+ "_hinweis": "Award- und Medaillen-Embleme (24.11., Chris: Spieler-Awards und Team-Medaillen in Gold, Silber, Bronze). Bestellt mit scripts/pixellab-awards.py: je Award EIN Gold-Emblem (PixelLab /create-image-pixflux, 96x96, no_background, ein POST unter flock, keine Wiederholung). Silber und Bronze sind lokal aus dem Gold-Emblem umgefaerbt (0 Generationen). 14 Generationen insgesamt, alle Treffer, Guthaben 203,54 -> 189,54. Bisher nur in public/mockups/awards-historie-24-11.html genutzt. Konzept: docs/design/awards-historie-24-11.md.",
+ "mvp-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "MVP der Saison",
+  "saat": 7001,
+  "generationen": 1.0,
+  "guthaben_vorher": 203.54,
+  "guthaben_nachher": 202.54,
+  "prompt": "golden trophy cup with two handles and a five pointed star on top wearing a small royal crown with red gems, on a dark stone base, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "pow-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Power-Spieler (Klassenfarbe POW)",
+  "saat": 7003,
+  "generationen": 1.0,
+  "guthaben_vorher": 202.54,
+  "guthaben_nachher": 201.54,
+  "prompt": "golden clenched gauntlet fist holding up a heavy war hammer, framed by a round golden ring with a glowing red ruby enamel background, red flames, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "medaille-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Disziplin-Medaille der Teams",
+  "saat": 7008,
+  "generationen": 1.0,
+  "guthaben_vorher": 201.54,
+  "guthaben_nachher": 200.54,
+  "prompt": "round golden medal coin with a laurel wreath rim and a plain raised star in the middle, hanging on a short dark blue and cream striped ribbon, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "mvp-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "mvp-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "mvp-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "mvp-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "pow-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "pow-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "pow-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "pow-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "medaille-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "medaille-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "medaille-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "medaille-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "mip-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Most Improved Player",
+  "saat": 7002,
+  "generationen": 1.0,
+  "guthaben_vorher": 200.54,
+  "guthaben_nachher": 199.54,
+  "prompt": "golden winged arrow pointing steeply upwards over three rising steps, small sparkles, on a dark stone base, trophy statuette, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "spe-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Speed-Spieler (Klassenfarbe SPE)",
+  "saat": 7004,
+  "generationen": 1.0,
+  "guthaben_vorher": 199.54,
+  "guthaben_nachher": 198.54,
+  "prompt": "golden winged boot with a lightning bolt, framed by a round golden ring with a glowing emerald green enamel background, green wind streaks, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "men-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Mental-Spieler (Klassenfarbe MEN)",
+  "saat": 7005,
+  "generationen": 1.0,
+  "guthaben_vorher": 198.54,
+  "guthaben_nachher": 197.54,
+  "prompt": "golden wise owl head with an open eye above an open book, framed by a round golden ring with a glowing sapphire blue enamel background, blue stars, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "soc-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Social-Spieler (Klassenfarbe SOC)",
+  "saat": 7006,
+  "generationen": 1.0,
+  "guthaben_vorher": 197.54,
+  "guthaben_nachher": 196.54,
+  "prompt": "golden theatre mask smiling next to a small lyre harp, framed by a round golden ring with a glowing amber and purple enamel background, confetti, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "allstar-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "All-Star-Team der Saison",
+  "saat": 7007,
+  "generationen": 1.0,
+  "guthaben_vorher": 196.54,
+  "guthaben_nachher": 195.54,
+  "prompt": "large golden five pointed star with a smaller star inside, surrounded by an open golden laurel wreath, shield plaque, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "meister-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Meisterschale der Liga",
+  "saat": 7009,
+  "generationen": 1.0,
+  "guthaben_vorher": 195.54,
+  "guthaben_nachher": 194.54,
+  "prompt": "big round golden champion shield plate with engraved rings and a crown in the centre, two crossed laurel branches below, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "pp-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "PP-Koenig der Saison",
+  "saat": 7010,
+  "generationen": 1.0,
+  "guthaben_vorher": 194.54,
+  "guthaben_nachher": 193.54,
+  "prompt": "golden royal crown with a big diamond, resting on a red velvet cushion with golden tassels, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "mip-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "mip-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "mip-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "mip-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "spe-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "spe-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "spe-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "spe-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "men-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "men-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "men-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "men-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "soc-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "soc-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "soc-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "soc-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "allstar-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "allstar-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "allstar-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "allstar-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "meister-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "meister-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "meister-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "meister-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "pp-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "pp-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "pp-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "pp-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "spieltag-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Spieler des Spieltags",
+  "saat": 7011,
+  "generationen": 1.0,
+  "guthaben_vorher": 193.54,
+  "guthaben_nachher": 192.54,
+  "prompt": "small round golden badge pin with a bright sunburst and a single star in the middle, short red ribbon tails below, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "disziplin-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Disziplin-Koenig",
+  "saat": 7012,
+  "generationen": 1.0,
+  "guthaben_vorher": 192.54,
+  "guthaben_nachher": 191.54,
+  "prompt": "golden torch with a bright orange flame inside a golden ring of five small circles, on a small pedestal, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "neuzugang-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Neuzugang der Saison",
+  "saat": 7013,
+  "generationen": 1.0,
+  "guthaben_vorher": 191.54,
+  "guthaben_nachher": 190.54,
+  "prompt": "rolled parchment contract scroll with a red wax seal and a golden quill pen crossed over it, inside a golden hexagon frame with small stars, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "eisern-gold.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Eiserner Spieler (alle Einsaetze)",
+  "saat": 7014,
+  "generationen": 1.0,
+  "guthaben_vorher": 190.54,
+  "guthaben_nachher": 189.54,
+  "prompt": "heavy golden anvil with a golden heart shaped shield on top and a chain link around it, solid and sturdy, on a small pedestal, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "spieltag-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "spieltag-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "spieltag-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "spieltag-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "neuzugang-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "neuzugang-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "neuzugang-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "neuzugang-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "eisern-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "eisern-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "eisern-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "eisern-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "disziplin-silber.png": {
+  "paket": "abgeleitet",
+  "aus": "disziplin-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ },
+ "disziplin-bronze.png": {
+  "paket": "abgeleitet",
+  "aus": "disziplin-gold.png",
+  "weg": "scripts/pixellab-awards.py stufen (Gold-Toene lokal umgefaerbt)",
+  "generationen": 0
+ }
+}

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Awards, Medaillen und Historie – modern (Mockup 24.11.)</title>
+<!--
+  AWARDS, MEDAILLEN UND HISTORIE IM NEUEN STIL (Fable, 24.11.). Erklaerung: docs/design/awards-historie-24-11.md
+  Fuenf Ansichten: Award-Katalog, Trophaeenschrank im Spielerprofil, Medaillen und Medaillenspiegel im Teamprofil,
+  Team-Historie (je Liga getrennt), Spieler-Historie (ohne Liga-Trennung). Fuehrt historie-modern-18-11.html weiter.
+  ECHT (Live-Abbild 24.11., Saison 1, 11 Spieltage gewertet; modern-24-11/daten.js): Teams, Liga, Tabelle, Punkte, Kasse, Kaderwert,
+        Player Points und Einsaetze je Spieler, beste Disziplinen je Spieler, Stand der Disziplin-Wertung (Medaillen-Kurs).
+  BEISPIEL (im UI markiert): alle abgeschlossenen Saisons (der Live-Stand steht in Saison 1), Gebaeudewert, Entwicklung (OVR),
+        Spieler des Spieltags. Mit ?saisons=1 zeigt die Seite nur, was heute echt da ist.
+  Embleme: public/sprites/awards/ (PixelLab, 14 Generationen; Silber und Bronze lokal umgefaerbt), Herkunft in quellen.json.
+  URL: ?ansicht=katalog|schrank|medaillen|teams|spieler  ?saisons=5|1  ?liga=1|2  ?team=D-P|…  ?spieler=<slug>
+       ?zeit=alle|saison  ?farbe=0..3  ?kader=1  ?sort=<spalte>&dir=-1|1  ?still=1
+-->
+<link rel="stylesheet" href="modern-24-11/rahmen.css">
+<link rel="stylesheet" href="modern-24-11/bausteine.css">
+<style>
+:root{--silber:#cfd8e6;--bronze:#d68b52}
+img.emb{image-rendering:pixelated;object-fit:contain;flex:none;width:3rem;height:3rem}
+.g0{color:var(--gold)} .g1{color:var(--silber)} .g2{color:var(--bronze)}
+.gsb{display:inline-flex;gap:.45rem;font-weight:700;font-size:1rem} .gsb i{font-style:normal;min-width:.9rem;text-align:right}
+.gsb i.n0{opacity:.28}
+.lf{font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--gut);border:1px solid rgba(98,211,148,.5);border-radius:.2rem;padding:.02rem .3rem;font-family:var(--zahl)}
+.umsch{display:inline-flex;border:1px solid var(--linie-2);border-radius:.3rem;overflow:hidden;flex:none}
+.umsch a{padding:.2rem .65rem;font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--leise)!important}
+.umsch a.an{background:var(--gold);color:#17120a!important}
+.pk .bsp{margin-left:.1rem}
+.tz .wap{width:1.9rem;height:1.9rem}
+.tz .tn{display:flex;align-items:center;gap:.5rem;min-width:0} .tz .tn .nm{min-width:0}
+.sz{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1} .sz b{font-size:1.04rem;color:var(--tinte)} .sz small{font-size:.66rem;color:var(--stumm);font-weight:700}
+.sz.r1 small{color:var(--gold)} .sz.r2 small{color:var(--silber)} .sz.r3 small{color:var(--bronze)} .sz.lauf b{color:var(--gut)}
+.and{font-size:.66rem;font-weight:700;color:var(--stumm);border:1px dashed var(--linie);border-radius:.2rem;padding:0 .25rem}
+.zn{font-weight:700;font-size:1.02rem} .zn.n0{color:var(--stumm);font-weight:500}
+.zw2{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.02} .zw2 b{font-size:1rem} .zw2 small{font-size:.68rem;font-weight:700}
+svg.spark{width:100%;height:1.5rem;display:block;overflow:visible}
+
+/* ---------- Katalog ---------- */
+.seite.kat{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr))}
+.ak{display:grid;grid-template-columns:8.6rem minmax(0,1fr);gap:.2rem .8rem;padding:.7rem .85rem .6rem .6rem;background:var(--flaeche-1);border:1px solid var(--linie);border-top:.2rem solid var(--linie-2);border-radius:var(--r);min-width:0;min-height:0;overflow:hidden}
+.ak.f0{border-top-color:var(--pow)} .ak.f1{border-top-color:var(--spe)} .ak.f2{border-top-color:var(--men)} .ak.f3{border-top-color:var(--soc)} .ak.team{border-top-color:var(--gast)}
+.ak .eb{display:grid;grid-template-columns:1fr 1fr;justify-items:center;align-content:center;gap:.2rem;background:radial-gradient(circle at 50% 38%,rgba(240,195,90,.16),transparent 68%)}
+.ak .eb img:first-child{grid-column:1/3;width:6.6rem;height:6.6rem} .ak .eb img{width:3.3rem;height:3.3rem}
+.ak .tx{display:flex;flex-direction:column;min-width:0;min-height:0}
+.ak h3{margin:0;font:400 1.3rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ak .tg{display:flex;gap:.3rem;margin:.3rem 0 .35rem;flex-wrap:wrap;height:1.3rem;overflow:hidden}
+.ak p{margin:0;font-size:.88rem;line-height:1.25;color:var(--leise)} .ak p b{color:var(--tinte);font-weight:600}
+.ak .ks{margin-top:auto;border-top:1px solid var(--linie);padding-top:.25rem}
+.ak .ks h4{margin:0 0 .1rem;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--stumm);font-weight:700;display:flex;gap:.4rem;align-items:center}
+.ak .ks div{display:grid;grid-template-columns:1.1rem minmax(0,1fr) auto;gap:.3rem;font-size:.9rem;line-height:1.28;white-space:nowrap}
+.ak .ks div span{overflow:hidden;text-overflow:ellipsis;color:var(--tinte)} .ak .ks div small{color:var(--stumm);font-size:.78rem} .ak .ks div b{color:var(--creme)}
+.ak.info{grid-column:span 2;grid-template-columns:1fr 1fr;padding:.75rem 1rem;border-top-color:var(--gold);gap:.2rem 1.4rem}
+.ak.info h3{font-size:1.15rem;margin-bottom:.3rem} .ak.info li{font-size:.88rem;line-height:1.3;color:var(--leise);margin-bottom:.22rem} .ak.info ul{margin:0;padding-left:1rem} .ak.info li b{color:var(--tinte);font-weight:600}
+
+/* ---------- Trophaeenschrank ---------- */
+.seite.sch{grid-template-columns:22.5rem minmax(0,1fr) 33rem}
+.held{display:flex;flex-direction:column;align-items:center;gap:.3rem;text-align:center;flex:none}
+.held .bild{width:9rem;height:9rem;border-radius:.6rem;overflow:hidden;border:1px solid var(--linie-2);background:var(--flaeche-3) center/45% no-repeat} .held .bild img{width:100%;height:100%;object-fit:cover;object-position:center 15%}
+.held h3{margin:.3rem 0 0;font:400 1.8rem/1 var(--haus);color:#fff}
+.held .zl{display:flex;gap:.6rem;align-items:center;font-size:.9rem;color:var(--leise)}
+.summe{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin:.7rem 0 .5rem;flex:none}
+.stat{flex:1;min-height:0;overflow:hidden;margin-top:.6rem} .stat h4{margin:0 0 .2rem;font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.stat div{display:grid;grid-template-columns:1.9rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.22rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.9rem;white-space:nowrap} .stat div span{overflow:hidden;text-overflow:ellipsis;color:var(--tinte)} .stat div small{color:var(--stumm);margin-left:.3rem} .stat div b{color:var(--creme)}
+#s-schrank .tz .nm b{font-size:.9rem;white-space:normal;line-height:1.02} #s-medaillen .tz .nm b{font-size:.96rem} #s-schrank .tz .wap{width:1.7rem;height:1.7rem}
+.summe div{display:flex;flex-direction:column;align-items:center;padding:.5rem 0 .4rem;border:1px solid var(--linie);border-radius:.4rem;background:var(--flaeche-2)}
+.summe strong{font-size:2rem;line-height:1;font-weight:700} .summe small{font-size:.64rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.wechsel{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:auto} .wechsel a{font-size:.8rem;padding:.15rem .5rem;border:1px solid var(--linie);border-radius:1rem;color:var(--leise);white-space:nowrap} .wechsel a.an{border-color:var(--gold);color:var(--gold)}
+.regal{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:.6rem;flex:1;min-height:0}
+.tro{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.1rem;padding:.4rem .4rem .5rem;border-radius:.5rem;border:1px solid var(--linie);background:linear-gradient(180deg,var(--flaeche-2),var(--flaeche-1));text-align:center;min-width:0;min-height:0;overflow:hidden}
+.tro::after{content:"";position:absolute;left:8%;right:8%;bottom:0;height:.18rem;border-radius:2px;background:currentColor;opacity:.7}
+.tro.g0{border-color:rgba(240,195,90,.5);background:radial-gradient(circle at 50% 34%,rgba(240,195,90,.2),transparent 70%),var(--flaeche-2)}
+.tro.g1{border-color:rgba(207,216,230,.4);background:radial-gradient(circle at 50% 34%,rgba(207,216,230,.14),transparent 70%),var(--flaeche-2)}
+.tro.g2{border-color:rgba(214,139,82,.45);background:radial-gradient(circle at 50% 34%,rgba(214,139,82,.16),transparent 70%),var(--flaeche-2)}
+.tro img.emb{width:auto;height:50%;max-height:7rem;aspect-ratio:1}
+.tro b{font:400 1.02rem/1.08 var(--haus);color:#fff;max-width:100%;text-wrap:balance}
+.tro small{font-size:.8rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%} .tro small i{font-style:normal;font-weight:700}
+.tro .mal{position:absolute;right:.45rem;top:.35rem;font-size:1.15rem;font-weight:700}
+.tro.leer{border-style:dashed;background:none;color:var(--stumm)} .tro.leer::after{display:none} .tro.leer img{opacity:.22;filter:grayscale(1)}
+.kurs{display:flex;gap:.4rem;flex:none;margin-top:.7rem;padding-top:.6rem;border-top:1px solid var(--linie);align-items:center;overflow:hidden;white-space:nowrap}
+.kurs .kc{display:inline-flex;align-items:center;gap:.3rem;padding:.12rem .55rem .12rem .2rem;border:1px dashed var(--linie-2);border-radius:1.2rem;font-size:.86rem;color:var(--leise)} .kurs .kc img{width:1.7rem;height:1.7rem} .kurs .kc b{color:var(--creme)}
+.sbalken{display:flex;align-items:flex-end;justify-content:center;gap:.7rem;flex:1;min-height:0;padding-top:.3rem}
+.sbalken div{flex:1;max-width:9rem;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:.2rem;min-width:0}
+.sbalken i{display:block;width:100%;background:linear-gradient(180deg,var(--gold),rgba(240,195,90,.35));border-radius:.2rem .2rem 0 0;min-height:2px} .sbalken .lauf i{background:repeating-linear-gradient(135deg,rgba(98,211,148,.8) 0 .3rem,rgba(98,211,148,.4) .3rem .6rem)}
+.sbalken b{font-size:.95rem;color:var(--creme)} .sbalken small{font-size:.72rem;color:var(--leise);font-weight:700;display:flex;gap:.25rem;align-items:center} .sbalken small img.wap{width:1.2rem;height:1.2rem}
+.embz{display:inline-flex;gap:.1rem;align-items:center} .embz img.emb{width:1.5rem;height:1.5rem}
+
+/* ---------- Medaillen ---------- */
+.seite.med{grid-template-columns:minmax(0,1fr) 43rem;grid-template-rows:auto minmax(0,1fr)}
+.seite.med .rechtsp{grid-row:1/3;grid-column:2}
+.schmuck{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.7rem 1rem;white-space:nowrap;overflow:hidden}
+.schmuck img.wap{width:4.2rem;height:4.2rem;border:2px solid var(--heim)} .schmuck .nmb{min-width:0;flex:0 1 15rem;overflow:hidden}
+.schmuck .bl{display:flex;align-items:center;gap:.4rem;flex:none} .schmuck .bl img.emb{width:3.7rem;height:3.7rem}
+.schmuck .bl strong{font-size:1.9rem;line-height:.95;font-weight:700;display:block} .schmuck .bl small{font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--leise);font-weight:600;display:block}
+.schmuck .tr{width:1px;align-self:stretch;background:var(--linie)}
+.schmuck h3{margin:0;font:400 1.45rem/1.05 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis} .schmuck p{margin:.15rem 0 0;font-size:.82rem;color:var(--leise);line-height:1.25;white-space:normal}
+.wand{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:.5rem;flex:1;min-height:0}
+.wz{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);border:1px solid var(--linie);border-radius:.4rem;border-bottom:.18rem solid var(--stumm);padding:.4rem .55rem .35rem;min-width:0;min-height:0;overflow:hidden;background:var(--flaeche-2)}
+.wz.a0{border-bottom-color:var(--pow)} .wz.a1{border-bottom-color:var(--spe)} .wz.a2{border-bottom-color:var(--men)} .wz.a3{border-bottom-color:var(--soc)}
+.wz h4{margin:0;display:flex;align-items:center;gap:.35rem;font:400 1.05rem/1.1 var(--haus);color:#fff;white-space:nowrap;overflow:hidden} .wz h4 img.dic{width:1.3rem;height:1.3rem} .wz h4 small{margin-left:auto;font:600 .76rem/1 var(--zahl);color:var(--leise)} .wz h4 small b{color:var(--tinte);font-size:.9rem}
+.wz .ms{display:flex;gap:.25rem;flex:1;align-items:center;min-height:0}
+.wz .ms span{flex:1;display:grid;grid-template-rows:minmax(0,1fr) auto;justify-items:center;align-items:center;gap:.15rem;min-width:0;height:100%;padding:.2rem 0 .25rem} .wz .ms img.emb{width:min(100%,3.5rem);height:auto;aspect-ratio:1}
+.wz .ms u{display:block;width:.5rem;height:.5rem;border-radius:50%;background:rgba(255,255,255,.1)} .wz .ms u.x{width:1.5rem;height:1.5rem;background:none;border:1px dashed var(--linie-2)}
+.wz .ms small{font-size:.66rem;font-weight:700;color:var(--stumm);line-height:1;white-space:nowrap} .wz .ms small i{font-style:normal;color:var(--gast)}
+.wz .kz{display:flex;justify-content:space-between;font-size:.76rem;color:var(--leise);white-space:nowrap} .wz .kz b{color:var(--tinte)}
+
+/* ---------- Historie ---------- */
+.seite.his{grid-template-columns:minmax(0,1fr) 29rem}
+.spalte{display:flex;flex-direction:column;gap:.72rem;min-width:0;min-height:0} .spalte>.pan{flex:1}
+.kopfz{display:flex;align-items:center;gap:.7rem;flex:none;margin-bottom:.5rem;min-width:0} .kopfz img.wap{width:3rem;height:3rem} .kopfz .por{width:3.4rem;height:3.4rem}
+.kopfz h3{margin:0;font:400 1.35rem/1.05 var(--haus);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .kopfz small{font-size:.82rem;color:var(--leise);white-space:nowrap}
+.stapel{display:flex;align-items:flex-end;justify-content:center;gap:.8rem;flex:1;min-height:0}
+.stapel>div{flex:1;max-width:9rem;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:.15rem;min-width:0}
+.stapel .st{width:100%;display:flex;flex-direction:column-reverse;border-radius:.2rem .2rem 0 0;overflow:hidden} .stapel .st i{display:block;min-height:1px}
+.stapel b{font-size:.98rem;color:var(--creme)} .stapel small{font-size:.72rem;color:var(--leise);font-weight:700}
+.c-ka{background:var(--gold)} .c-kd{background:var(--heim)} .c-ge{background:var(--gast)} .c-neg{background:var(--warn)}
+.leg i.c-ka,.leg i.c-kd,.leg i.c-ge{transform:skewX(-14deg)}
+.fahr{flex:1;min-height:0;width:100%}
+.fahr text{font-family:var(--zahl);font-weight:700}
+.dreier{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;flex:none;margin-bottom:.5rem}
+.dreier div{line-height:1.05;min-width:0} .dreier small{display:block;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600;white-space:nowrap} .dreier strong{font-size:1.4rem;color:var(--creme);white-space:nowrap} .dreier em{font-style:normal;font-size:.74rem;color:var(--stumm);display:block;white-space:nowrap}
+.awl{display:flex;flex-wrap:wrap;gap:.3rem;align-content:flex-start;flex:1;min-height:0;overflow:hidden}
+.awl span{display:inline-flex;align-items:center;gap:.25rem;padding:.1rem .5rem .1rem .15rem;border:1px solid var(--linie);border-radius:1.2rem;font-size:.82rem;color:var(--leise);white-space:nowrap} .awl span img.emb{width:1.7rem;height:1.7rem} .awl span b{color:var(--tinte);font-weight:600}
+.fchips{display:flex;gap:.3rem;align-items:center} .fchips a{font-size:.74rem;font-weight:700;letter-spacing:.08em;padding:.12rem .5rem;border:1px solid var(--linie);border-radius:1rem;color:var(--leise)!important;text-transform:uppercase} .fchips a.an{background:var(--gold);border-color:var(--gold);color:#17120a!important}
+.tz .por{width:2.1rem;max-height:2.3rem}
+.leerh{display:grid;place-items:center;text-align:center;flex:1;color:var(--leise);font-size:.95rem;line-height:1.35;padding:0 2rem} .leerh b{display:block;font:400 1.3rem/1.2 var(--haus);color:var(--creme);margin-bottom:.3rem}
+</style>
+</head>
+<body>
+<script src="modern-24-11/daten.js"></script>
+<script src="modern-24-11/rahmen.js"></script>
+<script src="modern-24-11/tabelle.js"></script>
+<script>
+"use strict";
+/* ============================== Zustand ============================== */
+var BSP=q.get("saisons")!=="1",NS=BSP?5:1,AKT=NS;
+var Z={ans:q.get("ansicht")||"katalog",liga:+q.get("liga")||ICH.liga,team:TC[q.get("team")]||ICH,sort:q.get("sort"),dir:+q.get("dir")||-1,blatt:0,
+  zeit:q.get("zeit")||(BSP?"alle":"saison"),farbe:q.get("farbe")==null?-1:+q.get("farbe"),kader:q.get("kader")==="1"};
+var STN=["Gold","Silber","Bronze"],STD=["gold","silber","bronze"];
+function emb(k,st,tip){return '<img class="emb" src="../sprites/awards/'+k+'-'+STD[st]+'.png" alt=""'+(tip?' title="'+esc(tip)+'"':"")+'>'}
+function bsp(t){return '<i class="bsp" title="Beispielwerte: der Live-Stand steht in Saison 1">'+(t||"Beispiel")+'</i>'}
+function sn(s){return "S"+s}
+function gsb(a){return '<span class="gsb">'+[0,1,2].map(function(i){return '<i class="g'+i+(a[i]?"":" n0")+'">'+a[i]+'</i>'}).join("")+'</span>'}
+
+/* ============================== Award-Katalog ============================== */
+/* k = Emblem, wer = Spieler|Team, takt, krit, quelle: [Stand, Text]; Stand "da" = heute schon im Spielstand, "teil" = Quelle da, Vergabe neu, "neu" = neues Tracking */
+var AW=[
+ {k:"mvp",n:"MVP der Saison",takt:"Saisonende",krit:"<b>Höchste PP-Summe</b> der Saison über alle Disziplinen, beide Ligen zusammen. Gleichstand: PP je Einsatz.",q:["da","Saison-PP je Spieler"],ein:" PP"},
+ {k:"pp",n:"Krone der Konstanz",takt:"Saisonende",krit:"<b>Höchste PP je Einsatz</b> bei mindestens 60 % der Einsätze des fleißigsten Spielers. Belohnt den, der nie einen schlechten Tag hat.",q:["da","PP und Einsätze"],ein:" PP/E"},
+ {k:"mip",n:"Most Improved Player",takt:"Saisonende",krit:"<b>Größter Zuwachs im Gesamtwert (OVR)</b> vom ersten bis zum letzten Spieltag, ganze Saison unter Vertrag.",q:["teil","OVR-Start je Saison wird neu gestempelt"],ein:" OVR",bsp:1},
+ {k:"allstar",n:"All-Star-Team",takt:"Saisonende",krit:"<b>Drei Achter-Teams</b> der Saison: je Klassenfarbe die zwei PP-Besten. First Team = Gold, Second = Silber, Third = Bronze.",q:["da","Saison-PP und Klassenfarbe"],ein:" PP"},
+ {k:"pow",f:0,n:"Bester Power-Spieler",takt:"Saisonende",krit:"PP-Bester unter allen Spielern der <b>Klassenfarbe Power</b> (Berserker, Warlord, Tank).",q:["da","Saison-PP und Klassenfarbe"],ein:" PP"},
+ {k:"spe",f:1,n:"Bester Speed-Spieler",takt:"Saisonende",krit:"PP-Bester unter allen Spielern der <b>Klassenfarbe Speed</b> (Sprinter, Rogue, Charger).",q:["da","Saison-PP und Klassenfarbe"],ein:" PP"},
+ {k:"men",f:2,n:"Bester Mental-Spieler",takt:"Saisonende",krit:"PP-Bester unter allen Spielern der <b>Klassenfarbe Mental</b> (Mage, Overseer, Templar).",q:["da","Saison-PP und Klassenfarbe"],ein:" PP"},
+ {k:"soc",f:3,n:"Bester Social-Spieler",takt:"Saisonende",krit:"PP-Bester unter allen Spielern der <b>Klassenfarbe Social</b> (Bard, Hero, Badass, Tactician).",q:["da","Saison-PP und Klassenfarbe"],ein:" PP"},
+ {k:"disziplin",n:"Disziplin-König",takt:"Saisonende · 20 Disziplinen",krit:"Je Disziplin die <b>höchste PP-Summe</b> der Saison (meist zwei Einsätze). 20 Fackeln in Gold, Silber und Bronze.",q:["da","PP je Disziplin und Saison"],ein:" PP"},
+ {k:"spieltag",n:"Spieler des Spieltags",takt:"jeder Spieltag",krit:"<b>Höchste PP-Summe eines Spieltags</b> (beide Disziplinen), beide Ligen. Platz 1, 2, 3 des Tages; im Schrank als Zähler.",q:["da","Spieltags-MVP der Leaders-Seite"],ein:" PP",bsp:1},
+ {k:"neuzugang",n:"Neuzugang der Saison",takt:"Saisonende",krit:"PP-Bester unter den Spielern, die <b>in dieser Saison neu zum Team</b> kamen (Draft der ersten Saison zählt nicht).",q:["da","Transfers und Saison-PP"],ein:" PP",bsp:1},
+ {k:"eisern",n:"Eisernes Herz",takt:"Saisonende",krit:"<b>Meiste Einsätze</b> der Saison ohne einen verpassten Spieltag durch Verletzung. Gleichstand: PP-Summe.",q:["teil","Einsätze da, Verletzungs-Spieltage neu gezählt"],ein:" Eins."},
+ {k:"medaille",wer:"Team",n:"Disziplin-Medaille",takt:"Saisonende · je Liga",krit:"Je Liga und Disziplin die <b>beste Ergebnis-Summe</b> der Saison. Gibt es schon (Medaillen-Regel), bekommt jetzt ein Emblem.",q:["da","seasonState.medaillenVergabe"],ein:""},
+ {k:"meister",wer:"Team",n:"Meisterschale",takt:"Saisonende · je Liga",krit:"<b>Platz 1, 2, 3 der Abschlusstabelle</b> je Liga. Der Erste der Liga 2 ist Zweitliga-Meister und steigt auf.",q:["da","finalStandings im Saison-Archiv"],ein:" P."}
+];
+var AWK={};AW.forEach(function(a){AWK[a.k]=a});
+
+/* ============================== Historie: echte laufende Saison + Beispiel-Saisons ============================== */
+/* Team-Saison h[s] = {liga,rang,pkt,mw,kasse,geb,lauf}. Gebaeudewert = Investition x Zustand (immer Beispiel: nicht im Abbild-Auszug). */
+TEAMS.forEach(function(T){var z=zufall(hash(T.c+"geb"));T.inv=Math.round((4+T.id.finances*2.2+z()*10)*10)/10;T.zust=Math.round(72+z()*26);
+  T.h=[];T.h[AKT]={liga:T.liga,rang:T.st.rank,pkt:T.st.pts,mw:Math.round(T.mwsum*10)/10,kasse:T.cash,geb:Math.round(T.inv*T.zust)/100,lauf:true}});
+(function(){ if(!BSP)return;
+  /* Fahrstuhl-Topf: vier schwaechste der Liga 1 und vier staerkste der Liga 2; je Saisonwechsel drei Auf- und drei Absteiger */
+  var l1=TEAMS.filter(function(t){return t.liga===1}).sort(function(a,b){return a.ges-b.ges}).slice(0,4),l2=TEAMS.filter(function(t){return t.liga===2}).sort(function(a,b){return b.ges-a.ges}).slice(0,4);
+  var topf=l1.concat(l2);
+  for(var s=AKT-1;s>=1;s--){var z=zufall(hash("saison"+s));
+    var oben=topf.filter(function(t){return t.h[s+1].liga===1}).sort(function(){return z()-.5}).slice(0,3),unten=topf.filter(function(t){return t.h[s+1].liga===2}).sort(function(){return z()-.5}).slice(0,3);
+    TEAMS.forEach(function(T){var n=T.h[s+1];T.h[s]={liga:oben.indexOf(T)>=0?2:unten.indexOf(T)>=0?1:n.liga,auf:oben.indexOf(T)>=0,ab:unten.indexOf(T)>=0}});
+    [1,2].forEach(function(l){var L=TEAMS.filter(function(T){return T.h[s].liga===l}).map(function(T){return [T,T.ges+(z()-.5)*9+(T.h[s].auf?40:0)-(T.h[s].ab?40:0)]}).sort(function(a,b){return b[1]-a[1]});
+      var p=56+Math.round(z()*4);L.forEach(function(x,i){p-=i?Math.round(z()*3.6+.2):0;var T=x[0],n=T.h[s+1],f=.6+.4*s/AKT;
+        T.h[s].rang=i+1;T.h[s].pkt=p;T.h[s].mw=Math.round(T.mwsum*f*(.9+z()*.2)*10)/10;T.h[s].kasse=Math.round((T.cash*.5+(17-i)*1.6+(z()-.5)*30)*10)/10;
+        T.h[s].geb=Math.round(T.inv*(s/AKT)*(T.zust+ (AKT-s)*2>100?100:T.zust+(AKT-s)*2))/100})})}
+})();
+TEAMS.forEach(function(T){T.h.forEach(function(x){x.verm=Math.round((x.kasse+x.mw+x.geb)*10)/10})});
+function saisons(T,l){var a=[];for(var s=1;s<=AKT;s++)if(T.h[s].liga===l)a.push(s);return a}
+/* Kennzahlen eines Teams IN EINER LIGA: nur Saisons, die es in dieser Liga gespielt hat */
+function ligaBilanz(T,l){var S=saisons(T,l),ab=S.filter(function(s){return !T.h[s].lauf}),b={sz:S.length,ab:ab.length,p:[0,0,0],t5:0,t10:0,all:0,pkt:{}};
+  S.forEach(function(s){b.all+=T.h[s].pkt;b.pkt[s]=T.h[s].pkt});
+  ab.forEach(function(s){var r=T.h[s].rang;if(r<=3)b.p[r-1]++;if(r<=5)b.t5++;if(r<=10)b.t10++});
+  var sum=ab.reduce(function(a,s){return a+T.h[s].pkt},0);
+  b.hoch=!ab.length;b.avg=ab.length?sum/ab.length:(T.h[AKT].liga===l?T.h[AKT].pkt/GEWERTET*ST_SAISON:0);return b}
+
+/* Spieler-Saison h[s] = {team,eins,pp,ov,dev,lauf} */
+var AKTIV=SP.filter(function(p){return p.team});
+AKTIV.forEach(function(p){var z=zufall(hash(p.s+"laufbahn"));p.h=[];p.h[AKT]={team:p.team,eins:p.eins,pp:p.pps,ov:p.ov,dev:p.dev,lauf:true};p.neu=AKT>1&&z()<.14;
+  if(!BSP)return;var start=z()<.52?1:1+Math.floor(z()*(AKT-1)+.999),ov=p.ov-p.dev*.55,team=p.team,basis=p.eins>=3?p.ppe:1.2+p.ov/40;
+  if(p.neu){team=TEAMS[Math.floor(z()*32)];if(team===p.team)p.neu=false}
+  for(var s=AKT-1;s>=start;s--){var e=z(),g=z(),dev=e<.04?6+g*2:e<.10?3+g*3:e<.30?1+g*2:e<.70?-1+g*2:e<.90?-3+g*2:e<.96?-6+g*3:-8+g*2;dev=Math.round(dev*10)/10;
+    var eins=Math.round(11+z()*8),pp=Math.round(eins*basis*Math.pow(kl(ov/p.ov,.6,1.4),1.6)*(.84+z()*.32)*10)/10;
+    p.h[s]={team:team,eins:eins,pp:pp,ov:Math.round(ov*10)/10,dev:dev,neu:false};
+    ov-=dev;if(z()<.16){var nt=TEAMS[Math.floor(z()*32)];if(nt!==team){p.h[s].neu=true;team=nt}}}
+  if(p.h[start])p.h[start].neu=start>1});
+AKTIV.forEach(function(p){p.h[AKT].neu=!!p.neu;p.aw=[];p.kurs=[];p.tag=[0,0,0];var S=[];for(var s=1;s<=AKT;s++)if(p.h[s])S.push(s);p.S=S;
+  var ab=S.filter(function(s){return !p.h[s].lauf});p.ppAll=S.reduce(function(a,s){return a+p.h[s].pp},0);p.einsAll=S.reduce(function(a,s){return a+p.h[s].eins},0);
+  p.hoch=!ab.length;p.ppAvg=ab.length?ab.reduce(function(a,s){return a+p.h[s].pp},0)/ab.length:p.pps/GEWERTET*ST_SAISON;p.ppeAll=p.einsAll?p.ppAll/p.einsAll:0;
+  p.ovStart=p.h[S[0]].ov-(p.h[S[0]].dev||0)*(p.h[S[0]].lauf?.55:1);p.bestS=Math.max.apply(null,S.map(function(s){return p.h[s].pp}))});
+
+/* ---------- Vergabe: je Saison dieselben Regeln; die laufende Saison ergibt nur den "Kurs" ---------- */
+var ERG=[],TM=[];
+function top3(l,f,min){return l.filter(function(p){return !min||min(p)}).map(function(p){return [p,f(p)]}).sort(function(a,b){return b[1]-a[1]||(a[0].n<b[0].n?-1:1)})}
+function vergib(s){var L=AKTIV.filter(function(p){return p.h[s]}),lauf=s===AKT,E={},z=zufall(hash("vergabe"+s));
+  function H(p){return p.h[s]}
+  var maxE=Math.max.apply(null,L.map(function(p){return H(p).eins}));
+  E.mvp=top3(L,function(p){return H(p).pp});
+  E.pp=top3(L,function(p){return H(p).pp/H(p).eins},function(p){return H(p).eins>=maxE*.6});
+  E.mip=top3(L,function(p){return H(p).dev});
+  [0,1,2,3].forEach(function(f){E[AX[f].toLowerCase()]=top3(L.filter(function(p){return p.kf===f}),function(p){return H(p).pp})});
+  E.allstar=[[],[],[]];[0,1,2,3].forEach(function(f){E[AX[f].toLowerCase()].slice(0,6).forEach(function(x,i){E.allstar[Math.floor(i/2)].push(x)})});
+  E.neuzugang=top3(L.filter(function(p){return H(p).neu}),function(p){return H(p).pp});
+  E.eisern=top3(L,function(p){return H(p).eins+H(p).pp/1000});
+  /* Disziplin-Koenig: laufende Saison echt aus den besten Disziplinen je Spieler, sonst Beispiel aus der Eignung */
+  E.disz=DN.map(function(_,d){if(lauf){var l=[];L.forEach(function(p){(p.topd||[]).forEach(function(t){if(t[0]===d)l.push([p,t[1]])})});return l.sort(function(a,b){return b[1]-a[1]})}
+    return L.map(function(p){return [p,Math.round(Math.sqrt(p.d[d]/100)*(5+z()*6)*10)/10]}).sort(function(a,b){return b[1]-a[1]})});
+  /* Spieler des Spieltags (Beispiel): je Spieltag drei aus den PP-Staerksten */
+  E.tag=[];var pool=E.mvp.slice(0,70),tage=lauf?GEWERTET:ST_SAISON;
+  for(var st=1;st<=tage;st++){var w=[];while(w.length<3){var c=pool[Math.floor(Math.pow(z(),1.7)*pool.length)];if(w.indexOf(c)<0)w.push(c)}E.tag.push(w.map(function(x,i){return [x[0],Math.round((9.6-i*.5+z()*.5)*10)/10]}))}
+  return E}
+function trag(p,k,st,s,wert,extra){p.aw.push({k:k,st:st,s:s,w:wert,team:p.h[s].team,x:extra||""})}
+for(var s=1;s<=AKT;s++){var E=vergib(s);ERG[s]=E;if(s===AKT)continue;
+  ["mvp","pp","mip","pow","spe","men","soc","neuzugang","eisern"].forEach(function(k){E[k].slice(0,3).forEach(function(x,i){trag(x[0],k,i,s,x[1])})});
+  E.allstar.forEach(function(t,i){t.forEach(function(x){trag(x[0],"allstar",i,s,x[1])})});
+  E.disz.forEach(function(l,d){l.slice(0,3).forEach(function(x,i){trag(x[0],"disziplin",i,s,x[1],DN[d][0])})});
+  E.tag.forEach(function(w){w.forEach(function(x,i){trag(x[0],"spieltag",i,s,x[1])})})}
+/* Kurs der laufenden Saison: Platz je Award, solange der Spieler unter den ersten zehn steht */
+(function(){var E=ERG[AKT];["mvp","pp","pow","spe","men","soc","eisern"].concat(BSP?["mip"]:[]).forEach(function(k){E[k].slice(0,10).forEach(function(x,i){x[0].kurs.push({k:k,r:i+1,w:x[1]})})});
+  E.disz.forEach(function(l,d){l.slice(0,3).forEach(function(x,i){x[0].kurs.push({k:"disziplin",r:i+1,w:x[1],x:DN[d][0]})})})})();
+AKTIV.forEach(function(p){p.g=[0,0,0];p.aw.forEach(function(a){p.g[a.st]++;if(a.k==="spieltag")p.tag[a.st]++});p.awn=p.g[0]+p.g[1]+p.g[2];p.awp=p.g[0]*3+p.g[1]*2+p.g[2]});
+/* Team-Medaillen je Saison und Liga: laufende Saison = echter Kurs (MED), abgeschlossene = Beispiel aus der Kaderstaerke */
+for(s=1;s<=AKT;s++){TM[s]={1:[],2:[]};[1,2].forEach(function(l){var z=zufall(hash("med"+s+l));
+  TM[s][l]=DN.map(function(_,d){if(s===AKT)return MED[l][d].slice(0,3).map(function(x){return TC[x[0]]});
+    return TEAMS.filter(function(T){return T.h[s].liga===l}).map(function(T){return [T,T.stk[d]+(z()-.5)*16]}).sort(function(a,b){return b[1]-a[1]}).slice(0,3).map(function(x){return x[0]})})})}
+/* Medaillen eines Teams: nach Liga getrennt, "saison" = Kurs der laufenden, "alle" = abgeschlossene Saisons */
+function medBilanz(T,l,zeit){var b={m:[0,0,0],titel:[0,0,0],aw:[0,0,0],sz:0};
+  for(var s=1;s<=AKT;s++){var lauf=s===AKT;if(T.h[s].liga!==l||(zeit==="saison")!==lauf)continue;b.sz++;
+    TM[s][l].forEach(function(t){var i=t.indexOf(T);if(i>=0)b.m[i]++});
+    if(!lauf&&T.h[s].rang<=3)b.titel[T.h[s].rang-1]++;
+    if(lauf&&T.h[s].rang<=3)b.titel[T.h[s].rang-1]++}
+  AKTIV.forEach(function(p){p.aw.forEach(function(a){if(zeit==="alle"&&a.team===T&&T.h[a.s].liga===l&&a.k!=="spieltag")b.aw[a.st]++})});
+  if(zeit==="saison")["mvp","pp","pow","spe","men","soc","eisern"].forEach(function(k){ERG[AKT][k].slice(0,3).forEach(function(x,i){if(x[0].team===T)b.aw[i]++})});
+  b.sum=b.m[0]+b.m[1]+b.m[2];return b}
+var HELD=ALLE[q.get("spieler")]||(BSP?AKTIV.slice().sort(function(a,b){return b.awp-a.awp})[0]:ICH.K.slice().sort(function(a,b){return b.pps-a.pps})[0]);
+if(!HELD.h)HELD=AKTIV[0];
+
+/* ============================== Rahmen ============================== */
+var ANS=[["katalog","Katalog","Award-Katalog"],["schrank","Schrank","Trophäenschrank (Spielerprofil)"],["medaillen","Medaillen","Medaillen (Teamprofil)"],["teams","Teams","Team-Historie"],["spieler","Spieler","Spieler-Historie"]];
+RAHMEN.bau({seite:"historie",demoTitel:"Mockup 24.11. · Awards & Historie",demo:'<span>Ansicht</span><span id="d-ans"></span><i class="tr"></i><span>Daten</span><span id="d-dat"></span>',demoHinweis:"Abgeschlossene Saisons sind Beispiel."});
+$("buehne").innerHTML='<div class="seite kat" id="s-katalog"></div><div class="seite sch" id="s-schrank"></div><div class="seite med" id="s-medaillen"></div><div class="seite his" id="s-teams"></div><div class="seite his" id="s-spieler"></div>';
+function reiter(){return ANS.map(function(a){return '<a class="'+(Z.ans===a[0]?"an":"")+'" href="'+RAHMEN.link({ansicht:a[0],sort:null,dir:null})+'">'+a[1]+'</a>'}).join("")}
+function ligaUm(){return '<span class="umsch">'+[1,2].map(function(l){return '<a class="'+(Z.liga===l?"an":"")+'" data-liga="'+l+'">Liga '+l+'</a>'}).join("")+'</span>'}
+function standText(){return BSP?"Saison "+AKT+" läuft · Spieltag "+GEWERTET+" gewertet":"Saison 1 läuft · Spieltag "+GEWERTET+" gewertet"}
+
+/* ============================== 1. Katalog ============================== */
+function katalog(){
+  RAHMEN.kopf('Welt <span>›</span> Leaders <span>›</span> Auszeichnungen',"Awards",reiter(),
+    RAHMEN.kpi("Spieler-Awards","12","je Gold · Silber · Bronze","zone")+RAHMEN.kpi("Team-Auszeichnungen","2","je Liga")+RAHMEN.kpi("Vergabe","Saisonende","+ jeder Spieltag"));
+  var E=ERG[AKT];
+  function kurs(a){var l;if(a.k==="allstar")l=E.allstar[0].slice().sort(function(x,y){return y[1]-x[1]}).slice(0,3);
+    else if(a.k==="disziplin"){l=[];E.disz.forEach(function(x,d){if(x[0])l.push([x[0][0],x[0][1],DK[d]])});l=l.sort(function(x,y){return y[1]-x[1]}).slice(0,3)}
+    else if(a.k==="spieltag")l=E.tag[E.tag.length-1];
+    else if(a.k==="medaille")l=TEAMS.map(function(T){var b=medBilanz(T,T.liga,"saison");return [T,b.m[0]*100+b.m[1]*10+b.m[2],b]}).sort(function(x,y){return y[1]-x[1]}).slice(0,3);
+    else if(a.k==="meister")l=TEAMS.filter(function(T){return T.liga===1}).sort(function(x,y){return x.st.rank-y.st.rank}).slice(0,3).map(function(T){return [T,T.st.pts]});
+    else l=E[a.k].slice(0,3);
+    var kopf=a.k==="allstar"?"First Team · Spitze":a.k==="disziplin"?"Stärkste Fackeln":a.k==="spieltag"?"Spieltag "+GEWERTET:a.k==="medaille"?"Medaillen-Kurs · beide Ligen":a.k==="meister"?"Liga 1":"Kurs Saison "+AKT;
+    if(!l.length)return '<div class="ks"><h4>'+kopf+'</h4><div><i></i><span class="zu">'+(a.k==="neuzugang"?"In Saison 1 gibt es nur den Draft.":"noch offen")+'</span></div></div>';
+    return '<div class="ks"><h4>'+kopf+(a.bsp&&(BSP||a.k!=="neuzugang")?bsp():"")+'</h4>'+l.map(function(x,i){var o=x[0],t=o.K?null:o.team;
+      var w=a.k==="medaille"?gsb(x[2].m):a.k==="mip"?vz(x[1]):a.k==="eisern"?Math.floor(x[1]):a.k==="meister"?x[1]:de(x[1],a.k==="pp"?2:1);
+      return '<div><b class="g'+i+'">'+(i+1)+'.</b><span>'+o.n+' <small>'+(o.K?"Liga "+o.liga:t.n+(x[2]?" · "+x[2]:""))+'</small></span><b class="t">'+w+(a.k==="medaille"?"":a.ein)+'</b></div>'}).join("")+'</div>'}
+  $("s-katalog").innerHTML=AW.map(function(a){var st=a.q[0];
+    return '<div class="ak'+(a.f!=null?" f"+a.f:"")+(a.wer?" team":"")+'"><div class="eb">'+emb(a.k,0,"Gold")+emb(a.k,1,"Silber")+emb(a.k,2,"Bronze")+'</div><div class="tx"><h3>'+a.n+'</h3>'+
+      '<div class="tg"><span class="tag'+(a.wer?"":" go")+'">'+(a.wer||"Spieler")+'</span><span class="tag">'+a.takt+'</span><span class="tag '+(st==="da"?"g":"a")+'" title="'+esc(a.q[1])+'">'+(st==="da"?"Daten da":"teils neu")+'</span></div>'+
+      '<p>'+a.krit+'</p>'+kurs(a)+'</div></div>'}).join("")+
+    '<div class="ak info"><div><h3>So wird vergeben</h3><ul><li><b>Ein Lauf am Saisonende</b> für alle Awards, zusammen mit den Medaillen. Gebucht wird einmal, eine zweite Buchung tut nichts.</li><li><b>Gold, Silber, Bronze</b> = Platz 1, 2, 3 der jeweiligen Wertung. Bei Gleichstand entscheidet die Zweitwertung, danach wird geteilt.</li><li><b>Spieler-Awards über beide Ligen</b>, weil Player Points vergleichbar sind. <b>Team-Auszeichnungen je Liga.</b></li></ul></div>'+
+    '<div><h3>Wo man sie sieht</h3><ul><li><b>Spielerprofil:</b> Trophäenschrank mit allen Awards der Laufbahn und dem Kurs der laufenden Saison.</li><li><b>Teamprofil:</b> Medaillenwand, Meisterschalen und die Awards der eigenen Spieler.</li><li><b>Während der Saison</b> steht überall nur der <b>Kurs</b>. Ein Award gilt erst, wenn die Saison gebucht ist.</li></ul></div></div>'}
+
+/* ============================== 2. Trophaeenschrank ============================== */
+function schrank(){var p=HELD,T=p.team;
+  RAHMEN.kopf('Spielerprofil <span>›</span> '+p.n+' <span>›</span> Erfolge',"Trophäenschrank",reiter(),
+    RAHMEN.kpi("Awards",p.awn,"in "+p.S.length+(p.S.length===1?" Saison":" Saisons"),"zone")+RAHMEN.kpi("All-Time-PP",de(p.ppAll),"Ø "+de(p.ppAvg)+(p.hoch?" hochger.":" je Saison"))+RAHMEN.kpi("Spieler des Spieltags",p.tag[0]+"×",BSP?"Beispiel":"ab Saisonende"));
+  /* gleiche Awards derselben Stufe werden zu einer Trophaee mit Zaehler */
+  var G={};p.aw.forEach(function(a){var id=a.k+a.st;(G[id]=G[id]||{k:a.k,st:a.st,l:[]}).l.push(a)});
+  var R={mvp:0,pp:1,allstar:2,pow:3,spe:3,men:3,soc:3,mip:4,neuzugang:5,eisern:6,disziplin:7,spieltag:8};
+  var L=Object.keys(G).map(function(k){return G[k]}).sort(function(a,b){return a.st-b.st||R[a.k]-R[b.k]}),mehr=L.length>15?L.length-14:0;if(mehr)L=L.slice(0,14);
+  var tro=L.map(function(g){var a=AWK[g.k],l=g.l,sa=[];l.forEach(function(x){if(sa.indexOf(x.s)<0)sa.push(x.s)});
+    var zus=g.k==="disziplin"?l.map(function(x){return x.x}).filter(function(x,i,arr){return arr.indexOf(x)===i}).slice(0,2).join(", "):g.k==="allstar"?["First Team","Second Team","Third Team"][g.st]:l.length===1?(g.k==="mip"?vz(l[0].w):g.k==="eisern"?Math.floor(l[0].w):de(l[0].w,g.k==="pp"?2:1))+a.ein:"";
+    return '<div class="tro g'+g.st+'" title="'+esc(a.n+" · "+STN[g.st])+'">'+(l.length>1?'<span class="mal">×'+l.length+'</span>':"")+emb(g.k,g.st)+'<b>'+a.n+'</b><small><i class="g'+g.st+'">'+STN[g.st]+'</i> · '+sa.map(sn).join(" ")+(zus?" · "+zus:"")+'</small></div>'}).join("");
+  if(mehr)tro+='<div class="tro leer"><b>+'+mehr+' weitere</b><small>ganze Liste in der Laufbahn</small></div>';
+  if(!L.length)tro='<div class="leerh" style="grid-column:1/6;grid-row:1/4"><div><b>Noch leer</b>Die erste Saison läuft. Awards werden am Saisonende vergeben und stehen dann hier.<br>Unten siehst du, wo '+p.n+' gerade auf Kurs liegt.</div></div>';
+  var kurs=p.kurs.slice().sort(function(a,b){return a.r-b.r}).slice(0,5).map(function(k){return '<span class="kc">'+emb(k.k,Math.min(2,k.r-1))+'<b>'+k.r+'.</b> '+(k.x?k.x+"-König":AWK[k.k].n)+'</span>'}).join("");
+  var mx=Math.max.apply(null,p.S.map(function(s){return p.h[s].pp/(p.h[s].lauf?GEWERTET/ST_SAISON:1)}));
+  var lauf=tafel({cols:[
+    {k:"s",t:"Saison",w:"2.4rem",html:function(s){return '<b class="gr">'+sn(s)+'</b>'}},
+    {k:"t",t:"Team",w:"minmax(0,1fr)",html:function(s){var h=p.h[s];return '<span class="tn">'+logo(h.team.c)+'<span class="nm"><b>'+h.team.n+'</b><small>Liga '+h.team.h[s].liga+(h.lauf?' <i class="lf">läuft</i>':"")+'</small></span></span>'}},
+    {k:"e",t:"Eins.",w:"2.4rem",r:1,html:function(s){return '<b class="t">'+p.h[s].eins+'</b>'}},
+    {k:"p",t:"PP",w:"2.9rem",r:1,html:function(s){return '<b class="t gr">'+de(p.h[s].pp)+'</b>'}},
+    {k:"o",t:"OVR",w:"3.3rem",r:1,html:function(s){var h=p.h[s];return '<span class="zw2"><b class="t">'+de(h.ov)+'</b><small class="'+(h.dev>=1?"plus":h.dev<=-1?"minus":"null")+'">'+vz(h.dev)+'</small></span>'}},
+    {k:"a",t:"Awards",w:"6.6rem",r:1,html:function(s){var l=p.aw.filter(function(a){return a.s===s&&a.k!=="spieltag"}).sort(function(a,b){return a.st-b.st});
+      return p.h[s].lauf?'<span class="zu">Kurs</span>':l.length?'<span class="embz">'+l.slice(0,3).map(function(a){return emb(a.k,a.st,AWK[a.k].n+" · "+STN[a.st])}).join("")+(l.length>3?'<small style="color:var(--leise);font-weight:700;margin-left:.15rem">+'+(l.length-3)+'</small>':"")+'</span>':'<span class="zu">–</span>'}}],
+    rows:p.S.slice().reverse(),zeilen:5});
+  var stat=[];p.S.forEach(function(s){var h=p.h[s],l=stat[stat.length-1];if(l&&l.T===h.team){l.b=s;l.pp+=h.pp}else stat.push({T:h.team,a:s,b:s,pp:h.pp})});
+  var wahl=[HELD].concat(AKTIV.slice().sort(function(a,b){return b.awp-a.awp||b.pps-a.pps}).slice(0,3),ICH.K.slice().sort(function(a,b){return b.awp-a.awp||b.pps-a.pps}).slice(0,3)).filter(function(x,i,a){return a.indexOf(x)===i}).slice(0,6);
+  $("s-schrank").innerHTML=
+    '<div class="pan"><div class="pk"><h2>Spieler</h2><span class="sp"></span><small class="u">Profil › Erfolge</small></div><div class="pb"><div class="held"><span class="bild" style="background-image:url(../class-icons/'+p.kl+'.png)">'+por(p)+'</span><h3>'+p.n+'</h3>'+
+      '<span class="zl">'+klasse(p)+rasse(p,true)+'</span><span class="zl">'+logo(T.c)+'<span>'+T.n+' · Liga '+T.liga+'</span></span></div>'+
+      '<div class="summe"><div><strong class="g0 t">'+p.g[0]+'</strong><small>Gold</small></div><div><strong class="g1 t">'+p.g[1]+'</strong><small>Silber</small></div><div><strong class="g2 t">'+p.g[2]+'</strong><small>Bronze</small></div></div>'+
+      '<div class="zeile2"><span>Saisons in der Liga</span><b class="t">'+p.S.length+'</b></div><div class="zeile2"><span>Beste Saison</span><b class="t">'+de(p.bestS)+' PP</b></div>'+
+      '<div class="zeile2"><span>PP je Einsatz, Laufbahn</span><b class="t">'+de(p.ppeAll,2)+'</b></div><div class="zeile2"><span>Gesamtwert seit dem Start</span><b class="t">'+de(p.ovStart)+' → '+de(p.ov)+'<small class="'+(p.ov-p.ovStart>=0?"plus":"minus")+'">'+vz(p.ov-p.ovStart)+'</small></b></div>'+
+      '<div class="zeile2"><span>Spieler des Spieltags</span><b>'+gsb(p.tag)+'</b></div>'+
+      '<div class="stat"><h4>Stationen</h4>'+stat.reverse().map(function(x){return '<div>'+logo(x.T.c)+'<span>'+x.T.n+'<small>'+(x.a===x.b?sn(x.a):sn(x.a)+"–"+sn(x.b))+'</small></span><b class="t">'+de(x.pp)+' PP</b></div>'}).join("")+'</div>'+
+      '<div class="wechsel">'+wahl.map(function(x){return '<a class="'+(x===p?"an":"")+'" href="'+RAHMEN.link({spieler:x.s})+'">'+x.n+'</a>'}).join("")+'</div></div></div>'+
+    '<div class="pan"><div class="pk"><h2>Trophäenschrank</h2>'+(BSP?bsp("Beispiel-Laufbahn"):"")+'<span class="sp"></span><small class="u">Gold zuerst · gleiche Awards mit Zähler</small></div><div class="pb"><div class="regal">'+tro+'</div>'+
+      '<div class="kurs"><span class="gk">Kurs Saison '+AKT+'</span>'+(kurs||'<span class="zu">in keiner Wertung unter den ersten zehn</span>')+'</div></div></div>'+
+    '<div class="spalte"><div class="pan" style="flex:1.15"><div class="pk"><h2>Laufbahn</h2>'+(BSP?bsp():"")+'<span class="sp"></span><small class="u">je Saison</small></div>'+lauf.html+'</div>'+
+      '<div class="pan"><div class="pk"><h2>Player Points je Saison</h2><span class="sp"></span><small class="u">laufende Saison hochgerechnet</small></div><div class="pb"><div class="sbalken">'+p.S.map(function(s){var h=p.h[s],w=h.pp/(h.lauf?GEWERTET/ST_SAISON:1);
+        return '<div class="'+(h.lauf?"lauf":"")+'"><b class="t">'+(h.lauf?"≈ ":"")+de(w)+'</b><i style="height:'+Math.round(w/mx*72)+'%"></i><small>'+logo(h.team.c)+sn(s)+'</small></div>'}).join("")+'</div></div></div></div>'}
+
+/* ============================== 3. Medaillen ============================== */
+function medaillen(){var T=Z.team,l=Z.liga,alle=Z.zeit==="alle";
+  var eig=medBilanz(T,T.liga,"alle"),ek=medBilanz(T,T.liga,"saison"),and=medBilanz(T,T.liga===1?2:1,"alle");
+  RAHMEN.kopf('Teams <span>›</span> '+T.n+' <span>›</span> Profil',"Medaillen",reiter(),
+    RAHMEN.kpi("Disziplin-Medaillen",eig.sum+and.sum,"abgeschlossene Saisons","zone")+RAHMEN.kpi("Kurs Saison "+AKT,gsb(ek.m),"Liga "+T.liga)+RAHMEN.kpi("Meisterschalen",gsb([eig.titel[0]+and.titel[0],eig.titel[1]+and.titel[1],eig.titel[2]+and.titel[2]])));
+  var schmuck='<div class="pan"><div class="schmuck">'+logo(T.c)+'<div class="nmb"><h3>'+T.n+'</h3><p>'+(BSP?"Liga "+T.liga+" · "+saisons(T,1).length+" Saisons in Liga 1, "+saisons(T,2).length+" in Liga 2 "+bsp():"Liga "+T.liga+" · erste Saison läuft, vergeben wird am Saisonende")+'</p></div>'+
+    [0,1,2].map(function(i){return '<div class="bl">'+emb("medaille",i)+'<div><strong class="g'+i+' t">'+(eig.m[i]+and.m[i])+'</strong><small>'+STN[i]+'</small></div></div>'}).join("")+
+    '<div class="bl">'+emb("meister",0)+'<div><strong class="t">'+gsb([eig.titel[0]+and.titel[0],eig.titel[1]+and.titel[1],eig.titel[2]+and.titel[2]])+'</strong><small>Meisterschalen</small></div></div>'+
+    '<div class="bl">'+emb("mvp",0)+'<div><strong class="t">'+gsb([eig.aw[0]+and.aw[0],eig.aw[1]+and.aw[1],eig.aw[2]+and.aw[2]])+'</strong><small>Awards der Spieler</small></div></div></div></div>';
+  var wand=DN.map(function(_,d){var k=medRang(T,d),zellen="";
+    for(var s=1;s<=AKT;s++){var i=TM[s][T.h[s].liga][d].indexOf(T),lauf=s===AKT;
+      zellen+='<span title="'+sn(s)+' · Liga '+T.h[s].liga+'">'+(lauf?(k&&k<=3?'<img class="emb" style="opacity:.45" src="../sprites/awards/medaille-'+STD[k-1]+'.png" alt="" title="Kurs: '+k+'. Platz, noch nicht vergeben">':'<u class="x"></u>'):i>=0?emb("medaille",i,sn(s)+" · "+STN[i]+" · Liga "+T.h[s].liga):'<u></u>')+'<small>'+sn(s)+(T.h[s].liga!==T.liga?" <i>L"+T.h[s].liga+"</i>":"")+'</small></span>'}
+    return '<div class="wz a'+DA[d]+'"><h4>'+dIcon(d)+DN[d][0]+'<small>Kurs <b class="'+(k&&k<=3?"g"+(k-1):"")+'">'+(k?k+".":"offen")+'</b></small></h4><div class="ms">'+zellen+'</div></div>'}).join("");
+  var rows=TEAMS.filter(function(x){return saisons(x,l).some(function(s){return alle?!x.h[s].lauf:x.h[s].lauf})}).map(function(x){var b=medBilanz(x,l,Z.zeit);b.T=x;b.n=x.n;return b});
+  var olymp=function(b){return b.m[0]*1e4+b.m[1]*100+b.m[2]+(17-b.T.st.rank)/100};
+  rows.sort(function(a,b){return olymp(b)-olymp(a)}).forEach(function(b,i){b.r=i+1});
+  var tf=tafel({sort:Z.sort||"r",dir:Z.sort?Z.dir:1,rows:rows,zeilen:Math.max(16,rows.length),cols:[
+    {k:"r",t:"#",w:"1.6rem",wert:function(b){return b.r},html:function(b){return '<b class="pl">'+b.r+'</b>'},tip:"Rang im Medaillenspiegel: Gold, dann Silber, dann Bronze"},
+    {k:"n",t:"Team",w:"minmax(0,1fr)",wert:function(b){return b.T.n},html:function(b){return '<span class="tn">'+logo(b.T.c)+'<span class="nm"><b>'+b.T.n+'</b><small>'+(alle?b.sz+(b.sz===1?" Saison":" Saisons")+" in Liga "+l:b.T.st.rank+". der Tabelle")+'</small></span></span>'}},
+    {k:"g",t:"Gold",w:"2.6rem",r:1,wert:function(b){return b.m[0]},html:function(b){return '<b class="zn g0 t'+(b.m[0]?"":" n0")+'">'+b.m[0]+'</b>'}},
+    {k:"s",t:"Silber",w:"2.6rem",r:1,wert:function(b){return b.m[1]},html:function(b){return '<b class="zn g1 t'+(b.m[1]?"":" n0")+'">'+b.m[1]+'</b>'}},
+    {k:"b",t:"Bronze",w:"2.8rem",r:1,wert:function(b){return b.m[2]},html:function(b){return '<b class="zn g2 t'+(b.m[2]?"":" n0")+'">'+b.m[2]+'</b>'}},
+    {k:"sum",t:"Summe",w:"2.9rem",r:1,wert:function(b){return b.sum},html:function(b){return '<b class="gr t">'+b.sum+'</b>'}},
+    {k:"ti",t:alle?"Schalen":"Platz",w:"4.4rem",r:1,tip:"Meisterschale: Platz 1, 2, 3 der Abschlusstabelle",wert:function(b){return alle?b.titel[0]*100+b.titel[1]*10+b.titel[2]:-b.T.st.rank},html:function(b){return alle?gsb(b.titel):'<b class="t">'+b.T.st.rank+'.</b>'}},
+    {k:"aw",t:"Spieler-Awards",w:"6rem",r:1,tip:"Awards, die Spieler in diesem Team gewonnen haben (ohne Spieler des Spieltags)",wert:function(b){return b.aw[0]*100+b.aw[1]*10+b.aw[2]},html:function(b){return gsb(b.aw)}}],
+    zeile:function(b){return {cls:"klick"+(b.T===T?" an":"")+(b.T===ICH&&b.T!==T?" ich":""),attr:'data-team="'+b.T.c+'"'}}});
+  $("s-medaillen").innerHTML=schmuck+
+    '<div class="pan rechtsp"><div class="pk"><h2>Medaillenspiegel</h2>'+(alle&&BSP?bsp():"")+'<span class="sp"></span><span class="umsch"><a class="'+(alle?"":"an")+'" data-zeit="saison">Saison '+AKT+' · Kurs</a><a class="'+(alle?"an":"")+'" data-zeit="alle">Alle Saisons</a></span>'+ligaUm()+'</div>'+tf.html+
+      '<div class="tfuss"><span>Gold vor Silber vor Bronze. Gezählt werden nur Medaillen aus Saisons in <b>Liga '+l+'</b>.</span><span class="sp"></span><span>Klick wählt das Team</span></div></div>'+
+    '<div class="pan"><div class="pk"><h2>Medaillenwand</h2>'+(BSP?bsp("S1–S"+(AKT-1)+" Beispiel"):"")+'<span class="sp"></span><small class="u">20 Disziplinen · je Saison eine Medaille möglich · '+sn(AKT)+' = echter Kurs</small></div><div class="pb"><div class="wand">'+wand+'</div></div></div>'}
+
+/* ============================== 4. Team-Historie ============================== */
+function rangKl(r){return r<=3?" r"+r:""}
+function funke(w,farbe){var mn=Math.min.apply(null,w),mx=Math.max.apply(null,w),sp=mx-mn||1;if(w.length<2)return '<span class="zu">–</span>';
+  return '<svg class="spark" viewBox="0 0 100 24" preserveAspectRatio="none"><polyline fill="none" stroke="'+farbe+'" stroke-width="2" vector-effect="non-scaling-stroke" points="'+w.map(function(v,i){return (i/(w.length-1)*100).toFixed(1)+","+(21-(v-mn)/sp*18).toFixed(1)}).join(" ")+'"/></svg>'}
+function teamHist(){var l=Z.liga,T=Z.team;
+  var rows=TEAMS.filter(function(x){return saisons(x,l).length}).map(function(x){var b=ligaBilanz(x,l);b.T=x;b.n=x.n;return b});
+  var best=rows.slice().sort(function(a,b){return b.avg-a.avg})[0];
+  RAHMEN.kopf('Welt <span>›</span> Historie <span>›</span> Teams · nach Liga getrennt',"Team-Historie",reiter(),
+    RAHMEN.kpi("Saisons",AKT,BSP?"4 abgeschlossen · Beispiel":"läuft","zone")+RAHMEN.kpi("Bester Schnitt Liga "+l,de(best.avg),best.T.n)+RAHMEN.kpi("Teams in Liga "+l,rows.length,rows.length>16?"16 heute + "+(rows.length-16)+" frühere":"alle heute"));
+  var cols=[
+    {k:"rk",t:"#",w:"1.5rem",html:function(b,i){return '<b class="pl">'+(i+1)+'</b>'}},
+    {k:"n",t:"Team",w:"minmax(0,1fr)",wert:function(b){return b.T.n},html:function(b){var x=b.T,jetzt=x.liga===l;return '<span class="tn">'+logo(x.c)+'<span class="nm"><b>'+x.n+'</b><small>'+(jetzt?"heute "+x.st.rank+". in Liga "+l:"heute in Liga "+x.liga)+(b.sz<AKT?" · "+b.sz+" von "+AKT+" Saisons hier":"")+'</small></span></span>'}},
+    {k:"p1",t:"1.",w:"1.8rem",r:1,tip:"Wie oft Erster dieser Liga",wert:function(b){return b.p[0]},html:function(b){return '<b class="zn g0 t'+(b.p[0]?"":" n0")+'">'+b.p[0]+'</b>'}},
+    {k:"p2",t:"2.",w:"1.8rem",r:1,wert:function(b){return b.p[1]},html:function(b){return '<b class="zn g1 t'+(b.p[1]?"":" n0")+'">'+b.p[1]+'</b>'}},
+    {k:"p3",t:"3.",w:"1.8rem",r:1,wert:function(b){return b.p[2]},html:function(b){return '<b class="zn g2 t'+(b.p[2]?"":" n0")+'">'+b.p[2]+'</b>'}},
+    {k:"t5",t:"Top 5",w:"2.6rem",r:1,tip:"Platz 1 bis 5 (schließt die Plätze 1 bis 3 ein)",wert:function(b){return b.t5},html:function(b){return '<b class="zn t'+(b.t5?"":" n0")+'">'+b.t5+'</b>'}},
+    {k:"t10",t:"Top 10",w:"2.9rem",r:1,tip:"Platz 1 bis 10",wert:function(b){return b.t10},html:function(b){return '<b class="zn t'+(b.t10?"":" n0")+'">'+b.t10+'</b>'}}];
+  for(var s=1;s<=AKT;s++)(function(s){cols.push({k:"s"+s,t:sn(s),w:"2.9rem",r:1,tip:"Punkte in Saison "+s+", klein der Platz. Gestrichelt: das Team spielte in der anderen Liga.",wert:function(b){return b.pkt[s]==null?-1:b.pkt[s]},
+    html:function(b){var h=b.T.h[s];return h.liga!==l?'<span class="and">L'+h.liga+'</span>':'<span class="sz'+rangKl(h.rang)+(h.lauf?" lauf":"")+'"><b class="t">'+h.pkt+'</b><small>'+h.rang+'.</small></span>'}})})(s);
+  cols.push(
+    {k:"all",t:"All-Time",w:"3.5rem",r:1,tip:"Summe aller Punkte in dieser Liga, mit der laufenden Saison",wert:function(b){return b.all},html:function(b){return '<b class="t">'+b.all+'</b>'}},
+    {k:"avg",t:"Ø Punkte",w:"3.9rem",r:1,tip:"Punkte je abgeschlossener Saison in dieser Liga. Ohne abgeschlossene Saison: Hochrechnung der laufenden (≈).",wert:function(b){return b.avg},html:function(b){return '<b class="gr t">'+(b.hoch?"≈ ":"")+de(b.avg)+'</b>'}},
+    {k:"mw",t:"Marktwert",w:"4.3rem",r:1,tip:"Kaderwert heute, klein die Änderung seit der ersten Saison",wert:function(b){return b.T.h[AKT].mw},html:function(b){var h=b.T.h;return '<span class="zw2"><b class="t">'+de(h[AKT].mw,0)+'</b>'+(AKT>1?'<small class="'+(h[AKT].mw>=h[1].mw?"plus":"minus")+'">'+vz(h[AKT].mw-h[1].mw,0)+'</small>':"")+'</span>'}},
+    {k:"ka",t:"Kasse",w:"3.6rem",r:1,wert:function(b){return b.T.h[AKT].kasse},html:function(b){var k=b.T.h[AKT].kasse;return '<b class="t'+(k<0?" minus":"")+'">'+de(k,0)+'</b>'}},
+    {k:"vm",t:"Vermögen",w:"4rem",r:1,tip:"Kasse + Kaderwert + Gebäude (Investition × Zustand)",wert:function(b){return b.T.h[AKT].verm},html:function(b){return '<b class="t" style="color:var(--creme)">'+de(b.T.h[AKT].verm,0)+'</b>'}});
+  if(AKT>1)cols.push({k:"vl",t:"Verlauf",w:"4.6rem",html:function(b){return funke(b.T.h.slice(1).map(function(x){return x.verm}),"var(--gold)")},tip:"Vermögen über alle Saisons"});
+  var tf=tafel({sort:Z.sort||"avg",dir:Z.dir,rows:rows,zeilen:Math.max(16,rows.length),cols:cols,zeile:function(b){return {cls:"klick"+(b.T===T?" an":"")+(b.T===ICH&&b.T!==T?" ich":""),attr:'data-team="'+b.T.c+'"'}}});
+  /* rechte Spalte: gewaehltes Team */
+  var H=T.h.slice(1),mxV=Math.max.apply(null,H.map(function(x){return Math.max(0,x.kasse)+x.mw+x.geb}));
+  var stapel=H.map(function(x,i){var f=function(v){return (Math.max(0,v)/mxV*100).toFixed(1)};
+    return '<div><b class="t">'+de(x.verm,0)+'</b><span class="st" style="height:'+f(Math.max(0,x.kasse)+x.mw+x.geb)*.78+'%"><i class="c-kd" style="flex:'+x.mw+'" title="Kader '+de(x.mw)+' C"></i><i class="'+(x.kasse<0?"c-neg":"c-ka")+'" style="flex:'+Math.abs(x.kasse)+'" title="Kasse '+de(x.kasse)+' C"></i><i class="c-ge" style="flex:'+x.geb+'" title="Gebäude '+de(x.geb)+' C"></i></span><small>'+sn(i+1)+(x.lauf?" läuft":"")+'</small></div>'}).join("");
+  var jz=T.h[AKT],er=T.h[1];
+  /* Fahrstuhl: Platz 1..32 ueber beide Ligen (Liga 2 = 17..32) */
+  var W=260,Hh=120,pts=H.map(function(x,i){var r=x.rang+(x.liga-1)*16;return [H.length>1?16+i/(H.length-1)*(W-32):W/2,8+(r-1)/31*(Hh-16),x]});
+  var fahr='<svg class="fahr" viewBox="0 0 '+W+' '+Hh+'" preserveAspectRatio="none"><rect x="0" y="0" width="'+W+'" height="'+(Hh/2)+'" fill="rgba(240,195,90,.07)"/><rect x="0" y="'+(Hh/2)+'" width="'+W+'" height="'+(Hh/2)+'" fill="rgba(69,176,201,.06)"/>'+
+    '<line x1="0" x2="'+W+'" y1="'+(Hh/2)+'" y2="'+(Hh/2)+'" stroke="rgba(244,230,196,.3)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>'+
+    (pts.length>1?'<polyline fill="none" stroke="#f4e6c4" stroke-width="2" vector-effect="non-scaling-stroke" points="'+pts.map(function(p){return p[0].toFixed(1)+","+p[1].toFixed(1)}).join(" ")+'"/>':"")+
+    pts.map(function(p){return '<line x1="'+p[0].toFixed(1)+'" x2="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" y2="'+p[1].toFixed(1)+'" stroke="'+(p[2].lauf?"#62d394":p[2].rang<=3?"#f0c35a":"#f4e6c4")+'" stroke-width="11" stroke-linecap="round" vector-effect="non-scaling-stroke"/>'}).join("")+'</svg>';
+  var marken=H.map(function(x,i){return '<div><strong class="t '+(x.rang<=3?"g"+(x.rang-1):"")+'">'+x.rang+'.</strong><small>'+sn(i+1)+' · Liga '+x.liga+'</small></div>'}).join("");
+  var b1=ligaBilanz(T,1),b2=ligaBilanz(T,2);
+  $("s-teams").innerHTML=
+    '<div class="pan"><div class="pk"><h2>Ewige Tabelle · Liga '+l+'</h2>'+(BSP?bsp("S1–S"+(AKT-1)+" Beispiel · S"+AKT+" echt"):"")+'<span class="sp"></span><small class="u">'+standText()+'</small>'+ligaUm()+'</div>'+tf.html+
+      '<div class="tfuss"><span>Gezählt wird nur, was ein Team <b>in Liga '+l+'</b> gespielt hat. Standard-Sortierung: Ø Punkte je Saison.</span><span class="sp"></span><span class="leg"><span><i class="and" style="padding:0 .2rem;transform:none;width:auto;height:auto">L'+(3-l)+'</i>andere Liga</span><span style="color:var(--gut)">grün = läuft</span></span></div></div>'+
+    '<div class="spalte"><div class="pan" style="flex:1.25"><div class="pk"><h2>Vermögen</h2>'+bsp(BSP?"Beispiel":"Gebäude Beispiel")+'<span class="sp"></span><span class="leg"><span><i class="c-kd"></i>Kader</span><span><i class="c-ka"></i>Kasse</span><span><i class="c-ge"></i>Gebäude</span></span></div><div class="pb">'+
+        '<div class="kopfz">'+logo(T.c)+'<div style="min-width:0"><h3>'+T.n+'</h3><small>Vermögen heute <b style="color:var(--creme)">'+C(jz.verm)+'</b>'+(AKT>1?' · seit S1 <span class="'+(jz.verm>=er.verm?"plus":"minus")+'">'+vz(jz.verm-er.verm)+' C</span>':"")+'</small></div></div>'+
+        '<div class="dreier"><div><small>Kaderwert</small><strong class="t">'+de(jz.mw)+'</strong><em>Summe Marktwerte</em></div><div><small>Kasse</small><strong class="t'+(jz.kasse<0?" minus":"")+'">'+de(jz.kasse)+'</strong><em>Kontostand</em></div><div><small>Gebäude</small><strong class="t">'+de(jz.geb)+'</strong><em>'+de(T.inv)+' C × '+T.zust+' %</em></div></div>'+
+        '<div class="stapel">'+stapel+'</div></div></div>'+
+      '<div class="pan"><div class="pk"><h2>Weg durch die Ligen</h2><span class="sp"></span><small class="u">oben Liga 1 · unten Liga 2</small></div><div class="pb">'+
+        '<div class="dreier" style="grid-template-columns:repeat('+H.length+',1fr);text-align:center">'+marken+'</div>'+fahr+
+        '<div class="zeile2" style="margin-top:.4rem"><span>Liga 1: Saisons · Ø Punkte</span><b class="t">'+b1.sz+' · '+(b1.sz?(b1.hoch?"≈ ":"")+de(b1.avg):"–")+'</b></div><div class="zeile2"><span>Liga 2: Saisons · Ø Punkte</span><b class="t">'+b2.sz+' · '+(b2.sz?(b2.hoch?"≈ ":"")+de(b2.avg):"–")+'</b></div></div></div></div>'}
+
+/* ============================== 5. Spieler-Historie ============================== */
+function spielerHist(){var p=HELD;
+  var rows=AKTIV.filter(function(x){return (Z.farbe<0||x.kf===Z.farbe)&&(!Z.kader||x.team===ICH)});
+  var best=AKTIV.slice().sort(function(a,b){return b.ppAll-a.ppAll})[0];
+  RAHMEN.kopf('Welt <span>›</span> Historie <span>›</span> Spieler · beide Ligen zusammen',"Spieler-Historie",reiter(),
+    RAHMEN.kpi("Spieler",rows.length,"mit Vertrag","zone")+RAHMEN.kpi("Meiste PP aller Zeiten",de(best.ppAll),best.n)+RAHMEN.kpi("Saisons",AKT,BSP?"4 abgeschlossen · Beispiel":"läuft"));
+  var cols=[
+    {k:"rk",t:"#",w:"1.9rem",html:function(x,i){return '<b class="pl">'+(i+1)+'</b>'}},
+    {k:"n",t:"Spieler",w:"minmax(0,1fr)",wert:function(x){return x.n},html:function(x){return '<span class="tn">'+por(x)+'<span class="nm"><b>'+x.n+'</b><small>'+klasse(x)+'<span>'+x.team.n+'</span></small></span></span>'}},
+    {k:"sa",t:"Sais.",w:"2.3rem",r:1,tip:"Saisons mit Einsätzen",wert:function(x){return x.S.length},html:function(x){return '<b class="t">'+x.S.length+'</b>'}}];
+  for(var s=1;s<=AKT;s++)(function(s){cols.push({k:"s"+s,t:sn(s),w:"3rem",r:1,tip:"Player Points in Saison "+s,wert:function(x){return x.h[s]?x.h[s].pp:-1},
+    html:function(x){var h=x.h[s];return h?'<span class="sz'+(h.lauf?" lauf":"")+'"><b class="t">'+de(h.pp)+'</b><small>'+h.eins+' E</small></span>':'<span class="zu">–</span>'}})})(s);
+  cols.push(
+    {k:"all",t:"All-Time",w:"3.6rem",r:1,tip:"Summe aller Player Points, mit der laufenden Saison",wert:function(x){return x.ppAll},html:function(x){return '<b class="t">'+de(x.ppAll)+'</b>'}},
+    {k:"avg",t:"Ø je Saison",w:"5.2rem",r:1,tip:"PP je abgeschlossener Saison. Ohne abgeschlossene Saison: Hochrechnung der laufenden (≈).",wert:function(x){return x.ppAvg},html:function(x){return '<b class="gr t">'+(x.hoch?"≈ ":"")+de(x.ppAvg)+'</b>'}},
+    {k:"ppe",t:"PP / Eins.",w:"3.6rem",r:1,wert:function(x){return x.ppeAll},html:function(x){return '<b class="t">'+de(x.ppeAll,2)+'</b>'}},
+    {k:"e",t:"Eins.",w:"2.6rem",r:1,wert:function(x){return x.einsAll},html:function(x){return '<b class="t">'+x.einsAll+'</b>'}},
+    {k:"tag",t:"Sp. d. Tages",w:"4.4rem",r:1,tip:"Spieler des Spieltags: Platz 1, 2, 3"+(BSP?" (Beispiel)":""),wert:function(x){return x.tag[0]*100+x.tag[1]*10+x.tag[2]},html:function(x){return gsb(x.tag)}},
+    {k:"aw",t:"Awards",w:"4.4rem",r:1,tip:"Saison-Awards in Gold, Silber, Bronze (ohne Spieler des Spieltags)",wert:function(x){return (x.g[0]-x.tag[0])*100+(x.g[1]-x.tag[1])*10+x.g[2]-x.tag[2]},html:function(x){return gsb([x.g[0]-x.tag[0],x.g[1]-x.tag[1],x.g[2]-x.tag[2]])}},
+    {k:"ov",t:"OVR",w:"4.4rem",r:1,tip:"Gesamtwert heute, klein die Änderung seit der ersten Saison",wert:function(x){return x.ov},html:function(x){var d=x.ov-x.ovStart;return '<span class="zw2"><b class="t">'+de(x.ov)+'</b><small class="'+(d>=1?"plus":d<=-1?"minus":"null")+'">'+vz(d)+'</small></span>'}},
+    {k:"mw",t:"Marktwert",w:"3.9rem",r:1,wert:function(x){return x.mw},html:function(x){return '<b class="t">'+de(x.mw)+'</b>'}});
+  var tf=tafel({sort:Z.sort||"avg",dir:Z.dir,rows:rows,zeilen:17,blatt:Z.blatt,cols:cols,zeile:function(x){return {cls:"klick"+(x===p?" an":"")+(x.team===ICH&&x!==p?" ich":""),attr:'data-spieler="'+x.s+'"'}}});
+  var blaetter=Math.ceil(tf.n/17);
+  var mx=Math.max.apply(null,p.S.map(function(s){return p.h[s].pp/(p.h[s].lauf?GEWERTET/ST_SAISON:1)}));
+  var awl=p.aw.filter(function(a){return a.k!=="spieltag"}).sort(function(a,b){return a.st-b.st||b.s-a.s}).slice(0,12).map(function(a){return '<span>'+emb(a.k,a.st)+'<b>'+AWK[a.k].n+(a.x?" "+a.x:"")+'</b> '+sn(a.s)+'</span>'}).join("");
+  var ovp=p.S.map(function(s){return p.h[s].ov});
+  $("s-spieler").innerHTML=
+    '<div class="pan"><div class="pk"><h2>Ewige Bestenliste</h2>'+(BSP?bsp("S1–S"+(AKT-1)+" Beispiel · S"+AKT+" echt"):"")+'<span class="sp"></span><span class="fchips">'+
+      '<a class="'+(Z.farbe<0&&!Z.kader?"an":"")+'" data-farbe="-1">Alle</a>'+AX.map(function(a,i){return '<a class="'+(Z.farbe===i?"an":"")+'" data-farbe="'+i+'" style="'+(Z.farbe===i?"":"color:"+AXF[i]+"!important")+'">'+a+'</a>'}).join("")+'<a class="'+(Z.kader?"an":"")+'" data-kader="1">Mein Kader</a></span></div>'+tf.html+
+      '<div class="tfuss"><span><b>Keine Liga-Trennung:</b> Player Points sind über beide Ligen vergleichbar. Standard-Sortierung: Ø PP je Saison.</span><span class="sp"></span><span>'+tf.n+' Spieler · Blatt '+(Z.blatt+1)+' von '+blaetter+'</span><a class="'+(Z.blatt?"":"aus")+'" data-blatt="-1">‹ zurück</a><a class="'+(Z.blatt<blaetter-1?"":"aus")+'" data-blatt="1">weiter ›</a></div></div>'+
+    '<div class="spalte"><div class="pan" style="flex:1.2"><div class="pk"><h2>Laufbahn</h2>'+(BSP?bsp():"")+'<span class="sp"></span><a href="'+RAHMEN.link({ansicht:"schrank",spieler:p.s,sort:null,dir:null})+'">Trophäenschrank ›</a></div><div class="pb">'+
+        '<div class="kopfz">'+por(p)+'<div style="min-width:0"><h3>'+p.n+'</h3><small>'+klasse(p)+' · '+p.team.n+'</small></div></div>'+
+        '<div class="dreier"><div><small>All-Time-PP</small><strong class="t">'+de(p.ppAll)+'</strong><em>'+p.einsAll+' Einsätze</em></div><div><small>Ø je Saison</small><strong class="t">'+(p.hoch?"≈ ":"")+de(p.ppAvg)+'</strong><em>beste '+de(p.bestS)+'</em></div><div><small>Gesamtwert</small><strong class="t">'+de(p.ov)+'</strong><em class="'+(p.ov>=p.ovStart?"plus":"minus")+'">'+vz(p.ov-p.ovStart)+' seit Start</em></div></div>'+
+        '<div class="sbalken">'+p.S.map(function(s){var h=p.h[s],w=h.pp/(h.lauf?GEWERTET/ST_SAISON:1);return '<div class="'+(h.lauf?"lauf":"")+'"><b class="t">'+(h.lauf?"≈ ":"")+de(w)+'</b><i style="height:'+Math.round(w/mx*70)+'%"></i><small>'+logo(h.team.c)+sn(s)+'</small></div>'}).join("")+'</div></div></div>'+
+      '<div class="pan"><div class="pk"><h2>Awards</h2><span class="sp"></span>'+gsb(p.g)+'</div><div class="pb"><div class="zeile2" style="border-top:0"><span>Gesamtwert je Saison</span><b style="width:9rem;display:block">'+funke(ovp,"var(--gut)")+'</b></div><div class="zeile2" style="margin-bottom:.4rem"><span>Spieler des Spieltags</span><b>'+gsb(p.tag)+'</b></div>'+
+        '<div class="awl">'+(awl||'<span class="zu" style="border:0">Noch keine Awards: die erste Saison läuft.</span>')+'</div></div></div></div>'}
+
+/* ============================== Steuerung ============================== */
+function alles(){ANS.forEach(function(a){$("s-"+a[0]).classList.toggle("an",a[0]===Z.ans)});
+  ({katalog:katalog,schrank:schrank,medaillen:medaillen,teams:teamHist,spieler:spielerHist})[Z.ans]();
+  $("d-ans").innerHTML=ANS.map(function(a){return '<a class="'+(Z.ans===a[0]?"an":"")+'" href="'+RAHMEN.link({ansicht:a[0],sort:null,dir:null})+'">'+a[2]+'</a>'}).join(" ");
+  $("d-dat").innerHTML='<a class="'+(BSP?"an":"")+'" href="'+RAHMEN.link({saisons:null,spieler:null})+'">Beispiel: 5 Saisons</a> <a class="'+(BSP?"":"an")+'" href="'+RAHMEN.link({saisons:1,spieler:null,zeit:null})+'">Echt: Saison 1 läuft</a>'}
+document.addEventListener("click",function(ev){var t=ev.target,e;
+  if(e=t.closest("[data-liga]")){Z.liga=+e.getAttribute("data-liga");Z.blatt=0;return alles()}
+  if(e=t.closest("[data-zeit]")){Z.zeit=e.getAttribute("data-zeit");return alles()}
+  if(e=t.closest("[data-farbe]")){Z.farbe=+e.getAttribute("data-farbe");Z.kader=false;Z.blatt=0;return alles()}
+  if(e=t.closest("[data-kader]")){Z.kader=!Z.kader;Z.farbe=-1;Z.blatt=0;return alles()}
+  if(e=t.closest("[data-blatt]")){Z.blatt+=+e.getAttribute("data-blatt");return alles()}
+  if(t.closest(".tz.kopf")&&sortKlick(ev,Z,{n:1,r:1}))return alles();
+  if(e=t.closest("[data-team]")){Z.team=TC[e.getAttribute("data-team")];return alles()}
+  if(e=t.closest("[data-spieler]")){HELD=ALLE[e.getAttribute("data-spieler")];return alles()}
+});
+alles();
+</script>
+</body>
+</html>
