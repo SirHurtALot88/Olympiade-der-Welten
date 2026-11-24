@@ -298,6 +298,40 @@ Teams tragen ihre Marke (Chris, Franky, Ramona) in jeder Liste; „Auf einen Bli
 | 13 | **Ticket-Einnahme im Spielplan:** je Heimspiel die Erwartung des eigenen Teams; bei fremden Teams nur die Auslastung. | **Ja.** |
 | 14 | **Medaillen-Kurs** (Stand der Disziplin-Wertung während der Saison) zeigen, obwohl erst am Saisonende vergeben wird? | **Ja**, als „Kurs“ beschriftet. |
 
+## 6a. Entscheidungen (Chris, 24.11.) — gelten für den Bau, gehen den Empfehlungen in Abschnitt 6 vor
+
+Die drei Mockups sind freigegeben, **gebaut wird ab Samstag, 28.11., 16:05**.
+
+| # | Entscheidung |
+|---|---|
+| 1 | Sechs feste Spalten-Sätze reichen erstmal. |
+| 2 | Filter links. |
+| 3 | **Traits bekommen eine eigene Spalte** in der Liste, gern untereinander gestapelt. Nur wenn die Zeile dann wirklich zu breit wird, weglassen. |
+| 4 | Reiter Transfers im Team zeigt die **laufende Saison**; ältere Saisons in der Historie (alternativ als eigener Reiter im Transfermarkt). |
+| 5 | **Kasse fremder Teams als Spanne mit wechselnder Breite** (mal enger, mal weiter, etwa 10–30, also rund 20 bis 30 C Unterschied), nicht immer dieselbe 10er-Stufe. **Gehaltssumme in 10er-Schritten** (40–50 usw.). **Der Finanzwert wird gar nicht angezeigt** — er ist ein reiner Hintergrundwert (gilt für alle Seiten). |
+| 6 | Arena, Fans und Sponsor-Name fremder Teams öffentlich, Beträge nicht. |
+| 7 | **Rolle im Kader ausblenden.** Erst später, falls sie in Vertragsverhandlungen eingebunden wird (Prospect, Stammspieler …). |
+| 8 | Trainingsvorlieben und Trainingsziel gehören zum Fog of War (verdeckt bis gescoutet). |
+| 9 | **Spielplan fremder Teams komplett öffentlich**: Weg, Ergebnisse **und** Top-Spieler. |
+| 10 | **Der komplette Spielplan der Saison ist einsehbar**, auch die Vierergruppen; er wird am Saisonanfang festgelegt. |
+| 11 | **Nur das Ergebnis zeigen** („8 : 5“), den Rohwert **nur im Hover**. |
+| 12 | Kalender als eigene Ansicht **und** die Leiste. |
+| 13 | Ticket-Einnahme wie vorgeschlagen: eigenes Team erwartete Einnahme je Heimspiel, fremde Teams nur Auslastung. |
+| 14 | Medaillen-Kurs schon während der Saison sichtbar (als „Kurs“). |
+
+**Neuer Auftrag aus Punkt 14 (Konzept + Mockup zuerst, ab Samstag):**
+
+- **Spieler-Awards** wie MVP (Most Valuable Player), Most Improved Player usw. Konzept überlegen, Awards (Embleme) generieren
+  (PixelLab-Requisiten), sie erscheinen im Spielerprofil.
+- **Medaillen der Teams** (Gold, Silber, Bronze) im Teamprofil, damit sich die Teams damit schmücken können, plus
+  **Medaillenspiegel**.
+- **Team-Historie über die Saisons:**
+  - Wie oft war ein Team 1., 2., 3., Top 5, Top 10?
+  - Marktwert-, Kassen- und Vermögensentwicklung (Kasse + Kader + Gebäude).
+  - Punkte je Saison (S1, S2, S3 …), All-Time-Punkte und Durchschnittspunkte, sortiert nach Durchschnittspunkten.
+  - **Getrennt nach Ligen**, damit ein Liga-2-Team mit 20 Punkten nicht zu den besten insgesamt zählt.
+- **Spieler:** ähnliche Historie, aber **ohne Liga-Trennung**, weil Player Points ligaübergreifend vergleichbar sind.
+
 ## 7. Bedienung
 
 Graue Leiste oben (gehört nicht zum UI): Ansicht, Spalten-Satz bzw. Team bzw. Spieltag, aktiver Manager, Nebel. `?still=1`
