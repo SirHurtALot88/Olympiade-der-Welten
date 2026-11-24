@@ -133,6 +133,14 @@ export type SponsorUebersicht = {
     /** GuV bei "alle auf Erwartungsrang": Grund + Farb-Mittel - (Kosten - Plan-Einnahmen) - Kader-Ersatz. */
     guvBeiErwartung: number;
   }>;
+  /**
+   * SEITEN-PR (24.11.): beide Ligen mit dem Ergebnis "alle auf Erwartungsrang" (dieselbe Formel wie `liga_vergleich[].guvBeiErwartung`) und die Summe
+   * der Grundbetraege je Liga; die Rechnungsansicht zeichnet daraus das Saeulenbild und das Verhaeltnis Liga 1 zu Liga 2.
+   */
+  ligaBilanz: {
+    teams: Array<{ teamId: string; teamName: string; kuerzel: string; liga: SponsorLiga; guvBeiErwartung: number; grund: number }>;
+    grundSummeJeLiga: { liga1: number; liga2: number };
+  };
   rechnung: {
     schritte: Array<{ id: "betrieb" | "ersatz" | "faktor" | "verteilung"; titel: string; formel: string; wert: number }>;
     betriebsteil: number;
@@ -310,6 +318,25 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
     })
     .sort((a, b) => (a.platz ?? 99) - (b.platz ?? 99) || a.teamName.localeCompare(b.teamName));
 
+  const alleTeams = Object.values(stand.teams);
+  const farbMittelJeLiga = (l: SponsorLiga) => (4 * stand.farbTopf[l - 1]!) / Math.max(1, alleTeams.filter((x) => x.liga === l).length);
+  const ligaBilanz = {
+    teams: alleTeams.map((x) => {
+      const grund = runde1(x.grundbetrag + x.treue);
+      return {
+        teamId: x.teamId,
+        teamName: teamName(gameState, x.teamId),
+        kuerzel: gameState.teams.find((tm) => tm.teamId === x.teamId)?.shortCode ?? x.teamId,
+        liga: x.liga,
+        grund,
+        guvBeiErwartung: runde1(grund + farbMittelJeLiga(x.liga) - (x.kosten - x.planEinnahmen) - kaderErsatzJeTeam),
+      };
+    }),
+    grundSummeJeLiga: {
+      liga1: runde1(alleTeams.filter((x) => x.liga === 1).reduce((s, x) => s + x.grundbetrag + x.treue, 0)),
+      liga2: runde1(alleTeams.filter((x) => x.liga === 2).reduce((s, x) => s + x.grundbetrag + x.treue, 0)),
+    },
+  };
   const r = stand.rechnung;
   const ligaMittelBeiErwartung = runde1(liga_vergleich.reduce((s, x) => s + x.guvBeiErwartung, 0) / Math.max(1, liga_vergleich.length));
   return {
@@ -327,10 +354,11 @@ export function baueSponsorUebersicht(gameState: GameState, teamId: string): Spo
     termine: sponsorTermine(gameState, teamId),
     angebote,
     liga_vergleich,
+    ligaBilanz,
     rechnung: {
       schritte: [
         { id: "betrieb", titel: "Kosten der Liga abzueglich uebriger Einnahmen", formel: "K_B = Summe (Gehaelter + Unterhalt + Zins - Tickets - Marketing - Medaillen - Ziele - Gebaeude), 85 bis 115 % der Vorsaison", wert: r.betriebsteil },
-        { id: "ersatz", titel: "Kader-Ersatz", formel: "K_E = 10 % des Kaderwerts der Liga (ab Saison 2)", wert: r.kaderErsatz },
+        { id: "ersatz", titel: "Kader-Ersatz", formel: "K_E = 6 % des Kaderwerts der Liga (Saison 1 zusaetzlich 8 %)", wert: r.kaderErsatz },
         { id: "faktor", titel: "Saisonfaktor", formel: "Topf T = F x (K_B + K_E) - Uebertrag", wert: stand.topf },
         { id: "verteilung", titel: "Verteilung", formel: "Hauptsponsor-Topf = T - Farb-Toepfe - Treueboni; Grundbetrag nach Liga-Anteil, Erwartungsrang, Beliebtheit, Passung", wert: stand.hauptTopf },
       ],
