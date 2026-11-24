@@ -25,7 +25,12 @@ export const SPONSOR_TOPF = {
   anteil: { 1: 1.11, 2: 0.89 } as Record<SponsorLiga, number>,
   /** Steigung s_L in C je Erwartungsrang ohne Kader-Ersatz (Saison 1) und mit (ab Saison 2, kappa = 1). */
   steigung: { 1: 1.2, 2: 1.0 } as Record<SponsorLiga, number>,
-  steigungKaderErsatz: { 1: 2.2, 2: 2.0 } as Record<SponsorLiga, number>,
+  /**
+   * Mit Kader-Ersatz (immer, kappa = 1): gemessen nachkalibriert. Konzept 2,2 / 2,0 stand fuer ein System ohne eigene Tickets und Marketing; weil diese
+   * Einnahmen mit der Staerke steigen (+4 C zwischen oberem und unterem Budget-Viertel), lag das reichste Viertel bei Erwartung 2,8 bis 7,0 C vor dem
+   * aermsten (Abnahme: hoechstens +2). Die Modellrechnung auf den eingefrorenen Staenden der Laeufe A/B ergibt bei 1,8 / 1,6 im Mittel +2,0.
+   */
+  steigungKaderErsatz: { 1: 1.8, 2: 1.6 } as Record<SponsorLiga, number>,
   /** Marktgroesse m: C je Beliebtheitspunkt. */
   markt: 0.8,
   /** Leistungsteil: C je Platz ueber/unter Erwartung. */
