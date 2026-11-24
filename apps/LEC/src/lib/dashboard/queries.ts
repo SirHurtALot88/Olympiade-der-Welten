@@ -85,7 +85,7 @@ export async function loadArticleAggregates(
     // Letzter Einzelverkauf je Artikel (Spalte "Letzter Verkauf")
     prisma.sale.groupBy({ by: ["articleId"], _max: { soldAt: true } }),
     // Einzelverkaeufe des letzten Jahres fuer das gewichtete Verkaufstempo
-    prisma.sale.findMany({ where: { soldAt: { gte: new Date(Date.now() - 366 * 86_400_000) } }, select: { articleId: true, soldAt: true, qty: true, orderRef: true } }),
+    prisma.sale.findMany({ where: { soldAt: { gte: new Date(Date.now() - 366 * 86_400_000) } }, select: { articleId: true, soldAt: true, qty: true, orderRef: true, unitPrice: true } }),
     // Letzte VK-Aenderung je Artikel (Billbee-Abgleich und eBay-Shop-Abruf schreiben sie mit)
     prisma.priceChange.groupBy({ by: ["articleId"], _max: { at: true } }),
     // Letzte EK-Aenderung (Billbee-Abgleich) und letzter Einkauf (Einkaufsliste): das Spaetere zeigt, wie aktuell der EK ist
@@ -101,7 +101,7 @@ export async function loadArticleAggregates(
     if (d && (!lastEkAtByArticle.has(c.articleId) || d > lastEkAtByArticle.get(c.articleId)!)) lastEkAtByArticle.set(c.articleId, d);
   }
   const lastPriceChangeByArticle = new Map(lastPriceChanges.map((c) => [c.articleId, c._max.at]));
-  const salesByArticle = new Map<string, { soldAt: Date; qty: number }[]>();
+  const salesByArticle = new Map<string, { soldAt: Date; qty: number; unitPrice: number }[]>();
   for (const s of recentSales) (salesByArticle.get(s.articleId) ?? salesByArticle.set(s.articleId, []).get(s.articleId)!).push(s);
   const nowForPace = new Date();
   const lastSoldByArticle = new Map(lastSales.map((s) => [s.articleId, s._max.soldAt]));
@@ -203,6 +203,8 @@ export async function loadArticleAggregates(
         if (!at) return null;
         return (salesByArticle.get(article.id) ?? []).filter((x) => x.soldAt > at).reduce((n, x) => n + x.qty, 0);
       })(),
+      // Einzelverkaeufe der letzten 30 Tage mit Stueckpreis: frischer Nachfrage-Beweis fuer den heutigen VK
+      recentSales: (salesByArticle.get(article.id) ?? []).filter((x) => nowForPace.getTime() - x.soldAt.getTime() <= 30 * 86_400_000),
       lastEkAt: lastEkAtByArticle.get(article.id) ?? null,
       // Mindestalter: erst aus der eBay-Nummer, sonst Tage seit der ersten Erfassung in LEC (Opus 14.11.). Unterschaetzt
       // alte Ladenhueter, solange die DB jung ist, erfindet aber kein Alter.

@@ -67,6 +67,9 @@ export function marketValueOf(quote: LatestQuote, packQty: number, lastEk?: numb
   return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
 
+/** Zeitraum des frischen Nachfrage-Beweises: ein Verkauf in so vielen Tagen zu (fast) dem heutigen VK reicht. */
+export const RECENT_PROOF_DAYS = 14 as const;
+
 export function marketRangeOf(quote: LatestQuote, packQty: number, factor = 1): { min: number; max: number; variants: number } | null {
   if (quote.matchQuality !== "mehrdeutig" || quote.priceMin == null || quote.priceMax == null) return null;
   const pack = Math.max(1, packQty);
@@ -120,7 +123,7 @@ export interface MarketComparisonRow {
   marginAtLastEk: number | null;
   /** Der Artikel hat sich zu (fast) diesem VK bereits mehrfach verkauft: der Markt nimmt den Preis. */
   provenByDemand: boolean;
-  soldAtVk: { qty: number; avg: number; days: 90 | 365 } | null;
+  soldAtVk: { qty: number; avg: number; days: 14 | 90 | 365 } | null;
   /** Eigener EK deutlich (>50 %) ueber dem Marktwert: teuer eingekauft oder Markt gefallen. */
   ekAboveMarket: boolean;
   matchQuality: string | null;
@@ -215,13 +218,21 @@ export function buildMarketComparisonRow(
   // "zu guenstig" bleibt (dort liegt Geld auf dem Tisch).
   const w90 = a.windows["90"];
   const w365 = a.windows["365"];
+  // Frischer Beweis (Chris, 24.11.): Hat sich der Artikel in den letzten RECENT_PROOF_DAYS Tagen schon zu (fast) diesem VK verkauft
+  // (auch nur einmal, auch nach einer Preiserhoehung), nimmt der Markt den Preis, obwohl der Ø-VK der Fenster noch niedriger liegt.
+  const recentAtVk = ownVk > 0
+    ? (a.recentSales ?? []).filter((x) => Date.now() - x.soldAt.getTime() <= RECENT_PROOF_DAYS * 86_400_000 && x.unitPrice >= ownVk * 0.95 && x.qty > 0)
+    : [];
+  const recentQty = recentAtVk.reduce((n, x) => n + x.qty, 0);
   const soldAtVk: MarketComparisonRow["soldAtVk"] =
     ownVk > 0
-      ? w90 && w90.qty >= 2 && w90.avgPrice >= ownVk * 0.95
-        ? { qty: w90.qty, avg: w90.avgPrice, days: 90 }
-        : w365 && w365.qty >= 5 && w365.avgPrice >= ownVk * 0.95
-          ? { qty: w365.qty, avg: w365.avgPrice, days: 365 }
-          : null
+      ? recentQty > 0
+        ? { qty: recentQty, avg: recentAtVk.reduce((s, x) => s + x.unitPrice * x.qty, 0) / recentQty, days: RECENT_PROOF_DAYS }
+        : w90 && w90.qty >= 2 && w90.avgPrice >= ownVk * 0.95
+          ? { qty: w90.qty, avg: w90.avgPrice, days: 90 }
+          : w365 && w365.qty >= 5 && w365.avgPrice >= ownVk * 0.95
+            ? { qty: w365.qty, avg: w365.avgPrice, days: 365 }
+            : null
       : null;
   let provenByDemand = false;
   if (status === "zu_teuer" && soldAtVk) {

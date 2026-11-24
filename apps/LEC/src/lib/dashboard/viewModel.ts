@@ -63,6 +63,8 @@ export interface ArticleAggregate {
   lastPriceChangeAt?: Date | null;
   /** Verkaeufe seit der letzten Preisaenderung; null = keine Aenderung bekannt. */
   salesSincePriceChange?: number | null;
+  /** Einzelverkaeufe der letzten 30 Tage mit Stueckpreis (Nachfrage-Beweis: sich frisch zum heutigen VK verkauft). */
+  recentSales?: { soldAt: Date; qty: number; unitPrice: number }[] | null;
   /** Letzte EK-Aenderung oder letzter Einkauf, das Spaetere; null = unbekannt. */
   lastEkAt?: Date | null;
   /** Geschaetztes Mindestalter des eBay-Angebots in Tagen (aus der Artikelnummer, siehe listedAge.ts); null = unbekannt. */
@@ -289,7 +291,7 @@ export interface SortimentMarket {
   marginLastEk: number | null;
   /** Hat sich zu (fast) diesem VK schon mehrfach verkauft: Urteil "zu teuer" entfaellt. */
   provenByDemand: boolean;
-  soldAt: { qty: number; avg: number; days: 90 | 365 } | null;
+  soldAt: { qty: number; avg: number; days: 14 | 90 | 365 } | null;
   fetchedAt: string;
   /** Ø 7 Tage gegen Ø 30 Tage am Markt (z. B. -0,12 = 12 % darunter); null ohne beide Werte. */
   trend7vs30?: number | null;
