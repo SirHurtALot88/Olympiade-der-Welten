@@ -473,17 +473,25 @@ describe("Verkaufs-Schwellen: Restgehalt bremst, Vertragsende nur nach Schwellen
     expect(plan.decisions.length).toBeGreaterThan(0);
   });
 
-  it("am Vertragsende geht unter Opt nur, wer sich lohnt: Ueberschuss ueber Opt ja, gleich starke Stammspieler nein", () => {
-    // 18 gleich starke Spieler, Opt 8, Ein-Jahres-Vertraege ohne Restgehalt.
+  it("am Vertragsende geht nur, wer sich lohnt: Gewinnmitnahme und Ueberschuss ueber Opt ja, Stammspieler ohne gutes Angebot nein", () => {
+    // 18 gleich starke Spieler, Opt 8, Ein-Jahres-Vertraege ohne Restgehalt; die Leistungs-Rangfolge gibt p0 … p6 ein Angebot
+    // ueber 1,1 x MW, den anderen nicht.
     const ohne = gateState("neu", 1, { schwellen: "alt" });
     const mit = gateState("neu", 1, { schwellen: "neu" });
     const planOhne = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(ohne.gameState), team: ohne.team, identity: IDENTITY, roster: ohne.players, allowBelowMin: true, vertragsende: true });
     const planMit = planOrganicSellsForTeam({ gameState: mitGehaltsAbzug(mit.gameState), team: mit.team, identity: IDENTITY, roster: mit.players, allowBelowMin: true, vertragsende: true });
     expect(planOhne.decisions.length).toBeGreaterThan(18 - planOhne.optTarget);
-    // Mit Schwellen: hoechstens der Ueberschuss ueber Opt (niemand ist klar schwach, keine Gewinnmitnahme ueber 1,1 x MW).
+    // Mit Schwellen: der Planer haelt die Spieler ohne gutes Angebot, sobald der Ueberschuss weg ist.
     expect(planMit.decisions.length).toBeGreaterThan(0);
-    expect(planMit.decisions.length).toBeLessThanOrEqual(18 - planMit.optTarget);
-    for (const d of planMit.decisions) expect(d.abgangsGrund).toBe("ueberschuss_opt");
+    expect(planMit.decisions.length).toBeLessThan(planOhne.decisions.length);
+    let kader = mit.players.length;
+    for (const d of planMit.decisions) {
+      kader -= 1;
+      expect(["gewinnmitnahme", "ueberschuss_opt"]).toContain(d.abgangsGrund);
+      // Ueberschuss nur, solange der Kader ueber Opt stand; Gewinnmitnahme nur mit Angebot ab 1,1 x MW.
+      if (d.abgangsGrund === "ueberschuss_opt") expect(kader + 1).toBeGreaterThan(planMit.optTarget);
+      if (d.abgangsGrund === "gewinnmitnahme") expect(nettoErloes(mitGehaltsAbzug(mit.gameState), d.playerId, kader)).toBeGreaterThanOrEqual(1.1 * 40 - 1e-9);
+    }
     expect(planMit.finalRosterSize).toBeGreaterThanOrEqual(planMit.optTarget);
   });
 
@@ -532,8 +540,8 @@ describe("Verkaufs-Schwellen: Restgehalt bremst, Vertragsende nur nach Schwellen
   });
 });
 
-describe("Vertrags-Tick mit Stempel `verkaufSchwellen`: geplante Abgaenge zaehlen gegen die Freigabe-Bremse", () => {
-  it("zwei geplante Abgaenge + Bremse 3 ⇒ nur noch eine weitere heuristische Freigabe, der Rest wird brueckenverlaengert", () => {
+describe("Vertrags-Tick mit Stempel `verkaufSchwellen`: keine Freigabe-Bremse mehr (Chris 24.11., keine Kadergroessen-Bremse)", () => {
+  it("zwei geplante Abgaenge + fuenf heuristische Freigaben ⇒ alle sieben gehen, nichts wird brueckenverlaengert", () => {
     const teuer = (id: string) => spieler(id, { rating: 50 });
     const ids = ["g1", "g2", "s1", "s2", "s3", "s4", "s5"];
     const players = ids.map((id) => (id.startsWith("g") ? spieler(id) : teuer(id)));
@@ -550,8 +558,14 @@ describe("Vertrags-Tick mit Stempel `verkaufSchwellen`: geplante Abgaenge zaehle
     const geplant = ereignisse.filter((e) => e.decisionReason === "ki_verkauf_geplant").length;
     const freigegeben = ereignisse.filter((e) => e.eventType === "contract_expired_exit" && e.decisionReason !== "ki_verkauf_geplant").length;
     expect(geplant).toBe(2);
-    expect(freigegeben).toBe(1);
-    expect(geplant + freigegeben).toBe(3);
-    expect(tick.renewedPlayers).toBe(4);
+    expect(freigegeben).toBe(5);
+    expect(tick.renewedPlayers).toBe(0);
+    // Ohne Stempel (alter Stand): hoechstens drei heuristische Freigaben, der Rest wird fuer ein Jahr brueckenverlaengert.
+    const ohneStempel = computeSeasonEndContractTick(save(tickState([team("A-A")], players, rosters)), undefined, {
+      kiVerkaufsabsicht: new Map([["A-A", new Set(["g1", "g2"])]]),
+    });
+    const ereignisseOhne = ohneStempel.gameState.seasonState.contractEvents ?? [];
+    expect(ereignisseOhne.filter((e) => e.eventType === "contract_expired_exit" && e.decisionReason !== "ki_verkauf_geplant").length).toBe(3);
+    expect(ohneStempel.renewedPlayers).toBe(2);
   });
 });

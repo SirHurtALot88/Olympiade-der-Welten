@@ -203,6 +203,10 @@ ueber 1,1 x MW (Median des realisierten Preises 0,86 / 0,89 x MW). Die Liste des
 
 ### 7.3 Was jetzt gilt (Stempel `seasonState.wirtschaftsRegeln.verkaufSchwellen`)
 
+> **Ueberholt durch Abschnitt 8 (Chris, 24.11.):** die Hoechstzahl `ABGANG_UNTER_OPT_MAX` (Punkt 1), die Unterscheidung „unter Opt nur
+> Gewinnmitnahme/klar schwach, ueber Opt frei“ als Groessen-Regel und das Mitzaehlen der geplanten Abgaenge gegen die Freigabe-Bremse
+> (Punkt 2) sind gestrichen. Die Wert-Schwellen bleiben.
+
 Neues Spiel ab Saison 1 „neu“, bestehender Spielstand ab dem naechsten Saisonwechsel (der Tick fragt den Stempel der endenden Saison).
 Rueckweg `OLY_KI_VERKAUF_SCHWELLEN=aus` (neue Saisons; nur Server, in `deploy/hetzner/docker-compose.yml` noch nicht durchgereicht).
 
@@ -277,3 +281,129 @@ Tick-Bremse zaehlt geplante Abgaenge mit Stempel; Stempel und Rueckweg. Die Rest
    Preis frisst; Liquiditaet kommt ueber den Kassensturz (Kredit, Notverkauf). Passt das?
 3. **Rueckweg-Schalter auf dem Server.** `OLY_KI_VERKAUF_SCHWELLEN` (wie `OLY_KI_RESTGEHALT`) muss in `deploy/hetzner/docker-compose.yml`
    und `.env` eingetragen werden, wenn der Rueckweg gebraucht wird.
+
+## 8. Keine Kadergroessen-Bremse (Chris, 24.11.)
+
+Chris, woertlich: „Nee, unterhalb der Soll-Kadergroesse einen Spieler nur gehen zu lassen, ist schon der falsche Weg. Weil es ist ja
+okay, wenn ein Team unter Minimum verkauft, weil sie dann ja neue Spieler kaufen koennen. … Wenn ich jetzt zum Beispiel 12 Spieler habe
+und 10 davon haben ein richtig gutes Angebot und ich soll mindestens 10 Spieler haben, dann verkaufe ich ja nicht nur 2, dann verkaufe
+ich 8 oder so und kaufe mir ein viel besseres Team oder ein gleichwertiges Team und habe viel mehr Cash. Du willst immer diese Regelung
+einbinden. Bitte unterdruecke das fuer immer. … Also es ist immer erlaubt, alle moeglichen Spieler zu verkaufen. Es gibt keine Groesse,
+die sagt, du darfst nicht unter die Soll-Kadergroesse gehen. Weil sonst wuerde das ja bedeuten, bei Teams, die als Optimum 14 haben, die
+duerfen ja gar keinen verkaufen oder was.“
+
+**Regel.** Ob ein Spieler geht (Verkauf im Fenster, Vertragsende, Vertragsaufloesung), entscheidet allein der Wert: Preis gegen
+Marktwert (Gewinnmitnahme ab 1,1 x MW netto nach Restgehalt), klar schwach (≤ 0,8 x Kader-Median), Restgehalt netto (≥ 0,9 x MW),
+Finanzlage, Kosten-Rechnung des Ticks. Nie Opt, Soll, Minimum oder Pflichtkader. Die Kadergroesse steuert nur, wie viel das Team danach
+nachkauft. Eingetragen auch in `CLAUDE.md` (Finanzen und KI-Kaufverhalten). Alles hinter demselben Stempel
+`seasonState.wirtschaftsRegeln.verkaufSchwellen` (neues Spiel ab Saison 1, laufender Spielstand ab dem naechsten Saisonwechsel,
+Rueckweg `OLY_KI_VERKAUF_SCHWELLEN=aus`).
+
+### 8.1 Fundstellen
+
+Gesucht in `lib/` und `app/` (inkl. `app/api/`) nach jeder Stelle, an der die Kadergroesse einen Verkauf, eine Freigabe, eine
+Nicht-Verlaengerung oder eine Aufloesung verhindert oder deckelt — fuer KI und Menschen.
+
+**Entfernt (mit Stempel `neu`):**
+
+| Stelle | Was es tat | Jetzt |
+|---|---|---|
+| `draft-adapter.ts` `ABGANG_UNTER_OPT_MAX` (aus Abschnitt 7) | hoechstens 3 Abgaenge unter Opt je Team | Konstante gestrichen |
+| `draft-adapter.ts` Vertragsende-Pruefung | unter Opt nur Gewinnmitnahme/klar schwach, ueber Opt frei | dieselben Wert-Gruende fuer jede Kadergroesse; Ueberschuss ueber Opt nur noch zusaetzliche Erlaubnis |
+| `draft-adapter.ts` `rosterMin` (`ROSTER_MIN` ohne `allowBelowMin`) | Nutzen-Runde endet bei 8 | mit Stempel 0 |
+| `draft-adapter.ts` Nutzen-Runde allein | eine Gewinnmitnahme ging nur, solange `sellUtility` (Staerkeverlust OHNE Nachkauf) positiv blieb — der Kader bremste sich ueber den Staerkeverlust selbst | neue **Gewinnmitnahme-Runde** nach der Nutzen-Runde: jedes Angebot ab 1,1 x MW netto geht, hoechstes zuerst, Preis je Abgang mit dem kleineren Kader neu gerechnet |
+| `contract-renewal-service.ts` Mitzaehlen geplanter Abgaenge (Abschnitt 7.3 Punkt 2) | geplante Abgaenge fuellten die Freigabe-Bremse | gestrichen |
+| `contract-renewal-service.ts` `MAX_RELEASES_PER_TEAM_PER_TICK` = 3 | mehr als 3 „heuristic“-Freigaben je Team wurden fuer ein Jahr brueckenverlaengert | mit Stempel keine Hoechstzahl |
+| `contract-renewal-service.ts` `shouldAiRenewContract`: `rosterRetentionSignal`, `hardMinRetentionSignal` | Kader nach dem Abgang unter Opt bzw. Minimum ⇒ verlaengern | mit Stempel aus (KI) |
+| `contract-renewal-service.ts` `resolveContractRenewalTco`: `minRiskPremium` / `underMin` | Mindestkader-Risiko als Kostenaufschlag und Zwang zum Verlaengern | mit Stempel ohne Kadergroesse (KI) |
+| `contract-renewal-service.ts` `buildAiRenewalCashGate` | unter dem Minimum gelockertes Kassen-Tor | mit Stempel aus |
+| `contract-renewal-service.ts` Grund `hard_min_retention` | Etikett der Groessen-Verlaengerung | mit Stempel nicht mehr vergeben |
+| `ki-verkaufsabsicht-saisonende.ts` `spielraum` max(8, playerMin) | Absicht nur bis zum Minimum (nur im alten Stand `OLY_FENSTER_AUF_OPT=0`) | nur ohne Stempel |
+| `ai-transfer-window-session-service.ts` `sellNotBelowMin` | Fenster-Verkaufsrunde nur bis max(8, playerMin) (nur im alten Stand `OLY_FENSTER_AUF_OPT=0`) | nur ohne Stempel |
+| `ai-contract-dissolution-service.ts` `rosterFactor` | Kader unter Opt hob den Behalten-Wert bis x 1,45 | mit Stempel hoechstens 1 (ueber Opt bleibt der Abschlag) |
+| `ai-market-plan-preview-service.ts` → `selectCompositeSellCandidates` `hardMin` (Altpfad `OLY_ORGANIC_SQUAD_BUILDER=0`) | Verkauf unter das Minimum nur im Cash-Notfall | mit Stempel kein `hardMin` |
+
+**Bleibt — keine Groessen-Bremse auf eine Verkaufs-Entscheidung:**
+
+- `OPT_SURPLUS_SELL_THRESHOLD` (−18 ueber Opt): **lockert** die Nutzen-Schwelle, solange der Kader ueber Opt steht; darunter gilt die
+  normale Schwelle 0, die Wert-Gruende ebenso. Behalten, weil ein Platz ueber dem eigenen Ziel Bank ist und das Geld mehr wert ist —
+  eine zusaetzliche Erlaubnis, keine Sperre. Gemessen gab es in beiden Saaten keinen Ueberschuss-Abgang (alle Kader bei/unter Opt).
+- Kaderdruck-Abschlag im Verkaufspreis (`transfermarkt-sell-pricing-policy.ts`, am Minimum x 0,95, darunter x 0,9; Ticket #38): ein
+  Preis, keine Sperre. Er gehoert zum Angebot — eine Gewinnmitnahme unter dem Minimum braucht deshalb ein entsprechend hoeheres Angebot.
+- Bewertungsterme in `sellUtility` (`underOptPressure`, `rosterFullBoost` im Geldwert): weiche Gewichte der Nutzen-Runde, keine
+  Untergrenze und keine Hoechstzahl. Die Gewinnmitnahme-Runde haengt nicht daran.
+- Kernschutz (Angebot 1,5 / 1,4 / 1,3 x MW fuer die besten drei), „think twice“ (grosser Abschlag), frisch verlaengert, Restgehalt
+  netto: Wert-Regeln.
+- Kassensturz-Notverkauf nie unter 8 (`KASSENSTURZ_NOTVERKAUF_KADER_MIN`, Chris 18.11.): ein **Zwangs**verkauf am Ende des Fensters,
+  nach dem kein Kauf mehr moeglich ist. Er begrenzt einen Zwang, keine Entscheidung des Teams; jeder gewollte Verkauf liegt davor.
+- Admin-Simulation (`lib/admin/season-simulation-runner.ts`, Kassen-Notverkauf bis `playerMin`): Werkzeug ausserhalb des Spielablaufs,
+  ebenfalls Zwangsverkauf.
+- Mensch: der Verkauf auf dem Transfermarkt (`executeLocalTransfermarktSell`, Vorschau in `transfermarkt-local-service.ts`) zeigt nur
+  Warnungen (`team_would_fall_under_7`, `…_player_min`, `…_player_opt`, Bereitschaft) und sperrt nie; Vertragsfreigabe und Aufloesung
+  des Menschen pruefen keine Kadergroesse. Nichts zu aendern, deshalb auch kein Stempel noetig.
+- Altpfad-Vorschau `ai-transfermarkt-sell-preview-service.ts` `allowSellBelowRosterMin`: fuer KI-Teams standardmaessig `true`.
+
+### 8.2 Spielfaehigkeit
+
+Wer unter das Minimum verkauft, kauft im selben Fenster nach — ueber den bestehenden Kaufweg, keine zweite Kauflogik: im gemeinsamen
+Fenster (Standard, „Fenster auf Opt“) laufen nach der Verkaufsrunde die Kaufrunde und eine Nachrunde ueber den organischen Planer mit
+Kaderplan bis Opt (`ai-preseason-background-service.ts`), danach der Kassensturz. Gemessen (8.3) standen vor dem Kauf 17 von 32 Teams
+unter 8 (kleinster Kader 5 bzw. 3), am ersten Spieltag von Saison 2 **kein** Team unter 8 (Minimum 8 bzw. 9, Median 11).
+
+Findet ein Team am Markt nichts Bezahlbares, meldet der Kaufplaner den Notweg `unter_minimum`; einen Notkauf oder ein Auffuellen mit
+Billigst-Spielern gibt es nicht (Chris 18.11.: „niemals“). Der Spieltag sperrt dann nicht: nach der Teilaufstellungs-Regel
+(`lib/lineups/legacy-matchday-partial-lineup-rule.ts`) setzt ein Team alle verfuegbaren Spieler ein, die Aufstellung gilt als
+vollstaendig, leere Plaetze druecken das Ergebnis. Mitten in der Saison gibt es kein Transferfenster; unter 8 faellt ein Team dort nur
+durch Verletzungen (Verletzte sind nicht einsetzbar), die Verletzungs-Tiefe der KI (`applyAiInjuryDepthTopup`) kauft im naechsten
+Fenster nach. Ein menschliches Team bekommt beim Verkauf die Warnungen oben und muss selbst nachkaufen; gesperrt wird es nicht.
+
+### 8.3 Messung
+
+Derselbe Messweg wie 7.4 (`miss-teamfinanzen-saison.ts --stop-after spieltage --keep`, 32 KI von Anfang an, Saat 1 ohne Mischen bzw.
+`--mischen 7`; je Kopie Saisonabschluss → Saisonende-Kette → Saisonwechsel → `fuehreKiPreseasonLaufAus`), auf **neu angelegten** Basen
+mit dem Code dieses Branches (neues Spiel ⇒ Stempel `verkaufSchwellen: neu` ab Saison 1). „PR“ = Stand von Abschnitt 7 (`0c058e19b`),
+„ohne Bremse“ = dieser Stand, beide auf derselben Basis. Die Gruende stammen aus dem Plan unmittelbar vor dem Tick.
+
+| Fluss | S1 PR | **S1 ohne Bremse** | S7 PR | **S7 ohne Bremse** |
+|---|---:|---:|---:|---:|
+| Abgaenge gesamt | 76 | **114** | 88 | **124** |
+| davon Gewinnmitnahme (Median Preis / MW) | 31 (1,28) | **60 (1,29)** | 28 (1,25) | **59 (1,28)** |
+| davon klar schwach | 23 | **29** | 29 | **32** |
+| davon Ueberschuss ueber Opt | 0 | **0** | 1 | **0** |
+| davon Tick (schlechter Vertrag, Kosten, Moral) | 22 | **25** | 30 | **33** |
+| Brueckenverlaengerung (Freigabe-Bremse) | 5 | **0** | 4 | **0** |
+| `hard_min_retention` | 25 | **0** | 16 | **0** |
+| Abgaenge je Team min / Median / max | 0 / 3 / 5 | **1 / 3 / 6** | 0 / 3 / 6 | **0 / 4 / 8** |
+| Kader vor dem Kauf min / Median, Teams unter 8 | 6 / 9 / 9 | **5 / 7 / 17** | 4 / 8,5 / 8 | **3 / 7 / 17** |
+| Kauf extern (n / C) | 76 / −1757,42 | **108 / −2515,16** | 84 / −1958,43 | **119 / −2705,76** |
+| Vertragsende abloesefrei (n / C) | 76 / +1117,71 | **114 / +1832,75** | 88 / +1156,54 | **124 / +1954,78** |
+| Verkauf extern / Restgehalt-Abloese | 0 / 0 | **0 / 0** | 0 / 0 | **0 / 0** |
+| Verlaengert im Tick | 289 | **251** | 278 | **242** |
+| Δ Kasse | −930,31 | **−1013,09** | −1114,09 | **−1037,21** |
+| Δ Kaderwert (Σ MW) | +639,32 | **+774,05** | +697,92 | **+811,25** |
+| **Δ Kasse + Kaderwert** | −290,99 | **−239,04** | −416,17 | **−225,96** |
+| **Kader am 1. Spieltag S2 min / Median / max** | 9 / 11 / 14 | **8 / 11 / 14** | 9 / 11 / 14 | **9 / 11 / 14** |
+
+Verteilung der Abgaenge je Team (Anzahl Teams): S1 ohne Bremse {1: 3, 2: 5, 3: 10, 4: 3, 5: 7, 6: 4}, S7 ohne Bremse {0: 1, 1: 2, 2: 4,
+3: 5, 4: 8, 5: 7, 6: 4, 8: 1} (PR: S1 {0: 1, 1: 8, 2: 6, 3: 14, 4: 1, 5: 2}, S7 {0: 1, 1: 5, 2: 6, 3: 13, 4: 4, 5: 2, 6: 1}).
+
+**Lesart.**
+
+- Die Abgaenge steigen um rund 40 je Liga, fast ganz durch Gewinnmitnahmen (31 → 60, 28 → 59). Die gehen im Median zu 1,28 x MW, die
+  Nachkaeufe kosten genau den Marktwert (Kauf zu 1,00 x MW) — Chris' Rechnung „verkaufe 8 und kaufe ein gleichwertiges Team mit mehr
+  Cash“. Das Vermoegen (Kasse + Kaderwert) im Fenster wird besser: −239 statt −291 C bzw. −226 statt −416 C auf derselben Basis, und
+  auch besser als die −360 / −369 C aus 7.4 (andere Basen).
+- Keine Explosion: hoechstens 6 bzw. 8 Abgaenge eines Teams, kein Kader wird ausgetauscht. Was bremst, ist der Wert: unter dem Minimum
+  sinkt der Preis (Kaderdruck), und ohne Angebot ueber 1,1 x MW geht ein Spieler nicht. Die Wert-Schwellen mussten nicht verschaerft werden.
+- Spielfaehig: vor dem Kauf 17 Teams unter 8, am ersten Spieltag keines. Die Kaufrunde fuellt bis Opt (Median 11 wie vorher).
+- Die Freigaben des Ticks steigen nur leicht (22 → 25, 30 → 33): ohne Halte-Signal nach Kadergroesse entscheidet die Kosten-Rechnung,
+  die Spieler ohne Wert-Grund werden weiter verlaengert.
+
+### 8.4 Tests
+
+`tests/verkauf-keine-groessenbremse.test.ts` (neu): Chris' Beispiel (12 Spieler, Opt 10, zehn Angebote zu 1,25 x MW ⇒ 9 Abgaenge, am
+Vertragsende und im Fenster; der Kernschutz haelt die besten drei); der Kaderdruck im Preis beendet die Gewinnmitnahme, keine
+Groessen-Regel; ohne gutes Angebot verkauft dasselbe Team unter Opt nichts; ohne Stempel deutlich weniger; der Kaufplaner fuellt den
+Rest-Kader (3) bis Opt 10; Tick ohne Freigabe-Hoechstzahl und ohne `hard_min_retention`; Aufloesung `rosterFactor` ≤ 1; Fenster-Grenze
+nur ohne Stempel. `tests/verkauf-restgehalt.test.ts`: der Vertragsende-Test prueft jetzt Wert-Gruende statt „hoechstens Ueberschuss“,
+der Tick-Test „geplante Abgaenge zaehlen gegen die Bremse“ ist umgestellt auf „keine Bremse mit Stempel, drei ohne“.

@@ -18,7 +18,10 @@
  *              sich der Abgang nach den Schwellen der Verkaufslogik lohnt (Ueberschuss ueber Opt, klar schwach, Gewinnmitnahme, Upgrade-
  *              Tausch); sonst wird verlaengert. Ein Verkauf mit offenem Restgehalt braucht netto (nach Buyout) mindestens 90 % des
  *              Marktwerts (auch in Finanznot), und ein gerade verlaengerter Vertrag wird nicht freiwillig verkauft.
- *              "alt" = wie mit `restgehalt` allein. Fehlt im Altstempel = "alt".
+ *              Dazu (Chris 24.11., „fuer immer“, Abschnitt 8): KEINE Kadergroessen-Bremse auf Abgaenge — weder im Verkaufsplaner (keine
+ *              Untergrenze, keine Hoechstzahl, Gewinnmitnahme ab 1,1 x MW auch unter Opt/Minimum) noch im Vertrags-Tick (keine Halte-
+ *              Signale nach Opt/Minimum, keine Freigabe-Hoechstzahl) noch bei Vertragsaufloesungen; wer unter das Minimum geht, kauft
+ *              im Fenster nach. "alt" = wie mit `restgehalt` allein. Fehlt im Altstempel = "alt".
  *   (Die Verkaufs-Sperre fuer alle Teams ist KEIN Stempel: bestehende Spielregel, gilt sofort — lib/market/transfer-sold-cooldown.ts.)
  *
  * `vorjahr` (Anker): je Team die Platzierung der abgelaufenen Saison als Anteil 0..1 (0 = Erster, 1 = Letzter) IN DER LIGA, in der

@@ -267,6 +267,11 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
     Verlängerungen aus dem Gehaltstopf, beides hart und für Mensch und KI gleich (`pruefeGebaeudeGegenVorstandFreigabe`,
     `pruefeVerlaengerungGegenVorstandFreigabe` in `lib/finance/vorstand-budgetfreigabe.ts`). Geschrieben wird nur über
     `POST /api/finance/vorstand` hinter `authorizeServerRoomWrite`.
+- **Verkaufen ist immer erlaubt — keine Kadergrößen-Bremse (Chris, 24.11., „für immer“).** Ob ein Spieler geht (Verkauf,
+  Vertragsende, Auflösung), entscheidet allein der Wert (Preis gegen Marktwert, klar schwach, Restgehalt netto, Finanzlage), nie
+  Opt, Soll, Minimum oder Pflichtkader; die Kadergröße steuert nur, wie viel danach nachgekauft wird. Wer unter das Minimum
+  verkauft, kauft im selben Fenster nach. Kein Agent baut wieder eine Größenbremse auf Verkäufe ein (Stempel
+  `wirtschaftsRegeln.verkaufSchwellen`, Doku `docs/design/verkauf-restgehalt-24-11.md` Abschnitt 8).
 - **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte

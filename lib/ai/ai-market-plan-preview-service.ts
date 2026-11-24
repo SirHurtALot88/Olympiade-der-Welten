@@ -27,6 +27,7 @@ import {
   resolveUnifiedMarketPickSteps,
   isUnifiedPickEnabledForMarket,
 } from "@/lib/ai/unified-pick-planner-service";
+import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 import { computeCompositeSellScore, selectCompositeSellCandidates } from "@/lib/ai/ai-composite-sell-score";
 import { buildApronAbbauZiel } from "@/lib/ai/apron-abbau-ziel";
 import { getTeamGeneralManager } from "@/lib/foundation/team-general-managers";
@@ -490,7 +491,8 @@ function chooseSellCandidates(
       teamSalaryTotal: salaryTotal,
       cashPressureScore,
       teamProfile,
-      hardMin,
+      // Altpfad (OLY_ORGANIC_SQUAD_BUILDER=0): mit Stempel `verkaufSchwellen` kein Kaderschutz auf Verkaeufe (Chris 24.11., „fuer immer“).
+      hardMin: wirtschaftsRegel(gameState, "verkaufSchwellen") === "neu" ? undefined : hardMin,
       rosterCount,
       allowProfitSellsBelowMin:
         (identity?.boardConfidence ?? 0) < 7 ||
