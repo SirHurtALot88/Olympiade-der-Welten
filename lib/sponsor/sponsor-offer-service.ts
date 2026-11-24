@@ -128,6 +128,7 @@ function buildOfferSkeleton(input: {
   slotIndex: number;
   usedParentBrandIds?: string[];
   recentParentBrandIds?: string[];
+  renewalParentId?: string | null;
   globalParentUsage?: Record<string, number>;
   forcePremiumElite?: boolean;
   teamQualityRank?: number | null;
@@ -151,6 +152,7 @@ function buildOfferSkeleton(input: {
     slotIndex,
     usedParentBrandIds: input.usedParentBrandIds,
     recentParentBrandIds: input.recentParentBrandIds,
+    renewalParentId: input.renewalParentId,
     globalParentUsage: input.globalParentUsage,
     forcePremiumElite: input.forcePremiumElite,
     specialMode: specialMode ?? "standard",
@@ -413,6 +415,8 @@ export function buildSponsorOffersForTeam(input: {
       forcePremiumElite: slate.goldenCardSlots.includes(slotIndex),
       usedParentBrandIds,
       recentParentBrandIds,
+      // SPONSOR-TOPF: die Marke des auslaufenden Vertrags kehrt als Verlaengerung wieder (Treue zaehlt dann Saisons, nicht Unterschriften).
+      renewalParentId: sponsorTopfAktiv(input.gameState) ? recentParentBrandIds[recentParentBrandIds.length - 1] ?? null : null,
       globalParentUsage,
       teamQualityRank: qualityRank.qualityRank,
       specialMode: slotIndex === challengeSlotIndex ? "challenge" : "standard",

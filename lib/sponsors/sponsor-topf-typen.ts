@@ -94,6 +94,8 @@ export type SponsorRegelStempel = {
   /** Betriebsteil K_B der VORSAISON, Bezug der 15-%-Bremse. Fehlt in Saison 1 (Richtwert 32 x 62 C). */
   betriebsteilVorjahr: number | null;
   uebertrag: number;
+  /** Erste Topf-Saison eines Spielstands, der vorher nach dem alten System lief: keine Bremse (es gibt keinen Betriebsteil der Vorsaison, der Richtwert gilt nur fuer neue Spiele). */
+  ohneBremse?: boolean;
   /** Liga-Wert am Stichtag der Vorsaison und die dort angewandte Korrektur (Bezug der Rueckkopplung); `null` in der ersten Topf-Saison. */
   ligaWertVorjahr?: number | null;
   ligaWertKorrektur?: number;
@@ -122,4 +124,6 @@ export type SponsorTopfVertrag = {
    * Wechsel auf den Topf offen zeigen kann ("kein Vertrag verliert beim Saisonwechsel Geld ohne Anzeige").
    */
   vorherAnker?: number | null;
+  /** Felder, die die KI gefuellt hat, obwohl ein Mensch gewaehlt hat ("von" je Feld); leer = alles vom Waehlenden. */
+  kiFelder?: Array<"vertragsart" | "laufzeit" | "farben">;
 };

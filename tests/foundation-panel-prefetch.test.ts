@@ -7,5 +7,7 @@ describe("foundation panel prefetch", () => {
     prefetchFoundationPanel("teams");
     prefetchFoundationPanel("lineup");
     await expect(import("@/app/foundation/teams-v2/FoundationTeamsDetailPanel")).resolves.toBeTruthy();
+    // Der Aufstellungs-Import laeuft fire-and-forget; ohne Warten reisst ihn der Teardown mitten im Laden ab (EnvironmentTeardownError).
+    await expect(import("@/app/foundation/legacy-lineup-lab/FoundationLineupPanel")).resolves.toBeTruthy();
   });
 });

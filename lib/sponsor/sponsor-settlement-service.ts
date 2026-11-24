@@ -2,6 +2,7 @@ import { rangPraemieFaktor } from "@/lib/medaillen/medaillen-regel";
 import { bucheMedaillen } from "@/lib/medaillen/medaillen-modell";
 import { randomUUID } from "@/lib/utils/random-id";
 import { sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
+import { sichereSponsorTopf } from "@/lib/sponsors/sponsor-topf-stichtag";
 import { topfGrundJahr, topfRangAbschlag, topfRangFuerAbschlag, topfSaisonendeZeilen } from "@/lib/sponsors/sponsor-topf-buchung";
 
 import type { GameState, SponsorOfferComponent, TeamSponsorContract } from "@/lib/data/olyDataTypes";
@@ -225,6 +226,8 @@ export function applySponsorSettlement(input: {
   deductSalary?: boolean;
 }): { gameState: GameState; preview: SponsorSettlementPreview; applied: boolean } {
   const phase = input.phase ?? "season_end";
+  // SPONSOR-TOPF: ohne eingefrorenen Stand (Abrechnung ohne je gebuchten Spieltag) friert die Abrechnung ihn zuerst ein; ohne Topf-Stempel dieselbe Referenz.
+  if (sponsorTopfAktiv(input.gameState)) input = { ...input, gameState: sichereSponsorTopf(input.gameState) };
   const preview = previewSponsorSettlement(input.gameState, phase);
   if (!input.execute || (!preview.canApply && !input.deductSalary)) {
     return { gameState: input.gameState, preview, applied: false };

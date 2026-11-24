@@ -34,7 +34,8 @@ type LigaZeile = {
   ziel: number;
   summe: number;
   kosten: number;
-  ergebnis: number;
+  ergebnis: number | null;
+  nebel: boolean;
 };
 
 const ART_KURZ = { fest: "Fest", leistung: "Leistung", praemie: "Prämie" } as const;
@@ -87,7 +88,7 @@ export function SponsorenLigaAnsicht({ gameState, teamId, u }: { gameState: Game
       eigen: t.teamId === teamId,
       marke: t.markeName,
       art: t.vertragsart ? ART_KURZ[t.vertragsart] : "–",
-      erw: erwartungsAnzeige(gameState, t.teamId === teamId, t.erwartungsrang),
+      erw: erwartungsAnzeige(t.nebel, t.erwartungsrang),
       platz: t.platz,
       grund: t.grund,
       leistung: t.leistungHeute,
@@ -97,13 +98,12 @@ export function SponsorenLigaAnsicht({ gameState, teamId, u }: { gameState: Game
       summe: t.summeHeute,
       kosten: t.kosten,
       ergebnis: t.guvBeiErwartung,
+      nebel: t.nebel,
     }));
   }, [u.liga_vergleich, gameState, teamId]);
   const { sortiert, kopf } = useTabellenSortierung(zeilen, SPALTEN, { key: "summe", richtung: "ab" });
-  const k = useMemo(() => bilanzKennzahlen(u), [u]);
-  const maxAbs = Math.max(1, ...zeilen.map((z) => Math.abs(z.ergebnis)));
-  const ligaMittel = zeilen.length ? zeilen.reduce((s, z) => s + z.ergebnis, 0) / zeilen.length : 0;
-  const imPlus = zeilen.filter((z) => z.ergebnis >= 0).length;
+  const maxAbs = Math.max(1, ...zeilen.map((z) => Math.abs(z.ergebnis ?? 0)));
+  const ligaMittel = u.rechnung.ligaMittelBeiErwartung;
   const grundWerte = zeilen.map((z) => z.grund).filter((g) => g > 0);
 
   return (
@@ -112,7 +112,7 @@ export function SponsorenLigaAnsicht({ gameState, teamId, u }: { gameState: Game
         <h2>Liga {u.liga}: wer bekommt was</h2>
         <span className="so-marke is-echt">Teams, Plätze, Marken echt</span>
         <span className="sp" />
-        <span className="hin">Rang 1 = höchste Summe · alle Spalten sortierbar · C je Saison, Hochrechnung mit dem Tabellenstand · fremde Erwartungsränge nur als Viertel (Scouting-Nebel)</span>
+        <span className="hin">Rang 1 = höchste Summe · alle Spalten sortierbar · C je Saison, Hochrechnung mit dem Tabellenstand · fremde Teams im Scouting-Nebel</span>
       </div>
       <div className="so-tw">
         <table className="so-tab fuellt" aria-label={`Sponsoren-Vergleich Liga ${u.liga}`}>
@@ -182,20 +182,24 @@ export function SponsorenLigaAnsicht({ gameState, teamId, u }: { gameState: Game
                 <td className={`bc-t ${tonVon(z.farbe)}`}>{z.farbe > 0 ? zahlDe(z.farbe, 1) : "–"}</td>
                 <td className={`bc-t ${tonVon(z.ziel)}`}>{z.ziel !== 0 ? vorzeichenDe(z.ziel, 1) : "–"}</td>
                 <td className="bc-t gold">{zahlDe(z.summe, 1)}</td>
-                <td className="bc-t leise">{zahlDe(z.kosten, 1)}</td>
+                <td className="bc-t leise" title={z.nebel ? "Kosten fremder Teams nur in 5-C-Stufen (Scouting-Nebel)" : undefined}>{z.nebel ? `ca. ${zahlDe(z.kosten, 0)}` : zahlDe(z.kosten, 1)}</td>
                 <td>
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(3em,auto) minmax(0,1fr)", gap: "0.6em", alignItems: "center" }}>
-                    <span className={`bc-t ${tonVon(z.ergebnis)}`}>{vorzeichenDe(z.ergebnis, 1)}</span>
-                    <div className="so-bal" aria-hidden="true">
-                      <i
-                        style={
-                          z.ergebnis >= 0
-                            ? { left: "50%", width: `${Math.min(50, (z.ergebnis / maxAbs) * 50)}%`, background: "var(--bc-gut)" }
-                            : { right: "50%", width: `${Math.min(50, (-z.ergebnis / maxAbs) * 50)}%`, background: "var(--bc-warn)" }
-                        }
-                      />
+                  {z.ergebnis == null ? (
+                    <span className="leise" title="Ergebnis fremder Teams liegt im Scouting-Nebel">verdeckt</span>
+                  ) : (
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(3em,auto) minmax(0,1fr)", gap: "0.6em", alignItems: "center" }}>
+                      <span className={`bc-t ${tonVon(z.ergebnis)}`}>{vorzeichenDe(z.ergebnis, 1)}</span>
+                      <div className="so-bal" aria-hidden="true">
+                        <i
+                          style={
+                            z.ergebnis >= 0
+                              ? { left: "50%", width: `${Math.min(50, (z.ergebnis / maxAbs) * 50)}%`, background: "var(--bc-gut)" }
+                              : { right: "50%", width: `${Math.min(50, (-z.ergebnis / maxAbs) * 50)}%`, background: "var(--bc-warn)" }
+                          }
+                        />
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -204,8 +208,7 @@ export function SponsorenLigaAnsicht({ gameState, teamId, u }: { gameState: Game
       </div>
       <div className="so-fuss">
         <span>
-          Ergebnis bei Erwartung: Mittel <b className={`bc-t ${tonVon(ligaMittel)}`}>{vorzeichenDe(ligaMittel, 1)} C</b> · im Plus <b className="bc-t">{imPlus} von {zeilen.length}</b> · Gefälle oben gegen unten (Erwartung 1–4 gegen 13–16){" "}
-          <b className="bc-t">{vorzeichenDe(k.gaefalleEigeneLiga, 1)} C</b>
+          Ergebnis bei Erwartung: Mittel der Liga <b className={`bc-t ${tonVon(ligaMittel)}`}>{vorzeichenDe(ligaMittel, 1)} C</b> · Ergebnis, Kosten und Erwartung fremder Teams liegen im Scouting-Nebel (Stufen)
         </span>
         <span className="sp" />
         <span>
@@ -220,7 +223,7 @@ export function SponsorenRechnungAnsicht({ teamId, u }: { teamId: string; u: Spo
   const r = u.rechnung;
   const [faktor, setFaktor] = useState(u.faktor);
   const verschoben = useMemo(() => topfBeiFaktor(r, u.faktor, faktor), [r, u.faktor, faktor]);
-  const k = useMemo(() => bilanzKennzahlen(u), [u]);
+  const k = useMemo(() => bilanzKennzahlen(u, teamId), [u, teamId]);
   const gruppen = useMemo(
     () =>
       [1, 2].map((liga) => ({
@@ -234,7 +237,6 @@ export function SponsorenRechnungAnsicht({ teamId, u }: { teamId: string; u: Spo
   );
   const eigen = u.liga_vergleich.find((t) => t.teamId === teamId) ?? null;
   const schritte = u.rechnung.schritte;
-  const wert = (id: string) => schritte.find((s) => s.id === id)?.wert ?? 0;
   const ligaAnteil = SPONSOR_TOPF.anteil[u.liga];
 
   return (
@@ -246,40 +248,16 @@ export function SponsorenRechnungAnsicht({ teamId, u }: { teamId: string; u: Spo
           <span className="so-marke is-echt">Live-Zahlen</span>
         </div>
         <div className="so-kb">
-          <div className="so-schritt">
-            <span className="n">1</span>
-            <div>
-              <b>Was kostet die Liga?</b>
-              <small>Gehälter, Unterhalt und Zinsen abzüglich der übrigen Einnahmen (Tickets, Marketing, Medaillen, Ziele). Je Saison höchstens 15 % Bewegung.</small>
+          {schritte.map((st, i) => (
+            <div className="so-schritt" key={st.id}>
+              <span className="n">{i + 1}</span>
+              <div>
+                <b>{st.titel}</b>
+                <small>{st.formel}</small>
+              </div>
+              <strong className={`bc-t ${st.id === "faktor" ? "gold" : ""}`}>{st.id === "wertkorrektur" ? vorzeichenDe(st.wert, 0) : zahlDe(st.wert, 0)} C</strong>
             </div>
-            <strong className="bc-t">{zahlDe(wert("betrieb"), 0)} C</strong>
-          </div>
-          <div className="so-schritt">
-            <span className="n">2</span>
-            <div>
-              <b>Kader-Ersatz</b>
-              <small>{zahlDe(SPONSOR_TOPF.kaderErsatzAnteil * 100, 0)} % des Kaderwerts (Saison 1 zusätzlich {zahlDe(SPONSOR_TOPF.kaderErsatzZuschlagSaison1 * 100, 0)} %): die Liga bleibt im Wert.</small>
-            </div>
-            <strong className="bc-t">{zahlDe(wert("ersatz"), 0)} C</strong>
-          </div>
-          <div className="so-schritt">
-            <span className="n">3</span>
-            <div>
-              <b>Liga-Topf = Rest × Saisonfaktor</b>
-              <small>
-                × {zahlDe(u.faktor, 2)} − Übertrag {vorzeichenDe(r.uebertrag, 1)} C. Davon gehen {zahlDe(r.farbToepfe.liga1 + r.farbToepfe.liga2, 0)} C an die Farb-Töpfe und {zahlDe(r.treueSumme, 1)} C an Treueboni.
-              </small>
-            </div>
-            <strong className="bc-t gold">{zahlDe(wert("faktor"), 0)} C</strong>
-          </div>
-          <div className="so-schritt">
-            <span className="n">4</span>
-            <div>
-              <b>Verteilen: Grundbetrag, Leistung, Farbe</b>
-              <small>Grundbetrag nach Liga-Anteil, Erwartungsrang und Beliebtheit. Leistung: Summe je Liga 0. Farb-Töpfe getrennt je Farbe.</small>
-            </div>
-            <strong className="bc-t">{zahlDe(wert("verteilung") / 32, 1)} <small style={{ fontSize: "0.55em", color: "var(--bc-leise)" }}>je Team</small></strong>
-          </div>
+          ))}
           <div className="so-formel">
             Auszahlung = <em>Grundbetrag</em>(Erwartungsrang, Beliebtheit, Passung) + <em>Satz</em> × Hebel × (Erwartungsrang − Endrang) − Liga-Ausgleich + <em>Farb-Partner</em> + Ziel
           </div>
@@ -334,7 +312,7 @@ export function SponsorenRechnungAnsicht({ teamId, u }: { teamId: string; u: Spo
           </div>
         </div>
         <div className="so-fuss">
-          <span>Ergebnis = Grundbetrag + Farb-Mittel − (Kosten − übrige Einnahmen) − Kader-Ersatz. Wer für seinen Erwartungsrang teuer ist, liegt im Minus; der Vergleich mit dem alten System entfällt, weil es dafür keine Datenquelle mehr gibt.</span>
+          <span>Ergebnis = Grundbetrag + Farb-Mittel − (Kosten − übrige Einnahmen) − Kader-Ersatz. Wer für seinen Erwartungsrang teuer ist, liegt im Minus. Fremde Teams sind genähert (Scouting-Nebel).</span>
         </div>
       </section>
 
@@ -358,9 +336,9 @@ export function SponsorenRechnungAnsicht({ teamId, u }: { teamId: string; u: Spo
             <small>von {k.anzahl} Teams</small>
           </div>
           <div className="so-kachel">
-            <span className="bc-gk">Gefälle oben gegen unten, Liga {u.liga}</span>
-            <strong className={`bc-t ${tonVon(k.gaefalleEigeneLiga)}`}>{vorzeichenDe(k.gaefalleEigeneLiga, 1)} C</strong>
-            <small>Erwartungsrang 1 bis 4 gegen 13 bis 16</small>
+            <span className="bc-gk">Ergebnis deines Teams</span>
+            <strong className={`bc-t ${tonVon(k.eigenesErgebnis)}`}>{vorzeichenDe(k.eigenesErgebnis, 1)} C</strong>
+            <small>bei Erwartungsrang; fremde Teams sind genähert (Scouting-Nebel)</small>
           </div>
           <div className="so-kachel">
             <span className="bc-gk">Größter zu kleinstem Vertrag</span>

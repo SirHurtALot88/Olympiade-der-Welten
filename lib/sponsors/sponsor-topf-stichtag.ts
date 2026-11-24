@@ -12,11 +12,10 @@
  *                  3 % des Topfs, geht mit umgekehrtem Vorzeichen in den Topf der naechsten Saison.
  */
 import type { GameState } from "@/lib/data/olyDataTypes";
-import { getSeasonSponsorCashByTeam } from "@/lib/sponsor/sponsor-settlement-service";
 import { getTeamSponsorContract, getTeamSponsorOffers } from "@/lib/sponsor/sponsor-offer-read";
 import { gueltigerSponsorStempel, sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
-import { SPONSOR_TOPF, berechneTopf, richtwertSaison1, runde1, type TopfErgebnis } from "@/lib/sponsors/sponsor-topf-modell";
-import { berechneTopfLive, sammleTopfEingabe, sponsorLigaVon, teamPlanPosten } from "@/lib/sponsors/sponsor-topf-eingaben";
+import { SPONSOR_TOPF, berechneTopf, richtwertSaison1, type TopfErgebnis } from "@/lib/sponsors/sponsor-topf-modell";
+import { berechneTopfLive, sammleTopfEingabe } from "@/lib/sponsors/sponsor-topf-eingaben";
 import { rechneTopfLive, teamStandenAusLive } from "@/lib/sponsors/sponsor-topf-buchung";
 import { baueTopfWahlKontext, besteAngebotNachPassung, type TopfWahlKontext } from "@/lib/sponsors/sponsor-topf-wahl";
 import type { SponsorRegelStempel, SponsorTopfVorlaeufig } from "@/lib/sponsors/sponsor-topf-typen";
@@ -44,6 +43,11 @@ export function berechneVorlaeufig(gameState: GameState): SponsorTopfVorlaeufig 
   }));
   // Die Rueckkopplung kennt die Abweichung des Liga-Werts erst am Stichtag: vorlaeufig gilt nur die bisher angewandte Korrektur.
   const wertKorrektur = gueltigerSponsorStempel(gameState)?.ligaWertKorrektur ?? 0;
+  if (sammlung.eingabe.ohneBremse) {
+    // Erste Topf-Saison nach dem alten System: keine Bremse, vorlaeufig gelten die heutigen Kosten (kein Bezug zur Vorsaison).
+    const roh = berechneTopf({ ...sammlung.eingabe, wertKorrektur, zusage: undefined });
+    return { topf: roh.topf, grund: Object.fromEntries(Object.values(roh.teams).map((x) => [x.teamId, x.grundbetrag])) };
+  }
   const e: TopfErgebnis = berechneTopf({ ...sammlung.eingabe, teams, betriebsteilVorjahr: vor, wertKorrektur, zusage: undefined });
   return { topf: e.topf, grund: Object.fromEntries(Object.values(e.teams).map((t) => [t.teamId, t.grundbetrag])) };
 }
@@ -53,17 +57,6 @@ export function stempleVorlaeufig(gameState: GameState): GameState {
   const stempel = gueltigerSponsorStempel(gameState);
   if (!stempel || stempel.version !== "topf" || stempel.eingefroren) return gameState;
   return schreibeStempel(gameState, { ...stempel, vorlaeufig: berechneVorlaeufig(gameState) });
-}
-
-/** Der Uebertrag fuer den Topf der naechsten Saison aus der abgelaufenen (gebuchten) Saison. 0 ohne eingefrorenen Topf-Stand. */
-export function uebertragFuerSaisonwechsel(abgelaufen: GameState): number {
-  const stempel = gueltigerSponsorStempel(abgelaufen);
-  const f = stempel?.eingefroren;
-  if (!stempel || stempel.version !== "topf" || !f) return 0;
-  let gezahlt = 0;
-  for (const v of getSeasonSponsorCashByTeam(abgelaufen).values()) gezahlt += v;
-  const deckel = SPONSOR_TOPF.uebertragDeckel * f.topf;
-  return runde1(Math.min(deckel, Math.max(-deckel, gezahlt - f.topf)));
 }
 
 /** Teams ohne Vertrag am Stichtag: Leistungsvertrag der Marke mit der besten Passung, Laufzeit 1, KI-Farben (Konzept 8). */
@@ -118,34 +111,4 @@ export function sichereSponsorTopf(gameState: GameState, jetzt: string = new Dat
       gesperrtAm: jetzt,
     },
   });
-}
-
-/**
- * Was die KI-Kaufplanung als Sponsoreinnahme ansetzt (Konzept 7): die Vorab-Zusage (90 % des vorlaeufigen Grundbetrags) plus Treuebonus,
- * Leistungsteil 0. Nach dem Stichtag der eingefrorene Grundbetrag. `null`, wenn der Topf nicht gilt oder noch nichts berechnet ist.
- */
-export function topfPlanungSponsor(gameState: GameState, teamId: string): number | null {
-  const stempel = gueltigerSponsorStempel(gameState);
-  if (!stempel || stempel.version !== "topf") return null;
-  const vertrag = getTeamSponsorContract(gameState, teamId);
-  const treue = vertrag?.sponsorTopf ? SPONSOR_TOPF.treueBonus[Math.min(3, Math.max(1, vertrag.sponsorTopf.jahr)) - 1] ?? 0 : 0;
-  const eingefroren = stempel.eingefroren?.teams[teamId];
-  const verdraengt = verdraengteEinnahmenFuerPlanung(gameState, teamId, stempel);
-  if (eingefroren) return runde1(eingefroren.grundbetrag + eingefroren.treue + verdraengt);
-  const vorl = stempel.vorlaeufig?.grund[teamId];
-  if (vorl == null) return null;
-  return runde1(vorl * SPONSOR_TOPF.zusage + treue + verdraengt);
-}
-
-/**
- * Was der Topf den Sponsorgeldern der Teams "weggenommen" und als eigene Einnahme gegeben hat (Tickets samt Dauerkarten, Marketing, Medaillen)
- * plus der erwartete Farb-Anteil. Die KI-Planung zaehlt diese Posten sonst nirgends; ohne sie plante sie mit deutlich weniger Geld, als das Team
- * hat, und kaufte kleinere Kader als im alten System (gemessen: Lauf TOPF gegen BASIS, 24.11.).
- */
-function verdraengteEinnahmenFuerPlanung(gameState: GameState, teamId: string, stempel: SponsorRegelStempel): number {
-  const z = teamPlanPosten(gameState, teamId).zeilen;
-  const liga = sponsorLigaVon(gameState, teamId);
-  const faktor = stempel.eingefroren?.faktor ?? 1;
-  const farbMittel = (4 * SPONSOR_TOPF.farbTopf[liga] * faktor) / 16;
-  return (z.tickets ?? 0) + (z.marketing ?? 0) + (z.medaillen ?? 0) + farbMittel;
 }

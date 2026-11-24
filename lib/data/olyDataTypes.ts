@@ -4500,6 +4500,8 @@ export type SeasonState = {
   sponsorOffersByTeamId?: Record<string, SponsorOffer[]>;
   sponsorContractsByTeamId?: Record<string, TeamSponsorContract>;
   sponsorBrandHistoryByTeamId?: Record<string, string[]>;
+  /** SPONSOR-TOPF: gespielte SAISONEN je Team und Dachmarke (zaehlt beim Saisonwechsel, nicht je Unterschrift); Bezug der Treue (0 bis 3). */
+  sponsorMarkenSaisonenByTeamId?: Record<string, Record<string, number>>;
   sponsorEvents?: SponsorEventRecord[];
   sponsorPayoutLogs?: SponsorPayoutLogRecord[];
   /** Zu Saisonbeginn eingefrorene Apron-Linien dieser Saison. Siehe ApronLinesSnapshot. */

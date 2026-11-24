@@ -76,13 +76,13 @@ describe("Sponsorenseite modern", () => {
     const html = render(mit, team, "liga");
     expect((html.match(/<tr/g) ?? []).length).toBe(17);
     expect((html.match(/aria-sort=/g) ?? []).length).toBe(14);
-    expect(html).toMatch(/\d–\d/);
+    expect(html).toMatch(/ca\. \d+/);
     expect(html).toContain('data-testid="sponsoren-liga-eigen"');
   });
 
-  it("Rechenansicht: vier Schritte, Regler, Liga-Bilanz", () => {
+  it("Rechenansicht: Schritte aus dem View-Modell, Regler, Liga-Bilanz", () => {
     const html = render(mit, team, "rechnung");
-    expect(html).toContain("Was kostet die Liga?");
+    expect(html).toContain("Liga-Wert-Korrektur");
     expect(html).toContain('type="range"');
     expect(html).toContain("Liga-Bilanz");
   });
@@ -94,12 +94,9 @@ describe("Sponsorenseite modern", () => {
 });
 
 describe("Sponsorenseite: Helfer", () => {
-  it("Nebel: eigenes Team exakt, fremdes als Viertel; Nebel aus macht alles exakt", () => {
-    const gs = { scenarioMeta: {} } as Pick<GameState, "scenarioMeta">;
-    expect(erwartungsAnzeige(gs, true, 2.4).exakt).toBe(true);
-    expect(erwartungsAnzeige(gs, false, 6.2)).toMatchObject({ text: "5–8", sort: 5, exakt: false });
-    expect(erwartungsAnzeige(gs, false, 15.7).text).toBe("13–16");
-    expect(erwartungsAnzeige({ scenarioMeta: { scoutingNebelAus: true } } as never, false, 6.2).exakt).toBe(true);
+  it("Nebel: der Server liefert fremde Erwartungsränge in Stufen, die Seite zeigt und sortiert nur das", () => {
+    expect(erwartungsAnzeige(false, 2.4)).toMatchObject({ text: "2,4", exakt: true });
+    expect(erwartungsAnzeige(true, 8)).toMatchObject({ text: "ca. 8", sort: 8, exakt: false });
   });
 
   it("Auszahlungsstufen: Erwartung hat Leistung 0, Rang 1 ist am besten", () => {
@@ -110,7 +107,7 @@ describe("Sponsorenseite: Helfer", () => {
   });
 
   it("Faktor-Regler: derselbe Faktor ändert nichts, ein höherer hebt den Topf", () => {
-    const r = { betriebsteil: 1000, kaderErsatz: 200, uebertrag: -10, topf: 1150, farbToepfe: { liga1: 48, liga2: 36 }, treueSumme: 0, hauptTopf: 1000, betriebsteilRoh: 1000, ligaMittelBeiErwartung: 0, schritte: [] };
+    const r = { betriebsteil: 1000, kaderErsatz: 200, uebertrag: -10, wertKorrektur: -20, topf: 1230, farbToepfe: { liga1: 48, liga2: 36 }, treueSumme: 0, hauptTopf: 1000, betriebsteilRoh: 1000, ligaMittelBeiErwartung: 0, schritte: [] };
     expect(topfBeiFaktor(r, 1, 1).differenz).toBe(0);
     expect(topfBeiFaktor(r, 1, 1.05).differenz).toBeCloseTo(60, 0);
   });

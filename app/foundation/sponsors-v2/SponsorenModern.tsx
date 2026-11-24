@@ -130,7 +130,7 @@ export default function SponsorenModern({
               titel="Verhandlung"
               symbol={<BcIcon name="karte" />}
             />
-            <BcReiter aktiv={ansicht === "liga"} onClick={() => setAnsicht("liga")} eyebrow="Wer bekommt was" titel="Liga-Vergleich" symbol={<BcIcon name="krone" />} />
+            <BcReiter aktiv={ansicht === "liga"} onClick={() => setAnsicht("liga")} eyebrow="Wer bekommt was" titel={<><span className="so-lang">Liga-Vergleich</span><span className="so-kurz">Vergleich</span></>} symbol={<BcIcon name="krone" />} />
             <BcReiter aktiv={ansicht === "rechnung"} onClick={() => setAnsicht("rechnung")} eyebrow="So wird gerechnet" titel="Saisonfaktor" symbol={<BcIcon name="bank" />} />
           </>
         }
@@ -203,7 +203,7 @@ function VertragAnsicht({
         <div className="so-pk">
           <h2>Hauptsponsor</h2>
           <span className="sp" />
-          <span className={`so-marke ${u.eingefroren ? "is-echt" : "is-leer"}`} title={u.eingefroren ? undefined : "Vorschau: zum Stichtag (vor der ersten Wertung) friert der Grundbetrag ein, mindestens 90 % der Vorab-Zusage"}>{u.eingefroren ? "Stichtag gesetzt" : "Vorschau"}</span>
+          <span className={`so-marke ${u.eingefroren ? "is-echt" : "is-leer"}`} title={u.eingefroren ? undefined : "Zum Stichtag (vor der ersten Wertung) friert der Grundbetrag ein"}>{u.eingefroren ? "Stichtag gesetzt" : "Vorläufig"}</span>
           {u.notbremse ? <span className="so-marke is-rot">Notbremse</span> : null}
         </div>
         <div className="so-kb">
@@ -219,7 +219,13 @@ function VertragAnsicht({
             </div>
           </div>
           <div className="so-zl">
-            <Zeile label="Grundbetrag" hinweis={v.treueBonus > 0 ? `inkl. Treuebonus ${zahlDe(v.treueBonus, 1)} C` : undefined} wert={`${zahlDe(z.grund.saison, 1)} C`} spieltag={`${zahlDe(z.grund.jeSpieltag, 2)} C je Spieltag`} />
+            <Zeile
+              label="Grundbetrag"
+              hinweis={[v.treueBonus > 0 ? `inkl. Treuebonus ${zahlDe(v.treueBonus, 1)} C` : null, u.vorlaeufig && z.grund.zusageMind != null ? `vorläufig (zugesagt mind. ${zahlDe(z.grund.zusageMind, 1)} C)` : u.vorlaeufig ? "vorläufig" : null].filter(Boolean).join(" · ") || undefined}
+              wert={`${zahlDe(z.grund.saison, 1)} C`}
+              spieltag={`${zahlDe(z.grund.jeSpieltag, 2)} C je Spieltag`}
+            />
+            {z.grund.leihVerzicht > 0 ? <Zeile label="Gebäude-Leihe" hinweis="Verzicht im Grundbetrag" wert={`${vorzeichenDe(-z.grund.leihVerzicht, 1)} C`} ton="minus" klein /> : null}
             <Zeile
               label="Leistungsteil"
               hinweis={`${zahlDe(z.leistung.satzJePlatz, 2)} C je Platz, Stand ${z.leistung.platzJetzt != null ? `Platz ${z.leistung.platzJetzt}` : "vor Spieltag 1"}`}
@@ -227,6 +233,7 @@ function VertragAnsicht({
               ton={tonVon(z.leistung.saison)}
               spieltag={`${vorzeichenDe(z.leistung.jeSpieltag, 2)} C je Spieltag`}
             />
+            <div className="so-hinweis" style={{ fontSize: "0.82em", padding: "0.1em 0 0.1em 0.65em" }}>{z.leistung.abrechnungshinweis}</div>
             <Zeile label="Farb-Partner" hinweis={farbText(v.farben)} wert={`${vorzeichenDe(z.farbe.saison, 1)} C`} ton={tonVon(z.farbe.saison)} />
             <Zeile
               label="Ziel"

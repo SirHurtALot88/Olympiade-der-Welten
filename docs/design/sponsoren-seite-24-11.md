@@ -2,7 +2,7 @@
 
 Vorlage: `public/mockups/sponsoren-modern-22-11.html` (Ansichten `vertrag|angebote|liga|rechnung`), Rechenkern und View-Modell: `docs/design/sponsoren-rework-bau-24-11.md`.
 Bildpaare **Mockup | App** (links Mockup, rechts echte App, je Ansicht in 1920x1080, 2560x1440 und 1710x1112): `docs/design/sponsoren-seite-24-11/paar-<ansicht>-<breite>.png`;
-Einzelaufnahmen bei 1920 daneben. Aufnahme: `scripts/screenshot-sponsoren-seite.ts` (Wegwerf-SQLite, neues Spiel, 32 Teams, erstes Team menschlich, Topf-Regel ab Saison 1).
+Einzelaufnahmen bei 1920 daneben. Aufnahme: `scripts/screenshot-sponsoren-seite.ts` (Wegwerf-SQLite, neues Spiel mit 32 Teams und Topf-Regel ab Saison 1: KI-Draft, zwei gebuchte Spieltage, Stichtag war; danach wird das erste Team (A-A) menschlich, hat einen unterschriebenen Topf-Vertrag und einen erzwungenen offenen Sponsorentermin). Die Angebote-Aufnahmen entstehen nach dem Entfernen des Vertrags desselben Spielstands. Zusätzlich `app-vertrag-nach-zusage-1920.png`: der Termin wurde über den echten Schreibweg zugesagt (Zeile „zugesagt · Form −1“).
 
 ## Was gebaut ist
 
@@ -60,12 +60,19 @@ Mehrspieler: das Team kommt aus `selectedTeamId` (aktives Team der Shell), Schre
 
 Offen/akzeptiert: bei 1710x1112 kürzt „Liga-Vergleich“ im Reiter ab (Reiter schrumpfen gleichmäßig, Text bleibt über das Tooltip lesbar).
 
-## Probleme, die ich im Rechenkern sehe (Entscheidung nötig)
+## Stand nach der zweiten Runde (Rechenzweig cea82ad3e eingemischt)
 
-- **Vorschau-Grundbetrag gegen Richtwert**: vor dem Stichtag zeigt die Vertragsansicht den *live* gerechneten Grundbetrag (z. B. 24,5 C), das Angebot nannte den Richtwert 51,7 C und eine Vorab-Zusage von 47 C. Am Stichtag hebt die Zusage auf mindestens 90 % des vorläufigen Betrags. Die Vorschau sollte dieselbe Untergrenze anwenden (Rechenzweig) oder die Seite die Zusage nennen; bis dahin steht am Marker „Vorschau“ ein Hinweis.
-- Alle Teams starten im neuen Spiel mit Kosten ≈ 0 (kein Kader vor dem Draft), das „Ergebnis bei Erwartung“ ist deshalb vor dem Draft überall stark positiv. Sinnvoll erst nach dem Draft lesen.
-- Der Faktor-Regler leitet die Wert-Korrektur aus den gezeigten Größen ab (`topfBeiFaktor`); sobald `TopfStand.rechnung.wertKorrektur` auf dem Rechenzweig steht, ersetzt die Seite die Ableitung durch den Wert.
+- **Scouting-Nebel vom Server**: `liga_vergleich` liefert fremde Erwartungsränge in Vierer-Stufen, Kosten und Planeinnahmen in 5er-Stufen, `guvBeiErwartung` ist `null`. Die Seite zeigt nur das („ca. 8“, „ca. 45“, „verdeckt“) und rechnet nichts nach; die eigene Vierer-Stufung ist entfernt. `ligaBilanz` (meine Ergänzung) rechnet fremde Teams mit denselben auf 5 C gerundeten Kosten (Feld `grob`); das Säulenbild ist für sie eine Näherung und so beschriftet. Die Kachel „Gefälle oben gegen unten“ entfällt (braucht exakte Erwartungsränge), dafür „Ergebnis deines Teams“.
+- **Leistung je Spieltag** zeigt den gebuchten Wert (0,8·L/N) mit dem Abrechnungshinweis des View-Modells.
+- **Erklärschritte** kommen aus dem View-Modell (fünf Schritte inkl. Liga-Wert-Korrektur); der Faktor-Regler (`topfBeiFaktor`) nimmt `rechnung.wertKorrektur`.
+- **Vor dem Stichtag**: Grundbetrag mit Zusage-Untergrenze; die Seite schreibt „vorläufig (zugesagt mind. X C)“ (neues Feld `zeilen.grund.zusageMind` im View-Modell, Seiten-PR) und der Marker heißt „Vorläufig“. Nach dem Stichtag „Stichtag gesetzt“. `leihVerzicht` erscheint als eigene Zeile, wenn vorhanden.
+- Reiter „Liga-Vergleich“ heißt unter 1800 px Breite „Vergleich“ (kein Abschneiden mehr).
+- Kleine Mängel dieser Runde: Wappen luden lazy und fehlten in der Aufnahme (jetzt eager); Endwert der Angebotskurve lag auf der Linie (jetzt links vom Punkt, Erwartung links über der gestrichelten Linie).
+
+Offen:
+- Ziel: Prämienverträge ohne Achsen-Karte zeigen „kein Ziel auf diesem Vertrag“ (Rechenzweig, Entscheidung 1 der Bau-Doku).
+- Die Passung-Zeile bei den Angeboten nennt nach Stichtag den Wert ohne Liga-Normierung (Bau-Doku Abschnitt 5).
 
 ## Tests
 
-`tests/sponsoren-seite-modern.test.tsx` (8): alle vier Ansichten gerendert, Passung, drei Arten, 16 Zeilen mit 14 sortierbaren Köpfen, Nebel, Sperre ohne Verwaltungsrecht, Helfer. 35 weitere Dateien, die Panel, Shell oder View-Modell lesen, bleiben grün (334 Tests). Wertungs-Fingerabdruck `GESAMT fe1dc086d68d` unverändert, alle sechs Schutzsummen unverändert. `tsc --noEmit`: keine Fehler in den berührten Dateien. Browser-Bündel der Seite (esbuild `--platform=browser`) enthält keine `node:`-Module.
+`tests/sponsoren-seite-modern.test.tsx` (8): alle vier Ansichten gerendert, Passung, drei Arten, 16 Zeilen mit 14 sortierbaren Köpfen, Nebel, Sperre ohne Verwaltungsrecht, Helfer. 35 weitere Dateien, die Panel, Shell oder View-Modell lesen, bleiben grün (334 Tests). Wertungs-Fingerabdruck `GESAMT fe1dc086d68d` unverändert, alle sechs Schutzsummen unverändert. `npx tsc --noEmit -p tsconfig.next.json`: keine Fehler. Browser-Bündel der Seite (esbuild `--platform=browser`) enthält keine `node:`-Module.

@@ -847,3 +847,8 @@
 .so-tab.fuellt td { height: auto; }
 .so-tab.fuellt { height: 100%; }
 .so-tab.fuellt td { height: auto; }
+.so .so-kurz { display: none; }
+@media (max-width: 1800px) {
+  .so .so-lang { display: none; }
+  .so .so-kurz { display: inline; }
+}

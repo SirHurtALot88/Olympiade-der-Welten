@@ -50,7 +50,8 @@ import { buildCaptainRecordForPlayer } from "@/lib/morale/team-captain-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
 import { sponsorRegelFuerSpielmodus } from "@/lib/resolve/sponsor-regel";
-import { stempleVorlaeufig, uebertragFuerSaisonwechsel } from "@/lib/sponsors/sponsor-topf-stichtag";
+import { stempleVorlaeufig } from "@/lib/sponsors/sponsor-topf-stichtag";
+import { uebertragFuerSaisonwechsel } from "@/lib/sponsors/sponsor-topf-uebertrag";
 import { ueberfuehreAltvertraege } from "@/lib/sponsors/sponsor-topf-wahl";
 
 import { advanceTeamBeliebtheitForSeasonTransition } from "@/lib/economy/team-beliebtheit";

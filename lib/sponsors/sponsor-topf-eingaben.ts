@@ -41,6 +41,13 @@ export function sponsorLigaVon(gameState: GameState, teamId: string): SponsorLig
   return getLeagueOf(gameState, teamId) === "liga2" ? 2 : 1;
 }
 
+/** Anzahl der Teams in der Liga des Teams (ohne Liga-Split: alle). Gleichnamige Groesse fuer alle Mitten- und Anteilsrechnungen (2 x 16 heute, 2 x 20 geplant). */
+export function ligaGroesseVon(gameState: GameState, teamId: string): number {
+  const liga = sponsorLigaVon(gameState, teamId);
+  const n = gameState.teams.filter((t) => sponsorLigaVon(gameState, t.teamId) === liga).length;
+  return Math.max(1, n);
+}
+
 export function ligaVonAlle(gameState: GameState): Record<string, SponsorLiga> {
   return Object.fromEntries(gameState.teams.map((t) => [t.teamId, sponsorLigaVon(gameState, t.teamId)]));
 }
@@ -146,16 +153,16 @@ export function teamPlanPosten(gameState: GameState, teamId: string): { kosten: 
   };
 }
 
-/** Treue zur Marke: Saisons mit dieser Dachmarke (0 bis 3) aus Markenverlauf und laufendem Vertrag. */
+/**
+ * Treue zur Marke: gespielte SAISONEN mit dieser Dachmarke (0 bis 3), nicht Unterschriften. Quelle ist der Saisonzaehler
+ * (`sponsorMarkenSaisonenByTeamId`, zaehlt beim Saisonwechsel); ein Spielstand ohne Zaehler faellt auf den Markenverlauf zurueck.
+ */
 export function treueSaisonsFuerMarke(gameState: GameState, teamId: string, parentBrandId: string | undefined): number {
   if (!parentBrandId) return 0;
+  const zaehler = gameState.seasonState.sponsorMarkenSaisonenByTeamId?.[teamId];
+  if (zaehler) return Math.min(3, zaehler[parentBrandId] ?? 0);
   const verlauf = gameState.seasonState.sponsorBrandHistoryByTeamId?.[teamId] ?? [];
-  const contract = getTeamSponsorContract(gameState, teamId);
-  let n = verlauf.filter((id) => id === parentBrandId).length;
-  if (contract && contract.sponsorParentBrandId === parentBrandId && contract.sponsorTopf) {
-    n = Math.max(n, contract.sponsorTopf.treueSaisons + contract.sponsorTopf.jahr);
-  }
-  return Math.min(3, n);
+  return Math.min(3, verlauf.filter((id) => id === parentBrandId).length);
 }
 
 export type TopfSammlung = {
@@ -198,7 +205,7 @@ export function sammleTopfEingabe(gameState: GameState): TopfSammlung {
     return {
       teamId: team.teamId,
       liga,
-      erwartungsrang: erwartung[team.teamId] ?? (liga === 1 ? 8.5 : 8.5),
+      erwartungsrang: erwartung[team.teamId] ?? (ligaGroesseVon(gameState, team.teamId) + 1) / 2,
       beliebtheit: popularitaet(gameState, team.teamId),
       passungRoh: tv ? passungRoh(zBeliebtheit(kaderBeliebtheit(gameState, team.teamId), mittel[liga]), zTreue(tv.treueSaisons)) : 1,
       treue: tv ? treueBonus(tv.jahr) : 0,
@@ -224,6 +231,7 @@ export function sammleTopfEingabe(gameState: GameState): TopfSammlung {
     kaderErsatz: stempel?.kaderErsatz ?? 1,
     betriebsteilVorjahr: stempel?.betriebsteilVorjahr ?? null,
     uebertrag: stempel?.uebertrag ?? 0,
+    ...(stempel?.ohneBremse ? { ohneBremse: true } : {}),
     ...(zusage ? { zusage } : {}),
   };
   return { ligaWert, ligaWertDrift, eingabe, ligen, vertraege, zeilen };

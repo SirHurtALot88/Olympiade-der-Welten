@@ -26,7 +26,7 @@ export function SponsorWappenBild({
     <span className={`so-wap${klein ? " kl" : ""}`} title={pfad ? undefined : "Wappen folgt, bis dahin Monogramm"}>
       {pfad ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={pfad} alt="" draggable={false} loading="lazy" decoding="async" />
+        <img src={pfad} alt="" draggable={false} loading="eager" decoding="async" />
       ) : (
         <span>{sponsorMonogramm(name)}</span>
       )}
@@ -175,8 +175,8 @@ export function AuszahlungsKurve({ punkte, erwartungsrang, ligaGroesse }: { punk
             <line x1={rand} x2={w - rand} y1={y(erw.summe)} y2={y(erw.summe)} stroke="rgba(240,195,90,.45)" strokeDasharray="5 5" />
             <polyline points={punkte.map((p) => `${x(p.rang)},${y(p.summe)}`).join(" ")} fill="none" stroke="#f0c35a" strokeWidth={2.5} strokeLinejoin="round" />
             <circle cx={x(erw.rang)} cy={y(erw.summe)} r={5} fill="#f2a03d" />
-            <text x={x(erw.rang) > w * 0.55 ? x(erw.rang) - 10 : x(erw.rang) + 10} y={y(erw.summe) - 8} textAnchor={x(erw.rang) > w * 0.55 ? "end" : "start"} fontSize={f}>{`Erwartung · ${zahlDe(erw.summe, 1)} C`}</text>
-            {ligaGroesse - erw.rang > 3 ? <text x={w - rand} y={y(punkte[punkte.length - 1]!.summe) - 8} textAnchor="end" fontSize={f}>{`${zahlDe(punkte[punkte.length - 1]!.summe, 1)} C`}</text> : null}
+            <text x={rand} y={y(erw.summe) - 8} fontSize={f}>{`Erwartung · ${zahlDe(erw.summe, 1)} C`}</text>
+            <text x={w - rand - 10} y={y(punkte[punkte.length - 1]!.summe) + f * 0.35} textAnchor="end" fontSize={f}>{`${zahlDe(punkte[punkte.length - 1]!.summe, 1)} C`}</text>
             <text x={ersterX} y={h - f * 0.8} fontSize={f}>Platz 1</text>
             <text x={w - rand} y={h - f * 0.8} textAnchor="end" fontSize={f}>{`Platz ${ligaGroesse}`}</text>
           </>
