@@ -17,7 +17,8 @@ import { ausruestungRegelFuerNeueSaison } from "@/lib/ausruestung/ausruestung-re
 import { belastungsRegelFuerNeueSaison } from "@/lib/fatigue/belastung-regel-stempel";
 import { finanzenJeSpieltagFuerNeueSaison } from "@/lib/finance/finanzen-je-spieltag";
 import { resetPlayerFormForNewSeason } from "@/lib/morale/form-moral-modifikator";
-import { computeSeasonEndContractTick, previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
+import { previewSeasonEndContracts } from "@/lib/contracts/contract-renewal-service";
+import { computeSeasonEndContractTickMitVerkaufsabsicht } from "@/lib/contracts/ki-verkaufsabsicht-saisonende";
 import { buildFormCardSeasonUsageAudit, buildGeneratedFormCardRecordsForSeason } from "@/lib/lineups/legacy-lineup-modifiers";
 import type { Fixture, GameState, PreSeasonWorkflowLogRecord, SeasonSnapshotTeamRecord, SeasonState, StandingRecord, TeamCaptainRecord } from "@/lib/data/olyDataTypes";
 import { previewFacilitySeasonEndFinance } from "@/lib/facilities/facility-season-end-service";
@@ -548,7 +549,7 @@ function buildNextSeasonGameState(
   // kein Doppel-Tick, keine doppelte Cash-Buchung. Der Tick läuft VOR der Rest-Pipeline (Baseline-Drift
   // für frisch freigesetzte Free Agents, Sponsoren, Kader-Neuaufbau), damit diese auf dem gealterten
   // Kader/Cash aufsetzen und nichts doppelt zählen.
-  const contractTick = computeSeasonEndContractTick(inputSave);
+  const contractTick = computeSeasonEndContractTickMitVerkaufsabsicht(inputSave);
   const saveNachVertragsalterung: PersistedSaveGame = contractTick.applied
     ? { ...inputSave, gameState: contractTick.gameState }
     : inputSave;

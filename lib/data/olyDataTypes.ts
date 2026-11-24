@@ -4336,6 +4336,8 @@ export type SeasonState = {
     kernschutz: "alt" | "neu";
     /** 23.11.: Toepfe und Vorstands-Quote schon ab Saison 1, Startvertrauen aus der Identitaet (Budget-Gespraech). Fehlt = "alt". */
     toepfeS1?: "alt" | "neu";
+    /** 24.11.: KI verlaengert nicht, was sie verkaufen wuerde; Verkaufspruefung netto nach Rest-Buyout (verkauf-restgehalt-24-11.md). Fehlt = "alt". */
+    restgehalt?: "alt" | "neu";
     vorjahr?: Record<string, number>;
   } | null;
   /**

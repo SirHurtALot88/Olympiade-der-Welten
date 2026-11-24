@@ -64,6 +64,11 @@ export type AiDissolutionRenewalSignal = {
   renewalSalary: number | null;
   /** Laufzeit der Verlaengerung in Saisons. */
   renewalLength: number;
+  /**
+   * Wuerde die KI diesen Spieler im naechsten Fenster ohnehin verkaufen (24.11., verkauf-restgehalt-24-11.md)? Dann ist die
+   * Aufloesung mit Teilverzicht billiger als der Verkauf mit vollem Rest-Buyout — die KI nimmt sie an, sofern die Kasse sie traegt.
+   */
+  verkaufGeplant?: boolean;
 };
 
 export type AiDissolutionDecision = {
@@ -101,7 +106,12 @@ export type AiDissolutionReason =
   /** Annehmen: Erloes plus gespartes Gehalt schlagen seinen Restwert. */
   | "exit_gain_higher"
   /** Annehmen: der Vertrag endet an diesem Saisonende ohnehin und wird nicht verlaengert. */
-  | "contract_ends_anyway";
+  | "contract_ends_anyway"
+  /**
+   * Annehmen: die KI wuerde ihn im naechsten Fenster ohnehin verkaufen. Der Verkauf kostete den vollen Rest-Buyout, die
+   * Aufloesung nur den nicht erlassenen Teil — bei gleichem Verkaufspreis (dieselbe `buildTransfermarktSaleFactorBreakdown`).
+   */
+  | "verkauf_geplant";
 
 /**
  * WIE VIEL EIN UNZUFRIEDENER SPIELER NOCH WERT IST.
@@ -249,6 +259,20 @@ export function decideAiContractDissolution(input: {
       ...basis,
       decision: "declined",
       reason: "cash_floor",
+      keepWorth: 0,
+      moraleFactor: 0,
+      rosterFactor: 0,
+      qualityFactor: 0,
+    };
+  }
+
+  // VERKAUF OHNEHIN GEPLANT (24.11.): Behalten steht gar nicht zur Wahl — die Frage ist nur, WIE er geht. Die Aufloesung
+  // ist der billigere Weg (Teilverzicht auf den Rest-Buyout), also wird sie angenommen. Die Pleite-Wache oben gilt weiter.
+  if (input.renewal?.verkaufGeplant === true) {
+    return {
+      ...basis,
+      decision: "accepted",
+      reason: "verkauf_geplant",
       keepWorth: 0,
       moraleFactor: 0,
       rosterFactor: 0,
