@@ -80,6 +80,38 @@ Aufwand für Voranmeldungen und Belegprüfung, einmalige Beratung, Vorsteuer auf
 
 ---
 
+## 1a. Differenzbesteuerung (§ 25a UStG) gegen Regelbesteuerung mit Vorsteuer (Rechnung 24.11.2026)
+
+Anlass: Eine Rechnung von Junksplayground GmbH (Händler) über Einzelkarten weist 0 % MwSt aus und trägt den Hinweis „Die mit ¹ gekennzeichneten Produkte unterliegen der Differenzbesteuerung gem. § 25a UStG". Das Porto (Großbrief) ist als Postleistung ebenfalls steuerfrei.
+
+### Regeln **[Quelle: [IHK Region Stuttgart, Stand 1.6.2026](https://www.ihk.de/stuttgart/fuer-unternehmen/recht-und-steuern/steuerrecht/umsatzsteuer-national/gebrauchtwarenhandel-684838), [IHK Köln](https://www.ihk.de/koeln/hauptnavigation/recht-steuern/steuern/merkblatt-anwendung-der-differenzbesteuerung-5811434); Gesetzestext nicht abgerufen]**
+- Einkauf erlaubt von **Privatpersonen, Kleinunternehmern und Wiederverkäufern, die selbst Differenzbesteuerung anwenden**. Bei **gesondert ausgewiesener Umsatzsteuer** auf dem Einkauf ist die Differenzbesteuerung nicht möglich (dort gilt Vorsteuerabzug).
+- Besteuert wird nur die **Differenz** (Verkaufspreis minus Einkaufspreis, brutto), die Steuer wird mit 19/119 herausgerechnet. Die Rechnung darf **keine Umsatzsteuer gesondert ausweisen** und braucht einen Hinweis auf die Sonderregelung.
+- **Gesamtdifferenz** statt Einzeldifferenz: bei Einkaufspreisen bis **750 €** je Gegenstand (Stuttgart, Stand 6/2026) bzw. 500 € (Köln, ohne Datum). Summe der Verkaufspreise minus Summe der Einkaufspreise im Besteuerungszeitraum, einheitlich für alle solche Umsätze, Wechsel der Methode nur zum Jahresbeginn.
+- Aufzeichnungen: Verkaufspreis, Einkaufspreis und Bemessungsgrundlage, getrennt von den übrigen Aufzeichnungen; gilt als erfüllt, wenn sie sich aus der Buchführung ablesen lassen.
+- **Vorsteuer auf Betriebskosten (eBay-Gebühren, Billbee, Lexoffice, Telefon, Arbeitsmittel, Verpackungsmaterial) bleibt in jedem Fall abziehbar**, wenn die Rechnung Umsatzsteuer ausweist. Nur der Wareneinkauf ohne USt hat keine Vorsteuer.
+- **[offen]** Gelten **Sammelkarten** als Gebrauchtgegenstände/Sammlungsstücke? Darf ein **Display ausgepackt** und die Karten einzeln unter § 25a verkauft werden? Wie wird eine **negative Differenz** behandelt? Zählt der **Versandkostenanteil** im Verkaufspreis mit? Unterstützen **Lexoffice und Billbee** die Differenzbesteuerung?
+
+### Rechnung mit deiner EÜR 2026 (Januar bis Oktober), als wäre das Jahr schon regelbesteuert
+Einnahmen 20.282,04 € (darin 3.238 € Umsatzsteuer), Wareneinkauf 8.061,97 €, Vorsteuer auf Nicht-Ware grob 1.123 € (Annahmen: Übrige Ausgaben zu 85 % mit USt, Verpackung zu 12 %, Telefon, Arbeitsmittel, Buchführung mit USt; Porto, Miete, Beiträge ohne), Gewinn heute 639,71 €.
+
+| Fall | Ware ohne USt wird | Rechnungen für Nicht-Ware | Zahllast | Gewinn Jan.–Okt. |
+|---|---|---|---:|---:|
+| A | normal besteuert (kein § 25a) | nicht gesammelt | 3.238 € | −2.599 € |
+| B | normal besteuert (kein § 25a) | gesammelt | 2.115 € | −1.475 € |
+| C | 50 % Ware mit USt-Rechnung, Rest normal besteuert | gesammelt | 1.472 € | −832 € |
+| D | 100 % Ware mit USt-Rechnung | gesammelt | 828 € | −188 € |
+| E | 100 % Privat/Diff-Einkauf mit § 25a | gesammelt | 828 € | −188 € |
+| F | 50 % USt-Rechnung, 50 % Privat/Diff mit § 25a | gesammelt | 828 € | −188 € |
+
+**Kernaussage:** Mit Differenzbesteuerung ist die Quelle der Ware (USt-Rechnung, Privat, Diff-Händler) **steuerlich egal**: Zahllast = 19/119 × (Verkaufspreise − Einkaufspreise brutto) − Vorsteuer auf Betriebskosten. Das gilt bei **gleichem Bruttopreis**. Ohne § 25a ist Ware ohne USt etwa 16 % schlechter (Fälle B, C). Ohne gesammelte Rechnungen ist die Vorsteuer null (Fall A).
+Beispiel 100 % Diff: Differenz 20.282 − 8.062 = 12.220 € → USt 1.951 € → minus Vorsteuer 1.123 € → Zahllast **828 €** für zehn Monate (hochgerechnet etwa 1.000 € im Jahr). Das ist die **günstigste** Variante der Regelbesteuerung, aber weiter **etwa 1.000 € Gewinn unter dem Kleinunternehmer** (Gewinn 2026 etwa 2.000 €). Preisanhebung von 3 bis 4 % oder Umsatzwachstum gleicht das aus.
+
+### Praktische Umsetzung (Vorschlag, nicht verifiziert)
+- Zwei Töpfe nach Warenart: Einzelkarten von Privat/Diff-Händlern gegen Ware mit USt-Rechnung (Displays, Booster). Je Topf Summe Verkäufe und Summe Einkäufe je Monat. LEC hat Verkäufe mit Stückpreis und Einkäufe mit EK je Artikel und könnte die Auswertung liefern.
+- Jeder Privatkauf braucht einen **Beleg** (Kaufbestätigung oder Eigenbeleg mit Datum und Betrag), jede Eingangsrechnung wird nach „USt ausgewiesen" oder „§ 25a" markiert.
+- Die Entscheidung für die Gesamtdifferenz gilt für das Jahr, ein Wechsel geht nur zum 1. Januar. Wer 2027 nicht sofort startet, verliert nichts und kann 2028 einsteigen.
+
 ## 2. Rechtlicher Rahmen
 
 - **Grenzen seit 2025:** Gesamtumsatz im Vorjahr höchstens 25.000 €, im laufenden Jahr höchstens 100.000 € **[Quelle: [§ 19 UStG](https://www.gesetze-im-internet.de/ustg_1980/__19.html)]**.
