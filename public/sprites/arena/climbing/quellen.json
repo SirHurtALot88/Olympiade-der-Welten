@@ -1,0 +1,26 @@
+{
+ "climbing-griffsatz.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x64",
+  "zweck": "Climbing: Griffsatz",
+  "saat": 9307,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 87.41,
+  "guthaben_nachher": 86.41,
+  "prompt": "set of six colourful climbing wall holds, bolt-on resin hand holds of different shapes in red yellow blue green orange, arranged in two rows, flat on neutral background, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ },
+ "climbing-volumen.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Climbing: Volumen",
+  "saat": 9308,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 86.41,
+  "guthaben_nachher": 85.41,
+  "prompt": "large geometric climbing wall volume, a big faceted blue polygon shape bolted to the wall with bolt holes, front view, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ }
+}

@@ -34,5 +34,29 @@
   "guthaben_vorher": 107.54,
   "guthaben_nachher": 106.54,
   "prompt": "dented metal bucket standing on the floor, grey metal with a rope handle, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 view"
+ },
+ "wettessen-flaschen.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Wettessen: Ketchup/Senf",
+  "saat": 9305,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 89.41,
+  "guthaben_nachher": 88.41,
+  "prompt": "two squeeze bottles standing side by side, one red ketchup and one yellow mustard, no labels text, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ },
+ "wettessen-wimpelkette.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "192x48",
+  "zweck": "Wettessen: Wimpelkette",
+  "saat": 9306,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 88.41,
+  "guthaben_nachher": 87.41,
+  "prompt": "string of colourful triangular bunting pennant flags hanging in a curve, red yellow blue green, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
  }
 }

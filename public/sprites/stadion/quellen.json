@@ -1,0 +1,38 @@
+{
+ "stadion-grund.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "400x224",
+  "zweck": "Stadion-Aussenansicht Ausbaustufe 1",
+  "saat": 9510,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 58.41,
+  "guthaben_nachher": 57.41,
+  "prompt": "small basic football arena exterior with one low stand, simple fence and few floodlights, modest, seen from the front at a slight angle, evening sky, wide scene, pixel art background scene, 2D HD remake look, 16-bit RPG style, rich shading, no text, no letters, no people"
+ },
+ "stadion-ausgebaut.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "400x224",
+  "zweck": "Stadion-Aussenansicht Ausbaustufe 2",
+  "saat": 9511,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 57.41,
+  "guthaben_nachher": 56.41,
+  "prompt": "medium sized arena exterior with a tall double tier grandstand roof, large floodlight masts and a ticket entrance, seen from the front at a slight angle, evening sky, wide scene, pixel art background scene, 2D HD remake look, 16-bit RPG style, rich shading, no text, no letters, no people"
+ },
+ "stadion-voll.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "400x224",
+  "zweck": "Stadion-Aussenansicht Ausbaustufe 3",
+  "saat": 9512,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 56.41,
+  "guthaben_nachher": 55.41,
+  "prompt": "huge modern arena exterior with full ring grandstand, glass VIP lodge boxes along the upper level, giant roof and many floodlights, flags, seen from the front at a slight angle, evening sky, wide scene, pixel art background scene, 2D HD remake look, 16-bit RPG style, rich shading, no text, no letters, no people"
+ }
+}

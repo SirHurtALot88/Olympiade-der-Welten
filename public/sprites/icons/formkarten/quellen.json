@@ -40,23 +40,23 @@
   "endpunkt": "/v2/create-image-pixflux",
   "groesse": "64x96",
   "zweck": "Formkarte MEN (blau, Geist)",
-  "saat": 8604,
+  "saat": 9212,
   "datum": "2026-11-24",
   "generationen": 1.0,
-  "guthaben_vorher": 166.54,
-  "guthaben_nachher": 165.54,
-  "prompt": "card face with a blue background and a large golden eye with a swirling mind, golden border, blue theme, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
+  "guthaben_vorher": 97.54,
+  "guthaben_nachher": 96.54,
+  "prompt": "full card with solid saturated blue background filling the whole card, one large open golden eye with a bright blue iris in the middle, ornate golden border and plain empty corners without any digits, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
  },
  "karte-soc.png": {
   "paket": "PixelLab",
   "endpunkt": "/v2/create-image-pixflux",
   "groesse": "64x96",
   "zweck": "Formkarte SOC (gelb, Gemeinschaft)",
-  "saat": 8605,
+  "saat": 9213,
   "datum": "2026-11-24",
   "generationen": 1.0,
-  "guthaben_vorher": 165.54,
-  "guthaben_nachher": 164.54,
-  "prompt": "card face with a yellow background and a large golden pair of joined hands with a heart, golden border, yellow theme, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
+  "guthaben_vorher": 96.54,
+  "guthaben_nachher": 95.54,
+  "prompt": "full card with solid saturated yellow background filling the whole card, two golden hands clasped together in a handshake in the middle, ornate golden border and plain empty corners without any digits, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
  }
 }

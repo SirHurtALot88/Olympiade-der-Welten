@@ -4,12 +4,12 @@
   "endpunkt": "/v2/create-image-pixflux",
   "groesse": "64x64",
   "zweck": "Breaking: Folterwerkzeug BRANDEISEN",
-  "saat": 8755,
+  "saat": 8955,
   "datum": "2026-11-24",
   "generationen": 1.0,
-  "guthaben_vorher": 125.54,
-  "guthaben_nachher": 124.54,
-  "prompt": "glowing red hot branding iron with a wooden handle, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, lying flat on the ground seen from a 3/4 top-down view"
+  "guthaben_vorher": 99.54,
+  "guthaben_nachher": 98.54,
+  "prompt": "long iron rod with a wooden handle and a flat square branding head at the tip glowing bright orange red hot, no pan, no bowl, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, lying flat on the ground seen from a 3/4 top-down view"
  },
  "folter-strick.png": {
   "paket": "PixelLab",

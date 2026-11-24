@@ -1,0 +1,50 @@
+{
+ "zf-warnschild.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "48x64",
+  "zweck": "Zeitfahren: Warnschild",
+  "saat": 9301,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 93.41,
+  "guthaben_nachher": 92.41,
+  "prompt": "yellow road warning sign on a post with a black exclamation mark triangle, no text, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ },
+ "zf-leitpfosten.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "32x64",
+  "zweck": "Zeitfahren: Leitpfosten",
+  "saat": 9302,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 92.41,
+  "guthaben_nachher": 91.41,
+  "prompt": "white roadside guide post with a red reflector band and a black top, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ },
+ "zf-startpodest.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x64",
+  "zweck": "Zeitfahren: Startpodest",
+  "saat": 9303,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 91.41,
+  "guthaben_nachher": 90.41,
+  "prompt": "wooden time trial start ramp platform with a short ramp and railings, bicycle race start, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "zf-zwischenzeit-tor.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "160x96",
+  "zweck": "Zeitfahren: Zwischenzeit-Tor",
+  "saat": 9304,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 90.41,
+  "guthaben_nachher": 89.41,
+  "prompt": "intermediate time checkpoint gate arch over the road, steel frame truss with a timing sensor box and flags, no text, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ }
+}

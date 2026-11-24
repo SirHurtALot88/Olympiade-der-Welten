@@ -1,0 +1,74 @@
+{
+ "heben-silo.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x96",
+  "zweck": "Gewichtheben: Silo",
+  "saat": 9312,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 82.41,
+  "guthaben_nachher": 81.41,
+  "prompt": "tall round metal grain silo tower with a conical roof and rivets, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "heben-rampe.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x64",
+  "zweck": "Gewichtheben: Rampe",
+  "saat": 9313,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 81.41,
+  "guthaben_nachher": 80.41,
+  "prompt": "wooden loading ramp slope with planks and side rails leading up to a platform, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "heben-sack.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Gewichtheben: Sandsack",
+  "saat": 9314,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 80.41,
+  "guthaben_nachher": 79.41,
+  "prompt": "heavy burlap sandbag sack tied at the top with rope, lying, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "heben-hantel.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "128x48",
+  "zweck": "Gewichtheben: Hantel",
+  "saat": 9315,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 79.41,
+  "guthaben_nachher": 78.41,
+  "prompt": "heavy barbell with big black iron weight plates and a steel bar, lying horizontally, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, side view"
+ },
+ "heben-plattform.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "160x64",
+  "zweck": "Gewichtheben: Plattform",
+  "saat": 9316,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 78.41,
+  "guthaben_nachher": 77.41,
+  "prompt": "weightlifting platform, wooden lifting platform with a rubber centre and red border, flat low, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "kampfrichterlampen.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x48",
+  "zweck": "Kampfrichterlampen",
+  "saat": 9401,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 72.41,
+  "guthaben_nachher": 71.41,
+  "prompt": "set of three round judges lights in a row on a bar, one white and two red, referee lamps, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ }
+}

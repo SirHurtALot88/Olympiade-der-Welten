@@ -1,0 +1,38 @@
+{
+ "showcase-jurypult.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "160x80",
+  "zweck": "Showcase: Jury-Pult",
+  "saat": 9309,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 85.41,
+  "guthaben_nachher": 84.41,
+  "prompt": "talent show judges desk with a long dark wooden table, three big red golden buzzer buttons and small desk lamps, no text, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ },
+ "showcase-zielscheibe.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Showcase: Zielscheibe",
+  "saat": 9310,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 84.41,
+  "guthaben_nachher": 83.41,
+  "prompt": "archery target board with red white rings and a few arrows stuck in it on a wooden stand, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ },
+ "showcase-felsbrocken.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Showcase: Felsbrocken",
+  "saat": 9311,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 83.41,
+  "guthaben_nachher": 82.41,
+  "prompt": "big heavy grey boulder rock with cracks and moss, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ }
+}

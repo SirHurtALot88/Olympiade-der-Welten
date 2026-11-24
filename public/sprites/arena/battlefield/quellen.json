@@ -1,0 +1,14 @@
+{
+ "battlefield-fahnenmast.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "48x96",
+  "zweck": "Battlefield: Fahnenmast",
+  "saat": 9321,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 73.41,
+  "guthaben_nachher": 72.41,
+  "prompt": "tall flagpole with a plain red banner waving, small stone base, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ }
+}

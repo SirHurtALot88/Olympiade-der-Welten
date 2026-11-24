@@ -1,0 +1,14 @@
+{
+ "schachuhr.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x48",
+  "zweck": "Speed-Schach: Schachuhr",
+  "saat": 9319,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 75.41,
+  "guthaben_nachher": 74.41,
+  "prompt": "chess clock with two dials and two push buttons on a wooden case, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ }
+}

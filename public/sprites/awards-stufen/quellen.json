@@ -1,0 +1,222 @@
+{
+ "mvp-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "MVP der Saison (silber)",
+  "saat": 7001,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 40.41,
+  "prompt": "single award emblem, silver trophy cup with two handles and a five pointed star on top wearing a small royal crown with red gems, on a dark stone base, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "mvp-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "MVP der Saison (bronze)",
+  "saat": 7001,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 39.41,
+  "prompt": "single award emblem, bronze trophy cup with two handles and a five pointed star on top wearing a small royal crown with red gems, on a dark stone base, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "mip-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Most Improved Player (silber)",
+  "saat": 7002,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 38.41,
+  "prompt": "single award emblem, silver winged arrow pointing steeply upwards over three rising steps, small sparkles, on a dark stone base, trophy statuette, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "mip-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Most Improved Player (bronze)",
+  "saat": 7002,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 37.41,
+  "prompt": "single award emblem, bronze winged arrow pointing steeply upwards over three rising steps, small sparkles, on a dark stone base, trophy statuette, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "pow-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Power-Spieler (Klassenfarbe POW) (silber)",
+  "saat": 7003,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 36.41,
+  "prompt": "single award emblem, silver clenched gauntlet fist holding up a heavy war hammer, framed by a round silver ring with a glowing red ruby enamel background, red flames, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "pow-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Power-Spieler (Klassenfarbe POW) (bronze)",
+  "saat": 7003,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 35.41,
+  "prompt": "single award emblem, bronze clenched gauntlet fist holding up a heavy war hammer, framed by a round bronze ring with a glowing red ruby enamel background, red flames, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "spe-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Speed-Spieler (Klassenfarbe SPE) (silber)",
+  "saat": 7004,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 34.41,
+  "prompt": "single award emblem, silver winged boot with a lightning bolt, framed by a round silver ring with a glowing emerald green enamel background, green wind streaks, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "spe-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Speed-Spieler (Klassenfarbe SPE) (bronze)",
+  "saat": 7004,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 33.41,
+  "prompt": "single award emblem, bronze winged boot with a lightning bolt, framed by a round bronze ring with a glowing emerald green enamel background, green wind streaks, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "men-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Mental-Spieler (Klassenfarbe MEN) (silber)",
+  "saat": 7005,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 32.41,
+  "prompt": "single award emblem, silver wise owl head with an open eye above an open book, framed by a round silver ring with a glowing sapphire blue enamel background, blue stars, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "men-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Mental-Spieler (Klassenfarbe MEN) (bronze)",
+  "saat": 7005,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 31.41,
+  "prompt": "single award emblem, bronze wise owl head with an open eye above an open book, framed by a round bronze ring with a glowing sapphire blue enamel background, blue stars, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "soc-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Social-Spieler (Klassenfarbe SOC) (silber)",
+  "saat": 7006,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 30.41,
+  "prompt": "single award emblem, silver theatre mask smiling next to a small lyre harp, framed by a round silver ring with a glowing amber and purple enamel background, confetti, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "soc-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Bester Social-Spieler (Klassenfarbe SOC) (bronze)",
+  "saat": 7006,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 29.41,
+  "prompt": "single award emblem, bronze theatre mask smiling next to a small lyre harp, framed by a round bronze ring with a glowing amber and purple enamel background, confetti, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "meister-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Meisterschale der Liga (silber)",
+  "saat": 7009,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 28.41,
+  "prompt": "single award emblem, big round silver champion shield plate with engraved rings and a crown in the centre, two crossed laurel branches below, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "meister-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Meisterschale der Liga (bronze)",
+  "saat": 7009,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 27.41,
+  "prompt": "single award emblem, big round bronze champion shield plate with engraved rings and a crown in the centre, two crossed laurel branches below, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "medaille-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Disziplin-Medaille der Teams (silber)",
+  "saat": 7008,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 26.41,
+  "prompt": "single award emblem, round silver medal coin with a laurel wreath rim and a plain raised star in the middle, hanging on a short dark blue and cream striped ribbon, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "medaille-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Disziplin-Medaille der Teams (bronze)",
+  "saat": 7008,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 25.41,
+  "prompt": "single award emblem, round bronze medal coin with a laurel wreath rim and a plain raised star in the middle, hanging on a short dark blue and cream striped ribbon, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "sprung-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sprung der Saison (Team, Kaderstaerke-Rang) (silber)",
+  "saat": 7026,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 24.41,
+  "prompt": "single award emblem, silver rocket shooting diagonally upwards over a silver ladder of bars getting taller, small sparkle stars, on a dark stone base, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "sprung-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Sprung der Saison (Team, Kaderstaerke-Rang) (bronze)",
+  "saat": 7026,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 23.41,
+  "prompt": "single award emblem, bronze rocket shooting diagonally upwards over a bronze ladder of bars getting taller, small sparkle stars, on a dark stone base, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "allrounder-silber.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Allrounder der Saison (alle vier Farben) (silber)",
+  "saat": 7023,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 22.41,
+  "prompt": "single award emblem, round silver compass medallion with four gems at the four points, one red ruby, one green emerald, one blue sapphire, one yellow topaz, a silver four pointed star in the centre, polished silver metal with bright white highlights and cool blue grey shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "allrounder-bronze.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "bezug": "Allrounder der Saison (alle vier Farben) (bronze)",
+  "saat": 7023,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 21.41,
+  "prompt": "single award emblem, round bronze compass medallion with four gems at the four points, one red ruby, one green emerald, one blue sapphire, one yellow topaz, a bronze four pointed star in the centre, polished bronze copper metal with warm brown highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ }
+}
