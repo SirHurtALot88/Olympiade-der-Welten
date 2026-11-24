@@ -54,7 +54,9 @@ export function clearSeasonDerivationsSidecarsForTests() {
 
   for (const entry of fs.readdirSync(directory)) {
     if (entry.endsWith(".json")) {
-      fs.unlinkSync(path.join(directory, entry));
+      // Mehrere Testdateien raeumen dasselbe Verzeichnis parallel; eine Datei kann zwischen readdir und
+      // unlink schon weg sein. force: true ignoriert genau das (ENOENT), statt den Testlauf zu sprengen.
+      fs.rmSync(path.join(directory, entry), { force: true });
     }
   }
 }
