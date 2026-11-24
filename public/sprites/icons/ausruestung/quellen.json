@@ -1,0 +1,122 @@
+{
+ "schuhe.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8300,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 172.54,
+  "guthaben_nachher": 171.54,
+  "prompt": "athletic running shoe sneaker in red and white, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "handschuhe.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8301,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 157.54,
+  "guthaben_nachher": 156.54,
+  "prompt": "pair of sturdy leather sports gloves, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "helm.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8302,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 156.54,
+  "guthaben_nachher": 155.54,
+  "prompt": "protective sports helmet with visor, blue, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "trikot.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8303,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 155.54,
+  "guthaben_nachher": 154.54,
+  "prompt": "team jersey shirt in red with a plain white collar, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "schienbeinschoner.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8304,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 154.54,
+  "guthaben_nachher": 153.54,
+  "prompt": "pair of shin guards, black with white straps, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "guertel.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8305,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 153.54,
+  "guthaben_nachher": 152.54,
+  "prompt": "wide leather champion belt with a golden buckle, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "brille.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8306,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 152.54,
+  "guthaben_nachher": 151.54,
+  "prompt": "sports goggles with orange tinted lenses, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "stirnband.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8307,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 151.54,
+  "guthaben_nachher": 150.54,
+  "prompt": "sweatband headband in white with a blue stripe, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "rucksack.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8308,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 150.54,
+  "guthaben_nachher": 149.54,
+  "prompt": "sports backpack in green with straps, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "trinkflasche.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Ausruestung",
+  "saat": 8309,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 149.54,
+  "guthaben_nachher": 148.54,
+  "prompt": "sports water bottle with a blue cap, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ }
+}

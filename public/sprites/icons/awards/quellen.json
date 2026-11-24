@@ -1,0 +1,86 @@
+{
+ "award-fanliebling.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Award Fan-Liebling (ruhiger als erste Fassung)",
+  "saat": 8203,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 173.54,
+  "guthaben_nachher": 172.54,
+  "prompt": "calm simple golden heart shaped medal with a clean raised outline, hanging on a short ribbon, restrained and elegant, no extra objects, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "award-captain.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Award Captain (ersetzt kapitaen-Look nicht, Ergaenzung)",
+  "saat": 8201,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 163.54,
+  "guthaben_nachher": 162.54,
+  "prompt": "golden captain armband badge with a single raised star and two small chevrons below it, dark blue enamel stripe, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "award-comeback.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Award Comeback",
+  "saat": 8202,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 162.54,
+  "guthaben_nachher": 161.54,
+  "prompt": "golden phoenix bird rising with spread wings out of orange flames, round golden ring frame behind it, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "award-team-neuling.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Team-Award Bester Neuling (Team)",
+  "saat": 8204,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 161.54,
+  "guthaben_nachher": 160.54,
+  "prompt": "golden shield badge with a young green sprout leaf rising from a small golden star, small ribbon below, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "award-team-aufsteiger.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Team-Award Aufsteiger",
+  "saat": 8205,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 160.54,
+  "guthaben_nachher": 159.54,
+  "prompt": "golden arrow pointing steeply up through a golden ring, two small steps below, shining, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "award-team-abwehr.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Team-Award Abwehr/Bollwerk",
+  "saat": 8206,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 159.54,
+  "guthaben_nachher": 158.54,
+  "prompt": "golden fortress shield with a stone wall pattern and a single big keystone, solid and heavy, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ },
+ "award-team-konstanz.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x96",
+  "zweck": "Team-Award Konstanz",
+  "saat": 8207,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 158.54,
+  "guthaben_nachher": 157.54,
+  "prompt": "golden balance scale in perfect equilibrium on a small pedestal, steady and calm, single award emblem, polished gold metal with bright highlights and deep shading, centered, front view, pixel art game icon, 16-bit RPG item style, clean dark outline, no text, no letters, no numbers"
+ }
+}

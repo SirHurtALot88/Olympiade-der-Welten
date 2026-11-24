@@ -1,0 +1,443 @@
+{
+ "frames": [
+  {
+   "filename": "feuerwerk 0.png",
+   "frame": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 1.png",
+   "frame": {
+    "x": 153,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 2.png",
+   "frame": {
+    "x": 306,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 3.png",
+   "frame": {
+    "x": 459,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 4.png",
+   "frame": {
+    "x": 0,
+    "y": 208,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 5.png",
+   "frame": {
+    "x": 153,
+    "y": 208,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 6.png",
+   "frame": {
+    "x": 306,
+    "y": 208,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 7.png",
+   "frame": {
+    "x": 459,
+    "y": 208,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 8.png",
+   "frame": {
+    "x": 0,
+    "y": 416,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 9.png",
+   "frame": {
+    "x": 153,
+    "y": 416,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 10.png",
+   "frame": {
+    "x": 306,
+    "y": 416,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 11.png",
+   "frame": {
+    "x": 459,
+    "y": 416,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 12.png",
+   "frame": {
+    "x": 0,
+    "y": 624,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 13.png",
+   "frame": {
+    "x": 153,
+    "y": 624,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 14.png",
+   "frame": {
+    "x": 306,
+    "y": 624,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  },
+  {
+   "filename": "feuerwerk 15.png",
+   "frame": {
+    "x": 459,
+    "y": 624,
+    "w": 153,
+    "h": 208
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 153,
+    "h": 208
+   },
+   "sourceSize": {
+    "w": 153,
+    "h": 208
+   },
+   "pivot": {
+    "x": 0.5163398692810458,
+    "y": 0.47115384615384615
+   },
+   "duration": 83
+  }
+ ],
+ "meta": {
+  "app": "PixelLab VFX Creator",
+  "image": "feuerwerk.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 612,
+   "h": 832
+  },
+  "scale": "1",
+  "anchor": {
+   "kind": "origin",
+   "x": 79,
+   "y": 98
+  },
+  "frameTags": [
+   {
+    "name": "feuerwerk",
+    "from": 0,
+    "to": 15,
+    "direction": "forward"
+   }
+  ]
+ }
+}

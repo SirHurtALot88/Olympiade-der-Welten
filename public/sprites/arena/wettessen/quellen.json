@@ -1,0 +1,38 @@
+{
+ "bankettafel.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "192x112",
+  "zweck": "Wettessen: Bankettafel",
+  "saat": 8901,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 123.54,
+  "guthaben_nachher": 122.54,
+  "prompt": "long banquet table covered with a white cloth and loaded with big dishes of food, roast, bread, fruit, wooden benches on both sides, 3/4 top-down view, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 top-down view"
+ },
+ "menueschild.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "96x64",
+  "zweck": "Wettessen: Menueschild",
+  "saat": 8902,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 111.54,
+  "guthaben_nachher": 110.54,
+  "prompt": "standing wooden menu board sign with a chalkboard and a golden frame, drawings of food on it, no writing, front view, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, front view"
+ },
+ "wettessen-eimer.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Wettessen: Eimer",
+  "saat": 9002,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 107.54,
+  "guthaben_nachher": 106.54,
+  "prompt": "dented metal bucket standing on the floor, grey metal with a rope handle, pixel art game prop, 2D HD remake look, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, 3/4 view"
+ }
+}

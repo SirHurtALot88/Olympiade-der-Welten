@@ -1,0 +1,74 @@
+{
+ "brief.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Postfach",
+  "saat": 8500,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 142.54,
+  "guthaben_nachher": 141.54,
+  "prompt": "sealed letter envelope with a red wax seal, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "vertrag.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Postfach",
+  "saat": 8501,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 141.54,
+  "guthaben_nachher": 140.54,
+  "prompt": "contract paper scroll with a pen and a red seal, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "verletzung.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Postfach",
+  "saat": 8502,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 140.54,
+  "guthaben_nachher": 139.54,
+  "prompt": "red cross medical bandage plaster on a bone, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "transfer.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Postfach",
+  "saat": 8503,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 139.54,
+  "guthaben_nachher": 138.54,
+  "prompt": "two arrows swapping left and right in a circle, golden coin in the middle, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "vorstand.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Postfach",
+  "saat": 8504,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 138.54,
+  "guthaben_nachher": 137.54,
+  "prompt": "board room chair, high backed dark leather executive chair, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "sponsor.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x64",
+  "zweck": "Icon Postfach",
+  "saat": 8505,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 137.54,
+  "guthaben_nachher": 136.54,
+  "prompt": "handshake over a golden coin, single game UI icon, centered, front view, pixel art, 16-bit RPG item style, clean dark outline, rich shading, no text, no letters, no numbers"
+ }
+}

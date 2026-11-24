@@ -1,0 +1,62 @@
+{
+ "karte-pow.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x96",
+  "zweck": "Formkarte POW (rot, Kraft)",
+  "saat": 8622,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 164.54,
+  "guthaben_nachher": 163.54,
+  "prompt": "full card with solid saturated red background filling the whole card, a large golden clenched fist motif in the middle, ornate golden border and plain empty corners without any digits or symbols, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "kartenruecken.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x96",
+  "zweck": "Formkarten Kartenrueckseite",
+  "saat": 8601,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 168.54,
+  "guthaben_nachher": 167.54,
+  "prompt": "card back with an ornate golden pattern of a laurel wreath around a star on a deep dark blue background and a golden border, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "karte-spe.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x96",
+  "zweck": "Formkarte SPE (gruen, Tempo)",
+  "saat": 8603,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 167.54,
+  "guthaben_nachher": 166.54,
+  "prompt": "card face with a green background and a large golden winged boot, golden border, green theme, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "karte-men.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x96",
+  "zweck": "Formkarte MEN (blau, Geist)",
+  "saat": 8604,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 166.54,
+  "guthaben_nachher": 165.54,
+  "prompt": "card face with a blue background and a large golden eye with a swirling mind, golden border, blue theme, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
+ },
+ "karte-soc.png": {
+  "paket": "PixelLab",
+  "endpunkt": "/v2/create-image-pixflux",
+  "groesse": "64x96",
+  "zweck": "Formkarte SOC (gelb, Gemeinschaft)",
+  "saat": 8605,
+  "datum": "2026-11-24",
+  "generationen": 1.0,
+  "guthaben_vorher": 165.54,
+  "guthaben_nachher": 164.54,
+  "prompt": "card face with a yellow background and a large golden pair of joined hands with a heart, golden border, yellow theme, single playing card design, centered, front view, pixel art, 16-bit RPG style, clean dark outline, rich shading, no text, no letters, no numbers"
+ }
+}
