@@ -62,6 +62,9 @@ import { buildSeasonGuv } from "@/lib/finance/season-end-guv";
 import { resolveSeasonGuvPartsByTeam } from "@/lib/finance/season-guv-resolver";
 import { applyGameModeOwnership } from "@/lib/foundation/team-control-settings";
 import { chooseSponsorOfferForAiTeams } from "@/lib/sponsor/sponsor-offer-service";
+import { getSeasonSponsorCashByTeam } from "@/lib/sponsor/sponsor-settlement-service";
+import { sponsorRegelFuer } from "@/lib/resolve/sponsor-regel";
+import { topfFarbVerteilung } from "@/lib/sponsors/sponsor-topf-buchung";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 import { buildKontoauszuege } from "@/lib/finance/kontoauszug";
@@ -152,6 +155,8 @@ type TeamSnap = {
   hatSponsor: boolean;
   /** Kaderstaerke: Mittel der Top-6-Eignung je Disziplin (fehlende Plaetze zaehlen 0). */
   staerke: number;
+  /** SPONSOR-TOPF (24.11.): der am Stichtag eingefrorene Stand dieses Teams (Erwartungsrang, Grundbetrag, Passung, Hebel, Farben, Plan-Posten); `null` ohne Topf-Regel oder vor dem Stichtag. */
+  sponsorTopf?: unknown;
 };
 
 /**
@@ -256,6 +261,7 @@ function snap(gs: GameState): Record<string, TeamSnap> {
       sponsorAnker: (() => { const a = getSponsorV3Terms(getTeamSponsorContract(gs, t.teamId))?.anchor; return typeof a === "number" ? r2(a) : null; })(),
       hatSponsor: getTeamSponsorContract(gs, t.teamId) != null,
       staerke: staerke.jeTeam[t.teamId] ?? 0,
+      sponsorTopf: gs.seasonState.sponsorRegel?.eingefroren?.teams?.[t.teamId] ?? null,
       // ARENA und MEDAILLEN (22.11.): Plaetze, Fans, Ausbau der Saison und Medaillen-Geld, fuer `scripts/auswerte-arena-tickets-medaillen.ts`.
       arena: (() => {
         const a = gs.seasonState.arena?.[t.teamId];
@@ -614,6 +620,9 @@ async function main() {
     phasen[`${praefix}_03_nach_spieltagen`] = {
       snap: snap(vorAbschluss), kasseJeSpieltag, verletztJeSpieltag, marketing: marketingMessung(vorAbschluss),
       sponsorEvents: (vorAbschluss.seasonState.sponsorEvents ?? []).filter((e) => (e as { seasonId?: string }).seasonId === sid || true).length,
+      sponsorRegel: sponsorRegelFuer(vorAbschluss),
+      sponsorTopf: vorAbschluss.seasonState.sponsorRegel?.eingefroren ?? null,
+      sponsorTermine: (vorAbschluss.seasonState.sponsorRegel?.termine ?? []).map((t) => ({ id: t.id, team: t.teamId, status: t.status, von: t.entschiedenVon ?? null })),
     };
     schreibe();
     // Basis fuer paarweise Vergleiche des Saisonwechsels (Transferfenster, `scripts/miss-transferfenster-gemeinsam.ts`):
@@ -626,7 +635,12 @@ async function main() {
     log(`${praefix} Saisonabschluss: ok=${comp.ok} applied=${comp.applied} ${comp.blockingReasons?.join("|") ?? ""}`);
     const hops: { von: string; nach: string; sumKasse: number }[] = [];
     const nachComp = get().gameState;
-    phasen[`${praefix}_04_nach_abschluss`] = { snap: snap(nachComp), phase: nachComp.gamePhase, guv: guvSnapshot(nachComp), kontoauszug: kontoauszugSummen(nachComp, sid) };
+    phasen[`${praefix}_04_nach_abschluss`] = {
+      snap: snap(nachComp), phase: nachComp.gamePhase, guv: guvSnapshot(nachComp), kontoauszug: kontoauszugSummen(nachComp, sid),
+      // SPONSOR-TOPF (24.11.): gebuchte Sponsor-Summe je Team und die Verteilung der Farb-Toepfe (Summe je Topf = Topf).
+      sponsorCashJeTeam: Object.fromEntries(getSeasonSponsorCashByTeam(nachComp)),
+      farbToepfe: sponsorRegelFuer(nachComp) === "topf" ? topfFarbVerteilung(nachComp)?.toepfe ?? null : null,
+    };
     schreibe();
     // Saisonende-Kette
     for (let hop = 1; hop <= 12; hop += 1) {
