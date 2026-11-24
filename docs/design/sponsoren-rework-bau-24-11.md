@@ -232,5 +232,19 @@ Entscheidungen des PM nach unabhängigem Opus-Review, alle gebaut und mit Tests 
 | Typ | `FinanceSponsorComponentRow.kind` erlaubt `"farbe"`; `tsc -p tsconfig.next.json` ist fehlerfrei. |
 | Nachtrag PM | Vor dem Stichtag zeigt das View-Modell denselben Weg wie der Stichtag (`fuelleFehlendeVertraege` + Vorab-Zusage mit anteiliger Kürzung) und setzt `vorlaeufig: true`. `ligaBilanz` kommt mit der Seiten-PR (Merge). |
 
+### Messung nach der Review-Runde (Konstanten final: Steigung 1,8 / 1,6, K_E 6 % + 8 % in Saison 1, Rückkopplung 0,75)
+
+Dreisaisonlauf (ein Seed, 32 KI-Teams, `scripts/miss-teamfinanzen-saison.ts --seasons 3`, Auswertung `auswerte-sponsor-topf.ts`):
+
+| Saison | Liga-Wert Start | Drift | GuV Ø | Topf T | Wert-Korrektur | Σ Grund+Farb+Treue gegen T |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 9552,0 | – | 27,6 | 1985,8 | 0 | −0,1 |
+| 2 | 9168,7 | **−4,0 %** | 18,2 | 1737,9 | −98,2 | −0,1 |
+| 3 | 9399,3 | +2,5 % | 12,0 | 1342,9 | +74,8 | 0,0 |
+
+Flip-Lauf alt → Topf (Saison 1 im alten System, Wechsel zum Saisonwechsel, `--flip-sponsor`): Liga-Wert 9552,0 → 9448,0, **−1,1 %** (Ziel ±3 %), Topf 1764,6 = Σ Grund+Farb+Treue (Abweichung 0,0).
+
+**Ehrlich:** die Drift S1 → S2 liegt in diesem Seed mit −4,0 % über dem Ziel ±3 % (die Auslieferung davor lag bei höchstens ±1,4 %); S2 → S3 mit +2,5 % und der Flip-Lauf liegen innerhalb. Die Rückkopplung zieht die Folgesaison sichtbar zurück (−98,2 bzw. +74,8 im Topf). Ein Seed ist keine Verteilung: die Abweichung ist nicht mit einem zweiten Seed abgesichert, und die Ursache (Saison-1-Kader-Ersatz 8 % gegen die Kaufphase) ist nicht neu nachgerechnet. Vorschlag: nach den ersten echten Saisons nachmessen (Abschnitt 8, Punkt 3). Topf-Verteilung stimmt in allen Läufen auf 0,1 C.
+
 **Client-Bündel-Regel:** nichts, was Client-Komponenten erreichen, darf Persistenz oder `node:`-Module importieren. Prüfung: `npx esbuild app/foundation/FoundationPageClient.tsx --bundle ... | grep 'node:'` bleibt leer.
 
