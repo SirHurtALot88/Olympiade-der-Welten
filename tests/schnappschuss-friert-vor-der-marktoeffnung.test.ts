@@ -404,7 +404,7 @@ describe("patchSeasonSnapshotCashCarryOver", () => {
      * Buchungen schon drin und die Grenze verschoben.
      */
     const workflow = readFileSync(join(process.cwd(), "lib/season/preseason-workflow-service.ts"), "utf8");
-    const tick = workflow.indexOf("computeSeasonEndContractTick(inputSave)");
+    const tick = workflow.indexOf("computeSeasonEndContractTickMitVerkaufsabsicht(inputSave)");
     const grenze = workflow.indexOf("patchSeasonSnapshotCashCarryOver(");
     const neueSaison = workflow.indexOf("buildNextSeasonContext(save.gameState)");
 

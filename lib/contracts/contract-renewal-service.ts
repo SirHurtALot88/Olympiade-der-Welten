@@ -1511,6 +1511,28 @@ function buildSeasonEndContractTickLog(input: {
   };
 }
 
+/**
+ * VERKAUFSABSICHT DER KI AM SAISONENDE (24.11., docs/design/verkauf-restgehalt-24-11.md): je Team die Spieler, die die
+ * organische Verkaufslogik im naechsten Fenster verkaufen wuerde (`lib/contracts/ki-verkaufsabsicht-saisonende.ts`).
+ *
+ * Gemessen (32 KI, Saat 1): der Tick verlaengerte 339 auslaufende Saison-1-Vertraege um 1 bis 4 Jahre, und die
+ * Verkaufsrunde des Fensters vor Saison 2 verkaufte danach 50 genau dieser frisch verlaengerten Spieler — jeder mit
+ * dem vollen Restgehalt des NEUEN Vertrags als Buyout (330,73 C bei 704,65 C Erloes). Wer ohnehin verkauft werden
+ * soll, wird deshalb nicht verlaengert: sein Vertrag endet, und der Abgang ist ein abloesefreier Verkauf
+ * (`buildContractExitValue`) — ohne Restgehalt. Hier steht nur der Typ, damit der Vertragsdienst den Verkaufsplaner
+ * nicht importieren muss (der haengt ueber die Transferfenster-Sitzung wieder an diesem Dienst).
+ */
+export type KiVerkaufsabsicht = ReadonlyMap<string, ReadonlySet<string>>;
+
+export type SeasonEndContractTickOptionen = {
+  /** Fehlt sie (oder ist sie leer), entscheidet der Tick wie vor dem 24.11. */
+  kiVerkaufsabsicht?: KiVerkaufsabsicht | null;
+};
+
+function istVerkaufGeplant(absicht: KiVerkaufsabsicht | null | undefined, teamId: string, playerId: string): boolean {
+  return absicht?.get(teamId)?.has(playerId) === true;
+}
+
 export type SeasonEndContractTickComputation = {
   /** Fortgeschriebener GameState (rosters/teams.cash/contractEvents/transferHistory + Marker) — NICHT persistiert. */
   gameState: GameState;
@@ -1538,6 +1560,7 @@ export type SeasonEndContractTickComputation = {
 export function computeSeasonEndContractTick(
   save: PersistedSaveGame,
   previewOverride?: ContractSeasonEndPreview,
+  optionen?: SeasonEndContractTickOptionen,
 ): SeasonEndContractTickComputation {
   if (hasSeasonEndContractTickApplied(save.gameState)) {
     return {
@@ -1554,6 +1577,7 @@ export function computeSeasonEndContractTick(
 
   const preview = previewOverride ?? previewSeasonEndContracts(save);
   const rowsByRosterId = new Map(preview.rows.map((row) => [row.rowId, row] as const));
+  const kiVerkaufsabsicht = optionen?.kiVerkaufsabsicht ?? null;
 
   /**
    * VERTRAGSAUFLOESUNGEN DER KI — VOR der Alterung, aus demselben Dienst wie beim Menschen.
@@ -1576,9 +1600,15 @@ export function computeSeasonEndContractTick(
     preview.rows.map((row) => [
       `${row.teamId}:${row.playerId}`,
       {
-        wouldRenew: row.recommendedAction === "renew" && row.canRenewEffective,
+        // Ein Spieler, den die KI ohnehin verkaufen wuerde, wird nicht verlaengert (siehe unten) — und eine
+        // Aufloesung mit Teilverzicht ist fuer ihn billiger als der spaetere Verkauf mit vollem Rest-Buyout.
+        wouldRenew:
+          row.recommendedAction === "renew" &&
+          row.canRenewEffective &&
+          !istVerkaufGeplant(kiVerkaufsabsicht, row.teamId, row.playerId),
         renewalSalary: row.renewalSalaryPreview,
         renewalLength: row.recommendedLength,
+        verkaufGeplant: istVerkaufGeplant(kiVerkaufsabsicht, row.teamId, row.playerId),
       },
     ]),
   );
@@ -1637,7 +1667,16 @@ export function computeSeasonEndContractTick(
       }
 
       const canRenewEffective = row?.canRenewEffective ?? false;
-      if (row?.controlMode === "ai" && row.recommendedAction === "renew" && canRenewEffective) {
+      /**
+       * VERKAUF GEPLANT → NICHT VERLAENGERN (24.11., verkauf-restgehalt-24-11.md). Die Verkaufsrunde des naechsten
+       * Fensters wuerde diesen Spieler abgeben. Verlaengerte der Tick ihn vorher, zahlte das Team beim Verkauf das
+       * volle Restgehalt des gerade unterschriebenen Vertrags als Buyout. Sein Vertrag endet stattdessen hier, und
+       * der Abgang ist derselbe abloesefreie Verkauf wie jedes Vertragsende (`buildContractExitValue`). Zaehlt nicht
+       * gegen `MAX_RELEASES_PER_TEAM_PER_TICK` — die Bruecke dort schuetzt vor einem Kader, den niemand geplant hat.
+       */
+      const verkaufGeplant =
+        row?.controlMode === "ai" && istVerkaufGeplant(kiVerkaufsabsicht, entry.teamId, entry.playerId);
+      if (row?.controlMode === "ai" && row.recommendedAction === "renew" && canRenewEffective && !verkaufGeplant) {
         const newSalary = roundMoney(row.renewalSalaryPreview ?? entry.salary) ?? entry.salary;
         const contractShape = row.recommendedContractShape ?? "balanced";
         const bridgeRenew =
@@ -1691,6 +1730,7 @@ export function computeSeasonEndContractTick(
         row?.renewalBlockReason === "bad_value" || row?.renewalBlockReason === "morale";
       if (
         row?.controlMode === "ai" &&
+        !verkaufGeplant &&
         releaseCount >= MAX_RELEASES_PER_TEAM_PER_TICK &&
         !badValue &&
         row.recommendedAction === "release"
@@ -1723,7 +1763,7 @@ export function computeSeasonEndContractTick(
         continue;
       }
 
-      teamReleaseCounts.set(entry.teamId, releaseCount + 1);
+      if (!verkaufGeplant) teamReleaseCounts.set(entry.teamId, releaseCount + 1);
 
       const exit = buildContractExitValue(sourceState, playerForExit, entry);
       const source: ContractEventRecord["source"] = row?.controlMode === "ai" ? "ai_contract_expiry" : "manual_contract_expiry";
@@ -1755,7 +1795,7 @@ export function computeSeasonEndContractTick(
           oldLength: normalizeLength(entry.contractLength),
           newLength: 0,
           source,
-          decisionReason: row?.decisionReason ?? "contract_expired_exit",
+          decisionReason: verkaufGeplant ? "ki_verkauf_geplant" : row?.decisionReason ?? "contract_expired_exit",
         }),
       );
       continue;
@@ -1843,6 +1883,7 @@ export function applySeasonEndContractTick(
   confirmToken: string | null | undefined,
   persistence: PersistenceService,
   previewOverride?: ContractSeasonEndPreview,
+  optionen?: SeasonEndContractTickOptionen,
 ): ContractSeasonEndApplyResult {
   const preview = previewOverride ?? previewSeasonEndContracts(save);
   if (!confirmToken || confirmToken !== preview.confirmToken) {
@@ -1858,7 +1899,7 @@ export function applySeasonEndContractTick(
     };
   }
 
-  const computation = computeSeasonEndContractTick(save, preview);
+  const computation = computeSeasonEndContractTick(save, preview, optionen);
   if (computation.alreadyApplied) {
     // Bereits in dieser Saison gealtert (z. B. über den interaktiven Saisonübergang). Kein zweiter
     // Tick, keine doppelte Cash-Buchung — sauberer No-Op mit Hinweis-Warnung.
