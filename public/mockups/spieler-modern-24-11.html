@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Spieler – modern (Mockup 24.11.)</title>
+<!--
+  SPIELER-LISTE IM NEUEN STIL (Fable, 24.11.): ligaweite Spieler-Datenbank. Erklaerung: docs/design/spieler-teams-modern-24-11.md
+  Loest app/foundation/players-table/FoundationPlayersTableNewLook.tsx samt Vergleichs-Overlay, Podium und Query-Chips ab und
+  fuehrt die Ansicht "spieler" aus kader-teams-modern-18-11.html weiter (Entscheidungen von Chris vom 18.11. eingearbeitet).
+  Rahmen, Tokens, Tabellen: modern-24-11/rahmen.css (unveraendert aus dem Mockup vom 18.11.) + bausteine.css.
+  ECHT (Live-Abbild 24.11., Saison 1, Spieltag 12): Spieler, Werte, Eignung, Attribute, Marktwert, Gehalt, Vertrag, Kaufpreis,
+        Player Points (C2), Einsaetze, Form mit Verlauf, Moral, Verletzung, Belastung, Teams, Merkliste.
+  BEISPIEL: Scouting-Stand, Trainingsvorlieben, Trainingsziel, Entwicklung, Werbewert und Werbegeld.
+  URL: ?ansicht=liste|vergleich|streu  ?umfang=liga2|liga1|alle|kader|frei|merk  ?spalten=ueber|leist|eig|geld|train|attr
+       ?sort=<spalte>&dir=-1|1  ?d=0..19  ?filter=zu  ?nebel=aus  ?ich=V-W  ?kl=Mage,Bard  ?team=C-C  ?mw=2  ?vt=1  ?zu=verl,formauf  ?eig=60
+       ?vgl=slug,slug,slug  ?y=ov|pps|ppe|eig  ?blatt=0..  ?still=1
+-->
+<link rel="stylesheet" href="modern-24-11/rahmen.css">
+<link rel="stylesheet" href="modern-24-11/bausteine.css">
+<style>
+.seite.spl{grid-template-columns:19rem minmax(0,1fr)}
+.seite.spl.fzu{grid-template-columns:minmax(0,1fr)} .seite.spl.fzu #p-filter{display:none}
+#p-filter .inh{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+#p-filter .pk a{cursor:pointer}
+.kli{display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:.14rem;padding-bottom:.45rem}
+.kli a,.rai a{display:grid;place-items:center;height:1.55rem;border-radius:.25rem;border:1px solid var(--linie);background:var(--flaeche-2);cursor:pointer}
+.kli a img,.rai a img{width:1.05rem;height:1.05rem;object-fit:contain;opacity:.75}
+.kli a.k0{border-bottom:.14rem solid var(--pow)} .kli a.k1{border-bottom:.14rem solid var(--spe)} .kli a.k2{border-bottom:.14rem solid var(--men)} .kli a.k3{border-bottom:.14rem solid var(--soc)}
+.kli a.an,.rai a.an,.tli a.an{background:rgba(240,195,90,.22);border-color:var(--gold)} .kli a.an img,.rai a.an img{opacity:1}
+.rai{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:.14rem;padding-bottom:.45rem}
+.tli{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:.1rem;padding-bottom:.45rem}
+.tli a{display:block;border-radius:.2rem;border:1px solid transparent;opacity:.55;cursor:pointer;aspect-ratio:1} .tli a img{width:100%;height:100%;border-radius:.15rem;object-fit:cover;display:block}
+.tli a:hover,.tli a.an{opacity:1} .tli a.ich{outline:1px solid var(--heim)}
+.dli{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:.14rem;padding-bottom:.3rem}
+.dli a{display:grid;place-items:center;height:1.4rem;border-radius:.2rem;font-size:.66rem;font-weight:700;letter-spacing:.04em;background:var(--flaeche-2);border:1px solid var(--linie);color:var(--leise);cursor:pointer}
+.dli a.a0{border-bottom:.14rem solid var(--pow)} .dli a.a1{border-bottom:.14rem solid var(--spe)} .dli a.a2{border-bottom:.14rem solid var(--men)} .dli a.a3{border-bottom:.14rem solid var(--soc)}
+.dli a.an{background:var(--gold);color:#17120a;border-color:var(--gold)}
+.hist{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.2rem;height:3.3rem;align-items:end;padding-bottom:.1rem}
+.hist a{display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:pointer;text-align:center}
+.hist a i{display:block;background:var(--stumm);border-radius:1px;min-height:2px} .hist a:hover i{background:var(--creme)} .hist a.an i{background:var(--gold)}
+.hist a b{font-size:.72rem;color:var(--leise);font-weight:600;line-height:1.1} .hist a.an b{color:var(--gold)}
+.histx{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.2rem;font-size:.62rem;color:var(--stumm);text-align:center;padding-bottom:.45rem;font-weight:600}
+.fl{gap:.35rem}
+.fl .seg{display:inline-flex;border:1px solid var(--linie);border-radius:.4rem;overflow:hidden;flex:none}
+.fl .seg a{height:1.8rem;padding:0 .6rem;display:inline-flex;align-items:center;font-size:.8rem;font-weight:600;color:var(--leise);background:var(--flaeche-2);cursor:pointer}
+.fl .seg a+a{border-left:1px solid var(--linie)} .fl .seg a.an{background:var(--gold);color:#17120a}
+.fl .akt{display:inline-flex;align-items:center;gap:.3rem;height:1.6rem;padding:0 .3rem 0 .55rem;border-radius:.3rem;border:1px solid rgba(240,195,90,.5);background:rgba(240,195,90,.1);font-size:.78rem;font-weight:600;color:var(--creme);cursor:pointer}
+.fl .akt svg{font-size:.8rem;color:var(--gold)}
+.fl .knopf{height:1.9rem}
+.e20{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:.14rem;width:100%}
+.e20 i,.a12 i{font-style:normal;text-align:center;font-size:.86rem;font-weight:600;border-radius:.15rem;padding:.14rem 0;color:var(--tinte);min-width:0;overflow:hidden}
+.e20 i.nbz,.a12 i.nbz{font-size:.68rem;color:var(--leise);border:1px dashed rgba(154,167,186,.35);padding:.2rem 0}
+.e20 i.gew{outline:1px solid var(--gold)}
+.tz.kopf .e20 span,.tz.kopf .a12 span,.tz.kopf .ax4 span{text-align:center;cursor:pointer;letter-spacing:.02em} .tz.kopf .e20 span.gew{color:var(--creme)}
+.a12{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:.18rem;width:100%}
+.spark{width:100%;height:1.5rem;display:block} .spark polyline{fill:none;stroke:var(--creme);stroke-width:1.6;vector-effect:non-scaling-stroke} .spark line{stroke:rgba(255,255,255,.18);stroke-width:1;vector-effect:non-scaling-stroke;stroke-dasharray:3 3}
+.wb{display:flex;align-items:center;gap:.4rem;width:100%} .wb b{width:1.9rem;text-align:right;flex:none}
+.vl{display:inline-flex;gap:.22rem;align-items:center} .vl u{text-decoration:none;font-size:.82rem;line-height:1} .vl u.h{color:#e0637a} .vl u.x{color:var(--stumm)} .vl .dt.un{opacity:.55;text-decoration:line-through}
+.dv{display:inline-flex;align-items:baseline;gap:.4rem} .dv b{font-size:1.06rem} .dv small{font-size:.74rem;color:var(--leise)}
+.ppr{display:inline-flex;align-items:baseline;gap:.3rem} .ppr b{font-size:1.08rem;color:var(--creme)} .ppr small{font-size:.74rem;color:var(--stumm);font-weight:600}
+.tm{display:inline-flex;align-items:center;gap:.35rem;font-size:.84rem;font-weight:600;color:var(--leise)} .tm img.wap{width:1.5rem;height:1.5rem}
+/* Vergleich */
+.vgl{width:84rem;max-height:63rem;display:flex;flex-direction:column;background:var(--flaeche-1);border:1px solid var(--linie-2);border-radius:var(--r);box-shadow:0 2rem 5rem rgba(0,0,0,.8);overflow:hidden}
+.vgl .pk{height:2.8rem} .vgl .pk h2{font-size:1.5rem}
+.vr{display:grid;grid-template-columns:11rem repeat(var(--n),minmax(0,1fr));align-items:center;padding:0 1rem;border-top:1px solid rgba(244,230,196,.06);font-size:.94rem;min-height:1.3rem;white-space:nowrap}
+.vgl>*{flex:none}
+.vr>span:first-child{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.vr>span{padding:0 .6rem;display:flex;align-items:center;gap:.5rem;min-width:0}
+.vr>span+span{border-left:1px solid rgba(244,230,196,.06)}
+.vr .w{width:3.4rem;text-align:right;flex:none;font-weight:700;font-size:1.05rem}
+.vr span.sieg .w{color:var(--gold)} .vr span.sieg .bal i{background:var(--gold)}
+.vr.grp{min-height:1.05rem;font-size:.6rem;background:rgba(255,255,255,.025)} .vr.grp>span:first-child{color:var(--gold)}
+.vr.kopfz{align-items:stretch;border-top:0;padding-top:.5rem;padding-bottom:.35rem}
+.vk{flex-direction:column;align-items:flex-start!important;gap:.15rem!important;position:relative}
+.vk .bild{height:5rem;width:100%;display:flex;align-items:flex-end;gap:.6rem}
+.vk .bild .fig{height:5rem;width:5rem} .vk .bild .por{height:5rem;width:4rem}
+.vk h3{margin:0;font:400 1.3rem/1.05 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.vk .zl{display:flex;gap:.5rem;align-items:center;font-size:.8rem;color:var(--leise)}
+.vk .raus{position:absolute;right:.5rem;top:0;color:var(--stumm);cursor:pointer;font-size:1rem}
+.vr .d20{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:.1rem;height:2.6rem;align-items:end;flex:1}
+.vr .d20 i{display:block;border-radius:1px;background:var(--stumm);min-height:2px} .vr .d20 i.nbl{background:repeating-linear-gradient(135deg,rgba(154,167,186,.6) 0 .2rem,rgba(154,167,186,.2) .2rem .4rem)}
+.vfuss{display:flex;align-items:center;gap:.8rem;padding:.4rem 1rem;border-top:1px solid var(--linie);font-size:.84rem;color:var(--leise)} .vfuss .sp{flex:1}
+/* Streudiagramm */
+.streu{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 23rem;gap:0}
+.flaeche{position:relative;margin:1.2rem 1.4rem 2.6rem 3.6rem;border-left:1px solid var(--linie-2);border-bottom:1px solid var(--linie-2)}
+.flaeche .gx,.flaeche .gy{position:absolute;font-size:.74rem;color:var(--stumm);font-weight:600}
+.flaeche .gx{bottom:-1.4rem;transform:translateX(-50%)} .flaeche .gy{left:-2.4rem;transform:translateY(50%);width:2rem;text-align:right}
+.flaeche .lx{position:absolute;top:0;bottom:0;width:1px;background:rgba(244,230,196,.05)} .flaeche .ly{position:absolute;left:0;right:0;height:1px;background:rgba(244,230,196,.05)}
+.flaeche .ax{position:absolute;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.flaeche .pt{position:absolute;width:.62rem;height:.62rem;margin:0 0 -.31rem -.31rem;border-radius:50%;opacity:.85;cursor:pointer}
+.flaeche .pt:hover{outline:2px solid #fff;z-index:3;opacity:1}
+.flaeche .pt.ich{box-shadow:0 0 0 2px var(--grund),0 0 0 3.5px var(--heim);z-index:2;opacity:1}
+.flaeche .pt.top{z-index:2;opacity:1} .flaeche .nmz{position:absolute;font:400 .82rem/1 var(--haus);color:#fff;transform:translate(.5rem,50%);white-space:nowrap;text-shadow:0 0 .3rem #000,0 0 .3rem #000;pointer-events:none;z-index:4}
+.flaeche .bd{position:absolute;width:.34rem;margin-left:-.17rem;border-radius:.17rem;opacity:.3;border:1px dashed currentColor;background:repeating-linear-gradient(135deg,currentColor 0 .15rem,transparent .15rem .3rem)}
+.flaeche .med{position:absolute;left:0;right:0;border-top:1px dashed rgba(240,195,90,.5)} .flaeche .med span{position:absolute;right:.3rem;top:-1.1rem;font-size:.7rem;color:var(--gold);font-weight:600}
+.sr{border-left:1px solid var(--linie);padding:.7rem .9rem;display:flex;flex-direction:column;gap:.45rem;min-height:0;overflow:hidden}
+.sr h4{margin:0;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.sr .pl{display:grid;grid-template-columns:1.2rem 2rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.25rem 0;border-top:1px solid rgba(244,230,196,.07);font-size:.9rem;white-space:nowrap}
+.sr .pl .por{width:2rem;height:2.2rem} .sr .pl b{font:400 1rem/1.1 var(--haus);color:#fff;display:block;overflow:hidden;text-overflow:ellipsis} .sr .pl small{color:var(--leise);font-size:.76rem}
+.sr .pl strong{color:var(--gold);font-size:1.1rem} .sr .pl>span:first-child{color:var(--stumm);font-weight:700}
+</style>
+</head>
+<body>
+<script src="modern-24-11/daten.js"></script>
+<script src="modern-24-11/rahmen.js"></script>
+<script src="modern-24-11/tabelle.js"></script>
+<script>
+"use strict";
+RAHMEN.bau({seite:"spieler",demoTitel:"Mockup 24.11. · Spieler",demo:'<span>Ansicht</span><span id="d-ans"></span><i class="tr"></i><span>Spalten</span><span id="d-spa"></span>',
+  demoHinweis:"Spieler, Werte, Verträge, Player Points, Form, Moral, Verletzungen echt (Live-Abbild 24.11.) · Scouting-Stand, Vorlieben, Entwicklung, Werbewert Beispiel."});
+$("buehne").innerHTML='<div class="seite spl an" id="s-liste"><section class="pan" id="p-filter"></section><section class="pan" id="p-liste"></section></div><div class="schleier" id="schleier"></div>';
+
+function liste(par){var v=q.get(par);return v?v.split(","):[]}
+function menge(par){var o={};liste(par).forEach(function(x){o[x]=1});return o}
+var Z={ans:q.get("ansicht")||"liste",umfang:q.get("umfang")||("liga"+ICH.liga),spalten:q.get("spalten")||"ueber",sort:q.get("sort")||"pps",dir:+(q.get("dir")||-1),blatt:+(q.get("blatt")||0),
+  d:q.get("d")==null?null:+q.get("d"),such:q.get("such")||"",zeit:q.get("zeit")||"saison",fzu:q.get("filter")==="zu",y:q.get("y")||"pps",
+  kl:menge("kl"),ra:menge("ra"),team:menge("team"),mw:q.get("mw")==null?null:+q.get("mw"),vt:q.get("vt")==null?null:+q.get("vt"),zu:menge("zu"),eig:+(q.get("eig")||0),at:menge("at"),
+  vgl:liste("vgl")};
+if(Z.ans==="vergleich"&&Z.vgl.length<2)Z.vgl=["queen-loriana","brightpaw"].concat(SP.filter(function(p){return p.team&&p.team!==ICH&&p.team.liga===ICH.liga}).sort(function(a,b){return b.pps-a.pps}).slice(0,2).map(function(p){return p.s}));
+if(Z.spalten==="eig"&&Z.d!=null&&!q.get("sort"))Z.sort="e"+Z.d;
+var ZEILEN=18;
+var MWK=[[0,10,"< 10"],[10,20,"10–20"],[20,30,"20–30"],[30,45,"30–45"],[45,60,"45–60"],[60,999,"60 +"]];
+var VTK=[[1,"läuft aus"],[2,"+1 Saison"],[3,"+2 Saisons"],[4,"später"]];
+var ZUK=[["verl","verletzt"],["fit","einsetzbar"],["formauf","Form ▲"],["formab","Form ▼"],["froh","zufrieden"],["sauer","unzufrieden"],["fig","mit Pixel-Figur"],["wert","Schnäppchen"]];
+var ATK=[[4,70],[0,70],[8,75],[9,70],[7,70],[3,70]];
+var PRESET={ueber:"Überblick",leist:"Leistung",eig:"Eignung",geld:"Vertrag & Geld",train:"Training & Entwicklung",attr:"Attribute"};
+
+/* ---------- Auswahl: Filter rechnen nur mit dem, was man sieht ---------- */
+function stufeAb(v,p,ab){var b=ber(v,p);return b?b[0]>=ab:v>=ab}
+function umfang(){var u=Z.umfang;return SP.filter(function(p){return u==="alle"?true:u==="kader"?p.team===ICH:u==="frei"?p.frei:u==="merk"?p.stern:u==="liga1"?p.team&&p.team.liga===1:p.team&&p.team.liga===2})}
+function passt(p,ohne){
+  if(Z.such){var s=Z.such.toLowerCase();if((p.n+" "+p.kl+" "+p.ra+" "+(p.team?p.team.n:"frei")).toLowerCase().indexOf(s)<0)return false}
+  if(ohne!=="kl"&&Object.keys(Z.kl).length&&!Z.kl[p.kl])return false;
+  if(ohne!=="ra"&&Object.keys(Z.ra).length&&!Z.ra[p.ra])return false;
+  if(ohne!=="team"&&Object.keys(Z.team).length&&!(p.team&&Z.team[p.team.c]))return false;
+  if(ohne!=="mw"&&Z.mw!=null&&!(p.mw>=MWK[Z.mw][0]&&p.mw<MWK[Z.mw][1]))return false;
+  if(ohne!=="vt"&&Z.vt!=null&&!(p.team&&Math.min(4,p.rest)===Z.vt))return false;
+  if(Z.d!=null&&Z.eig&&!stufeAb(p.d[Z.d],p,Z.eig))return false;
+  for(var k in Z.at){var a=ATK[+k];if(!stufeAb(p.at[a[0]],p,a[1]))return false}
+  if(Z.zu.verl&&!p.verl)return false; if(Z.zu.fit&&p.verl)return false;
+  if(Z.zu.formauf&&p.fs<1)return false; if(Z.zu.formab&&p.fs>-1)return false;
+  if(Z.zu.froh&&!(moralSort(p)>=60))return false; if(Z.zu.sauer&&!(moralSort(p)>=0&&moralSort(p)<40))return false;
+  if(Z.zu.fig&&!p.fig)return false; if(Z.zu.wert&&!(p.eins>=4&&p.pps/Math.max(1,p.mw)>=.55))return false;
+  return true}
+
+/* ---------- Spalten ---------- */
+function heat(v,max){var t=kl((v-30)/((max||95)-30),0,1);return "background:rgba(240,195,90,"+(t*.42).toFixed(2)+")"+(t>.72?";color:#fff;font-weight:700":"")}
+function zelle(v,p,gew){var b=ber(v,p);return b?'<i class="nbz'+(gew?" gew":"")+'" title="Stufe '+b[0]+'–'+b[1]+'">'+b[0]+'+</i>':'<i class="'+(gew?"gew":"")+'" style="'+heat(v)+'">'+v+'</i>'}
+function verdeckt(t){return '<span class="zu" title="'+(t||"Erst nach dem Scouting sichtbar")+'">verdeckt</span>'}
+function devWort(v){return v>=3?"deutlich besser":v>=1?"etwas besser":v>-1?"etwa gleich":v>-3?"etwas schlechter":"deutlich schlechter"}
+function spark(p){var v=p.fv;if(!v||v.length<2)return '<span class="zu">–</span>';var pts=v.map(function(f,i){return (i/(v.length-1)*100).toFixed(1)+","+(30-kl(f,5,95)/100*30).toFixed(1)}).join(" ");
+  return '<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><line x1="0" y1="15" x2="100" y2="15"/><polyline points="'+pts+'" style="stroke:'+(p.fs>0?"var(--gut)":p.fs<0?"var(--warn)":"var(--creme)")+'"/></svg>'}
+var FEST=[
+  {k:"vgl",t:"",w:"1.1rem",tip:"Für den Vergleich wählen (2 bis 4)",html:function(p){return '<span class="wahl '+(Z.vgl.indexOf(p.s)>=0?"an":"")+'" data-vgl="'+p.s+'">✓</span>'}},
+  {k:"stern",t:"★",w:"1.1rem",tip:"Merkliste",wert:function(p){return p.stern?1:0},html:function(p){return '<span class="stern '+(p.stern?"an":"")+'" data-stern="'+p.s+'">★</span>'}},
+  {k:"bild",t:"",w:"2.3rem",html:function(p){return por(p)}},
+  {k:"name",t:"Spieler",w:"minmax(10rem,1.5fr)",wert:function(p){return p.n},html:function(p){return '<span class="nm"><b>'+esc(p.n)+'</b><small>'+klasse(p)+rasse(p,true)+'</small></span>'}},
+  {k:"team",t:"Team",w:"4.4rem",wert:function(p){return p.team?p.team.n:"zzz"},html:function(p){return p.team?'<span class="tm" data-team="'+p.team.c+'" title="'+p.team.n+' · Liga '+p.team.liga+'">'+logo(p.team.c)+p.team.c+'</span>':'<span class="tag go">frei</span>'}}];
+var S={
+  ov:{k:"ov",t:"Gesamt",w:"3.7rem",r:1,nebel:1,tip:"Gesamtwert (OVR)",wert:function(p){return sw(p.ov,p)},html:function(p){return zg(p.ov,p,"gr")}},
+  ax:{k:"ax",t:"",w:"8rem",kopf:function(o){return '<span class="ax4">'+AX.map(function(a,i){return '<span data-so="ax'+i+'" class="ac'+i+(o.sort==="ax"+i?" so":"")+'">'+a+(o.sort==="ax"+i?(o.dir<0?"▼":"▲"):"")+'</span>'}).join("")+'</span>'},
+    html:function(p){return '<span class="ax4">'+p.ax.map(function(v,i){var b=ber(v,p);return b?'<i class="nbz">'+b[0]+'+</i>':'<i class="'+(i===p.hax?"h a"+i:"")+'">'+v+'</i>'}).join("")+'</span>'}},
+  best:{k:"best",t:"Beste Disziplinen",w:"9.1rem",nebel:1,tip:"Die drei Disziplinen mit der höchsten Eignung",wert:function(p){return sw(p.d[p.best],p)},
+    html:function(p){if(!exakt(p)&&p.sc===0)return '<span class="zu">unbekannt</span>';if(!exakt(p))return dTag(p.best,' <small>'+zt(p.d[p.best],p)+'</small>');return p.top3.map(function(d){return dTag(d,' <b>'+p.d[d]+'</b>')}).join(" ")}},
+  pps:{k:"pps",t:"PP Saison",w:"5rem",r:1,tip:"Player Points dieser Saison, klein der Rang in der Liga des Spielers. Öffentlich.",wert:function(p){return p.pps},html:function(p){return p.eins?'<span class="ppr"><small>'+(ppRang(p)?ppRang(p)+".":"")+'</small><b class="t">'+de(p.pps)+'</b></span>':'<span class="zu">–</span>'}},
+  ppe:{k:"ppe",t:"PP / Eins.",w:"3.6rem",r:1,tip:"Player Points je Einsatz. Top-Spieler liegen in einer Disziplin um 5.",wert:function(p){return p.ppe},html:function(p){return p.eins?'<b class="t">'+de(p.ppe,2)+'</b>':'<span class="zu">–</span>'}},
+  eins:{k:"eins",t:"Eins.",w:"2.6rem",r:1,tip:"Einsätze in dieser Saison",wert:function(p){return p.eins},html:function(p){return '<span class="t">'+p.eins+'</span>'}},
+  form:{k:"form",t:"Form",w:"3.8rem",tip:"Form 0 bis 100, Mitte 50. Öffentlich.",wert:function(p){return p.form},html:formZ},
+  moral:{k:"moral",t:"Moral",w:"3.8rem",nebel:1,tip:"Gesicht in Farbe plus Zahl. Unbekannt: verdeckt, beobachtet: nur das Gesicht.",wert:moralSort,html:moralZ},
+  stat:{k:"stat",t:"Zustand",w:"6.4rem",tip:"Verletzt heißt: nicht einsetzbar",wert:function(p){return p.verl?-p.verl:p.bel>=60?0:1},html:status},
+  mw:{k:"mw",t:"Marktwert",w:"4.3rem",r:1,tip:"Immer exakt sichtbar",wert:function(p){return p.mw},html:function(p){return '<b class="t">'+de(p.mw)+'</b>'}},
+  geh:{k:"geh",t:"Gehalt / Saison",w:"5.3rem",r:1,nebel:1,tip:"Groß je Saison, klein je Spieltag. Freie Spieler: Forderung.",wert:gehSort,html:gehalt},
+  vt:{k:"vt",t:"Vertrag",w:"3.6rem",tip:"Restlaufzeit in Saisons. Öffentlich.",wert:function(p){return p.frei?0:p.rest},html:function(p){if(p.frei)return '<span class="zu">–</span>';var s="";for(var i=1;i<=4;i++)s+='<i class="'+(i<=p.rest?(p.rest===1?"w":"v"):"")+'"></i>';return '<span class="pips" title="'+p.rest+(p.rest===1?" Saison: läuft aus":" Saisons")+'">'+s+'</span>'}},
+  ppbar:{k:"ppe",t:"PP je Einsatz · Top ≈ 5",w:"9.5rem",wert:function(p){return p.ppe},html:function(p){return p.eins?'<span class="wb"><b class="t">'+de(p.ppe,2)+'</b><span class="bal gold"><i style="width:'+kl(p.ppe/5*100,0,100)+'%"></i></span></span>':'<span class="zu">kein Einsatz</span>'}},
+  ppmax:{k:"ppmax",t:"Bestwert",w:"4.2rem",r:1,tip:"Höchste Player Points in einem einzelnen Einsatz",wert:function(p){return p.ppmax},html:function(p){return p.eins?'<b class="t '+(p.ppmax>=4.5?"plus":"")+'">'+de(p.ppmax)+'</b>':'<span class="zu">–</span>'}},
+  topd:{k:"topd",t:"Stärkste Einsätze",w:"12.5rem",tip:"Disziplinen mit den meisten Player Points in einem Einsatz",wert:function(p){return p.topd.length?p.topd[0][1]:-1},html:function(p){return p.topd.map(function(x){return dTag(x[0],' <b>'+de(x[1])+'</b>')}).join(" ")||'<span class="zu">–</span>'}},
+  fv:{k:"fv",t:"Form-Verlauf",w:"7.5rem",tip:"Form über die gespielten Spieltage",wert:function(p){return p.fv.length>1?p.fv[p.fv.length-1]-p.fv[0]:0},html:spark},
+  bel:{k:"bel",t:"Belastung",w:"6.6rem",nebel:1,tip:"Ab 60 steigt das Verletzungsrisiko. Fremde Spieler: verdeckt bis zum Scouting.",wert:function(p){return exakt(p)?p.bel:-1},html:function(p){return exakt(p)?'<span class="wb"><b class="t">'+p.bel+'</b><span class="bal '+(p.bel>=60?"warn":p.bel>=40?"acht":"gut")+'"><i style="width:'+kl(p.bel,0,100)+'%"></i></span></span>':verdeckt()}},
+  e20:{k:"e20",t:"",w:"minmax(40rem,6fr)",kopf:function(o){return '<span class="e20">'+DK.map(function(k,i){return '<span data-so="e'+i+'" title="'+DN[i][0]+'" class="ac'+DA[i]+(o.sort==="e"+i?" so":"")+(Z.d===i?" gew":"")+'">'+k+'</span>'}).join("")+'</span>'},
+    html:function(p){return '<span class="e20">'+p.d.map(function(v,i){return zelle(v,p,Z.d===i)}).join("")+'</span>'}},
+  kauf:{k:"kauf",t:"Kaufpreis",w:"4.8rem",r:1,tip:"Gezahlte Ablöse. Öffentlich (Transfer-Historie).",wert:function(p){return p.kauf||0},html:function(p){return p.kauf?'<span class="t">'+de(p.kauf)+'</span>':'<span class="zu">–</span>'}},
+  wert:{k:"wert",t:"Wertänderung",w:"5.6rem",r:1,tip:"Marktwert heute gegen Kaufpreis (Auf- und Absteiger)",wert:function(p){return p.wert},html:function(p){return p.kauf?'<b class="t '+(p.wert>.05?"plus":p.wert<-.05?"minus":"null")+'">'+vz(p.wert)+'</b>':'<span class="zu">–</span>'}},
+  dem:{k:"dem",t:"Forderung",w:"5.2rem",r:1,nebel:1,tip:"Gehaltsforderung je Saison bei einem neuen Vertrag",wert:function(p){return exakt(p)||p.frei?p.dem:-1},html:function(p){return exakt(p)||p.frei?'<span class="t">'+de(p.dem)+'</span>':verdeckt()}},
+  vform:{k:"vform",t:"Vertragsform",w:"7rem",nebel:1,wert:function(p){return exakt(p)?p.vform:"zzz"},html:function(p){return p.frei?'<span class="zu">–</span>':exakt(p)?({front_loaded:"vorne hoch",back_loaded:"hinten hoch",balanced:"gleichmäßig"})[p.vform]||"gleichmäßig":verdeckt()}},
+  pl:{k:"pl",t:"PP je 10 C",w:"5rem",r:1,tip:"Preis-Leistung: Player Points je 10 C Marktwert",wert:function(p){return p.pps/Math.max(1,p.mw)*10},html:function(p){return p.eins?'<b class="t">'+de(p.pps/Math.max(1,p.mw)*10,2)+'</b>':'<span class="zu">–</span>'}},
+  werb:{k:"werb",t:"Werbewert",w:"7rem",tip:"Vermarktbarkeit 0 bis 100 (Beispielwerte)",wert:function(p){return p.werb},html:function(p){return '<span class="wb"><b class="t">'+p.werb+'</b><span class="bal"><i style="width:'+p.werb+'%"></i></span></span>'}},
+  wgeld:{k:"wgeld",t:"Werbegeld",w:"4.8rem",r:1,nebel:1,tip:"Werbegeld je Saison; der Spieler-Anteil hebt die Moral (Beispielwerte)",wert:function(p){return exakt(p)?p.wgeld:-1},html:function(p){return p.frei?'<span class="zu">–</span>':exakt(p)?'<span class="t">'+de(p.wgeld)+'</span>':verdeckt()}},
+  pot:{k:"pot",t:"Potenzial",w:"4.8rem",r:1,nebel:1,tip:"Nur für den eigenen Kader und gescoutete Spieler",wert:function(p){return exakt(p)?p.pot:-1},html:function(p){return exakt(p)?'<b class="t">'+Math.round(p.pot)+'</b>':verdeckt()}},
+  dev:{k:"dev",t:"Entwicklung Saison 1",w:"9.6rem",nebel:1,tip:"Änderung des Gesamtwerts in dieser Saison (Beispielwerte)",wert:function(p){return exakt(p)&&!p.frei?p.dev:-99},html:function(p){return p.frei?'<span class="zu">–</span>':exakt(p)?'<span class="dv"><b class="t '+(p.dev>=1?"plus":p.dev<=-1?"minus":"null")+'">'+vz(p.dev)+'</b><small>'+devWort(p.dev)+'</small></span>':verdeckt()}},
+  ziel:{k:"ziel",t:"Trainingsziel",w:"8.4rem",nebel:1,tip:"Ziel-Disziplin des Trainings; Liebling wirkt ×1,30, ungeliebt ×0,50 (Beispielwerte)",wert:function(p){return p.team===ICH?p.zart:-9},
+    html:function(p){return p.team!==ICH?'<span class="zu">'+(p.frei?"–":"nur eigener Kader")+'</span>':dTag(p.ziel)+' '+(p.zart>0?'<span class="tag g">×1,30</span>':p.zart<0?'<span class="tag w">×0,50</span>':'<span class="tag">×1,00</span>')}},
+  vor:{k:"vor",t:"Vorlieben Saison 1",w:"11.4rem",nebel:1,tip:"Zwei Lieblings-Disziplinen und eine ungeliebte, jede Saison neu (Beispielwerte)",wert:function(p){return exakt(p)?DN[p.lieb[0]][0]:"zzz"},
+    html:function(p){return exakt(p)?'<span class="vl"><u class="h">♥</u>'+dTag(p.lieb[0])+dTag(p.lieb[1])+'<u class="x">✕</u><span class="dt un a'+DA[p.unlieb]+'">'+DK[p.unlieb]+'</span></span>':verdeckt()}},
+  a12:{k:"a12",t:"",w:"minmax(30rem,5fr)",kopf:function(o){return '<span class="a12">'+AK.map(function(k,i){return '<span data-so="a'+i+'" title="'+AN[i]+'" class="'+(o.sort==="a"+i?"so":"")+'">'+k+'</span>'}).join("")+'</span>'},
+    html:function(p){return '<span class="a12">'+p.at.map(function(v){return zelle(v,p)}).join("")+'</span>'}}};
+var SATZ={ueber:["ov","ax","best","pps","ppe","eins","form","moral","stat","mw","geh","vt"],leist:["eins","pps","ppbar","ppmax","topd","form","fv","moral","bel","stat"],eig:["ov","e20","pps"],
+  geld:["mw","kauf","wert","geh","dem","vt","vform","pl","werb","wgeld"],train:["ov","pot","dev","ziel","vor","bel","form","moral","stat"],attr:["ov","a12","pot","pps"]};
+var EXTRA={};
+[0,1,2,3].forEach(function(i){EXTRA["ax"+i]={nebel:1,wert:function(p){return sw(p.ax[i],p)}}});
+DK.forEach(function(_,i){EXTRA["e"+i]={nebel:1,wert:function(p){return sw(p.d[i],p)}}});
+AK.forEach(function(_,i){EXTRA["a"+i]={nebel:1,wert:function(p){return sw(p.at[i],p)}}});
+
+/* ---------- Zeichnen ---------- */
+function chip(par,wert,txt,an,zus){return '<a class="fc '+(an?"an":"")+'" data-f="'+par+'" data-w="'+wert+'">'+txt+(zus||"")+'</a>'}
+function zeichneFilter(basis){
+  function zahl(ohne,test){return basis.filter(function(p){return passt(p,ohne)&&test(p)}).length}
+  var mwN=MWK.map(function(b){return zahl("mw",function(p){return p.mw>=b[0]&&p.mw<b[1]})}),mwMax=Math.max.apply(null,mwN.concat([1]));
+  var klL=Object.keys(KLF),raL=[];SP.forEach(function(p){if(raL.indexOf(p.ra)<0)raL.push(p.ra)});raL.sort();
+  var h='<div class="pk"><h2>Filter</h2><span class="sp"></span><a data-reset="1">zurücksetzen</a></div><div class="inh">'+
+    '<div class="fg"><h4>Schnellfilter</h4><div class="ch">'+ZUK.map(function(z){return chip("zu",z[0],z[1],Z.zu[z[0]])}).join("")+'</div></div>'+
+    '<div class="fg"><h4>Klasse <small>in Klassenfarbe · POW, SPE, MEN, SOC</small></h4><div class="kli">'+klL.map(function(k){return '<a class="k'+KLF[k]+(Z.kl[k]?" an":"")+'" data-f="kl" data-w="'+k+'" title="'+k+'"><img src="../class-icons/'+k+'.png" alt=""></a>'}).join("")+'</div></div>'+
+    '<div class="fg"><h4>Rasse</h4><div class="rai">'+raL.map(function(r){return '<a class="'+(Z.ra[r]?"an":"")+'" data-f="ra" data-w="'+r+'" title="'+r+'"><img src="../race-icons/'+r+'.png" alt="" onerror="this.replaceWith(document.createTextNode(this.parentNode.title.slice(0,2)))"></a>'}).join("")+'</div></div>'+
+    '<div class="fg"><h4>Team <small>oben Liga 1, unten Liga 2</small></h4><div class="tli">'+TEAMS.map(function(T){return '<a class="'+(Z.team[T.c]?"an ":"")+(T===ICH?"ich":"")+'" data-f="team" data-w="'+T.c+'" title="'+T.n+' · Liga '+T.liga+'"><img src="../team-logos/'+T.c+'.jpg" alt=""></a>'}).join("")+'</div></div>'+
+    '<div class="fg"><h4>Disziplin-Eignung <small>'+(Z.d==null?"Disziplin wählen":DN[Z.d][0])+'</small></h4><div class="dli">'+DK.map(function(k,i){return '<a class="a'+DA[i]+(Z.d===i?" an":"")+'" data-d="'+i+'" title="'+DN[i][0]+'">'+k+'</a>'}).join("")+'</div>'+
+      '<div class="ch">'+[0,50,60,70,80].map(function(e){return chip("eig",e,e?"ab "+e:"egal",Z.eig===e)}).join("")+'</div></div>'+
+    '<div class="fg"><h4>Preis <small>Marktwert in C · Balken klicken</small></h4><div class="hist">'+MWK.map(function(b,i){return '<a class="'+(Z.mw===i?"an":"")+'" data-f="mw" data-w="'+i+'"><b>'+mwN[i]+'</b><i style="height:'+Math.round(mwN[i]/mwMax*100)+'%"></i></a>'}).join("")+'</div><div class="histx">'+MWK.map(function(b){return '<span>'+b[2]+'</span>'}).join("")+'</div></div>'+
+    '<div class="fg"><h4>Vertrag <small>Restlaufzeit</small></h4><div class="ch">'+VTK.map(function(v){return chip("vt",v[0],v[1],Z.vt===v[0],' <small>'+zahl("vt",function(p){return p.team&&Math.min(4,p.rest)===v[0]})+'</small>')}).join("")+'</div></div>'+
+    '<div class="fg"><h4>Attribut <small>Wert ab Schwelle</small></h4><div class="ch">'+ATK.map(function(a,i){return chip("at",i,AN[a[0]]+" ≥ "+a[1],Z.at[i])}).join("")+'</div></div>'+
+    '<span style="flex:1"></span><div class="fg" style="padding-bottom:.7rem"><div class="nebelhin">'+ic("scout")+'<span>'+(NEBEL_AUS?'<b>Nebel ist ausgeschaltet</b> (Einstellung): alle Werte exakt.':'<b>Nebel:</b> unbekannt 10er-, beobachtet 5er-Stufe, gescoutet exakt. Sortiert und gefiltert wird nach der Stufe. <b>Marktwert, PP, Form, Verletzung, Vertragsende</b> sieht jeder.')+'</span></div></div></div>';
+  $("p-filter").innerHTML=h}
+function aktiv(){var a=[];
+  Object.keys(Z.kl).forEach(function(k){a.push(["kl",k,k])});Object.keys(Z.ra).forEach(function(k){a.push(["ra",k,k])});Object.keys(Z.team).forEach(function(k){a.push(["team",k,TC[k].n])});
+  if(Z.mw!=null)a.push(["mw",Z.mw,"Marktwert "+MWK[Z.mw][2]+" C"]);if(Z.vt!=null)a.push(["vt",Z.vt,"Vertrag: "+VTK[Z.vt-1][1]]);
+  if(Z.d!=null&&Z.eig)a.push(["eig",Z.eig,DN[Z.d][0]+" ab "+Z.eig]);else if(Z.d!=null)a.push(["d",Z.d,"Disziplin "+DN[Z.d][0]]);
+  Object.keys(Z.at).forEach(function(k){a.push(["at",k,AN[ATK[k][0]]+" ≥ "+ATK[k][1]])});Object.keys(Z.zu).forEach(function(k){ZUK.forEach(function(z){if(z[0]===k)a.push(["zu",k,z[1]])})});
+  return a}
+function zeichne(){
+  var basis=umfang(),rows=basis.filter(function(p){return passt(p)});
+  $("s-liste").classList.toggle("fzu",Z.fzu);
+  var n1=SP.filter(function(p){return p.team&&p.team.liga===1}).length,n2=SP.filter(function(p){return p.team&&p.team.liga===2}).length;
+  var UMF=[["liga"+ICH.liga,"Liga "+ICH.liga],["liga"+(3-ICH.liga),"Liga "+(3-ICH.liga)],["alle","Alle"],["kader","Mein Kader"],["frei","Freie"],["merk","Merkliste"]];
+  var bek=rows.filter(exakt);
+  RAHMEN.kopf('Team <span>›</span> '+({alle:"beide Ligen und freie Spieler",kader:"dein Kader",frei:"freie Spieler",merk:"deine Merkliste"}[Z.umfang]||"Spieler der "+(Z.umfang==="liga1"?"Liga 1":"Liga 2")),"Spieler",
+    UMF.map(function(u){return '<a class="'+(Z.umfang===u[0]?"an":"")+'" data-umf="'+u[0]+'">'+u[1]+(u[0]==="merk"?'<small>'+SP.filter(function(p){return p.stern}).length+'</small>':"")+'</a>'}).join(""),
+    RAHMEN.kpi("In der Auswahl",rows.length,"Spieler")+RAHMEN.kpi("Exakt bekannt",bek.length,NEBEL_AUS?"Nebel aus":"gescoutet, eigen")+RAHMEN.kpi("Ø Marktwert",rows.length?de(rows.reduce(function(a,p){return a+p.mw},0)/rows.length):"–","C")+RAHMEN.kpi("Verletzt",rows.filter(function(p){return p.verl}).length,"nicht einsetzbar"));
+  zeichneFilter(basis);
+  var a=aktiv();
+  var kopf='<div class="fl"><a class="knopf klein" data-fzu="1" title="Filter ein- oder ausblenden">'+ic("filter")+(Z.fzu?"Filter":"")+'</a><input id="such" placeholder="Name, Klasse, Rasse oder Team" value="'+esc(Z.such)+'">'+
+    '<span class="seg" title="Zeitraum der Leistungswerte">'+[["saison","Saison 1"],["alltime","All-Time"]].map(function(z){return '<a class="'+(Z.zeit===z[0]?"an":"")+'" data-zeit="'+z[0]+'">'+z[1]+'</a>'}).join("")+'</span>'+
+    '<span class="gk">Spalten</span>'+Object.keys(PRESET).map(function(k){return '<a class="fc '+(Z.spalten===k&&Z.ans!=="streu"?"an":"")+'" data-spa="'+k+'">'+PRESET[k]+'</a>'}).join("")+
+    '<span class="sp"></span><span class="seg">'+[["liste","Tabelle"],["streu","Streudiagramm"]].map(function(z){return '<a class="'+((Z.ans==="streu")===(z[0]==="streu")?"an":"")+'" data-ans="'+z[0]+'">'+z[1]+'</a>'}).join("")+'</span>'+
+    '<a class="knopf klein '+(Z.vgl.length>=2?"haupt":"zu")+'" data-vglauf="1">'+ic("waage")+'Vergleichen '+Z.vgl.length+' / 4</a></div>'+
+    '<div class="fl"><span class="gk">Aktive Filter</span>'+(a.length?a.map(function(x){return '<a class="akt" data-weg="'+x[0]+'" data-w="'+x[1]+'">'+esc(x[2])+ic("x")+'</a>'}).join(""):'<span class="hin">keine · links wählen oder oben suchen</span>')+
+    '<span class="sp"></span>'+(Z.vgl.length?'<a class="akt" data-vglleer="1">Vergleichsauswahl aufheben'+ic("x")+'</a>':"")+'</div>';
+  if(Z.ans==="streu"){$("p-liste").innerHTML=kopf+streu(rows);return}
+  var cols=FEST.concat(SATZ[Z.spalten].map(function(k){return S[k]}));
+  var maxBlatt=Math.max(0,Math.ceil(rows.length/ZEILEN)-1);Z.blatt=kl(Z.blatt,0,maxBlatt);
+  var t=tafel({cols:cols,rows:rows,sort:Z.sort,dir:Z.dir,zeilen:ZEILEN,blatt:Z.blatt,extraSort:EXTRA,zeile:function(p){return {cls:"klick"+(p.team===ICH?" ich":""),attr:'data-profil="'+p.s+'"'}}});
+  $("p-liste").innerHTML=kopf+t.html+'<div class="tfuss"><span><b>'+rows.length+'</b> Spieler · Blatt '+(Z.blatt+1)+' von '+(maxBlatt+1)+'</span>'+
+    (t.nebelSort?'<span class="tag a">im Nebel nach Stufe sortiert · innerhalb einer Stufe nach Name</span>':"")+
+    (Z.zeit==="alltime"?'<span>All-Time: Saison 1 ist die erste Saison dieses Spielstands, die Werte sind gleich</span>':'<span>PP-Rang gilt für die Liga des Spielers · orange Kante = dein Kader · Klick öffnet das Profil</span>')+
+    '<span class="sp"></span><a class="'+(Z.blatt<=0?"aus":"")+'" data-blatt="-1">'+ic("l")+' zurück</a><a class="'+(Z.blatt>=maxBlatt?"aus":"")+'" data-blatt="1">weiter '+ic("r")+'</a></div>';
+}
+/* ---------- Streudiagramm: x = Marktwert (immer exakt), y waehlbar; verdeckte Werte als Stufen-Balken ---------- */
+function streu(rows){
+  var YW={pps:["PP Saison",function(p){return [p.pps,null]},function(v){return de(v,0)}],ppe:["PP je Einsatz",function(p){return [p.ppe,null]},function(v){return de(v,1)}],
+    ov:["Gesamt",function(p){return [sw(p.ov,p),ber(p.ov,p)]},function(v){return Math.round(v)}],eig:["Eignung "+DN[Z.d==null?9:Z.d][0],function(p){var d=Z.d==null?9:Z.d;return [sw(p.d[d],p),ber(p.d[d],p)]},function(v){return Math.round(v)}]};
+  var Y=YW[Z.y]||YW.pps,pk=rows.filter(function(p){return Z.y==="pps"||Z.y==="ppe"?p.eins>0:true});
+  var xm=Math.max(40,Math.ceil(Math.max.apply(null,pk.map(function(p){return p.mw}).concat([1]))/10)*10),ym=Math.max.apply(null,pk.map(function(p){var y=Y[1](p);return y[1]?y[1][1]:y[0]}).concat([1]));
+  ym=Z.y==="ppe"?5:Z.y==="pps"?Math.ceil(ym/5)*5:100;
+  var h="",i;for(i=0;i<=4;i++){h+='<i class="lx" style="left:'+i*25+'%"></i><span class="gx" style="left:'+i*25+'%">'+Math.round(xm*i/4)+'</span><i class="ly" style="bottom:'+i*25+'%"></i><span class="gy" style="bottom:'+i*25+'%">'+Y[2](ym*i/4)+'</span>'}
+  var med=pk.map(function(p){return Y[1](p)[0]}).sort(function(a,b){return a-b})[Math.floor(pk.length/2)]||0;
+  h+='<div class="med" style="bottom:'+kl(med/ym*100,0,100)+'%"><span>Median der Auswahl '+Y[2](med)+'</span></div>';
+  var bestL=pk.filter(function(p){return p.eins>=4}).sort(function(a,b){return b.pps/Math.max(1,b.mw)-a.pps/Math.max(1,a.mw)||(a.n<b.n?-1:1)}).slice(0,9),bm={};bestL.forEach(function(p){bm[p.s]=1});
+  pk.forEach(function(p){var y=Y[1](p),x=kl(p.mw/xm*100,0,100),f=AXF[p.kf];
+    if(y[1])h+='<i class="bd" style="left:'+x+'%;bottom:'+Math.min(ym,y[1][0])/ym*100+'%;height:'+(Math.min(ym,y[1][1])-Math.min(ym,y[1][0]))/ym*100+'%;color:'+f+'" title="'+esc(p.n)+' · Stufe '+y[1][0]+'–'+y[1][1]+' · '+de(p.mw)+' C"></i>';
+    else h+='<i class="pt'+(p.team===ICH?" ich":"")+(bm[p.s]?" top":"")+'" data-profil="'+p.s+'" style="left:'+x+'%;bottom:'+kl(y[0]/ym*100,0,100)+'%;background:'+f+'" title="'+esc(p.n)+' · '+p.kl+' · '+Y[0]+' '+de(y[0],1)+' · '+de(p.mw)+' C"></i>'+(p.team===ICH||bestL.indexOf(p)<3&&bestL.indexOf(p)>=0?'<span class="nmz" style="left:'+x+'%;bottom:'+kl(y[0]/ym*100,0,100)+'%">'+esc(p.n)+'</span>':"")});
+  h+='<span class="ax" style="right:0;bottom:-2.4rem">Marktwert in C →</span><span class="ax" style="left:-3.2rem;top:-1rem">↑ '+Y[0]+'</span>';
+  return '<div class="streu"><div style="display:flex;flex-direction:column;min-width:0;min-height:0"><div class="fl"><span class="gk">Hochachse</span>'+Object.keys(YW).map(function(k){return '<a class="fc '+(Z.y===k?"an":"")+'" data-y="'+k+'">'+YW[k][0]+'</a>'}).join("")+
+    '<span class="sp"></span><span class="leg">'+AX.map(function(a,i){return '<span><i style="background:'+AXF[i]+';border-radius:50%;transform:none"></i>'+a+'-Klassen</span>'}).join("")+'<span><i style="background:none;border:2px solid var(--heim);border-radius:50%;transform:none"></i>dein Kader</span><span><i style="background:repeating-linear-gradient(135deg,var(--leise) 0 .15rem,transparent .15rem .3rem);transform:none;width:.3rem;height:.8rem"></i>im Nebel: Stufe</span></span></div>'+
+    '<div class="flaeche" style="flex:1">'+h+'</div></div>'+
+    '<div class="sr"><h4>Bestes Preis-Leistungs-Verhältnis</h4><div class="hin">Player Points je 10 C Marktwert, mindestens vier Einsätze. Beides ist öffentlich, der Nebel verfälscht hier nichts.</div>'+
+    bestL.map(function(p,i){return '<div class="pl klick" data-profil="'+p.s+'" style="cursor:pointer"><span>'+(i+1)+'.</span>'+por(p)+'<span style="min-width:0"><b>'+esc(p.n)+'</b><small>'+klasse(p)+' · '+(p.team?p.team.c:"frei")+' · '+de(p.mw)+' C</small></span><strong class="t">'+de(p.pps/Math.max(1,p.mw)*10,2)+'</strong></div>'}).join("")+
+    '<span style="flex:1"></span><div class="wert3" style="grid-template-columns:repeat(3,1fr)"><div><small>Auswahl</small><strong class="t">'+pk.length+'</strong><em>Spieler</em></div><div><small>Median '+Y[0]+'</small><strong class="t">'+Y[2](med)+'</strong></div><div><small>Ø Marktwert</small><strong class="t">'+(pk.length?de(pk.reduce(function(a,p){return a+p.mw},0)/pk.length):"–")+'</strong><em>C</em></div></div>'+
+    '<div class="nebelhin">'+ic("scout")+'<span>Bei <b>Gesamt</b> und <b>Eignung</b> stehen verdeckte Spieler als gestrichelter Balken über ihre Stufe, nie als Punkt auf dem wahren Wert.</span></div></div></div>'}
+/* ---------- Vergleich: 2 bis 4 Spieler ---------- */
+function vergleich(){
+  var L=Z.vgl.map(function(s){return ALLE[s]}).filter(Boolean).slice(0,4),n=L.length;
+  function zeile(lab,fn,o){o=o||{};var w=L.map(function(p){return fn(p)});/* [Sortierwert, Stufe|null, Anzeige, Balken 0..100|null] */
+    var sieger=-1;if(!o.ohne){var best=-1e9,bi=-1,off=false;w.forEach(function(x,i){if(x[0]==null)return;if(x[0]>best){best=x[0];bi=i}});
+      w.forEach(function(x,i){if(i===bi||x[0]==null)return;var a=w[bi][1]||[w[bi][0],w[bi][0]],b=x[1]||[x[0],x[0]];if(b[1]>=a[0]&&(w[bi][1]||x[1]||b[1]===a[0]))off=true});sieger=off?-1:bi}
+    return '<div class="vr" style="--n:'+n+'"><span>'+lab+'</span>'+w.map(function(x,i){return '<span class="'+(i===sieger?"sieg":"")+'"><span class="w t">'+x[2]+'</span>'+(x[3]==null?"":'<span class="bal"><i '+(x[1]?'class="nbl" style="left:'+x[1][0]+'%;width:'+(x[1][1]-x[1][0])+'%"':'style="width:'+kl(x[3],0,100)+'%"')+'></i></span>')+'</span>'}).join("")+'</div>'}
+  function zahl(v,p,max){var b=ber(v,p);return [sw(v,p),b,b?'<span class="nb">'+b[0]+'–'+b[1]+'</span>':Math.round(v),v/(max||100)*100]}
+  function grp(t){return '<div class="vr grp" style="--n:'+n+'"><span>'+t+'</span>'+L.map(function(){return "<span></span>"}).join("")+'</div>'}
+  var h='<div class="vgl"><div class="pk"><h2>Vergleich</h2><small class="u">'+n+' von höchstens 4 Spielern · Gold = bester Wert, nur wenn er feststeht</small><span class="sp"></span><a data-vglzu="1" style="cursor:pointer">schließen '+ic("x")+'</a></div>'+
+    '<div class="vr kopfz" style="--n:'+n+'"><span>Kennzahl</span>'+L.map(function(p){return '<span class="vk"><a class="raus" data-vgl="'+p.s+'" title="aus dem Vergleich nehmen">'+ic("x")+'</a><span class="bild">'+figur(p)+'<span>'+(p.team?logo(p.team.c):"")+'</span></span><h3>'+esc(p.n)+'</h3><span class="zl">'+klasse(p)+rasse(p,true)+'</span><span class="zl">'+(p.team?p.team.n:"freier Spieler")+' · <span class="tag '+(exakt(p)?"g":p.sc?"a":"")+'">'+scWort(p)+'</span></span></span>'}).join("")+'</div>'+
+    grp("Werte")+zeile("Gesamt",function(p){return zahl(p.ov,p)})+zeile("Potenzial",function(p){return exakt(p)?[p.pot,null,Math.round(p.pot),p.pot]:[null,null,'<span class="zu">verdeckt</span>',null]})+
+    AX.map(function(a,i){return zeile('<b class="ac'+i+'">'+AXN[i]+'</b>',function(p){return zahl(p.ax[i],p)})}).join("")+
+    grp("Attribute")+AN.map(function(a,i){return zeile(a,function(p){return zahl(p.at[i],p)})}).join("")+
+    grp("Eignung")+'<div class="vr" style="--n:'+n+';min-height:3.2rem"><span>20 Disziplinen</span>'+L.map(function(p){return '<span><span class="d20">'+p.d.map(function(v,i){var b=ber(v,p);return '<i class="'+(b?"nbl":"")+'" style="height:'+(b?b[1]:v)+'%;'+(b?"":"background:"+AXF[DA[i]])+'" title="'+DN[i][0]+' '+zt(v,p)+'"></i>'}).join("")+'</span></span>'}).join("")+'</div>'+
+    grp("Leistung · öffentlich")+zeile("PP Saison",function(p){return [p.pps,null,de(p.pps),p.pps/32*100]})+zeile("PP je Einsatz",function(p){return [p.ppe,null,de(p.ppe,2),p.ppe/5*100]})+zeile("Einsätze",function(p){return [p.eins,null,p.eins,p.eins/22*100]})+
+    zeile("Form",function(p){return [p.form,null,formZ(p),null]})+zeile("Moral",function(p){return [moralSort(p)<0?null:moralSort(p),null,moralZ(p),null]},{ohne:1})+zeile("Zustand",function(p){return [null,null,status(p),null]},{ohne:1})+
+    grp("Vertrag & Geld")+zeile("Marktwert in C",function(p){return [-p.mw,null,de(p.mw),null]},{ohne:1})+zeile("Gehalt je Saison",function(p){return [null,null,gehalt(p),null]},{ohne:1})+
+    zeile("Vertrag",function(p){return [null,null,p.frei?"frei":p.rest+(p.rest===1?" Saison":" Saisons"),null]},{ohne:1})+
+    zeile("Vorlieben",function(p){return [null,null,S.vor.html(p),null]},{ohne:1})+
+    '<div class="vfuss"><span>Verdeckte Werte stehen als Stufe. Überschneiden sich zwei Stufen, gibt es keinen Sieger: das verriete den Wert.</span><span class="sp"></span>'+L.map(function(p){return '<a class="knopf klein" href="'+profilUrl(p)+'">Profil '+esc(p.n.split(" ")[0])+'</a>'}).join("")+'</div></div>';
+  $("schleier").innerHTML=h;$("schleier").classList.add("auf")}
+function demo(){
+  $("d-ans").innerHTML=[["liste","Tabelle"],["vergleich","Vergleich"],["streu","Streudiagramm"]].map(function(a){return '<a class="'+(Z.ans===a[0]?"an":"")+'" href="'+RAHMEN.link({ansicht:a[0]})+'">'+a[1]+'</a>'}).join(" ");
+  $("d-spa").innerHTML=Object.keys(PRESET).map(function(k){return '<a class="'+(Z.spalten===k?"an":"")+'" href="'+RAHMEN.link({spalten:k,ansicht:"liste",sort:null})+'">'+PRESET[k]+'</a>'}).join(" ")}
+function alles(){zeichne();if(Z.ans==="vergleich")vergleich();else $("schleier").classList.remove("auf");demo()}
+document.addEventListener("click",function(ev){
+  var t=ev.target,e;
+  if(e=t.closest("[data-vgl]")){ev.preventDefault();var s=e.getAttribute("data-vgl"),i=Z.vgl.indexOf(s);if(i>=0)Z.vgl.splice(i,1);else if(Z.vgl.length<4)Z.vgl.push(s);else RAHMEN.melde("Höchstens vier Spieler","Nimm erst einen aus dem Vergleich.","w");if(Z.ans==="vergleich"&&Z.vgl.length<2)Z.ans="liste";return alles()}
+  if(e=t.closest("[data-stern]")){var p=ALLE[e.getAttribute("data-stern")];p.stern=!p.stern;RAHMEN.melde(p.stern?"Auf der Merkliste":"Von der Merkliste genommen",p.n+" · die Merkliste gilt je Manager","g");return alles()}
+  if(e=t.closest("[data-team]")){location.href="teams-modern-24-11.html?ansicht=kader&team="+e.getAttribute("data-team")+(q.get("still")?"&still=1":"");return}
+  if(e=t.closest("[data-vglzu]")){Z.ans="liste";return alles()}
+  if(t===$("schleier")){Z.ans="liste";return alles()}
+  if(e=t.closest("[data-vglauf]")){if(Z.vgl.length>=2){Z.ans="vergleich";alles()}else RAHMEN.melde("Vergleich","Mindestens zwei Spieler in der Spalte „Vgl.“ wählen.","w");return}
+  if(e=t.closest("[data-vglleer]")){Z.vgl=[];return alles()}
+  if(sortKlick(ev,Z,{name:1,team:1}))return alles();
+  if(e=t.closest("[data-profil]")){location.href=profilUrl(ALLE[e.getAttribute("data-profil")]);return}
+  if(e=t.closest("[data-umf]")){Z.umfang=e.getAttribute("data-umf");Z.blatt=0;return alles()}
+  if(e=t.closest("[data-spa]")){Z.spalten=e.getAttribute("data-spa");Z.ans="liste";if(Z.spalten==="eig"&&Z.d!=null){Z.sort="e"+Z.d;Z.dir=-1}return alles()}
+  if(e=t.closest("[data-ans]")){Z.ans=e.getAttribute("data-ans");return alles()}
+  if(e=t.closest("[data-zeit]")){Z.zeit=e.getAttribute("data-zeit");return alles()}
+  if(e=t.closest("[data-y]")){Z.y=e.getAttribute("data-y");return alles()}
+  if(e=t.closest("[data-fzu]")){Z.fzu=!Z.fzu;return alles()}
+  if(e=t.closest("[data-blatt]")){Z.blatt+=+e.getAttribute("data-blatt");return alles()}
+  if(e=t.closest("[data-reset]")){Z.kl={};Z.ra={};Z.team={};Z.mw=null;Z.vt=null;Z.zu={};Z.eig=0;Z.at={};Z.d=null;Z.such="";Z.blatt=0;return alles()}
+  if(e=t.closest("[data-d]")){var d=+e.getAttribute("data-d");Z.d=Z.d===d?null:d;if(Z.d!=null){Z.sort="e"+Z.d;Z.dir=-1;RAHMEN.kulisse(Z.d,Z.d)}else if(/^e\d/.test(Z.sort))Z.sort="pps";Z.blatt=0;return alles()}
+  if(e=t.closest("[data-weg]")){var f=e.getAttribute("data-weg"),w=e.getAttribute("data-w");if(f==="mw"||f==="vt")Z[f]=null;else if(f==="eig")Z.eig=0;else if(f==="d")Z.d=null;else delete Z[f][w];Z.blatt=0;return alles()}
+  if(e=t.closest("[data-f]")){var f2=e.getAttribute("data-f"),w2=e.getAttribute("data-w");
+    if(f2==="mw"||f2==="vt"){Z[f2]=Z[f2]===+w2?null:+w2}else if(f2==="eig"){Z.eig=+w2;if(Z.eig&&Z.d==null)Z.d=ECHT.DIS[HEUTE-1][0]}else{if(Z[f2][w2])delete Z[f2][w2];else Z[f2][w2]=1}
+    Z.blatt=0;return alles()}
+});
+document.addEventListener("input",function(ev){if(ev.target.id==="such"){Z.such=ev.target.value;Z.blatt=0;var pos=ev.target.selectionStart;zeichne();var i=$("such");i.focus();i.setSelectionRange(pos,pos)}});
+alles();
+</script>
+</body>
+</html>
