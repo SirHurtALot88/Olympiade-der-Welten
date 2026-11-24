@@ -68,6 +68,9 @@ import {
 } from "@/lib/sponsor/sponsor-v3-model";
 import { buildSeasonStrategyState } from "@/lib/ai/ai-manager-doctrine-service";
 import { resolveChallengeSlotIndex } from "@/lib/sponsor/sponsor-special-objectives";
+import { sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
+import { treueSaisonsFuerMarke } from "@/lib/sponsors/sponsor-topf-eingaben";
+import { baueTopfWahlKontext, ergaenzeTopfWahl, pruefeTopfWahl, wendeTopfWahlAn, type TopfWahl, type TopfWahlKontext } from "@/lib/sponsors/sponsor-topf-wahl";
 import {
   applySponsorV3ToOffers,
   getSponsorV3Terms,
@@ -606,6 +609,13 @@ export function chooseSponsorOffer(input: {
    * bestehender Aufrufer (z. B. `app/api/sponsor/choose/route.ts`) im Typ stehen.
    */
   termSeasons?: SponsorTermSeasons;
+  /**
+   * SPONSOR-TOPF (24.11., lib/sponsors/): Vertragsart, gewaehlte Laufzeit und Farb-Partner. Gilt nur unter dem Stempel "topf"; fehlende Felder
+   * fuellt die KI-Wahl (Mensch ueberschreibt, KI respektiert das). Unter "alt" wird das Feld ignoriert (die Laufzeit steht am Angebot).
+   */
+  topf?: TopfWahl;
+  /** Nur fuer Liga-Runden (KI-Wahl): Erwartungs- und Farb-Raenge einmal gerechnet statt je Team (`baueTopfWahlKontext`). */
+  topfKontext?: TopfWahlKontext;
 }): { gameState: GameState; contract: TeamSponsorContract | null; error?: string } {
   // Audit R2/A2: Server-Guard gegen Re-Sign. Ohne diesen Guard konnte ein zweiter POST /api/sponsor/choose
   // einen bestehenden Vertrag überschreiben (payouts:{} zurückgesetzt) und base_first ERNEUT auszahlen →
@@ -725,6 +735,17 @@ export function chooseSponsorOffer(input: {
   // Danach blieben VORSCHUSS-KARTEN als bewusste Ausnahme stehen; auch die sind jetzt weg. Damit
   // gibt es wieder genau EINEN Zahlungszeitpunkt, und die Anzeige kann gegen keine zweite Buchung
   // driften — die Begruendung steht in sponsor-v3-model.ts.
+  // SPONSOR-TOPF (24.11.): Vertragsart, Laufzeit und Farben haengen am Vertrag. Die Treue zur Marke wird VOR dem Verlaufseintrag gezaehlt.
+  if (sponsorTopfAktiv(nextGameState)) {
+    const fehler = pruefeTopfWahl(input.topf);
+    if (fehler) return { gameState: input.gameState, contract: null, error: fehler };
+    nextGameState = wendeTopfWahlAn(
+      nextGameState,
+      input.teamId,
+      ergaenzeTopfWahl(nextGameState, input.teamId, input.topf, "ki", input.topfKontext),
+      treueSaisonsFuerMarke(input.gameState, input.teamId, offer.sponsorParentBrandId),
+    );
+  }
   nextGameState = appendSponsorBrandHistory(nextGameState, input.teamId, offer.sponsorParentBrandId);
   const updatedContract = getTeamSponsorContract(nextGameState, input.teamId);
   return { gameState: nextGameState, contract: updatedContract };
@@ -1336,6 +1357,8 @@ export function chooseSponsorOfferForAiTeams(
   // Einmal je Liga statt je Kadereintrag: die Academy-Berechtigung unten braucht nur das Rating.
   const ratingByPlayerId = new Map(nextGameState.players.map((player) => [player.id, player.rating]));
 
+  // SPONSOR-TOPF (24.11.): die Raenge fuer die KI-Wahl einmal je Runde (die Teams unterschreiben nacheinander).
+  const topfKontext = sponsorTopfAktiv(nextGameState) ? baueTopfWahlKontext(nextGameState) : undefined;
   for (const team of nextGameState.teams) {
     if (getTeamSponsorContract(nextGameState, team.teamId)) {
       continue;
@@ -1398,8 +1421,13 @@ export function chooseSponsorOfferForAiTeams(
       profile, identity, cashPressure, powerRank, teamId: team.teamId, cash: row?.cash ?? 0, rosterSize, ecoIntent01,
       eigeneFacilityStufen, leihPassung,
     };
+    // SPONSOR-TOPF (24.11.): unter dem Stempel entscheidet zuerst die Passung (Treue zur Marke; die Beliebtheit des Kaders ist fuer alle
+    // Angebote gleich), bei Gleichstand die alte Bewertung. Ohne Topf-Stempel bleibt die alte Reihenfolge bit-gleich.
+    const topfAktiv = sponsorTopfAktiv(nextGameState);
+    const treueVon = (offer: SponsorOffer) => (topfAktiv ? treueSaisonsFuerMarke(nextGameState, team.teamId, offer.sponsorParentBrandId) : 0);
     const bestOffer = [...offers].sort(
       (left, right) =>
+        treueVon(right) - treueVon(left) ||
         scoreOfferForAi({ offer: right, ...scoreArgs }) - scoreOfferForAi({ offer: left, ...scoreArgs }),
     )[0];
     if (!bestOffer) {
@@ -1409,6 +1437,7 @@ export function chooseSponsorOfferForAiTeams(
       gameState: nextGameState,
       teamId: team.teamId,
       offerId: bestOffer.offerId,
+      ...(topfAktiv ? { topf: { von: control?.controlMode === "manual" ? ("delegiert" as const) : ("ki" as const) }, topfKontext } : {}),
     });
     nextGameState = result.gameState;
   }

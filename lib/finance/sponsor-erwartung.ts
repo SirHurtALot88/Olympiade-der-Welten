@@ -14,6 +14,7 @@
 import type { GameState } from "@/lib/data/olyDataTypes";
 import { estimateTeamAnnualRevenue } from "@/lib/finance/loan-service";
 import { getTeamSponsorContract } from "@/lib/sponsor/sponsor-offer-read";
+import { topfPlanungSponsor } from "@/lib/sponsors/sponsor-topf-stichtag";
 import { getSponsorV3Terms } from "@/lib/sponsor/sponsor-v3-offer-service";
 
 /** Gemessene Realisationsquote Auszahlung / Anker (Median ueber 93 Team-Laeufe). */
@@ -25,6 +26,9 @@ export function istSponsorForecastAktiv(): boolean {
 }
 
 export function erwarteterSponsorFuerPlanung(gameState: GameState, teamId: string): number {
+  // SPONSOR-TOPF (24.11.): die Planung rechnet mit der Vorab-Zusage (90 % des vorlaeufigen Grundbetrags, Leistungsteil 0), nach dem Stichtag mit dem Grundbetrag.
+  const topf = topfPlanungSponsor(gameState, teamId);
+  if (topf != null) return topf;
   const vertrag = getTeamSponsorContract(gameState, teamId);
   const anker = getSponsorV3Terms(vertrag)?.anchor;
   if (typeof anker === "number" && Number.isFinite(anker) && anker > 0) {

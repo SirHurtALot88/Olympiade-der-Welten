@@ -21,6 +21,8 @@ import { stempleWirtschaftsRegelnBeimAnlegen } from "@/lib/resolve/wirtschafts-r
 import { startbudgetStaffelFuerNeuesSpiel } from "@/lib/resolve/startbudget-staffel";
 import { stempleWertungsSkalenBeimAnlegen } from "@/lib/resolve/wertungs-skalen";
 import { stempleFormkartenRegelBeimAnlegen } from "@/lib/resolve/formkarten-regel";
+import { stempleSponsorRegelBeimAnlegen } from "@/lib/resolve/sponsor-regel";
+import { stempleVorlaeufig } from "@/lib/sponsors/sponsor-topf-stichtag";
 import { stempleEntwicklungsRegelBeimAnlegen } from "@/lib/resolve/entwicklung-regel";
 import { stempleTrainingsVorliebenBeimAnlegen } from "@/lib/resolve/trainings-vorlieben";
 import { stempleBelastungsRegelBeimAnlegen } from "@/lib/fatigue/belastung-regel-stempel";
@@ -700,7 +702,9 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // workflow / AI autopilot / choose route) happens to generate them. Offer generation is
   // deterministic for a given (season id, teamId), so calling this here is idempotent and
   // safe to run again later (e.g. via ensureSeasonSponsorOffers elsewhere) without reshuffling.
-  const gameStateWithSponsorOffers: GameState = ensureSeasonSponsorOffers(baseGameStateWithSponsorSystem);
+  // SPONSOR-REGEL (24.11., lib/resolve/sponsor-regel.ts): ein neues Battle-Spiel rechnet ab Saison 1 mit dem Liga-Topf (Rueckweg: OLY_SPONSOR_REGEL=aus).
+  // Der Stempel steht VOR der Angebotserzeugung: die KI-Wahl unten haengt Vertragsart, Laufzeit und Farben an den Vertrag.
+  const gameStateWithSponsorOffers: GameState = ensureSeasonSponsorOffers(stempleSponsorRegelBeimAnlegen(baseGameStateWithSponsorSystem));
 
   // AI-/passive Teams signieren ihren Sponsor bereits in Season 1 (bestes Angebot), damit sie — wie das
   // eigene Team — ab S1 einen Vertrag samt sichtbarer Sponsoreinnahmen haben (Finanz-Vergleichstabelle,
@@ -712,7 +716,8 @@ export function buildNewGameStateFromBaseline(input: NewGameSetupInput & { saveI
   // Cash-Gutschrift, die Basisrate wird regulär bei der Saison-Abrechnung fällig.
   // BUDGET-GESPRAECH (23.11.): ab Saison 1 gelten die zwei Toepfe samt Vorstands-Quote. KI-Teams und Menschen mit delegiertem Vorstand
   // fuehren ihr Gespraech sofort (dieselbe Regel wie der Mensch); wer selbst verhandelt, unterschreibt vor dem Draft.
-  const gameState: GameState = fuehreKiBudgetGespraecheAus(chooseSponsorOfferForAiTeams(gameStateWithSponsorOffers));
+  // Vorab-Zusage (flach, solange es keine Kader gibt): die KI-Kaufplanung des Drafts rechnet mit 90 % des vorlaeufigen Grundbetrags.
+  const gameState: GameState = fuehreKiBudgetGespraecheAus(stempleVorlaeufig(chooseSponsorOfferForAiTeams(gameStateWithSponsorOffers)));
 
   const preview: NewGameSetupPreview = {
     mode: "preview",

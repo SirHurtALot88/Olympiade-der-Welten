@@ -181,6 +181,8 @@ export function advanceSponsorContractsForNewSeason(gameState: GameState, nextSe
       seasonsRemaining: newRemaining,
       payouts: {},
       chosenAt: contract.chosenAt,
+      // SPONSOR-TOPF (24.11.): das Vertragsjahr zaehlt weiter (Treuebonus +1 C im zweiten, +2 C im dritten Jahr).
+      ...(contract.sponsorTopf ? { sponsorTopf: { ...contract.sponsorTopf, jahr: Math.min(3, contract.sponsorTopf.jahr + 1) } } : {}),
       ...(rerolledTerms
         ? {
             sponsorV3: rerolledTerms,

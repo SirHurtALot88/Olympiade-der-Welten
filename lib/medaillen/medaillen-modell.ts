@@ -24,6 +24,7 @@ import {
 import { buildSpieltagsUebersicht } from "@/lib/foundation/season-matchday-fixtures-overview";
 import { lesPraemienPlan } from "@/lib/finance/vorstand-praemien";
 import { gueltigerMedaillenStempel, medaillenAktiv } from "@/lib/medaillen/medaillen-regel";
+import { sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
 import type { FarbMeisterZeile, MedaillenVergabe, MedaillenZeile } from "@/lib/medaillen/medaillen-typen";
 
 /** Farb-Meister-Bonus je Liga in C (Variante B des Konzepts: 3,0 / 2,0). */
@@ -79,7 +80,9 @@ export function berechneVergabe(gameState: GameState, m: LeadersModell): Vergabe
   }
 
   // Farb-Meister: je Liga die Summe der Wertung aus den Disziplinen der Farbe; hoechstens zwei Farben je Team (der Rest geht an den Naechsten).
-  for (const liga of [1, 2] as const) {
+  // SPONSOR-TOPF (24.11.): der Farb-Partner IST der Farb-Meister (Konzept 4.5). Unter dem neuen Sponsor-System wird er dort bezahlt und hier nicht
+  // noch einmal; die Medaillen bleiben.
+  for (const liga of sponsorTopfAktiv(gameState) ? [] : ([1, 2] as const)) {
     const teamIds = m.teams.filter((t) => t.liga === liga).map((t) => t.teamId);
     const jeFarbe = LEADERS_ACHSEN.map((farbe) => {
       const summe = new Map<string, number>();

@@ -43,6 +43,7 @@ import {
   resolveMatchdayPreviewToBook,
 } from "@/lib/foundation/matchday-resolve-snapshot";
 import { ensureSeasonApronLinesFrozen } from "@/lib/season/apron-settlement-service";
+import { sichereSponsorTopf } from "@/lib/sponsors/sponsor-topf-stichtag";
 import { bucheSiegpraemien } from "@/lib/finance/vorstand-praemien";
 import { getMatchdayScoringProgress } from "@/lib/season/season-discipline-schedule";
 import {
@@ -914,7 +915,7 @@ export class LegacyMatchdayResultApplyService {
     // das Ergebnis gebucht wird. Ohne das haette ein Spielstand, der zwischen Saisonwechsel und Spieltag 3 nie neu geladen
     // wurde, beim ersten Neuladen "schon gebucht, kein Stempel -> altes Format" angenommen (Rueckfall der Lade-Migration)
     // und die im neuen Format gebuchten Spieltage rueckwirkend auf das alte Format gesetzt. Rein und idempotent.
-    const gameStateMitLinien = stempleAusruestungRegel(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleClimbingFormat(stempleBattlefieldFormat(ensureSeasonApronLinesFrozen(save.gameState)))))));
+    const gameStateMitLinien = stempleAusruestungRegel(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleClimbingFormat(stempleBattlefieldFormat(sichereSponsorTopf(ensureSeasonApronLinesFrozen(save.gameState))))))));
     const seasonState = gameStateMitLinien.seasonState;
     const nextGameStateOhnePraemien = {
       ...gameStateMitLinien,

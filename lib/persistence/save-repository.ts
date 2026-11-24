@@ -34,6 +34,7 @@ import { stelleLaufendeSaisonAufC2Um } from "@/lib/resolve/wertungs-skalen";
 import { stempleClimbingFormat } from "@/lib/resolve/climbing-format";
 import { stempleHockeyTorwart } from "@/lib/resolve/hockey-torwart";
 import { stempleFormkartenRegelNachLaden } from "@/lib/resolve/formkarten-regel";
+import { stempleSponsorRegelNachLaden } from "@/lib/resolve/sponsor-regel";
 import { stempleEntwicklungsRegelNachLaden } from "@/lib/resolve/entwicklung-regel";
 import { stempleTrainingsVorliebenNachLaden } from "@/lib/resolve/trainings-vorlieben";
 import { stempleBasketballPuste } from "@/lib/resolve/basketball-puste";
@@ -1454,10 +1455,11 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   // HOCKEY-TORWART (22.11., lib/resolve/hockey-torwart.ts): gleiches Muster.
   // BASKETBALL-PUSTE (22.11., lib/resolve/basketball-puste.ts): gleiches Muster.
   // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): ohne Stempel rechnet die laufende Saison "alt" zu Ende.
+  // SPONSOR-REGEL (24.11., lib/resolve/sponsor-regel.ts): gleiches Muster -- die laufende Saison rechnet bit-identisch alt zu Ende.
   // BREAKING-FORMAT (22.11., lib/resolve/breaking-format.ts): gleiches Muster.
   // ENTWICKLUNGSREGEL (22.11., lib/resolve/entwicklung-regel.ts): ohne Stempel rechnet die laufende Saison "alt" zu Ende.
   // MARKETING-REGEL und AUSRUESTUNGS-REGEL (22.11.): gleiches Muster (Wechselliste je Saison); Wrapper verkettet.
-  const gameStateWithoutBaseline = migriereSponsorNamen(stempleKreditRegelNachLaden(stempleAusruestungRegel(stempleArenaNachLaden(stempleMedaillenNachLaden(stempleMarketingNachLaden(stempleTrainingsVorliebenNachLaden(stempleEntwicklungsRegelNachLaden(stempleFormkartenRegelNachLaden(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
+  const gameStateWithoutBaseline = migriereSponsorNamen(stempleKreditRegelNachLaden(stempleAusruestungRegel(stempleArenaNachLaden(stempleMedaillenNachLaden(stempleMarketingNachLaden(stempleTrainingsVorliebenNachLaden(stempleEntwicklungsRegelNachLaden(stempleSponsorRegelNachLaden(stempleFormkartenRegelNachLaden(stempleBreakingFormat(stempleBasketballPuste(stempleHockeyTorwart(stempleBattlefieldFormat(stempleClimbingFormat(stelleLaufendeSaisonAufC2Um(withNegotiatedSalaryBenchmark(withNormalizedSeasonDisciplineSchedule(
     withSponsorLadderInLeagueRankSpace(
     withSponsorSalaryFactorOfCurrentSeason(
     withMigratedSponsorLadders(
@@ -1481,7 +1483,7 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
     ),
     ),
     saveId,
-  )))))))))))))))));
+  ))))))))))))))))));
   // SPONSOR-NAMEN (22.11.): gespeicherte Angebots-/Vertrags-/Ereignis-Namen auf die Parodienamen setzen (nur Anzeige, id bleibt).
   mark("legacy normalization done");
   const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {

@@ -14,6 +14,7 @@
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
 import { istJeSpieltagSaison } from "@/lib/finance/finanzen-je-spieltag";
 import type { MedaillenRegelStempel } from "@/lib/medaillen/medaillen-typen";
+import { sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
 
 /**
  * Der Topf-Abzug: 52 C (Medaillen 32 + Farb-Meister 20) von rund 620 C Rangpraemien der Liga (Konzept g.1, Variante B) = 8,4 %.
@@ -87,6 +88,8 @@ export function medaillenAktiv(gameState: MedaillenQuelle): boolean {
 /** Der Faktor auf jede Sponsor-Rangpraemie: 1 ohne Medaillen-Regel, sonst 1 - Topf-Abzug. */
 export function rangPraemieFaktor(gameState: MedaillenQuelle): number {
   if (!medaillenAktiv(gameState)) return 1;
+  // SPONSOR-TOPF (24.11.): unter dem neuen Sponsor-System gibt es keine Rangpraemie zu kuerzen; die Medaillen sind eine Planeinnahme im Topf.
+  if (sponsorTopfAktiv(gameState as Parameters<typeof sponsorTopfAktiv>[0])) return 1;
   const a = gueltigerMedaillenStempel(gameState)?.rangAbzug ?? 0;
   return Math.min(1, Math.max(0, 1 - a));
 }

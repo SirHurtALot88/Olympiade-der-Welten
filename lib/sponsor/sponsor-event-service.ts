@@ -1,3 +1,4 @@
+import { sponsorTopfAktiv } from "@/lib/resolve/sponsor-regel";
 import { randomUUID } from "@/lib/utils/random-id";
 
 import type { GameState, SponsorEventRecord } from "@/lib/data/olyDataTypes";
@@ -27,6 +28,8 @@ function roundCash(value: number) {
  * nicht auf sponsorEvents) — daher keine Doppelzählung.
  */
 export function maybeGenerateSponsorEvents(gameState: GameState, saveId: string): GameState {
+  // SPONSOR-TOPF (24.11.): Wuerfel-Ereignisse entfallen; an ihre Stelle tritt der Sponsorentermin als Entscheidung (lib/sponsors/sponsor-topf-termine.ts).
+  if (sponsorTopfAktiv(gameState)) return gameState;
   const seasonId = gameState.season.id;
   const matchday = gameState.season.currentMatchday;
   const existing = gameState.seasonState.sponsorEvents ?? [];

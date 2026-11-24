@@ -26,6 +26,13 @@ type SponsorChooseBody = {
   termSeasons?: 1 | 2 | 3;
   /** @deprecated Verhandlungs-Achse entfernt. Feld wird bei Alt-Requests ignoriert (kein 400). */
   negotiationProfile?: "safe" | "balanced" | "ambitious";
+  /**
+   * SPONSOR-TOPF (24.11.): Vertragsart, gewaehlte Laufzeit (1 bis 3) und zwei Farb-Partner. Nur unter dem Stempel "topf" wirksam; fehlende
+   * Felder fuellt die KI-Wahl (Mensch ueberschreibt, KI respektiert das). Unter "alt" werden sie ignoriert.
+   */
+  vertragsart?: "fest" | "leistung" | "praemie";
+  laufzeit?: 1 | 2 | 3;
+  farben?: Array<"pow" | "spe" | "men" | "soc">;
   dryRun?: boolean;
   source?: "sqlite" | "prisma";
   roomCode?: string | null;
@@ -121,6 +128,7 @@ export async function POST(request: Request) {
       teamId,
       offerId,
       saveId,
+      topf: { vertragsart: body.vertragsart, laufzeit: body.laufzeit, farben: body.farben, von: "mensch" },
     });
     if (result.error) {
       return NextResponse.json({ success: false, error: result.error, summary: null }, { status: 400 });

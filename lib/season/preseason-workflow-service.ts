@@ -49,6 +49,10 @@ import { refreshTeamObjectiveState } from "@/lib/board/team-season-objectives-se
 import { buildCaptainRecordForPlayer } from "@/lib/morale/team-captain-service";
 import { advanceScoutIntelTick } from "@/lib/scouting/facility-scout-pipeline-service";
 import { advanceSponsorContractsForNewSeason } from "@/lib/sponsor/sponsor-contract-lifecycle";
+import { sponsorRegelFuerSpielmodus } from "@/lib/resolve/sponsor-regel";
+import { stempleVorlaeufig, uebertragFuerSaisonwechsel } from "@/lib/sponsors/sponsor-topf-stichtag";
+import { ueberfuehreAltvertraege } from "@/lib/sponsors/sponsor-topf-wahl";
+
 import { advanceTeamBeliebtheitForSeasonTransition } from "@/lib/economy/team-beliebtheit";
 import {
   buildSponsorChoiceSummary,
@@ -691,6 +695,15 @@ function buildNextSeasonGameState(
     // FORMKARTEN-REGEL (22.11., lib/resolve/formkarten-regel.ts): Plus/Minus-Karten gelten ab der FOLGENDEN Saison;
     // die Kartenwerte werden zum Saisonstart gezogen, die Regel darf deshalb nie mitten in der Saison wechseln.
     formkartenRegel: nextFormkartenRegel,
+    // SPONSOR-REGEL (24.11., lib/resolve/sponsor-regel.ts): gilt ab der FOLGENDEN Saison; der Uebertrag der abgelaufenen Saison und der
+    // Betriebsteil (Bremse) wandern in den Stempel. Ein bestehender Spielstand stellt hier vom alten Sockel-System auf den Liga-Topf um
+    // (laufende Vertraege werden unten ueberfuehrt). Rueckweg OLY_SPONSOR_REGEL=aus.
+    sponsorRegel: sponsorRegelFuerSpielmodus(
+      save.gameState,
+      nextSeasonId,
+      save.gameState.seasonState.sponsorRegel,
+      uebertragFuerSaisonwechsel(save.gameState),
+    ) ?? null,
     // ENTWICKLUNGSREGEL (22.11., lib/resolve/entwicklung-regel.ts): gilt ab der FOLGENDEN Saison; Training je Spieltag und
     // Saisonende-Wirkung muessen in einer Saison dieselbe Regel haben, der Saisonwechsel ist deshalb der einzige Wechselort.
     entwicklungsRegel: entwicklungsRegelFuerSpielmodus(save.gameState, nextSeasonId) ?? null,
@@ -889,7 +902,7 @@ function buildNextSeasonGameState(
     ],
   };
 
-  const nextGameState = transferPipelineFast
+  const nextGameStateOhneVorab = transferPipelineFast
     ? // FAST-Pfad (Sims/Long-Run): die teuren Schritte (Season-End-Progression, FormCards, Sponsor-
       // Angebots-Neugenerierung, Scout-Intel) bleiben übersprungen, ABER die Beliebtheits-KPI-
       // Fortschreibung läuft AUCH hier — sonst friert die Arena-Kopplung (mean-reverting Beliebtheit)
@@ -901,7 +914,7 @@ function buildNextSeasonGameState(
           // Audit R2/V5: die Saison-Grenzen-Resets (trainingMode/Accumulator/Fatigue/Moral) laufen auch im
           // FAST-Pfad — sonst startet der Sim-/Long-Run mit stale Vorsaison-Fatigue + Accumulator und driftet
           // gegenüber dem Normalpfad, der diese Resets über applySeasonBaselineProgression erhält.
-          nextGameState: advanceSponsorContractsForNewSeason(
+          nextGameState: rolleSponsorVertraegeZumSaisonwechsel(
             applySeasonBoundaryPlayerResets(baseGameState),
             nextSeasonId,
           ),
@@ -916,7 +929,7 @@ function buildNextSeasonGameState(
             regenerateSponsorOffersForSeason(
               advanceTeamBeliebtheitForSeasonTransition({
                 completedGameState: save.gameState,
-                nextGameState: advanceSponsorContractsForNewSeason(
+                nextGameState: rolleSponsorVertraegeZumSaisonwechsel(
                   applySeasonBaselineProgression(baseGameState, { completedSeasonId: save.gameState.season.id }),
                   nextSeasonId,
                 ),
@@ -926,6 +939,9 @@ function buildNextSeasonGameState(
           phase: "preseason",
         }),
       );
+
+  // SPONSOR-TOPF (24.11.): die Vorab-Zusage wird NACH der Sponsorwahl gerechnet (die Passung kennt die unterschriebenen Vertraege).
+  const nextGameState = stempleVorlaeufig(nextGameStateOhneVorab);
 
   // Apron-Linien werden hier BEWUSST NICHT MEHR eingefroren. Ein frueherer Stand tat es und
   // begruendete das mit "das Transferfenster ist zu diesem Zeitpunkt bereits durchlaufen" — das war
@@ -940,6 +956,11 @@ function buildNextSeasonGameState(
     auditLog,
     gameState: nextGameState,
   };
+}
+
+/** Vertraege zum Saisonwechsel rollen und unter dem Topf-Stempel die laufenden Altvertraege ueberfuehren (Konzept 6). */
+function rolleSponsorVertraegeZumSaisonwechsel(gameState: GameState, nextSeasonId: string): GameState {
+  return ueberfuehreAltvertraege(advanceSponsorContractsForNewSeason(gameState, nextSeasonId));
 }
 
 function applyFormCardPenaltyToStandings(save: PersistedSaveGame): { save: PersistedSaveGame; warnings: string[] } {
