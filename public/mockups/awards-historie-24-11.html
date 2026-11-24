@@ -9,6 +9,9 @@
   RUNDE 2 (24.11.): Spieler-Awards und Team-Auszeichnungen sind getrennte Kataloge; Farb-Awards zaehlen die PP in den fuenf Disziplinen
   der Farbe; Spieler des Spieltags ist ein Zaehler (Tagesbester, Teambester); der Schrank heisst Achievements (eine Ansicht je Spieler);
   Medaillen je Disziplin als feste 20-Zeilen-Tabelle (skaliert ueber beliebig viele Saisons); Team-Historie mit Punkten nach Farbe.
+  RUNDE 3 (24.11.): neue Ansicht ?ansicht=disziplinen = Medaillenspiegel je Disziplin ueber alle Saisons. Liga 1 und Liga 2 getrennt gezaehlt,
+  Liga-2-Medaillen mit dem Zeichen II (CSS-Marke auf dem vorhandenen Emblem, keine neue Generation), dazu gewichtete Punkte
+  (Liga 1 Gold 10 / Silber 6 / Bronze 2, Liga 2 halb = 5 / 3 / 1). ?dis=<slug>|alle waehlt die Disziplin.
   Sechs Ansichten: Spieler-Awards, Team-Awards, Achievements im Spielerprofil, Medaillen und Medaillenspiegel im Teamprofil,
   Team-Historie (je Liga getrennt), Spieler-Historie (ohne Liga-Trennung). Fuehrt historie-modern-18-11.html weiter.
   ECHT (Live-Abbild 24.11., Saison 1, 11 Spieltage gewertet; modern-24-11/daten.js): Teams, Liga, Tabelle, Punkte, Kasse, Kaderwert,
@@ -16,7 +19,7 @@
   BEISPIEL (im UI markiert): alle abgeschlossenen Saisons (der Live-Stand steht in Saison 1), Gebaeudewert, Entwicklung (OVR),
         Spieler des Spieltags, Aufteilung der Spieler-PP nach Farbe (nur die drei besten Disziplinen je Spieler sind echt). Mit ?saisons=1 zeigt die Seite nur, was heute echt da ist.
   Embleme: public/sprites/awards/ (PixelLab, 14 + 7 Generationen; Silber und Bronze lokal umgefaerbt), Herkunft in quellen.json.
-  URL: ?ansicht=katalog|teamawards|achievements|medaillen|teams|spieler  ?saisons=10|1  ?spann=5|alle  ?zu=1  ?zeig=<Team>|<Saison>  ?liga=1|2  ?team=D-P|…  ?spieler=<slug>
+  URL: ?ansicht=katalog|teamawards|achievements|medaillen|disziplinen|teams|spieler  ?dis=<slug>|alle  ?saisons=10|1  ?spann=5|alle  ?zu=1  ?zeig=<Team>|<Saison>  ?liga=1|2  ?team=D-P|…  ?spieler=<slug>
        ?zeit=alle|saison  ?farbe=0..3  ?kader=1  ?sort=<spalte>&dir=-1|1  ?still=1
 -->
 <link rel="stylesheet" href="modern-24-11/rahmen.css">
@@ -188,6 +191,61 @@ svg.spark{width:100%;height:1.5rem;display:block;overflow:visible}
 #pop h5{margin:0;font:400 1.1rem/1.1 var(--haus);color:#fff} #pop small{display:block;font-size:.76rem;color:var(--leise);margin:.1rem 0 .35rem} #pop small.fu{margin:.35rem 0 0;color:var(--stumm);font-size:.68rem}
 #pop div{display:grid;grid-template-columns:3.6rem minmax(0,1fr) 2.6rem 2.4rem;gap:.4rem;align-items:center;font-size:.9rem;line-height:1.5} #pop div span{font-weight:700}
 #pop div i{display:block;height:.5rem;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden} #pop div u{display:block;height:100%} #pop div b{text-align:right;color:var(--creme)} #pop div em{font-style:normal;text-align:right;color:var(--stumm);font-size:.78rem}
+
+/* ---------- Runde 3: Medaillenspiegel je Disziplin ---------- */
+.seite.dis{grid-template-columns:minmax(0,1fr) 31rem;grid-template-rows:auto auto minmax(0,1fr)}
+.seite.dis>.dpick{grid-column:1/-1} .seite.dis>.spalte{grid-column:2;grid-row:2/4} .seite.dis>.haupt{grid-column:1;grid-row:3} .seite.dis>.haupt.voll{grid-row:2/4}
+.dpick{display:grid;grid-template-columns:8.6rem repeat(10,minmax(0,1fr));grid-template-rows:2.05rem 2.05rem;gap:.3rem;padding:.4rem .5rem}
+.dp{display:flex;align-items:center;gap:.4rem;min-width:0;padding:0 .5rem;border:1px solid var(--linie);border-left:.2rem solid var(--stumm);border-radius:.3rem;background:var(--flaeche-2);cursor:pointer;white-space:nowrap;overflow:hidden}
+.dp b{font:400 .98rem/1.15 var(--haus);color:var(--tinte);overflow:hidden;text-overflow:ellipsis} .dp img.dic{width:1.3rem;height:1.3rem}
+.dp:hover{border-color:var(--linie-2)} .dp.an{background:linear-gradient(90deg,rgba(240,195,90,.32),rgba(240,195,90,.08));border-color:var(--gold)} .dp.an b{color:#fff}
+.dp.a0{border-left-color:var(--pow)} .dp.a1{border-left-color:var(--spe)} .dp.a2{border-left-color:var(--men)} .dp.a3{border-left-color:var(--soc)}
+.dp.alle{grid-row:1/3;flex-direction:column;justify-content:center;align-items:flex-start;gap:.2rem;border-left-color:var(--gold)} .dp.alle b{font-size:1.15rem} .dp.alle small{font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--leise);font-weight:600}
+.e2{position:relative;display:inline-flex;flex:none;font-size:1rem;line-height:1}
+.e2>i{position:absolute;right:-.25em;bottom:-.12em;font:700 .68em/1 var(--zahl);font-style:normal;letter-spacing:.04em;padding:.1em .22em .06em;border-radius:.2em;background:#0a1320;color:var(--gast);border:1px solid var(--gast)}
+.gsb.l2::before{content:"II";font:700 .62rem/1 var(--zahl);color:var(--gast);border:1px solid var(--gast);border-radius:.15rem;padding:.08rem .16rem .04rem;align-self:center;margin-right:.1rem}
+.rek{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.72rem;min-width:0;grid-column:1;grid-row:2}
+.rk{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.5rem .7rem .5rem .55rem;background:var(--flaeche-1);border:1px solid var(--linie);border-top:.18rem solid var(--gold);border-radius:var(--r);min-width:0;overflow:hidden}
+.rk.l2{border-top-color:var(--gast)} .rk.neu{border-top-color:var(--linie-2)}
+.rk img.emb{width:2.8rem;height:2.8rem} .rk .e2{font-size:1.3rem}
+.rk .sig{width:2.8rem;height:2.8rem;display:grid;place-items:center;border:1px solid var(--linie-2);border-radius:50%;font:700 1.6rem/1 var(--zahl);color:var(--gold);flex:none}
+.rk .tx{min-width:0;line-height:1.1} .rk .tx small{display:block;font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:var(--leise);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk .tx h4{margin:.18rem 0 .12rem;display:flex;align-items:center;gap:.4rem;font:400 1.06rem/1.15 var(--haus);color:#fff;white-space:nowrap;min-width:0} .rk .tx h4 span{overflow:hidden;text-overflow:ellipsis} .rk .tx h4 img.wap{width:1.5rem;height:1.5rem}
+.rk .tx em{display:block;font-style:normal;font-size:.78rem;color:var(--leise);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk strong{font-size:1.9rem;line-height:1;font-weight:700;color:var(--creme);white-space:nowrap} .rk strong{text-align:right} .rk strong small{display:block;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--leise);font-weight:600;margin-top:.1rem}
+.seite.dis .haupt .tf{grid-template-rows:2.9rem repeat(var(--zeilen),minmax(0,1fr))}
+.seite.dis .haupt .tz.kopf{align-items:end;padding-bottom:.35rem}
+.tz.kopf span.bk{position:relative;overflow:visible}
+.tz.kopf span.bk em{position:absolute;left:50%;bottom:1.1rem;transform:translateX(-50%);width:10rem;text-align:center;font-style:normal;color:var(--gold);border-bottom:2px solid var(--gold);padding-bottom:.14rem;letter-spacing:.16em;pointer-events:none}
+.tz.kopf span.bk.l2 em{color:var(--gast);border-color:var(--gast)}
+.tz>span.b1,.tz>span.b2{align-self:stretch;--bt:rgba(240,195,90,.055);background:var(--bt);box-shadow:.25rem 0 0 var(--bt),-.25rem 0 0 var(--bt)} .tz>span.b2{--bt:rgba(69,176,201,.075)}
+.szl{font-weight:700} .szl i{font-style:normal;color:var(--stumm);font-weight:500;margin:0 .15rem} .szl b.zw{color:var(--gast)} .szl b.n0{color:var(--stumm);font-weight:500}
+.lm{display:flex;align-items:center;gap:.45rem;min-width:0} .lm img.emb{width:1.6rem;height:1.6rem} .lm .e2{font-size:.9rem} .lm b{font-weight:700} .lm small{font-size:.74rem;color:var(--leise);font-weight:600} .lm small.zw{color:var(--gast)}
+.kr{display:inline-flex;align-items:baseline;gap:.25rem} .kr small{font-size:.68rem;color:var(--stumm);font-weight:700} .kr small.zw{color:var(--gast)}
+.st2{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;grid-template-rows:1fr 1fr;gap:2px;width:100%;height:1.3rem}
+.st2 i,.leg i.s2{border-radius:2px;min-width:2px} .st2 i.da{background:rgba(255,255,255,.11)} .st2 i.zw.da,.leg i.s2.zw{background:rgba(69,176,201,.3)}
+.st2 i.m0,.st2 i.zw.m0{background:var(--gold)} .st2 i.m1,.st2 i.zw.m1{background:var(--silber)} .st2 i.m2,.st2 i.zw.m2{background:var(--bronze)} .st2 i.zw.m0,.st2 i.zw.m1,.st2 i.zw.m2{box-shadow:inset 0 -2px 0 var(--gast)}
+.st2 i.lauf{opacity:.55;outline:1px dashed rgba(98,211,148,.9)}
+.leg i.s2{transform:none;background:rgba(255,255,255,.16)}
+.rh{display:flex;align-items:center;gap:.45rem;min-width:0;width:100%} .rh img.wap{width:1.7rem;height:1.7rem} .rh b.nm{font:400 .98rem/1.15 var(--haus);color:#fff;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.rh .glz{font-size:.68rem;font-weight:700;color:var(--stumm);border:1px dashed var(--linie-2);border-radius:.2rem;padding:0 .22rem;flex:none} .rh b.pz{font-size:1.1rem;color:var(--creme);flex:none} .rh small.ser{font-size:.76rem;color:var(--leise);font-weight:600;flex:none}
+.zwl{display:inline-flex;gap:.45rem;align-items:center} .zwl img.wap{width:1.6rem;height:1.6rem} .zwl .e2{font-size:.8rem}
+.sl3{display:grid;grid-template-rows:1.5rem repeat(var(--n),minmax(0,1fr));flex:1;min-height:0}
+.sl3>div{display:grid;grid-template-columns:3.4rem 1fr 1fr;gap:.6rem;align-items:center;border-top:1px solid rgba(244,230,196,.07);min-height:0;height:100%}
+.sl3>div.k{border-top:0;font-size:.64rem;letter-spacing:.11em;text-transform:uppercase;color:var(--stumm);font-weight:600;text-align:center} .sl3>div.k b{font-weight:700;color:var(--gold)} .sl3>div.k b.zw{color:var(--gast)}
+.sl3>div>b{font-size:1.05rem;color:var(--creme);display:flex;flex-direction:column;line-height:1.05;align-items:flex-start} .sl3 .lf{font-size:.52rem}
+.sl3 .tri{display:flex;gap:.45rem;justify-content:center;align-items:center;height:100%;min-height:0}
+.sl3 .tri img.wap{width:auto;height:74%;max-height:2.3rem;aspect-ratio:1;border:0;border-bottom:.2rem solid var(--stumm)} .sl3 .tri img.m0{border-color:var(--gold)} .sl3 .tri img.m1{border-color:var(--silber)} .sl3 .tri img.m2{border-color:var(--bronze)}
+.sl3 .tri img.ich{outline:2px solid var(--heim);outline-offset:1px} .sl3 .lauf .tri img{opacity:.55}
+.gwp{gap:.5rem;padding:.6rem .8rem .65rem}
+.gwt{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:.35rem .5rem;align-items:center;flex:none}
+.gwt b.lg{font:700 .74rem/1 var(--zahl);letter-spacing:.12em;text-transform:uppercase;color:var(--gold);white-space:nowrap} .gwt b.lg.l2{color:var(--gast)}
+.gwt span{display:flex;align-items:center;gap:.35rem;padding:.15rem .55rem .15rem .3rem;border:1px solid var(--linie);border-radius:.35rem;background:var(--flaeche-2);min-width:0} .gwt span img.emb{width:1.9rem;height:1.9rem} .gwt span .e2{font-size:.95rem}
+.gwt span small{font-size:.7rem;color:var(--leise);font-weight:600;overflow:hidden;text-overflow:ellipsis} .gwt span strong{font-size:1.35rem;line-height:1;margin-left:auto}
+.gwp .hin{margin:0}
+.gtab .tz .nm b{font-size:.9rem} .gtab .gsb{gap:.35rem;font-size:.96rem} .gtab .tz{gap:.4rem;padding-right:.6rem}
+.haupt .tz .nm b{white-space:nowrap}
+a.dz{cursor:pointer} a.dz:hover b{color:var(--gold)} a.dz u{text-decoration:none;color:var(--stumm);font-weight:700;margin-left:auto;padding-right:.3rem}
 </style>
 </head>
 <body>
@@ -201,7 +259,7 @@ var BSP=q.get("saisons")!=="1",NS=BSP?10:1,AKT=NS;
 var ALT={schrank:"achievements",teamkatalog:"teamawards"};
 var Z={ans:ALT[q.get("ansicht")]||q.get("ansicht")||"katalog",liga:+q.get("liga")||ICH.liga,team:TC[q.get("team")]||ICH,sort:q.get("sort"),dir:+q.get("dir")||-1,blatt:0,
   zeit:q.get("zeit")||(BSP?"alle":"saison"),farbe:q.get("farbe")==null?-1:+q.get("farbe"),kader:q.get("kader")==="1",
-  spann:q.get("spann")==="alle"?"alle":"5",offen:q.get("zu")!=="1",dsort:"d",ddir:1};
+  spann:q.get("spann")==="alle"?"alle":"5",offen:q.get("zu")!=="1",dsort:"d",ddir:1,dis:-1,disSlug:q.get("dis"),gsort:"r",gdir:1,gblatt:0};
 var STN=["Gold","Silber","Bronze"],STD=["gold","silber","bronze"];
 var FWORT=["rot","grün","blau","gelb"],FWORTN=["roten","grünen","blauen","gelben"];
 function emb(k,st,tip){return '<img class="emb" src="../sprites/awards/'+k+'-'+STD[st]+'.png" alt=""'+(tip?' title="'+esc(tip)+'"':"")+'>'}
@@ -374,11 +432,11 @@ var HELD=ALLE[q.get("spieler")]||(BSP?AKTIV.slice().sort(function(a,b){return b.
 if(!HELD.h)HELD=AKTIV[0];
 
 /* ============================== Rahmen ============================== */
-var ANS=[["katalog","Spieler-Awards","Spieler-Awards (Katalog)"],["teamawards","Team-Awards","Team-Auszeichnungen (Katalog)"],["achievements","Achievements","Achievements (Spielerprofil)"],["medaillen","Medaillen","Medaillen (Teamprofil)"],["teams","Teams","Team-Historie"],["spieler","Spieler","Spieler-Historie"]];
-RAHMEN.bau({seite:"historie",demoTitel:"Mockup 24.11. · Awards & Historie · Runde 2",demo:'<span>Ansicht</span><span id="d-ans"></span><i class="tr"></i><span>Daten</span><span id="d-dat"></span>',demoHinweis:"Abgeschlossene Saisons sind Beispiel."});
-$("buehne").innerHTML=ANS.map(function(a){return '<div class="seite '+({katalog:"kat",teamawards:"tka",achievements:"sch",medaillen:"med",teams:"his",spieler:"his"})[a[0]]+'" id="s-'+a[0]+'"></div>'}).join("");
+var ANS=[["katalog","Spieler-Awards","Spieler-Awards (Katalog)"],["teamawards","Team-Awards","Team-Auszeichnungen (Katalog)"],["achievements","Achievements","Achievements (Spielerprofil)"],["medaillen","Medaillen","Medaillen (Teamprofil)"],["disziplinen","Disziplinen","Medaillenspiegel je Disziplin"],["teams","Teams","Team-Historie"],["spieler","Spieler","Spieler-Historie"]];
+RAHMEN.bau({seite:"historie",demoTitel:"Mockup 24.11. · Awards & Historie · Runde 3",demo:'<span>Ansicht</span><span id="d-ans"></span><i class="tr"></i><span>Daten</span><span id="d-dat"></span>',demoHinweis:"Abgeschlossene Saisons sind Beispiel."});
+$("buehne").innerHTML=ANS.map(function(a){return '<div class="seite '+({katalog:"kat",teamawards:"tka",achievements:"sch",medaillen:"med",disziplinen:"dis",teams:"his",spieler:"his"})[a[0]]+'" id="s-'+a[0]+'"></div>'}).join("");
 /* Reiter je Zusammenhang: Spieler-Awards und Team-Awards stehen nie in einem Katalog (Chris 24.11.) */
-var GRUPPE={katalog:["katalog","spieler","achievements"],achievements:["achievements","katalog","spieler"],spieler:["spieler","katalog","achievements"],teamawards:["teamawards","medaillen","teams"],medaillen:["medaillen","teamawards","teams"],teams:["teams","medaillen","teamawards"]};
+var GRUPPE={katalog:["katalog","spieler","achievements"],achievements:["achievements","katalog","spieler"],spieler:["spieler","katalog","achievements"],teamawards:["teamawards","medaillen","disziplinen","teams"],medaillen:["medaillen","teamawards","disziplinen","teams"],disziplinen:["disziplinen","medaillen","teamawards","teams"],teams:["teams","medaillen","disziplinen","teamawards"]};
 function reiter(){var g=GRUPPE[Z.ans].slice().sort(function(a,b){return ANS.findIndex(function(x){return x[0]===a})-ANS.findIndex(function(x){return x[0]===b})});
   return g.map(function(k){var a=ANS.filter(function(x){return x[0]===k})[0];return '<a class="'+(Z.ans===k?"an":"")+'" href="'+RAHMEN.link({ansicht:k,sort:null,dir:null})+'">'+a[1]+'</a>'}).join("")}
 function ligaUm(){return '<span class="umsch">'+[1,2].map(function(l){return '<a class="'+(Z.liga===l?"an":"")+'" data-liga="'+l+'">Liga '+l+'</a>'}).join("")+'</span>'}
@@ -477,7 +535,7 @@ function medaillen(){var T=Z.team,l=Z.liga,alle=Z.zeit==="alle";
   function platz(d,s){return TM[s][T.h[s].liga][d].indexOf(T)}
   var drows=DN.map(function(_,d){var m=[0,0,0];for(var s=1;s<AKT;s++){var i=platz(d,s);if(i>=0)m[i]++}return {d:d,n:DN[d][0],m:m,sum:m[0]+m[1]+m[2],k:medRang(T,d)}});
   var dtf=tafel({sort:Z.dsort,dir:Z.ddir,rows:drows,zeilen:20,cols:[
-    {k:"d",t:"Disziplin",w:"minmax(0,1fr)",wert:function(x){return x.d},html:function(x){return '<span class="dz a'+DA[x.d]+'">'+dIcon(x.d)+'<b>'+x.n+'</b><small class="c'+DA[x.d]+'">'+AX[DA[x.d]]+'</small></span>'}},
+    {k:"d",t:"Disziplin",w:"minmax(0,1fr)",wert:function(x){return x.d},html:function(x){return '<a class="dz a'+DA[x.d]+'" href="'+RAHMEN.link({ansicht:"disziplinen",dis:DN[x.d][1],sort:null,dir:null})+'" title="Medaillenspiegel dieser Disziplin über alle Teams öffnen">'+dIcon(x.d)+'<b>'+x.n+'</b><small class="c'+DA[x.d]+'">'+AX[DA[x.d]]+'</small><u>›</u></a>'}},
     {k:"g",t:"Gold",w:"2.8rem",r:1,wert:function(x){return x.m[0]},html:function(x){return '<b class="zn g0 t'+(x.m[0]?"":" n0")+'">'+x.m[0]+'</b>'}},
     {k:"s",t:"Silber",w:"2.9rem",r:1,wert:function(x){return x.m[1]},html:function(x){return '<b class="zn g1 t'+(x.m[1]?"":" n0")+'">'+x.m[1]+'</b>'}},
     {k:"b",t:"Bronze",w:"3.1rem",r:1,wert:function(x){return x.m[2]},html:function(x){return '<b class="zn g2 t'+(x.m[2]?"":" n0")+'">'+x.m[2]+'</b>'}},
@@ -505,7 +563,110 @@ function medaillen(){var T=Z.team,l=Z.liga,alle=Z.zeit==="alle";
     '<div class="pan rechtsp"><div class="pk"><h2>Medaillenspiegel</h2>'+(alle&&BSP?bsp():"")+'<span class="sp"></span><span class="umsch"><a class="'+(alle?"":"an")+'" data-zeit="saison">Saison '+AKT+' · Kurs</a><a class="'+(alle?"an":"")+'" data-zeit="alle">Alle Saisons</a></span>'+ligaUm()+'</div>'+tf.html+
       '<div class="tfuss"><span>Gold vor Silber vor Bronze. Gezählt werden nur Medaillen aus Saisons in <b>Liga '+l+'</b>.</span><span class="sp"></span><span>Klick wählt das Team</span></div></div>'+
     '<div class="pan dtab"><div class="pk"><h2>Medaillen je Disziplin</h2>'+(BSP?bsp("S1–S"+(AKT-1)+" Beispiel"):"")+'<span class="sp"></span><small class="u">20 Zeilen, egal wie viele Saisons · Zähler über alle · '+sn(AKT)+' = echter Kurs</small></div>'+dtf.html+
-      '<div class="tfuss"><span class="leg"><span><i class="m0"></i>Gold</span><span><i class="m1"></i>Silber</span><span><i class="m2"></i>Bronze</span><span><i class="mx"></i>keine</span><span><i class="mand"></i>Saison in der anderen Liga</span></span><span class="sp"></span><span>Spalten sortierbar</span></div></div>'}
+      '<div class="tfuss"><span class="leg"><span><i class="m0"></i>Gold</span><span><i class="m1"></i>Silber</span><span><i class="m2"></i>Bronze</span><span><i class="mx"></i>keine</span><span><i class="mand"></i>Saison in der anderen Liga</span></span><span class="sp"></span><span>Klick auf eine Disziplin: alle Teams</span><span>Spalten sortierbar</span></div></div>'}
+
+/* ============================== 4b. Medaillenspiegel je Disziplin (Runde 3, Chris 24.11.) ============================== */
+/* Liga 1 und Liga 2 werden getrennt gezaehlt. Die gewichteten Punkte ordnen nur diese Tabellen; Geld und Moral der Medaille bleiben je Liga gleich.
+   Gewichtung (Vorschlag): Liga 1 Gold 10 / Silber 6 / Bronze 2, Liga 2 die Haelfte = 5 / 3 / 1 (Chris' 5/3/1 und halbe Liga 2, mal zwei, damit keine Kommazahlen stehen). */
+var GEW={1:[10,6,2],2:[5,3,1]};
+var DSLUG={};DN.forEach(function(x,d){DSLUG[x[1]]=d});
+function medE(l,st,tip){return l===2?'<span class="e2"'+(tip?' title="'+esc(tip)+'"':"")+'>'+emb("medaille",st)+'<i>II</i></span>':emb("medaille",st,tip)}
+function gsbL(a,l){return gsb(a).replace('class="gsb"','class="gsb'+(l===2?" l2":"")+'"')}
+function abS(T,l){return saisons(T,l).filter(function(s){return !T.h[s].lauf}).length}
+/* Standard-Reihenfolge: Gold, Silber, Bronze der Liga 1, dann Gold, Silber, Bronze der Liga 2 */
+function cmpL(a,b){for(var l=1;l<=2;l++)for(var i=0;i<3;i++)if(a.m[l][i]!==b.m[l][i])return b.m[l][i]-a.m[l][i];return b.pkt-a.pkt||(a.n<b.n?-1:1)}
+function pktTip(b){return "Liga 1: "+b.m[1].map(function(v,i){return v+" × "+GEW[1][i]}).join(" + ")+" · Liga 2: "+b.m[2].map(function(v,i){return v+" × "+GEW[2][i]}).join(" + ")+" = "+b.pkt+" Punkte"}
+function neuB(T){return {T:T,n:T.n,m:{1:[0,0,0],2:[0,0,0]},pkt:0,letzte:null,sz1:abS(T,1),sz2:abS(T,2)}}
+var GB={};TEAMS.forEach(function(T){GB[T.c]=neuB(T)});
+var DB=DN.map(function(_,d){var M={},o={d:d,n:DN[d][0],serie:null};
+  for(var s=1;s<AKT;s++)[1,2].forEach(function(l){TM[s][l][d].forEach(function(T,i){var b=M[T.c]||(M[T.c]=neuB(T)),g=GB[T.c];b.m[l][i]++;b.pkt+=GEW[l][i];b.letzte={s:s,l:l,i:i};g.m[l][i]++;g.pkt+=GEW[l][i];g.letzte=s})});
+  /* laengste Gold-Serie: aufeinanderfolgende Saisons mit Gold in derselben Liga */
+  [1,2].forEach(function(l){var run=0,vor=null;for(var s=1;s<AKT;s++){var g=TM[s][l][d][0];run=g===vor?run+1:1;vor=g;if(!o.serie||run>o.serie.n||(run===o.serie.n&&l===o.serie.l))o.serie={T:g,n:run,a:s-run+1,b:s,l:l}}});
+  if(!BSP)[1,2].forEach(function(l){MED[l][d].slice(0,3).forEach(function(x){M[x[0]]=M[x[0]]||neuB(TC[x[0]])})});
+  o.rows=Object.keys(M).map(function(c){var b=M[c];b.k=medRang(b.T,d);return b}).sort(cmpL);o.rows.forEach(function(b,i){b.r=i+1});
+  function rek(l){var a=o.rows.filter(function(b){return b.m[l][0]>0}).sort(function(x,y){return y.m[l][0]-x.m[l][0]||y.m[l][1]-x.m[l][1]||y.m[l][2]-x.m[l][2]||(x.n<y.n?-1:1)});
+    return a[0]?{b:a[0],gleich:a.filter(function(x){return x.m[l][0]===a[0].m[l][0]}).length}:null}
+  o.rek={1:rek(1),2:rek(2)};o.top=o.rows.slice().sort(function(x,y){return y.pkt-x.pkt||cmpL(x,y)})[0];if(o.top&&!o.top.pkt)o.top=null;
+  o.gold={};o.kurs={};[1,2].forEach(function(l){o.gold[l]=AKT>1?TM[AKT-1][l][d][0]:null;o.kurs[l]=MED[l][d][0]?TC[MED[l][d][0][0]]:null});
+  o.mit=o.rows.filter(function(b){return b.pkt>0}).length;return o});
+if(Z.disSlug&&DSLUG[Z.disSlug]!=null)Z.dis=DSLUG[Z.disSlug];
+var GROWS=TEAMS.map(function(T){return GB[T.c]}).sort(cmpL);GROWS.forEach(function(b,i){b.r=i+1});
+function disziplinen(){var d=Z.dis,T=Z.team,ab=AKT-1;
+  var pick='<div class="pan dpick"><a class="dp alle'+(d<0?" an":"")+'" data-dis="-1"><b>Übersicht</b><small>alle 20 · Rekordhalter</small></a>'+
+    [0,1,2,3].map(function(f){return DF[f].map(function(x){return '<a class="dp a'+f+(x===d?" an":"")+'" data-dis="'+x+'" title="'+esc(DN[x][0]+" · "+AXN[f])+'">'+dIcon(x)+'<b>'+DN[x][0]+'</b></a>'}).join("")}).join("")+'</div>';
+  var gewTip="Gewichtete Punkte: Liga 1 Gold "+GEW[1][0]+", Silber "+GEW[1][1]+", Bronze "+GEW[1][2]+" · Liga 2 Gold "+GEW[2][0]+", Silber "+GEW[2][1]+", Bronze "+GEW[2][2]+". Nur für diesen Vergleich.";
+  var gewp='<div class="pan" style="flex:none"><div class="pk"><h2>Gewichtete Punkte</h2><span class="sp"></span><small class="u">Vorschlag · nur für diesen Vergleich</small></div><div class="pb gwp">'+
+    '<div class="gwt">'+[1,2].map(function(l){return '<b class="lg l'+l+'">Liga '+l+'</b>'+[0,1,2].map(function(i){return '<span>'+medE(l,i)+'<small>'+STN[i]+'</small><strong class="t g'+i+'">'+GEW[l][i]+'</strong></span>'}).join("")}).join("")+'</div>'+
+    '<p class="hin">Eine Medaille aus <b>Liga 2 zählt halb</b> und trägt das Zeichen <b style="color:var(--gast)">II</b>. Die Punkte ordnen nur diese Tabellen: <b>Geld und Moral</b> einer Medaille bleiben je Liga gleich wie heute.</p></div></div>';
+  var kpiG=RAHMEN.kpi("Gewichtung",GEW[1].join(" · "),"Liga 2: "+GEW[2].join(" · "));
+  function ich(b){return "klick"+(b.T===T?" an":"")+(b.T===ICH&&b.T!==T?" ich":"")}
+  if(d<0){
+    RAHMEN.kopf('Welt <span>›</span> Leaders <span>›</span> Medaillenspiegel je Disziplin',"Disziplinen",reiter(),
+      RAHMEN.kpi("Disziplinen",20,"je Liga ein Medaillensatz","zone")+RAHMEN.kpi("Medaillen vergeben",ab*120,ab+(ab===1?" Saison":" Saisons")+" × 2 Ligen")+kpiG);
+    var halter=function(l){return function(o){var r=o.rek[l];if(!r)return '<span class="zu">noch offen</span>';
+      return '<span class="rh">'+logo(r.b.T.c)+'<b class="nm">'+r.b.T.n+'</b>'+(r.gleich>1?'<small class="glz" title="'+r.gleich+' Teams haben gleich viel Gold. Silber, dann Bronze entscheiden.">='+r.gleich+'</small>':"")+gsbL(r.b.m[l],l)+'</span>'}};
+    var zwei=function(a,tip){return a[1]||a[2]?'<span class="zwl">'+[1,2].map(function(l){var X=a[l];if(!X)return "";var im=logo(X.c).replace("<img",'<img title="'+esc("Liga "+l+" · "+X.n+tip)+'"');return l===2?'<span class="e2">'+im+'<i>II</i></span>':im}).join("")+'</span>':'<span class="zu">–</span>'};
+    var tf=tafel({sort:Z.sort||"d",dir:Z.sort?Z.dir:1,rows:DB,zeilen:20,cols:[
+      {k:"d",t:"Disziplin",w:"12rem",wert:function(o){return o.d},html:function(o){return '<span class="dz a'+DA[o.d]+'">'+dIcon(o.d)+'<b>'+o.n+'</b><small class="c'+DA[o.d]+'">'+AX[DA[o.d]]+'</small></span>'}},
+      {k:"r1",t:"Meiste Gold · Liga 1",w:"minmax(0,1fr)",tip:"Rekordhalter: das Team mit den meisten Goldmedaillen in Liga 1, daneben sein Gold, Silber, Bronze dort",wert:function(o){return o.rek[1]?o.rek[1].b.m[1][0]:-1},html:halter(1)},
+      {k:"r2",t:"Meiste Gold · Liga 2",w:"minmax(0,1fr)",tip:"Rekordhalter: das Team mit den meisten Goldmedaillen in Liga 2",wert:function(o){return o.rek[2]?o.rek[2].b.m[2][0]:-1},html:halter(2)},
+      {k:"pk",t:"Meiste Punkte",w:"5.6rem",tip:"Das Team mit den meisten gewichteten Punkten in dieser Disziplin. "+gewTip,wert:function(o){return o.top?o.top.pkt:-1},html:function(o){var b=o.top;return b?'<span class="rh" title="'+esc(b.T.n+" · "+pktTip(b))+'">'+logo(b.T.c)+'<b class="pz t">'+b.pkt+'</b></span>':'<span class="zu">offen</span>'}},
+      {k:"se",t:"Längste Gold-Serie",w:"10.4rem",tip:"Aufeinanderfolgende Saisons mit Gold in derselben Liga",wert:function(o){return o.serie?o.serie.n:0},html:function(o){var s=o.serie;return s&&s.n>1?'<span class="rh">'+logo(s.T.c)+'<b class="pz t">'+s.n+'×</b><small class="ser">'+sn(s.a)+'–'+sn(s.b)+' · <i style="font-style:normal'+(s.l===2?";color:var(--gast)":"")+'">Liga '+s.l+'</i></small></span>':'<span class="zu">'+(s?"keine Serie":"offen")+'</span>'}},
+      {k:"ti",t:AKT>1?"Gold "+sn(AKT-1):"Gold",w:"4.6rem",tip:"Goldmedaille der letzten abgeschlossenen Saison: Liga 1 und Liga 2",html:function(o){return zwei(o.gold," · Gold "+sn(AKT-1))}},
+      {k:"ku",t:"Kurs "+sn(AKT),w:"4.6rem",tip:"Führt die Disziplin-Wertung der laufenden Saison an (echt): Liga 1 und Liga 2",html:function(o){return zwei(o.kurs," · führt in "+sn(AKT))}}],
+      zeile:function(o){return {cls:"klick",attr:'data-dis="'+o.d+'"'}}});
+    var gt=tafel({sort:Z.gsort,dir:Z.gdir,rows:GROWS,zeilen:16,blatt:Z.gblatt,cols:[
+      {k:"r",t:"#",w:"1.6rem",wert:function(b){return b.r},html:function(b,i){return '<b class="pl">'+(i+1)+'</b>'},tip:"Standard: Gold, Silber, Bronze der Liga 1, dann der Liga 2"},
+      {k:"n",t:"Team",w:"minmax(0,1fr)",wert:function(b){return b.T.n},html:function(b){return '<span class="tn">'+logo(b.T.c)+'<span class="nm"><b>'+b.T.n+'</b><small>'+(BSP?b.sz1+" Sais. L1 · "+b.sz2+" L2":"Liga "+b.T.liga)+'</small></span></span>'}},
+      {k:"l1",t:"Liga 1",w:"4.3rem",r:1,tip:"Gold, Silber, Bronze aus Saisons in Liga 1, alle 20 Disziplinen",wert:function(b){return b.m[1][0]*1e6+b.m[1][1]*1e3+b.m[1][2]},html:function(b){return gsbL(b.m[1],1)}},
+      {k:"l2",t:"Liga 2",w:"5.2rem",r:1,tip:"Gold, Silber, Bronze aus Saisons in Liga 2, alle 20 Disziplinen",wert:function(b){return b.m[2][0]*1e6+b.m[2][1]*1e3+b.m[2][2]},html:function(b){return gsbL(b.m[2],2)}},
+      {k:"pkt",t:"Punkte",w:"3.2rem",r:1,tip:gewTip,wert:function(b){return b.pkt},html:function(b){return '<b class="gr t" title="'+esc(pktTip(b))+'">'+b.pkt+'</b>'}}],
+      zeile:function(b){return {cls:ich(b),attr:'data-team="'+b.T.c+'"'}}});
+    $("s-disziplinen").innerHTML=pick+
+      '<div class="pan haupt voll"><div class="pk"><h2>Rekordhalter je Disziplin</h2>'+(BSP?bsp("S1–S"+ab+" Beispiel · Kurs echt"):"")+'<span class="sp"></span><small class="u">'+(BSP?"abgeschlossene Saisons · Klick öffnet die Disziplin":"Die erste Saison läuft, vergeben wird am Saisonende")+'</small></div>'+tf.html+
+        '<div class="tfuss"><span><b>Liga 1 und Liga 2 werden getrennt gezählt.</b> Medaillen aus Liga 2 tragen das Zeichen <b style="color:var(--gast)">II</b>.</span><span class="sp"></span><span>Spalten sortierbar</span></div></div>'+
+      '<div class="spalte"><div class="pan gtab"><div class="pk"><h2>Alle 20 zusammen</h2>'+(BSP?bsp():"")+'<span class="sp"></span><span class="umsch"><a class="'+(Z.gsort==="r"?"an":"")+'" data-gsort="r">Medaillen</a><a class="'+(Z.gsort==="pkt"?"an":"")+'" data-gsort="pkt">Punkte</a></span></div>'+gt.html+
+        '<div class="tfuss"><span>'+gt.n+' Teams · Blatt '+(Z.gblatt+1)+' von 2</span><span class="sp"></span><a class="'+(Z.gblatt?"":"aus")+'" data-gblatt="-1">‹ zurück</a><a class="'+(Z.gblatt<1?"":"aus")+'" data-gblatt="1">weiter ›</a></div></div>'+gewp+'</div>';
+    return}
+  var o=DB[d],f=DA[d];
+  RAHMEN.kopf('Welt <span>›</span> Leaders <span>›</span> Medaillenspiegel je Disziplin <span>›</span> <i class="c'+f+'" style="font-style:normal">'+AXN[f]+'</i>',o.n,reiter(),
+    RAHMEN.kpi("Medaillen vergeben",ab*6,ab+(ab===1?" Saison":" Saisons")+" × 2 Ligen","zone")+RAHMEN.kpi("Teams mit Medaille",o.mit,"von 32")+kpiG);
+  function rk(l){var r=o.rek[l],b=r&&r.b;return '<div class="rk'+(l===2?" l2":"")+'">'+medE(l,0)+'<div class="tx"><small>Meiste Gold · Liga '+l+'</small>'+
+    (r?'<h4>'+logo(b.T.c)+'<span>'+b.T.n+'</span></h4><em>dazu '+b.m[l][1]+' S, '+b.m[l][2]+' B · '+b["sz"+l]+' Saisons Liga '+l+(r.gleich>1?' · '+r.gleich+' gleichauf':"")+'</em>':'<h4><span class="zu">noch offen</span></h4><em>vergeben wird am Saisonende</em>')+
+    '</div><strong class="t g0">'+(r?b.m[l][0]+'×<small>Gold</small>':"–")+'</strong></div>'}
+  var se=o.serie,tp=o.top;
+  var rek='<div class="rek">'+rk(1)+rk(2)+
+    '<div class="rk'+(se&&se.l===2?" l2":"")+'">'+medE(se?se.l:1,0)+'<div class="tx"><small>Längste Gold-Serie</small>'+(se&&se.n>1?'<h4>'+logo(se.T.c)+'<span>'+se.T.n+'</span></h4><em>'+sn(se.a)+' bis '+sn(se.b)+' · Liga '+se.l+'</em>':'<h4><span class="zu">'+(se?"keine Serie":"noch offen")+'</span></h4><em>'+(se?"kein Team gewann zweimal in Folge":"vergeben wird am Saisonende")+'</em>')+
+      '</div><strong class="t g0">'+(se&&se.n>1?se.n+'<small>in Folge</small>':"–")+'</strong></div>'+
+    '<div class="rk neu" title="'+esc(gewTip)+'"><span class="sig">Σ</span><div class="tx"><small>Meiste Punkte · gewichtet</small>'+(tp?'<h4>'+logo(tp.T.c)+'<span>'+tp.T.n+'</span></h4><em>Liga 1 '+tp.m[1].join(" · ")+' &nbsp;/&nbsp; Liga 2 '+tp.m[2].join(" · ")+'</em>':'<h4><span class="zu">noch offen</span></h4><em>vergeben wird am Saisonende</em>')+
+      '</div><strong class="t">'+(tp?tp.pkt+'<small>Punkte</small>':"–")+'</strong></div></div>';
+  function kb(c,oben,l){c.kopf=function(t){return '<span class="r bk l'+l+(c.k===t.sort?" so":"")+'" data-so="'+c.k+'" title="'+esc(c.tip)+'">'+(oben?'<em>'+oben+'</em>':"")+c.t+(c.k===t.sort?(t.dir<0?" ▼":" ▲"):"")+'</span>'};return c}
+  function mc(l,i){return kb({k:"m"+l+i,t:STN[i],w:"3rem",r:1,cls:"b"+l,tip:STN[i]+" in Liga "+l+" (abgeschlossene Saisons)",wert:function(b){return b.m[l][i]},html:function(b){return '<b class="zn g'+i+' t'+(b.m[l][i]?"":" n0")+'">'+b.m[l][i]+'</b>'}},i===1?(l===2?"Liga 2 · II":"Liga 1"):"",l)}
+  var nz=Math.max(20,Math.min(24,o.rows.length)),bl=Math.ceil(o.rows.length/nz)||1;if(Z.blatt>bl-1)Z.blatt=0;
+  var so=Z.sort||"r";
+  var tf2=tafel({sort:so,dir:Z.sort?Z.dir:1,rows:o.rows,zeilen:nz,blatt:Z.blatt,cols:[
+    {k:"r",t:"#",w:"1.7rem",wert:function(b){return b.r},html:function(b,i){return '<b class="pl">'+(i+1)+'</b>'},tip:"Standard: Gold, Silber, Bronze der Liga 1, dann Gold, Silber, Bronze der Liga 2"},
+    {k:"n",t:"Team",w:"minmax(9rem,1.15fr)",wert:function(b){return b.T.n},html:function(b){var x=b.T;return '<span class="tn">'+logo(x.c)+'<span class="nm"><b>'+x.n+'</b></span></span>'}},
+    {k:"h",t:"Heute",w:"3.4rem",r:1,tip:"Liga und Tabellenplatz heute",wert:function(b){return -(b.T.liga*100+b.T.st.rank)},html:function(b){return '<span class="kr"><small class="'+(b.T.liga===2?"zw":"")+'">L'+b.T.liga+'</small><b class="t">'+b.T.st.rank+'.</b></span>'}},
+    mc(1,0),mc(1,1),mc(1,2),mc(2,0),mc(2,1),mc(2,2),
+    {k:"pkt",t:"Punkte",w:"3.5rem",r:1,tip:gewTip,wert:function(b){return b.pkt},html:function(b){return '<b class="gr t" title="'+esc(pktTip(b))+'">'+b.pkt+'</b>'}},
+    {k:"sz",t:"Sais. L1 · L2",w:"5.8rem",r:1,tip:"Abgeschlossene Saisons je Liga. Jede Saison enthält jede Disziplin, also sind das auch die Saisons in dieser Disziplin.",wert:function(b){return b.sz1*100+b.sz2},html:function(b){return '<span class="szl t"><b class="'+(b.sz1?"":"n0")+'">'+b.sz1+'</b><i>·</i><b class="'+(b.sz2?"zw":"n0")+'">'+b.sz2+'</b></span>'}},
+    {k:"lm",t:"Letzte Medaille",w:"6.8rem",tip:"Die jüngste Medaille in dieser Disziplin: Saison und Liga",wert:function(b){return b.letzte?b.letzte.s*10+2-b.letzte.i:-1},html:function(b){var x=b.letzte;return x?'<span class="lm">'+medE(x.l,x.i,STN[x.i]+" · Liga "+x.l)+'<b class="t">'+sn(x.s)+'</b><small class="'+(x.l===2?"zw":"")+'">Liga '+x.l+'</small></span>':'<span class="zu">noch keine</span>'}},
+    {k:"k",t:"Kurs "+sn(AKT),w:"3.4rem",r:1,tip:"Platz in der Disziplin-Wertung der laufenden Saison, in der Liga von heute (echt)",wert:function(b){return b.k?-b.k:-99},html:function(b){return '<b class="t '+(b.k&&b.k<=3?"g"+(b.k-1):"")+'">'+(b.k?b.k+".":"–")+'</b>'}},
+    {k:"vl",t:sn(1)+" bis "+sn(AKT)+" · oben Liga 1, unten Liga 2",w:"minmax(7rem,1fr)",tip:"Je Saison ein Feld. Obere Reihe: Saisons in Liga 1, untere Reihe: Saisons in Liga 2. Ein Wechsel der Reihe ist ein Auf- oder Abstieg. Das letzte Feld ist der Kurs der laufenden Saison.",
+      html:function(b){var z="";for(var s=1;s<=AKT;s++)[1,2].forEach(function(l){var da=b.T.h[s].liga===l,i=!da?-1:s<AKT?TM[s][l][d].indexOf(b.T):(b.k&&b.k<=3?b.k-1:-1);
+        z+='<i class="'+(da?"da":"")+(l===2?" zw":"")+(i>=0?" m"+i:"")+(da&&s===AKT?" lauf":"")+'"'+(da?' title="'+esc(sn(s)+" · Liga "+l+(i>=0?" · "+STN[i]+(s===AKT?" (Kurs)":""):" · keine Medaille"))+'"':"")+'></i>'});return '<span class="st2">'+z+'</span>'}}],
+    zeile:function(b){return {cls:ich(b),attr:'data-team="'+b.T.c+'"'}}});
+  var n10=Math.min(AKT,10),sl="";for(var s=AKT;s>AKT-n10;s--){var lauf=s===AKT;
+    sl+='<div class="'+(lauf?"lauf":"")+'"><b class="t">'+sn(s)+(lauf?'<i class="lf">Kurs</i>':"")+'</b>'+[1,2].map(function(l){var a=lauf?MED[l][d].slice(0,3).map(function(x){return TC[x[0]]}):TM[s][l][d];
+      return '<span class="tri">'+a.map(function(X,i){return logo(X.c,"m"+i+(X===T?" ich":"")).replace("<img",'<img title="'+esc(sn(s)+" · Liga "+l+" · "+STN[i]+(lauf?" (Kurs)":"")+" · "+X.n)+'"')}).join("")+'</span>'}).join("")+'</div>'}
+  $("s-disziplinen").innerHTML=pick+rek+
+    '<div class="pan haupt"><div class="pk"><h2>Medaillenspiegel · '+o.n+'</h2>'+(BSP?bsp("S1–S"+ab+" Beispiel · Kurs echt"):"")+'<span class="sp"></span><small class="u">Sortierung</small><span class="umsch"><a class="'+(so==="r"?"an":"")+'" data-dsort="r">Medaillen · Liga 1 zuerst</a><a class="'+(so==="pkt"?"an":"")+'" data-dsort="pkt">Gewichtete Punkte</a></span></div>'+tf2.html+
+      '<div class="tfuss"><span class="leg"><span><i class="s2"></i>Saison in Liga 1</span><span><i class="s2 zw"></i>Saison in Liga 2</span><span><i class="m0"></i>Gold</span><span><i class="m1"></i>Silber</span><span><i class="m2"></i>Bronze</span></span>'+
+        (BSP?"":'<span>Die erste Saison läuft: die Liste zeigt, wer auf Kurs liegt.</span>')+'<span class="sp"></span>'+(bl>1?'<span>Blatt '+(Z.blatt+1)+' von '+bl+'</span><a class="'+(Z.blatt?"":"aus")+'" data-blatt="-1">‹ zurück</a><a class="'+(Z.blatt<bl-1?"":"aus")+'" data-blatt="1">weiter ›</a>':'<span>'+o.rows.length+' Teams</span>')+
+        '<a href="'+RAHMEN.link({ansicht:"medaillen",team:T.c,dis:null,sort:null,dir:null})+'">Medaillen · '+T.n+' ›</a></div></div>'+
+    '<div class="spalte"><div class="pan"><div class="pk"><h2>Siegerliste</h2>'+(BSP?bsp():"")+'<span class="sp"></span><small class="u">'+(AKT>10?"letzte 10 Saisons":"je Saison")+' · Gold, Silber, Bronze</small></div><div class="pb" style="padding-top:.3rem;padding-bottom:.4rem">'+
+      '<div class="sl3" style="--n:'+Math.max(n10,6)+'"><div class="k"><span></span><span><b>Liga 1</b> · 1. 2. 3.</span><span><b class="zw">Liga 2 · II</b> · 1. 2. 3.</span></div>'+sl+'</div></div></div>'+gewp+'</div>'}
 
 /* ============================== 5. Team-Historie ============================== */
 function rangKl(r){return r<=3?" r"+r:""}
@@ -623,11 +784,16 @@ document.addEventListener("mouseover",function(ev){var e=ev.target.closest&&ev.t
 
 /* ============================== Steuerung ============================== */
 function alles(){POP.style.display="none";ANS.forEach(function(a){$("s-"+a[0]).classList.toggle("an",a[0]===Z.ans)});
-  ({katalog:katalog,teamawards:teamAwards,achievements:achievements,medaillen:medaillen,teams:teamHist,spieler:spielerHist})[Z.ans]();
+  ({katalog:katalog,teamawards:teamAwards,achievements:achievements,medaillen:medaillen,disziplinen:disziplinen,teams:teamHist,spieler:spielerHist})[Z.ans]();
   $("d-ans").innerHTML=ANS.map(function(a){return '<a class="'+(Z.ans===a[0]?"an":"")+'" href="'+RAHMEN.link({ansicht:a[0],sort:null,dir:null})+'">'+a[2]+'</a>'}).join(" ");
   $("d-dat").innerHTML='<a class="'+(BSP?"an":"")+'" href="'+RAHMEN.link({saisons:null,spieler:null})+'">Beispiel: 10 Saisons</a> <a class="'+(BSP?"":"an")+'" href="'+RAHMEN.link({saisons:1,spieler:null,zeit:null})+'">Echt: Saison 1 läuft</a>';
   var pz=q.get("zeig");if(pz){var e=document.querySelector('.seite.an [data-ax="'+pz+'"],.seite.an [data-pax="'+pz+'"]');if(e)popZeig(e)}}
 document.addEventListener("click",function(ev){var t=ev.target,e;
+  if(e=t.closest("[data-dis]")){Z.dis=+e.getAttribute("data-dis");Z.sort=null;Z.dir=-1;Z.blatt=0;return alles()}
+  if(e=t.closest("[data-dsort]")){Z.sort=e.getAttribute("data-dsort");Z.dir=Z.sort==="r"?1:-1;Z.blatt=0;return alles()}
+  if(e=t.closest("[data-gsort]")){Z.gsort=e.getAttribute("data-gsort");Z.gdir=Z.gsort==="r"?1:-1;Z.gblatt=0;return alles()}
+  if(e=t.closest("[data-gblatt]")){Z.gblatt+=+e.getAttribute("data-gblatt");return alles()}
+  if(t.closest(".gtab .tz.kopf")){var G={sort:Z.gsort,dir:Z.gdir};if(sortKlick(ev,G,{n:1,r:1})){Z.gsort=G.sort;Z.gdir=G.dir;Z.gblatt=0;return alles()}return}
   if(e=t.closest("[data-liga]")){Z.liga=+e.getAttribute("data-liga");Z.blatt=0;return alles()}
   if(e=t.closest("[data-zeit]")){Z.zeit=e.getAttribute("data-zeit");return alles()}
   if(e=t.closest("[data-spann]")){Z.spann=e.getAttribute("data-spann");return alles()}
@@ -635,7 +801,7 @@ document.addEventListener("click",function(ev){var t=ev.target,e;
   if(e=t.closest("[data-kader]")){Z.kader=!Z.kader;Z.farbe=-1;Z.blatt=0;return alles()}
   if(e=t.closest("[data-blatt]")){Z.blatt+=+e.getAttribute("data-blatt");return alles()}
   if(t.closest(".dtab .tz.kopf")){var D={sort:Z.dsort,dir:Z.ddir};if(sortKlick(ev,D,{d:1})){Z.dsort=D.sort;Z.ddir=D.dir;return alles()}return}
-  if(t.closest(".tz.kopf")&&sortKlick(ev,Z,{n:1,r:1}))return alles();
+  if(t.closest(".tz.kopf")&&sortKlick(ev,Z,{n:1,r:1,d:1}))return alles();
   if(e=t.closest("[data-team]")){var nt=TC[e.getAttribute("data-team")];if(Z.ans==="teams")Z.offen=nt===Z.team?!Z.offen:true;Z.team=nt;return alles()}
   if(e=t.closest("[data-spieler]")){HELD=ALLE[e.getAttribute("data-spieler")];return alles()}
 });

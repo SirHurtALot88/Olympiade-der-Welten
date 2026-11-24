@@ -351,3 +351,99 @@ Eisernen Herz (Herz im Kettenrahmen); wenn das stört, kostet ein anderes Sinnbi
 | 7 | **Rookie in Saison 1:** nicht vergeben, weil alle neu sind? | Ja, ab Saison 2. |
 | 8 | **Spieler-Historie, Filter POW/SPE/MEN/SOC:** nach Klassenfarbe des Spielers (wie jetzt) oder nach Farbe der Disziplinen? | Klassenfarbe lassen; die PP nach Farbe zeigt die Zeiger-Tafel. |
 
+
+## 12. Runde 3 (24.11.): Medaillenspiegel je Disziplin
+
+### 12.1 Idee von Chris und was gebaut ist
+
+Chris, 24.11.: je Disziplin soll man sehen, welches Team dort über alle Saisons die meisten Medaillen geholt hat. Sein Einwand
+dazu: die Death Peaches holen in Liga 2 viele Medaillen, in Liga 1 wären es weniger. Entscheidung: **Liga 1 und Liga 2 werden
+getrennt gezählt** und stehen nebeneinander; dazu darf es eine gemeinsame Punktzahl mit verschiedenen Gewichten geben.
+
+Neue Ansicht `?ansicht=disziplinen` (`&dis=<slug>` wählt die Disziplin), Reiter **„Disziplinen“** im Team-Zusammenhang
+(Team-Awards · Medaillen · Disziplinen · Teams).
+
+| Teil | Inhalt |
+|---|---|
+| Auswahl oben | „Übersicht“ und alle 20 Disziplinen mit Icon, nach Farbe geordnet (Power, Speed, Mental, Social, je fünf), Rand in Klassenfarbe |
+| Übersicht | 20 Zeilen, je Disziplin: Rekordhalter Liga 1 (meiste Gold, daneben sein Gold · Silber · Bronze dort), Rekordhalter Liga 2, Team mit den meisten Punkten, längste Gold-Serie, Gold der letzten Saison und Kurs der laufenden (je Liga 1 und Liga 2). Klick auf eine Zeile öffnet die Disziplin. Rechts „Alle 20 zusammen“: jedes Team mit Liga-1-Block, Liga-2-Block und Punkten |
+| Je Disziplin: Rekordhalter | vier Kacheln: meiste Gold Liga 1, meiste Gold Liga 2, längste Gold-Serie, meiste Punkte |
+| Je Disziplin: Tabelle | alle Teams, die dort je eine Medaille geholt haben: Platz heute, **Liga 1** Gold · Silber · Bronze, **Liga 2** Gold · Silber · Bronze, Punkte, Saisons in Liga 1 · Liga 2, letzte Medaille (Saison und Liga), Kurs der laufenden Saison, Verlauf |
+| Verlauf | je Saison ein Feld in zwei Reihen: oben Liga 1, unten Liga 2. Springt ein Team von einer Reihe in die andere, ist das ein Auf- oder Abstieg |
+| Siegerliste (rechts) | je Saison Gold, Silber, Bronze beider Ligen als Wappen, die laufende Saison als Kurs. Bei mehr als zehn Saisons die letzten zehn |
+| Gewichtete Punkte (rechts) | die Gewichte als feste Tafel, dazu der Satz, dass Geld und Moral je Liga bleiben |
+
+**Sortierung.** Standard: Gold, dann Silber, dann Bronze der Liga 1, danach Gold, Silber, Bronze der Liga 2. Der Umschalter
+„Medaillen · Liga 1 zuerst / Gewichtete Punkte“ stellt um; jede Spalte ist außerdem per Klick sortierbar.
+
+**Liga-2-Medaillen** tragen ein kleines blaues Zeichen **II** unten rechts am Emblem, die Zahlen stehen in einem blau getönten
+Block, der Text „Liga 2“ ist blau. Das Zeichen ist eine CSS-Marke auf dem vorhandenen Medaillen-Emblem, **keine neue
+PixelLab-Generation**.
+
+**Verknüpfung.** In „Medaillen“ (Teamprofil) öffnet ein Klick auf eine Disziplin-Zeile diese Ansicht für die Disziplin. Aus der
+Disziplin führt „Medaillen · Teamname ›“ zurück ins Teamprofil.
+
+### 12.2 Gewichtung (Vorschlag)
+
+| | Gold | Silber | Bronze |
+|---|---:|---:|---:|
+| Liga 1 | 10 | 6 | 2 |
+| Liga 2 (halb) | 5 | 3 | 1 |
+
+Das ist dein Vorschlag (5 / 3 / 1, Liga 2 halb) mal zwei, damit keine Kommazahlen in den Tabellen stehen. Reihenfolge und
+Verhältnisse sind dieselben. Folgen: Gold in Liga 2 (5) liegt knapp unter Silber in Liga 1 (6) und über Bronze in Liga 1 (2). Die
+Gewichte stehen in jeder Ansicht in der Tafel „Gewichtete Punkte“, im Kopf der Seite und als Tooltip an jeder Punktzahl
+(„Liga 1: 2 × 10 + 0 × 6 + 0 × 2 · Liga 2: 3 × 5 + 2 × 3 + 0 × 1 = 41 Punkte“). Im Mockup ist es eine Konstante (`GEW`).
+
+**Die Punkte ordnen nur diesen Vergleich.** Die Vergabe im Spiel ändert sich nicht: Medaillen werden weiter je Liga, je Disziplin
+und je Saison vergeben (`medaillenSummen`, `medaillenTabelle`, `medaillenPlaetze` in `lib/foundation/leaders-modern.ts`), Geld und
+Moral einer Medaille sind in Liga 1 und Liga 2 gleich wie heute. Die Gewichtung ist reine Anzeige.
+
+### 12.3 Regeln im Detail
+
+- Gezählt werden nur abgeschlossene Saisons. Die laufende Saison steht als **Kurs** daneben (echt, aus der Disziplin-Wertung).
+- **Saisons je Liga:** jede Saison enthält jede Disziplin, deshalb sind die Saisons eines Teams in einer Liga zugleich seine
+  Saisons in der Disziplin.
+- **Rekordhalter** = meiste Gold in der Liga; bei gleich viel Gold entscheiden Silber, dann Bronze. Die Kachel und die Übersicht
+  zeigen, wenn mehrere Teams gleich viel Gold haben („2 gleichauf“, „=2“).
+- **Längste Gold-Serie** = aufeinanderfolgende Saisons mit Gold in derselben Liga. Ein Auf- oder Abstieg beendet die Serie.
+- Geteilte Medaillen (voller Gleichstand) zählen für jedes der Teams voll, wie bei der Vergabe.
+
+### 12.4 Echt und Beispiel
+
+- **Beispiel:** die neun abgeschlossenen Saisons (dieselben Beispiel-Medaillen wie in „Medaillen“), mit Auf- und Absteigern.
+  In der Staffel stehen die Death Peaches mit 2 Gold aus vier Saisons in Liga 1 und 3 Gold, 2 Silber aus fünf Saisons in Liga 2.
+- **Echt:** der Kurs der Saison 1. Mit `?saisons=1` zeigt die Ansicht nur ihn: alle Zähler stehen auf 0, die Tabelle listet die
+  Teams, die auf einem Medaillenplatz liegen.
+
+### 12.5 Bilder
+
+| Datei | Inhalt | Größen |
+|---|---|---|
+| `19-disziplinen-uebersicht` | Übersicht, alle 20 Disziplinen | 1920, 2560, 1710 |
+| `20-disziplinen-staffel` | Staffel, Standard-Sortierung | 1920, 2560, 1710 |
+| `21-disziplinen-staffel-punkte` | Staffel, nach gewichteten Punkten (`&sort=pkt`) | 1920, 2560 |
+| `22-disziplinen-basketball` | zweite Stichprobe | 1920 |
+| `23-echt-disziplinen-uebersicht`, `24-echt-disziplinen-staffel` | echter Stand der Saison 1 | 1920 |
+| `02`, `05`, `07` | neu aufgenommen, weil der Reiter „Disziplinen“ dazukam und die Disziplin-Zeilen in „Medaillen“ jetzt Links sind | 1920, 2560, 1710 |
+
+Aufgenommen mit `?still=1`, Geräte-Pixelverhältnis 1, unter `flock /tmp/oly-aufnahme.lock`. Geprüft je Aufnahme per Skript und mit
+eigenen Augen: kein Seitenscroll, keine JS-Fehler, kein Element außerhalb der Bühne, kein abgeschnittener Text, kein fehlendes
+Bild. Die Aufnahmen `06`, `08` bis `10`, `14`, `16`, `17` zeigen im Kopf noch drei statt vier Reiter; ihr Inhalt ist unverändert.
+
+![Übersicht](awards-historie-24-11/19-disziplinen-uebersicht-1920.png)
+
+![Staffel](awards-historie-24-11/20-disziplinen-staffel-1920.png)
+
+### 12.6 PixelLab in Runde 3
+
+Keine Generation. Guthaben unverändert 182,54.
+
+### 12.7 Offene Fragen
+
+| # | Frage | Empfehlung |
+|---|---|---|
+| 1 | **Gewichte** 10 / 6 / 2 und 5 / 3 / 1, oder lieber mit Kommazahlen 5 / 3 / 1 und 2,5 / 1,5 / 0,5? | Ganze Zahlen; das Verhältnis ist gleich. |
+| 2 | **Standard-Sortierung** nach Medaillen (Liga 1 zuerst) oder nach Punkten? | Medaillen, wie von dir genannt. Nach Punkten kann ein starkes Liga-2-Team vor einem Liga-1-Team mit Goldmedaille stehen. |
+| 3 | **Gold-Serie über einen Liga-Wechsel hinweg** zählen (Gold in Liga 2, Aufstieg, Gold in Liga 1)? | Nein, je Liga; sonst mischt die Serie wieder, was getrennt bleiben soll. |
+| 4 | Soll der Medaillenspiegel in „Medaillen“ (Teamprofil) dieselbe Punkte-Spalte bekommen? | Ja, als nächste kleine Ergänzung; dort ist er heute je Liga umschaltbar. |
