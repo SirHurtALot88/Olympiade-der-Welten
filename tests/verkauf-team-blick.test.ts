@@ -263,3 +263,51 @@ describe("4. Risiko-Kredit nach Risikobereitschaft", () => {
     expect(ohneStempel.reason).toBe("no_need");
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// 5. Qualitaetstausch mit Risiko-Kredit (PM 25.11.): Team auf Ziel, klar besserer Spieler am Markt, Geld fehlt
+// ---------------------------------------------------------------------------------------------------------------------
+describe("5. Qualitaetstausch mit Risiko-Kredit ueber den Umbau-Weg", () => {
+  function tauschWelt(riskTolerance: number, cashPriority: number) {
+    const kader = [spieler("schwach", 35, 8), ...Array.from({ length: 9 }, (_, i) => spieler(`k${i}`, 55 - i * 0.2, 18))];
+    const markt = [
+      ...Array.from({ length: 6 }, (_, i) => spieler(`top${i}`, 78 - i * 0.2, 45 + i)),
+      ...Array.from({ length: 20 }, (_, i) => spieler(`fueller${i}`, 40, 6 + i * 0.1)),
+    ];
+    const { gameState, team } = welt({ kader, markt, cash: 5 });
+    const bias = {
+      cashPriority, valuePriority: 5, starPriority: 5, riskTolerance, wageSensitivity: 5, sellForProfitAggression: 5, shortContractPreference: 5,
+      longContractPreference: 5, loyaltyBias: 5, harmonyStrictness: 5, rosterDepthPreference: 5, eliteSmallRosterPreference: 5,
+    };
+    const gs = {
+      ...gameState,
+      season: { id: "season-2", name: "S2", currentMatchday: 0, matchdayIds: [] },
+      seasonState: {
+        ...gameState.seasonState,
+        seasonId: "season-2",
+        // Gehalt der Saison gebucht: Ein-Jahres-Vertraege ohne Restgehalt (Vertragsende).
+        sponsorPayoutLogs: [{ seasonId: "season-2", teamId: "team-test", componentId: "salary_deduct" }],
+        loans: [],
+        teamStrategyProfiles: { "team-test": { teamId: "team-test", strategySummary: "t", preferredArchetypes: [], secondaryArchetypes: [], bias } },
+        wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: "neu" },
+      },
+    } as unknown as GameState;
+    return { gameState: gs, team, kader, markt };
+  }
+
+  it("ein mutiges Team gibt (nach den Einzelabgaengen) seinen Schwaechsten ab und plant den Kauf eines klar Besseren mit Kredit; ein vorsichtiges nicht", () => {
+    const mutig = tauschWelt(9, 2);
+    const planMutig = planOrganicSellsForTeam({ gameState: mutig.gameState, team: mutig.team, identity: IDENTITY, roster: mutig.kader, allowBelowMin: true, marktKandidaten: mutig.markt });
+    const tausch = planMutig.decisions.find((d) => d.abgangsGrund === "tausch_kredit");
+    expect(tausch).toBeDefined();
+    // Der Tausch trifft den schwaechsten Verbliebenen (der ganz schwache ging schon in der Einzelabwaegung), keinen Kernspieler.
+    expect(["schwach", "k5", "k6", "k7", "k8"]).toContain(tausch!.playerId);
+    expect(tausch!.umbau!.kredit).toBeGreaterThan(0);
+    expect(tausch!.umbau!.kreditKosten).toBeGreaterThan(0);
+    // Klarer Staerke-Gewinn der besten 6 gegenueber Halten, Zinsen eingerechnet.
+    expect(tausch!.umbau!.staerke).toBeGreaterThan(tausch!.umbau!.haltenStaerke!);
+    const vorsichtig = tauschWelt(2, 8);
+    const planVorsichtig = planOrganicSellsForTeam({ gameState: vorsichtig.gameState, team: vorsichtig.team, identity: IDENTITY, roster: vorsichtig.kader, allowBelowMin: true, marktKandidaten: vorsichtig.markt });
+    expect(planVorsichtig.decisions.some((d) => d.abgangsGrund === "tausch_kredit")).toBe(false);
+  });
+});

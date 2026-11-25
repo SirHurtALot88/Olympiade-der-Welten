@@ -78,6 +78,7 @@ import {
 } from "@/lib/ai/team-theme-composition-service";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
 import { isPlayerTransferBuyBlocked } from "@/lib/market/transfer-sold-cooldown";
+import { risikoKreditRahmen } from "@/lib/ai/ai-loan-decision-service";
 import { resolveOpenBuyoutCostForRoster } from "@/lib/market/transfermarkt-sell-proceeds";
 import {
   applySellPricingPolicyToBreakdown,
@@ -1112,7 +1113,7 @@ export type OrganicSellDecision = {
    * Warum der Abgang sich lohnt (nur mit Stempel `verkaufSchwellen`): `kosten_nutzen` = die Abwaegung (`abwaegung`) ergab einen
    * positiven Vorteil; `upgrade_churn` = Upgrade-Tausch. Fuer Protokoll und Messung.
    */
-  abgangsGrund?: "kosten_nutzen" | "cash_verkauf" | "ausgleich" | "umbau" | "upgrade_churn";
+  abgangsGrund?: "kosten_nutzen" | "cash_verkauf" | "ausgleich" | "umbau" | "tausch_kredit" | "upgrade_churn";
   /** Bei `umbau`: der durchgerechnete Plan (Verkauf + Nachkauf gegen Halten + Nachkauf). */
   umbau?: UmbauPlan;
   /** Die Abwaegung im Moment der Entscheidung (nur mit Stempel `verkaufSchwellen`), alle Posten in C. */
@@ -1257,10 +1258,18 @@ export const UMBAU_MARKT_MAX = 150;
 export const UMBAU_TEUER_FAKTOR = 1.25;
 /** Ein Kernspieler (beste drei) geht im Umbau nur bei einem Angebot ab diesem Vielfachen des Marktwerts (sonst Kernschutz 1,5/1,4/1,3). */
 export const UMBAU_KERN_ANGEBOT = 1.1;
+/** Kreditwunsch fuer einen Qualitaetstausch: der Marktwert an diesem Quantil des Markts (ein klar guter Spieler). */
+export const TAUSCH_KREDIT_MARKTQUANTIL = 0.8;
+
+function quantilMarktwert(markt: Player[], q: number): number {
+  const werte = markt.map((player) => player.marketValue ?? 0).filter((wert) => wert > 0).sort((a, b) => a - b);
+  if (werte.length === 0) return 0;
+  return werte[Math.min(werte.length - 1, Math.floor(q * (werte.length - 1)))]!;
+}
 
 /** Ergebnis eines durchgerechneten Nachkaufs (Umbau-Plan bzw. Halten), Werte in C bzw. Qualitaetspunkten. */
 export type UmbauPlan = {
-  /** Bewertung: Punktwert x Staerke der besten 6 + Kasse nach den Kaeufen − Gehalt (Horizont). */
+  /** Bewertung: Punktwert x Staerke der besten 6 + Kasse + Kaderwert nach den Kaeufen − Gehalt (Horizont). */
   wert: number;
   /** Summe der Qualitaet der besten 6 nach dem Nachkauf (Achsen nach Bedarf des Teams). */
   staerke: number;
@@ -1273,6 +1282,9 @@ export type UmbauPlan = {
   haltenWert?: number;
   haltenStaerke?: number;
   haltenKaeufe?: number;
+  /** Bei `tausch_kredit`: geplanter Kredit und seine Zinskosten ueber die Laufzeit. */
+  kredit?: number;
+  kreditKosten?: number;
 };
 
 const umbauMarktCache = new WeakMap<GameState, Player[]>();
@@ -1354,8 +1366,10 @@ function simuliereNachkauf(i: {
       .slice(0, 6);
     const staerke = besten.reduce((a, b) => a + b, 0);
     const kasse = ergebnis.finalCash;
+    // Vermoegen = Kasse + Kaderwert (Chris’ Liga-Wert): ein Kauf zum Marktwert tauscht Geld gegen einen gleich viel werten Spieler.
+    const kaderwert = ergebnis.finalSquad.reduce((summe, view) => summe + Math.max(0, view.marketValue), 0);
     return {
-      wert: i.punktwert * staerke + kasse - UMBAU_GEHALT_HORIZONT * ergebnis.finalSalaryTotal,
+      wert: i.punktwert * staerke + kasse + kaderwert - UMBAU_GEHALT_HORIZONT * ergebnis.finalSalaryTotal,
       staerke,
       kasse,
       gehalt: ergebnis.finalSalaryTotal,
@@ -1582,7 +1596,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
      * Angebot hat … um 2 mittlere zu holen“). Nach den Einzelabgaengen rechnet das Team fuer seine teuersten Spieler mit einem
      * Angebot ueber dem Marktwert den ganzen Plan durch: VERKAUF + NACHKAUF mit dem bestehenden Kaufplaner (`buildOrganicDraftFrame`
      * + `buildOrganicSquadPlan`, echte Marktangebote) gegen HALTEN + NACHKAUF. Bewertet wird der Kader danach: Staerke der besten 6
-     * (in C ueber den Marktpreis eines Qualitaetspunkts), Kasse nach den Kaeufen, ein Jahr Gehalt, Risiko auf die Abloesen. Der beste
+     * (in C ueber den Marktpreis eines Qualitaetspunkts), Kasse und Kaderwert nach den Kaeufen, ein Jahr Gehalt, Risiko auf die Abloesen. Der beste
      * Plan mit Gewinn wird genommen, danach neu bewertet; hoechstens `UMBAU_MAX_RUNDEN` Runden, je Runde `UMBAU_KANDIDATEN`
      * Kandidaten (rechnerisch beherrschbar). Ohne Markt (Tests, leerer Pool) entfaellt die Stufe.
      */
@@ -1640,6 +1654,49 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
         salaryTotal = Math.max(0, salaryTotal - Math.max(0, bester.view.salary));
         buchBilanz += bester.erloes - bester.view.marketValue;
         decisions.push({ playerId: bester.view.playerId, step: decisions.length, utility: bester.gewinn, abgangsGrund: "umbau", umbau: bester.plan });
+      }
+
+      /**
+       * QUALITAETSTAUSCH MIT RISIKO-KREDIT (PM 25.11. nach Chris: „wenn kein geld da ist aber es die lage vom team verbessert hängt das
+       * auch bisschen von der risikobereitschaft des teams ab“). Ein risikobereites Team rechnet einen dritten Plan: den schwaechsten
+       * Spieler abgeben und mit Erloes + Kredit nachkaufen (derselbe Kaufplaner). Genommen wird er nur, wenn er (1) mehr wert ist als
+       * Halten UND als derselbe Tausch ohne Kredit — Kredit und Zinsen als Schuld abgezogen —, und (2) die Staerke der besten 6 klar
+       * steigt (Gewinn in C groesser als die Zinskosten). Den Kredit selbst nimmt das Team im Fenster ueber den Risiko-Kredit auf.
+       */
+      const tauschKandidat = held
+        .filter((view) => !frischVerlaengert.has(view.playerId) && view.marketValue > 0 && !kernRang?.has(view.playerId))
+        .map((view) => ({ view, q: computePlayerQuality(view, achsen) }))
+        .sort((x, y) => x.q - y.q)[0];
+      const kreditWunsch = quantilMarktwert(markt, TAUSCH_KREDIT_MARKTQUANTIL);
+      const rahmen = tauschKandidat && held.length > 1 ? risikoKreditRahmen(input.gameState, input.team.teamId, kreditWunsch) : null;
+      if (tauschKandidat && rahmen) {
+        const { preis } = angebot(tauschKandidat.view, Math.max(0, held.length - 1));
+        const restgehalt = buyoutByPlayerId.get(tauschKandidat.view.playerId) ?? 0;
+        if (preis != null && restgehaltVerkaufLohnt({ marketValue: tauschKandidat.view.marketValue, realizedPrice: preis, openBuyout: restgehalt })) {
+          const state = buildState();
+          const erloes = preis - restgehalt;
+          const halten = simuliere(null, state.cash);
+          const ohne = simuliere(tauschKandidat.view.playerId, state.cash + erloes);
+          const mit = simuliere(tauschKandidat.view.playerId, state.cash + erloes + rahmen.betrag);
+          if (halten && ohne && mit) {
+            const risiko = UMBAU_RISIKO * mit.abloesen + VERKAUFS_ABWAEGUNG.WECHSEL_GEHALT * tauschKandidat.view.salary;
+            const wertMit = mit.wert - rahmen.betrag - rahmen.kosten - risiko;
+            const staerkeGewinn = punktwert * (mit.staerke - halten.staerke);
+            if (wertMit > halten.wert && wertMit > ohne.wert && staerkeGewinn > rahmen.kosten) {
+              held.splice(held.indexOf(tauschKandidat.view), 1);
+              cash += Math.max(0, erloes);
+              salaryTotal = Math.max(0, salaryTotal - Math.max(0, tauschKandidat.view.salary));
+              buchBilanz += erloes - tauschKandidat.view.marketValue;
+              decisions.push({
+                playerId: tauschKandidat.view.playerId,
+                step: decisions.length,
+                utility: wertMit - halten.wert,
+                abgangsGrund: "tausch_kredit",
+                umbau: { ...mit, haltenWert: halten.wert, haltenStaerke: halten.staerke, haltenKaeufe: halten.kaeufe, kredit: rahmen.betrag, kreditKosten: rahmen.kosten },
+              });
+            }
+          }
+        }
       }
     }
   }

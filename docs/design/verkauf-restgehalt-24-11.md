@@ -663,11 +663,89 @@ einer als `cash_verkauf`, der Kader bleibt bei 8 oder mehr; (4) Risiko-Kredit �
 vorsichtig nicht, mit Geld nicht, ohne Stempel `no_need`. Angepasst: `tests/verkauf-kosten-nutzen.test.ts` (Linien 1,1 bzw. 1,5 x MW),
 `tests/verkauf-keine-groessenbremse.test.ts` (1,25 x MW: 5 bis 8 bleiben).
 
-### 10.4 Offene Fragen an Chris
+### 10.4 Entscheidungen zu den offenen Fragen (PM, 25.11., nach Chris' Vorgabe)
 
-1. **Kredite fuer Upgrades.** Der Risiko-Kredit fuellt bis Opt + 1; ein Team auf seinem Ziel, das einen besseren Spieler nur mit Kredit
-   bekaeme, leiht nicht, weil der Kaufplaner auf dem Ziel kaum noch kauft. Soll ein Kredit auch einen reinen Qualitaetstausch
-   (verkaufen + teurer nachkaufen) finanzieren?
-2. **Umbau-Ausnahme vom Kernschutz** ab 1,1 x MW, wenn der durchgerechnete Plan staerker oder deutlich mehr wert ist. Passt die Schwelle?
-3. **Knapp bei Kasse** = Kasse unter max(Puffer, halbes Jahresgehalt). Nach Saison 1 trifft das niemanden; soll die Messung eine spaetere
-   Saison (S2 → S3) abdecken, um Cash-Verkaeufe und Kredite unter Druck zu sehen?
+1. **Qualitaetstausch mit Kredit: ja.** Ein Team auf seinem Ziel darf einen klar besseren Spieler mit Kredit holen (Kauf, ggf. nach
+   Abgabe eines schwaecheren) — gleiche Bedingungen: Risikobereitschaft, klarer Staerke-Gewinn in C groesser als die Kreditkosten,
+   Vorstands-Freigabe, Tragfaehigkeit, ueber den Umbau-Weg (Kaufplaner), keine zweite Kauflogik.
+2. **Umbau-Ausnahme vom Kernschutz ab 1,1 x MW bleibt** (der Plan muss insgesamt besser sein).
+3. **S2 → S3 messen: ja** (10.5).
+
+### 10.5 Qualitaetstausch mit Risiko-Kredit und Messung S2 → S3
+
+**Bau.** `risikoKreditRahmen` (`lib/ai/ai-loan-decision-service.ts`) liefert fuer ein risikobereites Team (Bereitschaft ≥ 0,55, kein
+Hort-Team, kein geplatzter Kredit, ab Saison 2) Betrag (Wunsch x Bereitschaft x Leverage-Bereitschaft, gedeckelt auf die Kapazitaet),
+Laufzeit und Zinskosten — mit denselben Pruefungen wie der Risiko-Kredit (Tragfaehigkeit, Vorstands-Sperre). In
+`planOrganicSellsForTeam` rechnet das Team nach den Umbau-Runden einen dritten Plan (Grund `tausch_kredit`): den schwaechsten
+Nicht-Kernspieler abgeben und mit Erloes + Kredit nachkaufen (derselbe Kaufplaner; Kreditwunsch = Marktwert am 80-%-Quantil des Markts,
+also ein klar guter Spieler). Genommen wird er nur, wenn er nach Abzug von Kredit, Zinsen und Risiko mehr wert ist als Halten **und** als
+derselbe Tausch ohne Kredit, und wenn der Staerke-Gewinn der besten 6 in C die Zinsen uebersteigt. Aufgenommen wird der Kredit danach im
+Fenster ueber den Risiko-Kredit (`risk_driven_borrow`) mit der Kaufplan-Probe.
+
+**Bewertung der Plaene, nachgeschaerft:** Wert = Punktwert x Staerke der besten 6 + Kasse + **Kaderwert** − ein Jahr Gehalt. Ohne den
+Kaderwert zaehlte jeder Kauf als reiner Kassenabfluss (ein Spieler fuer 45 C brachte nur seinen Staerke-Zuwachs ein); mit ihm tauscht ein
+Kauf zum Marktwert Geld gegen einen gleich viel werten Spieler, und es zaehlt, was er sportlich bringt — dieselbe Groesse wie Chris'
+Liga-Wert (Kasse + Kaderwert). Folge: Umbau wird seltener (Gewinn nur noch aus Preis ueber MW und Staerke, nicht aus „Geld sparen“).
+
+**Messung.** Neue Basen; je Saat ein durchgehender Lauf: S1 → S2 (wie 10.2), dann die 20 Spieltage von Saison 2, dann S2 → S3. „Abschnitt 9“
+= Commit `fa871880e`, „Team-Blick“ = dieser Stand.
+
+| S1 → S2 | S1 Abschn. 9 | **S1 Team-Blick** | S7 Abschn. 9 | **S7 Team-Blick** |
+|---|---:|---:|---:|---:|
+| Abgaenge (je Team min / Median / max) | 100 (1 / 3 / 6) | **115 (1 / 4 / 6)** | 93 (0 / 3 / 7) | **107 (0 / 4 / 7)** |
+| Gewinnverkaeufe / Median Preis/MW | 44 / 1,21 | **54 / 1,23** | 43 / 1,23 | **53 / 1,23** |
+| Verkaeufe unter MW / Median | 56 / 0,73 | **61 / 0,73** | 50 / 0,73 | **54 / 0,73** |
+| Umbau vollzogen (Plan kauft ≥ 2) / Ausgleich | – | **2 (2) / 1** | – | **1 (1) / 4** |
+| Cash-Verkauf / Tausch mit Kredit | – | **0 / 0** | – | **0 / 0** |
+| Top-3 im Verkaufsplan (Preis/MW) | 0 | **5 (0,99–1,48)** | 1 (1,47) | **2 (1,28, 1,47)** |
+| Nachkaeufe (n / C) | 101 / 2212,09 | **112 / 2559,99** | 97 / 2098,94 | **110 / 2354,90** |
+| Kader 1. Spieltag min / Median / max (13 / 14) | 9 / 11 / 14 (2 / 8) | **9 / 11 / 14 (2 / 6)** | 9 / 11,5 / 14 (2 / 9) | **9 / 12 / 14 (2 / 9)** |
+| Kasse Fensterende min / Median | 22,6 / 55,7 | **9,0 / 54,2** | 22,6 / 57,9 | **15,6 / 60,1** |
+| Kredite | 0 | **0** | 0 | **0** |
+| Δ Kasse + Kaderwert | −313,2 | **−234,4** | −341,7 | **−299,9** |
+| Δ Staerke beste 6 je Team | +2,65 | **+2,85** | +2,26 | **+2,18** |
+
+| S2 → S3 | S1 Abschn. 9 | **S1 Team-Blick** | S7 Abschn. 9 | **S7 Team-Blick** |
+|---|---:|---:|---:|---:|
+| Abgaenge (je Team max) | 13 (3) | **13 (2)** | 16 (3) | **16 (4)** |
+| Gewinnverkaeufe / Median Preis/MW | 6 / 1,09 | **5 / 1,12** | 7 / 1,20 | **8 / 1,26** |
+| Verkaeufe unter MW / Median | 7 / 0,65 | **8 / 0,76** | 9 / 0,65 | **8 / 0,79** |
+| Umbau geplant / vollzogen | – | **2 / 0** | – | **1 / 0** |
+| Cash-Verkauf / Tausch mit Kredit | – | **0 / 0** | – | **0 / 0** |
+| Nachkaeufe (n / C) | 21 / 488,73 | **25 / 481,16** | 18 / 315,03 | **25 / 487,78** |
+| Kader 1. Spieltag min / Median / max (13 / 14) | 9 / 12 / 14 (2 / 8) | **8 / 12 / 14 (2 / 9)** | 9 / 12 / 14 (2 / 8) | **9 / 12 / 14 (3 / 10)** |
+| Kasse vor dem Fenster min | 14 | **−5** | 8,5 | **21** |
+| Kasse Fensterende min / Median | 19,8 / 50,2 | **9,4 / 46,5** | 8,5 / 53,8 | **15,6 / 51,6** |
+| Kredite (fuer den Risiko-Kredit qualifiziert) | 0 | **0 (5)** | 0 | **0 (3)** |
+| Δ Kasse + Kaderwert | −46,9 | **−93,4** | −107,6 | **−2,7** |
+| Δ Staerke beste 6 je Team | +0,71 | **+0,53** | +0,30 | **+0,60** |
+
+**Lesart.**
+
+- S1 → S2 wie in 10.2: mehr Gewinnverkaeufe (54 / 53 statt 44 / 43, Median 1,23), Vermoegen besser (+79 / +42 C). Die Staerke der
+  besten 6 ist in Saat 1 hoeher, in Saat 7 knapp darunter (−0,08). Umbau seltener als in 10.2 (Kaderwert in der Bewertung), alle
+  vollzogenen Umbauten kaufen mindestens zwei nach.
+- **S2 → S3 ist ein ruhiges Fenster:** nur 13 bis 16 Abgaenge je Liga (S1 → S2: 93 bis 115). Grund: im Tick nach Saison 1 wurden die
+  meisten Vertraege um 1 bis 4 Jahre verlaengert; am Ende von Saison 2 laufen nur rund 25 bis 30 aus. Spieler mit laufendem Vertrag
+  verkauft die KI praktisch nie, weil die Restgehalt-Regel (netto ≥ 0,9 x MW, 7.3 Punkt 3) das sperrt — auch fuer einen Cash-Verkauf in
+  Kassennot und fuer Umbau und Tausch. Die drei geplanten Umbauten betrafen Spieler mit Vertrag und wurden deshalb im Fenster nicht
+  vollzogen.
+- **Kassendruck:** vor dem Fenster S2 → S3 stand ein Team bei −5 C (Saat 1), am Fensterende kein Team unter 8,5 C. Cash-Verkaeufe gab es
+  keine (der knappe Kader hatte nur Spieler mit Vertrag, siehe oben).
+- **Kredite:** keine. 5 / 3 risikobereite Teams qualifizieren sich fuer den Risiko-Kredit, die Kaufplan-Probe findet bei ihnen keinen Kauf
+  (`ai_loan_skipped_no_plan`): sie stehen auf oder ueber ihrem Ziel (13 bis 14 Spieler), der Planer kauft dort nicht mehr. Der Tausch mit
+  Kredit traf nie zu: sein Kandidat ist der schwaechste Spieler, und der hatte jeweils noch einen Vertrag (Restgehalt-Sperre).
+- Kader am 1. Spieltag S3: keiner unter 8 (ein Team genau 8).
+
+**Tests.** `tests/verkauf-team-blick.test.ts` Fall 5: ein mutiges Team (Kasse 5 C, auf Ziel) gibt nach den Einzelabgaengen seinen
+Schwaechsten ab und plant mit Kredit (42,8 C, Zinsen 10 C) einen klar besseren Spieler; die Staerke der besten 6 steigt; ein vorsichtiges
+Team tut das nicht.
+
+### 10.6 Offene Fragen an Chris
+
+1. **Restgehalt-Sperre gegen Team-Blick.** Ab Saison 2 haben fast alle Spieler mehrjaehrige Vertraege; die Regel „Verkauf mit Restgehalt
+   nur bei netto ≥ 0,9 x MW“ (7.3) blockiert damit Umbau, Tausch und Cash-Verkauf in Kassennot fast ganz. Soll der Team-Blick (der den
+   ganzen Plan durchrechnet) das Restgehalt als Kosten tragen duerfen, statt an der festen 0,9-Linie zu scheitern?
+2. **Kredite auf dem Ziel.** Risikofreudige Teams mit 13 bis 14 Spielern qualifizieren sich, kaufen aber nichts. Soll ein Team ueber seinem
+   Ziel fuer einen klar besseren Spieler leihen und dafuer einen Schwaecheren mit Vertrag abgeben (haengt an Frage 1)?
+3. **Vertragslaengen nach Saison 1** (1 bis 4 Jahre) bestimmen, wie beweglich der Markt in Saison 2 und 3 ist. Gewollt?

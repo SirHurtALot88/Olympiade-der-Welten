@@ -341,6 +341,39 @@ export function kreditRisikoBereitschaft(gameState: GameState, teamId: string): 
   );
 }
 
+/**
+ * Kreditrahmen fuer einen QUALITAETSTAUSCH (PM 25.11. nach Chris' Vorgabe): ein Team auf seinem Ziel, das einen klar besseren Spieler nur
+ * mit Kredit bekaeme. Dieselben Bedingungen wie der Risiko-Kredit (Stempel, Risikobereitschaft, kein Hort-Team, kein geplatzter Kredit,
+ * Kapazitaet, Tragfaehigkeit, Vorstands-Sperre). Liefert Betrag (Wunsch x Bereitschaft, gedeckelt), Laufzeit und die Zinskosten ueber die
+ * Laufzeit — der Verkaufsplaner rechnet damit den Tausch gegen Halten (`planOrganicSellsForTeam`, Grund `tausch_kredit`). Aufgenommen wird
+ * der Kredit spaeter in der Fenster-Sitzung ueber den Risiko-Kredit (`risk_driven_borrow`), gedeckelt auf den geplanten Kauf.
+ */
+export function risikoKreditRahmen(
+  gameState: GameState,
+  teamId: string,
+  wunsch: number,
+): { betrag: number; laufzeit: number; kosten: number; risiko: number } | null {
+  if (wirtschaftsRegel(gameState, "verkaufSchwellen") !== "neu") return null;
+  if (isSeasonOne(gameState.season.id)) return null;
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  if (!team || !(wunsch > 0)) return null;
+  if (isStrategicHoardTeam(gameState, teamId) || hasDefaultedLoan(gameState, teamId)) return null;
+  const risiko = kreditRisikoBereitschaft(gameState, teamId);
+  if (risiko < RISIKO_KREDIT_SCHWELLE) return null;
+  const probe = originateLoan(gameState, { borrowerTeamId: teamId, principal: wunsch, termSeasons: DEFAULT_TERM_SEASONS }, { execute: false });
+  if (probe.capacity <= 0) return null;
+  const betrag = round(Math.min(wunsch, probe.capacity) * risiko * resolveWillingness(gameState, teamId, gameState.season.id), 1);
+  if (betrag < MIN_MEANINGFUL_SHORTFALL) return null;
+  const finances = gameState.teamIdentities.find((entry) => entry.teamId === teamId)?.finances ?? 5;
+  const laufzeit = resolveServiceableTermSeasons({ gameState, teamId, principal: betrag, finances });
+  if (laufzeit == null) return null;
+  const erlaubt = pruefeKiKredit({ gameState, teamId, principal: betrag, termSeasons: laufzeit, finances });
+  if ("grund" in erlaubt) return null;
+  const konditionen = computeLoanTerms({ principal: betrag, termSeasons: erlaubt.termSeasons, finances });
+  const kosten = round(Math.max(0, konditionen.installmentPerSeason * erlaubt.termSeasons - betrag), 2);
+  return { betrag, laufzeit: erlaubt.termSeasons, kosten, risiko };
+}
+
 function risikoKreditOder(gameState: GameState, teamId: string, sonst: AiLoanDecision): AiLoanDecision {
   if (wirtschaftsRegel(gameState, "verkaufSchwellen") !== "neu") return sonst;
   const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;

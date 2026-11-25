@@ -275,7 +275,8 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   24.11.; `verkaufsAbwaegung` in `lib/ai/organic-squad/utility.ts`, Stempel `wirtschaftsRegeln.verkaufSchwellen`, Doku
   `docs/design/verkauf-restgehalt-24-11.md` Abschnitte 8 bis 10). **Team-Blick (Chris, 25.11.): Verkauf und Nachkauf sind ein Plan**
   (Bilanz der Runde, Umbau „teuer verkaufen, mit dem Kaufplaner nachkaufen“ gegen Halten, Cash-Verkauf wenn knapp bei Kasse); **Kredit
-  nach Risikobereitschaft** — wer das Geld hat, leiht nicht; fehlt es und verbessert der Kauf das Team, leihen mutige Teams eher.
+  nach Risikobereitschaft** — wer das Geld hat, leiht nicht; fehlt es und verbessert der Kauf das Team, leihen mutige Teams eher,
+  auch fuer einen Qualitaetstausch auf dem Ziel (Staerke-Gewinn in C groesser als die Zinsen, Doku Abschnitt 10.5).
 - **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte
