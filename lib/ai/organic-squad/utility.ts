@@ -624,7 +624,7 @@ export function stopUtility(state: OrganicTeamState): number {
  * Vorteil positiv ist. Alles in Credits (C):
  *
  *   Vorteil = Erloes − Haltewert − Ersatzrisiko − Wechselkosten + Gehaltsbilanz − Tiefenkosten + Liquiditaet − Marge − Verlustscheu
- *             ± Bauchgefuehl
+ *             + Ausgleich ± Bauchgefuehl
  *
  *   Erloes         = realisierter Preis (Angebot nach Angebot/Nachfrage, Leistung, Kaderdruck) − offenes Restgehalt.
  *   Haltewert      = MW x Leistungsanteil x Team-Bedeutung — was der Spieler DIESEM Team wert ist, gemessen am Preis, den ein
@@ -641,7 +641,10 @@ export function stopUtility(state: OrganicTeamState): number {
  *   Tiefenkosten   = TIEFE_KOSTEN x ((Bedarf / (n − 1))^2 − (Bedarf / n)^2): Belastung je Spieler steigt mit weniger Koerpern
  *                    (Bedarf = Spieler je Spieltag laut Spielplan), mehr Ermuedung und Verletzungen bis zum Nachkauf. Klein bei 12
  *                    bis 14 Spielern, steil unter 8 — eine Kostenkurve, keine Grenze.
- *   Liquiditaet    = LIQUIDITAET x Erloes in Finanznot (Kasse unter dem Puffer): Geld ist dann mehr wert.
+ *   Liquiditaet    = LIQUIDITAET x Druck x Erloes; Druck 1 in Finanznot (Kasse unter dem Puffer), dazwischen knapp bei Kasse (Kasse unter
+ *                    Puffer bzw. halbem Jahresgehalt): Geld ist dann mehr wert, Marge und Verlustscheu fallen mit (1 − Druck).
+ *   Ausgleich      = AUSGLEICH x min(Buchverlust der Runde, Gewinn dieses Abgangs): Team-Blick — wer schon unter Wert abgab, nimmt
+ *                    einen Gewinn lieber mit, um das auszugleichen und sich neu aufzustellen (Chris 25.11.).
  *   Marge          = MARGE x Haltewert x Haltefreude(Team): ein Abschluss muss einen kleinen Gewinn ueber dem Wert bringen. Ehrgeizige
  *                    Teams (wWin) halten lieber, Haendler (wProfit) verkaufen lieber.
  *   Verlustscheu   = VERLUST x Verlust^2 / (Verlust + 4 C), Verlust = MW − Erloes: ein kleiner Verlust in C geht (Chris: „gerade wenn
@@ -649,8 +652,8 @@ export function stopUtility(state: OrganicTeamState): number {
  *   Bauchgefuehl   = ± BAUCHGEFUEHL x Haltewert, reproduzierbar aus Saat und Spieler: manche Teams zocken, manche halten.
  *
  * Zahlenbeispiele (Bedarf 8, Kader 12, Gehalt 0,27 x MW): Top-Spieler 10 C MW, Leistungsfaktor 1,2, Staerke 1,25 x Median: zu 11 C
- * bleibt er (Vorteil −5,5), zu 18 C geht er (+1,5), die Linie liegt bei etwa 16,5 C. Mittelfeld 20 C, Leistung 1,0: geht ab etwa
- * 1,16 x MW. Schwacher Spieler 6 C MW, Leistung 0,67, Staerke 0,75 x Median: geht schon zu 4 C (+0,25, Linie bei etwa 3,8 C).
+ * bleibt er, zu 18 C geht er, die Linie liegt bei etwa 15,5 C. Mittelfeld 20 C, Leistung 1,0: geht ab etwa 1,1 x MW. Schwacher
+ * Spieler 6 C MW, Leistung 0,67, Staerke 0,75 x Median: geht schon zu 4 C. Zahlen: Abschnitte 9 und 10 der Doku.
  */
 export const VERKAUFS_ABWAEGUNG = {
   /**
@@ -665,13 +668,16 @@ export const VERKAUFS_ABWAEGUNG = {
   /** Team-Bedeutung unterhalb des Medians: 1 − BEDEUTUNG_UNTEN x (1 − Verhaeltnis)^2, mindestens BEDEUTUNG_MIN. */
   BEDEUTUNG_UNTEN: 6,
   BEDEUTUNG_MIN: 0.35,
-  ERSATZ_RISIKO: 0.04,
-  WECHSEL_GEHALT: 0.25,
+  ERSATZ_RISIKO: 0.025,
+  WECHSEL_GEHALT: 0.15,
   TIEFE_KOSTEN: 4,
   /** Spieler je Spieltag, wenn der Spielplan nichts sagt (zwei Disziplinen, 4 bis 12, im Mittel etwa 8). */
   BEDARF_STANDARD: 8,
   LIQUIDITAET: 0.2,
-  MARGE: 0.03,
+  MARGE: 0.015,
+  /** Bilanz-Ausgleich (Team-Blick): wer in dieser Runde schon unter Wert abgegeben hat, rechnet einen Gewinnverkauf um diesen Anteil des
+   *  ausgeglichenen Buchverlusts hoeher an. */
+  AUSGLEICH: 0.5,
   /** Verlustscheu: VERLUST x Verlust^2 / (Verlust + VERLUST_KNIE), Verlust = MW − Erloes in C (klein bei 1 bis 2 C, gross ab 5 C). */
   VERLUST: 0.5,
   VERLUST_KNIE: 4,
@@ -691,6 +697,13 @@ export type VerkaufsAbwaegungEingabe = {
   kaderVorher: number;
   spieltagsBedarf: number;
   finanznot: boolean;
+  /**
+   * Liquiditaetsdruck 0..1 (Team-Blick): 1 in Finanznot, dazwischen, wenn die Kasse unter dem Ziel aus Puffer und halbem Jahresgehalt
+   * liegt (knapp bei Kasse). Skaliert Liquiditaet, Marge und Verlustscheu. Fehlt er, gilt `finanznot` (0 oder 1).
+   */
+  liquiditaetsDruck?: number;
+  /** Buchbilanz der Runde bisher (Σ Erloes − MW der schon geplanten Abgaenge); negativ = schon unter Wert abgegeben. */
+  buchBilanz?: number;
   /** Gewichte des Teams (Charakter). */
   wWin: number;
   wProfit: number;
@@ -709,6 +722,7 @@ export type VerkaufsAbwaegung = {
   liquiditaet: number;
   marge: number;
   verlustScheu: number;
+  ausgleich: number;
   bauchgefuehl: number;
   teamBedeutung: number;
   leistungsAnteil: number;
@@ -742,14 +756,17 @@ export function verkaufsAbwaegung(e: VerkaufsAbwaegungEingabe): VerkaufsAbwaegun
   const gehaltsBilanz = gehalt * (1 - leistungsAnteil * bedeutung);
   const bedarf = e.spieltagsBedarf > 0 ? e.spieltagsBedarf : k.BEDARF_STANDARD;
   const tiefenKosten = k.TIEFE_KOSTEN * (kaderBelastung(e.kaderVorher - 1, bedarf) - kaderBelastung(e.kaderVorher, bedarf));
-  const liquiditaet = e.finanznot ? k.LIQUIDITAET * Math.max(0, erloes) : 0;
+  const druck = e.finanznot ? 1 : clamp(Number.isFinite(e.liquiditaetsDruck) ? (e.liquiditaetsDruck as number) : 0, 0, 1);
+  const liquiditaet = k.LIQUIDITAET * druck * Math.max(0, erloes);
   const haltefreude = clamp(0.6 + 0.4 * e.wWin - 0.5 * (e.wProfit - 0.1), 0.25, 1.8);
-  const marge = e.finanznot ? 0 : k.MARGE * halteWert * haltefreude;
+  const marge = (1 - druck) * k.MARGE * halteWert * haltefreude;
   const verlust = Math.max(0, mw - erloes);
-  const verlustScheu = e.finanznot ? 0 : (k.VERLUST * verlust * verlust) / (verlust + k.VERLUST_KNIE);
+  const verlustScheu = ((1 - druck) * k.VERLUST * verlust * verlust) / (verlust + k.VERLUST_KNIE);
+  const bilanz = Number.isFinite(e.buchBilanz) ? (e.buchBilanz as number) : 0;
+  const ausgleich = bilanz < 0 ? k.AUSGLEICH * Math.min(-bilanz, Math.max(0, erloes - mw)) : 0;
   const bauchgefuehl = k.BAUCHGEFUEHL * halteWert * 2 * ((Number.isFinite(e.zufall) ? e.zufall : 0.5) - 0.5);
   const vorteil =
-    erloes - halteWert - ersatzRisiko - wechselKosten + gehaltsBilanz - tiefenKosten + liquiditaet - marge - verlustScheu + bauchgefuehl;
+    erloes - halteWert - ersatzRisiko - wechselKosten + gehaltsBilanz - tiefenKosten + liquiditaet - marge - verlustScheu + ausgleich + bauchgefuehl;
   return {
     vorteil,
     erloes,
@@ -761,6 +778,7 @@ export function verkaufsAbwaegung(e: VerkaufsAbwaegungEingabe): VerkaufsAbwaegun
     liquiditaet,
     marge,
     verlustScheu,
+    ausgleich,
     bauchgefuehl,
     teamBedeutung: bedeutung,
     leistungsAnteil,

@@ -152,11 +152,17 @@ describe("Chris' Beispiel: 12 Spieler, Opt 10, 10 mit richtig gutem Angebot", ()
   }
 
   it("auch unter dem Minimum bleibt es eine Kosten-Frage: Kaderdruck im Preis und Tiefenkosten beenden den Abverkauf", () => {
-    // 1,25 x MW: vier gehen (bis zum Minimum 8); der naechste Abgang kostet 10 % im Preis (unter dem Minimum) und mehr Belastung.
+    // 1,25 x MW: einige gehen, auch unter das Minimum; dort kostet jeder weitere Abgang 10 % im Preis und mehr Belastung — dann ist Schluss.
     angebote(1.25);
     const { gameState, team, players } = chrisKader("neu");
     const plan = planOrganicSellsForTeam({ gameState, team, identity: IDENTITY, roster: players, allowBelowMin: true, vertragsende: true });
-    expect(plan.finalRosterSize).toBe(8);
+    expect(plan.finalRosterSize).toBeGreaterThanOrEqual(5);
+    expect(plan.finalRosterSize).toBeLessThanOrEqual(8);
+    const mitDreissigProzentMehr = (() => {
+      angebote(1.5);
+      return planOrganicSellsForTeam({ gameState, team, identity: IDENTITY, roster: players, allowBelowMin: true, vertragsende: true });
+    })();
+    expect(mitDreissigProzentMehr.finalRosterSize).toBeLessThanOrEqual(plan.finalRosterSize);
     const tiefen = plan.decisions.map((d) => d.abwaegung!.tiefenKosten);
     for (let i = 1; i < tiefen.length; i++) expect(tiefen[i]).toBeGreaterThan(tiefen[i - 1]!);
   });

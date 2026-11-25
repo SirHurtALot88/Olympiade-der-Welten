@@ -567,3 +567,107 @@ Nutzen-Runde (`verkaufSchwellen: alt`).
 3. **Kredite.** Die KI leiht nur bei echter Kassenluecke; im Fenster S1 → S2 hatte kein Team eine. Soll es einen „Investitionskredit“
    geben (gutes Upgrade am Markt, Kasse reicht knapp nicht, Tragfaehigkeit da), der auch bei voller Kasse fuer einen Zusatzkauf greift?
 4. **Tiefen-Aufstockung.** Belastungsziel 0,62 Spieler je Spieltag pro Kopf (bei 8 je Spieltag: 13 Koerper), hoechstens +2 ueber den Opt.
+
+## 10. Team-Blick: Verkauf und Nachkauf als ein Plan, Kredit nach Risikobereitschaft (Chris, 25.11.)
+
+Chris, woertlich, zu den offenen Fragen aus 9.6: „1. ja die ki soll häufiger gewinne mitnehmen! das ist essenziell um das team zu
+sichern gerade bei guten deals - du hast das einzeln jetzt ganz gut aufbereitet aber es gibt keinen team blick darauf der sagt ok ich hab
+jetzt 2 leute unter wert verkauft vllt sollte ich dann doch meinen starken teuren player verkaufen wenn der n gutes angebot hat um das zu
+kompensieren und mich neu aufzustellen ODER teams die knapp bei kasse sind müssten verkaufen damit sie vllt 1 teuren spieler verkaufen um
+2 mittlere zu holen - oder nen mittleren oder günstigen verkaufen und nicht nachbesetzen um cash zu generieren etc 2. ja das team soll
+kaufen, aber wenn sie das geld noch haben benötigen sie den kredit nicht, wenn kein geld da ist aber es die lage vom team verbessert hängt
+das auch bisschen von der risikobereitschaft des teams ab ob sie ihre lage verbessern wollen mit dem kredit 3. ja passt“ (3 = Tiefen-Aufstockung,
+bleibt wie 9.3).
+
+### 10.1 Was sich geaendert hat
+
+Alles hinter demselben Stempel `seasonState.wirtschaftsRegeln.verkaufSchwellen`.
+
+1. **Haeufiger Gewinne mitnehmen** (`VERKAUFS_ABWAEGUNG`): Ersatzrisiko 0,04 → 0,025, Wechselkosten 0,25 → 0,15 Jahresgehalt, Marge
+   0,03 → 0,015. Ein Mittelfeldspieler geht jetzt ab etwa 1,1 x MW (vorher 1,16), ein Leistungstraeger (Staerke 1,25 x Median, Leistung
+   1,2) weiter erst ab gut 1,5 x MW (Linie 15,3 C bei 10 C MW; 11 C bleibt), der schwache Spieler 6 C zu 4 C geht weiter.
+2. **Bilanz der Runde** (`buchBilanz`, Posten `Ausgleich` der Abwaegung): die Verkaufsrunde fuehrt Σ (Erloes − MW) ihrer Abgaenge mit.
+   Steht sie im Minus, rechnet ein Gewinnverkauf mit 0,5 x min(Buchverlust, Gewinn) hoeher — wer zwei unter Wert abgab, nimmt den guten
+   Deal fuer den Dritten mit, statt ihn knapp liegen zu lassen. Grund im Protokoll `ausgleich`.
+3. **Knapp bei Kasse** (`liquiditaetsDruck`): Druck = (Ziel − Kasse) / Ziel mit Ziel = max(Puffer, 0,5 x Jahresgehalt des Kaders), 1 in
+   Finanznot. Der Druck hebt den Liquiditaetswert des Erloeses (0,2 x Druck x Erloes) und senkt Marge und Verlustscheu mit (1 − Druck);
+   die Tiefenkosten bleiben voll. So verkauft ein klammes Team einen mittleren oder guenstigen Spieler fuer Bargeld, solange die Tiefe es
+   traegt, ein reiches behaelt ihn. Grund `cash_verkauf`, wenn die Liquiditaet den Ausschlag gibt. Nachbesetzt wird danach nur, was der
+   Kaufplaner im Rahmen (Vorstand, Ruecklage) noch will.
+4. **Umbau-Plaene** (`planOrganicSellsForTeam`, nach den Einzelabgaengen): fuer die zwei teuersten Spieler (MW ≥ 1,25 x Kader-Median)
+   mit Angebot ueber dem Marktwert rechnet das Team den ganzen Plan durch — Verkauf + Nachkauf mit dem **bestehenden Kaufplaner**
+   (`buildOrganicDraftFrame` + `buildOrganicSquadPlan`, freie Spieler des Spielstands, auf 150 gleichmaessig ueber die Preise
+   ausgeduennt) gegen Halten + Nachkauf. Wert eines Plans = Marktpreis je Qualitaetspunkt (Steigung MW ~ Qualitaet am Markt) x Staerke der
+   besten 6 + Kasse nach den Kaeufen − ein Jahr Gehalt; Risiko 0,1 x Abloesen der Nachkaeufe + Wechselkosten; dazu der Bilanz-Ausgleich.
+   Der beste Plan mit Gewinn wird genommen (Grund `umbau`, der Plan haengt an der Entscheidung), dann neu bewertet; hoechstens 2 Runden.
+   Ein Kernspieler darf hier schon ab 1,1 x MW gehen (statt Kernschutz 1,5 / 1,4 / 1,3): der Ersatz ist mit echten Marktangeboten
+   durchgerechnet, das ist die begruendete Ausnahme. Ohne Markt (Tests, leerer Pool) entfaellt die Stufe.
+5. **Risiko-Kredit** (`resolveAiLoanDecision` → `risikoKreditOder`, `kreditRisikoBereitschaft`): sagt der bedarfsgetriebene Kredit
+   `no_need` / `cash_sufficient` / `shortfall_minor`, prueft die KI einen zweiten Weg bis Opt + 1: Bedarf zum Fuellpreis gegen das
+   ausgebbare Geld (fehlt weniger als 8 C, kauft das Team ohne Kredit), Risikobereitschaft = 0,5 + 0,07 x (riskTolerance − 5) − 0,06 x
+   (cashPriority − 5) + 0,03 x (starPriority − 5) + 0,02 x (Finanzwert − 5), Schwelle 0,55, Betrag = Fehlbetrag x Bereitschaft x
+   Leverage-Bereitschaft, dieselbe Kapazitaet, Tragfaehigkeit und Vorstands-Sperre. Ob der Kauf das Team verbessert, entscheidet danach
+   die Kaufplan-Probe der Fenster-Sitzung (`deckleKreditAufKaufplan`: kein Kredit ohne geplanten Kauf). Grund `risk_driven_borrow`.
+
+### 10.2 Messung
+
+Derselbe Messweg wie 9.4 auf neu angelegten Basen (32 KI von Anfang an, Saat 1 bzw. `--mischen 7`), beide Staende auf derselben Basis:
+„Abschnitt 9“ = Commit `fa871880e`, „Team-Blick“ = dieser Stand. Top-3 nach Rating vor dem Wechsel; Staerke = Mittel der besten 6 nach
+Rating, Aenderung je Team.
+
+| | S1 Abschnitt 9 | **S1 Team-Blick** | S7 Abschnitt 9 | **S7 Team-Blick** |
+|---|---:|---:|---:|---:|
+| Abgaenge (je Team min / Median / max) | 99 (0 / 3 / 6) | **113 (1 / 3 / 6)** | 101 (1 / 3 / 6) | **113 (2 / 3 / 6)** |
+| davon aus dem Verkaufsplan | 75 | **90** | 80 | **90** |
+| **Gewinnverkaeufe (Preis > MW), Median Preis/MW** | 48 / 1,22 | **60 / 1,23** | 55 / 1,21 | **68 / 1,21** |
+| Verkaeufe unter MW, Median | 51 / 0,69 | **53 / 0,69** | 46 / 0,66 | **45 / 0,66** |
+| Preis/MW Median aller Abgaenge | 0,99 | **1,04** | 1,02 | **1,04** |
+| Umbau-Plaene (Plan kauft ≥ 2) | – | **4 (4)** | – | **4 (4)** |
+| Bilanz-Ausgleich | – | **0** | – | **3** |
+| Cash-Verkauf ohne Nachbesetzung | – | **0** | – | **0** |
+| Top-3 im Verkaufsplan (Preis/MW) | 5 (1,07–1,40) | **8 (1,07–1,58)** | 0 | **4 (1,13–1,30)** |
+| Nachkaeufe (n / C) | 107 / 2238,56 | **119 / 2475,65** | 110 / 2272,76 | **120 / 2542,49** |
+| Kader 1. Spieltag S2 min / Median / max | 9 / 11 / 14 | **9 / 11,5 / 14** | 9 / 11,5 / 14 | **9 / 11 / 14** |
+| Teams mit 13 / 14 | 1 / 9 | **3 / 6** | 1 / 10 | **2 / 9** |
+| Kasse am Fensterende min / Median | 13,7 / 49,3 | **13,7 / 48,5** | 10,1 / 49,4 | **10,1 / 50,4** |
+| Kredite | 0 | **0** | 0 | **0** |
+| Δ Kasse | −1252,86 | **−1206,10** | −1252,05 | **−1186,21** |
+| Δ Kaderwert | +949,72 | **+954,30** | +937,21 | **+948,30** |
+| **Δ Kasse + Kaderwert** | −303,14 | **−251,80** | −314,84 | **−237,91** |
+| **Δ Staerke beste 6** je Team | +2,23 | **+2,38** | +2,30 | **+2,57** |
+
+**Lesart.**
+
+- Mehr Gewinn mitgenommen: 60 / 68 Gewinnverkaeufe statt 48 / 55, im Median zu 1,23 / 1,21 x MW. Verkaeufe unter Wert bleiben etwa
+  gleich (53 / 45). Vermoegen und Staerke werden beide besser: Kasse + Kaderwert +51 / +77 C gegen Abschnitt 9, Staerke der besten 6
+  +0,15 / +0,27 je Team.
+- Umbau: je Liga 4 Plaene, alle mit mindestens zwei Nachkaeufen. In 5 von 8 ist der Kader danach staerker als beim Halten (z. B.
+  Staerke-Summe 246,8 gegen 231,2), in 3 traegt die Kasse den Gewinn (etwas schwaecher, aber 12 bis 29 C Wert mehr). Verkauft wurden
+  Spieler um 19 bis 40 C MW.
+- Top-3: im Verkaufsplan 8 / 4 Top-3-Spieler (nach Rating), alle ueber dem Marktwert (1,07 bis 1,58) — die Umbau-Ausnahme und das
+  niedrigere Ersatzrisiko. Abschnitt 9 hatte 5 / 0.
+- Cash-Verkauf: keiner — nach Saison 1 ist kein Team knapp (Kasse vor dem Fenster rund 100 C je Team, niedrigste am Fensterende 13,7 /
+  10,1 C). Die Regel greift erst bei klammen Teams (Waechter-Test).
+- Kredite: keine. In Saat 1 (Diagnose-Lauf) qualifizieren sich 4 risikofreudige Teams (Risiko 0,56 bis 0,77) fuer den Risiko-Kredit; die
+  Kaufplan-Probe der Sitzung findet bei ihnen keinen Kauf, den das Geld ermoeglichen wuerde (`ai_loan_skipped_no_plan`): sie stehen schon
+  auf ihrem Ziel. Die uebrigen: 25 `no_need`, 2 `cash_sufficient`, 1 Tragfaehigkeit. Genau Chris' Regel: wer das Geld hat oder nichts
+  kaufen will, leiht nicht.
+- Kader am 1. Spieltag: keiner unter 9.
+
+### 10.3 Tests
+
+`tests/verkauf-team-blick.test.ts` (neu): (1) Bilanz-Ausgleich — 24 C fuer einen 20-C-Leistungstraeger reicht allein nicht, nach 7 C
+Buchverlust schon; (2) Umbau — der Teure (60 C MW, Angebot 1,15) geht als `umbau`, der Plan kauft mindestens zwei mittlere und ist mehr
+wert als Halten; ohne gutes Angebot oder ohne Markt kein Umbau; (3) Cash-Verkauf — Kasse 6 C verkauft mehr als Kasse 300 C, mindestens
+einer als `cash_verkauf`, der Kader bleibt bei 8 oder mehr; (4) Risiko-Kredit — mutig (riskTolerance 9) leiht mit `risk_driven_borrow`,
+vorsichtig nicht, mit Geld nicht, ohne Stempel `no_need`. Angepasst: `tests/verkauf-kosten-nutzen.test.ts` (Linien 1,1 bzw. 1,5 x MW),
+`tests/verkauf-keine-groessenbremse.test.ts` (1,25 x MW: 5 bis 8 bleiben).
+
+### 10.4 Offene Fragen an Chris
+
+1. **Kredite fuer Upgrades.** Der Risiko-Kredit fuellt bis Opt + 1; ein Team auf seinem Ziel, das einen besseren Spieler nur mit Kredit
+   bekaeme, leiht nicht, weil der Kaufplaner auf dem Ziel kaum noch kauft. Soll ein Kredit auch einen reinen Qualitaetstausch
+   (verkaufen + teurer nachkaufen) finanzieren?
+2. **Umbau-Ausnahme vom Kernschutz** ab 1,1 x MW, wenn der durchgerechnete Plan staerker oder deutlich mehr wert ist. Passt die Schwelle?
+3. **Knapp bei Kasse** = Kasse unter max(Puffer, halbes Jahresgehalt). Nach Saison 1 trifft das niemanden; soll die Messung eine spaetere
+   Saison (S2 → S3) abdecken, um Cash-Verkaeufe und Kredite unter Druck zu sehen?

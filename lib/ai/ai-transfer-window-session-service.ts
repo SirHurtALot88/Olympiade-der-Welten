@@ -1030,7 +1030,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           // bleiben gültig; .save so überschreiben, wie es die Buy/Sell-Executoren selbst tun.
           sessionRunContext.save = persisted;
         }
-        warnings.push(`ai_loan_borrow:${teamId}:${geprueft.loanAmount}:${loanDecision.termSeasons}s`);
+        warnings.push(`ai_loan_borrow:${teamId}:${geprueft.loanAmount}:${loanDecision.termSeasons}s:${loanDecision.reason}`);
       }
     }
   };

@@ -76,8 +76,8 @@ describe("Zahlenbeispiele (Doku Abschnitt 9)", () => {
 
   it("Top-Performer zu 18 C: geht — das Angebot ist so gut, dass es Ersatz, Risiko und Tiefe bezahlt", () => {
     expect(abw({ ...top, preis: 18 }).vorteil).toBeGreaterThan(0);
-    // Die Linie liegt bei rund 16 C (1,6 x MW), passend zum Kernschutz 1,5 / 1,4 / 1,3.
-    expect(abw({ ...top, preis: 15 }).vorteil).toBeLessThan(0);
+    // Die Linie liegt bei rund 15,3 C (gut 1,5 x MW), passend zum Kernschutz 1,5 / 1,4 / 1,3.
+    expect(abw({ ...top, preis: 14.5 }).vorteil).toBeLessThan(0);
   });
 
   it("schwacher Spieler 6 C MW zu 4 C: darf gehen — Verkauf unter Marktwert, kleiner Verlust, Gehalt gespart", () => {
@@ -97,11 +97,11 @@ describe("Zahlenbeispiele (Doku Abschnitt 9)", () => {
     expect(abw({ marktwert: 20, gehalt: 5.4, preis: 13.3, finanznot: true }).verlustScheu).toBe(0);
   });
 
-  it("Mittelfeld ohne Ueberleistung zum Marktwert: bleibt; ab etwa 1,2 x MW lohnt es sich", () => {
+  it("Mittelfeld ohne Ueberleistung zum Marktwert: bleibt; ab etwa 1,1 x MW lohnt es sich (Chris 25.11.: haeufiger Gewinne mitnehmen)", () => {
     const mitte = { marktwert: 20, gehalt: 5.4 };
     expect(abw({ ...mitte, preis: 20 }).vorteil).toBeLessThan(0);
-    expect(abw({ ...mitte, preis: 22 }).vorteil).toBeLessThan(0);
-    expect(abw({ ...mitte, preis: 25 }).vorteil).toBeGreaterThan(0);
+    expect(abw({ ...mitte, preis: 21 }).vorteil).toBeLessThan(0);
+    expect(abw({ ...mitte, preis: 23 }).vorteil).toBeGreaterThan(0);
   });
 });
 

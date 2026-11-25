@@ -77,6 +77,7 @@ import {
   type TeamThemeCompositionRuntimeContext,
 } from "@/lib/ai/team-theme-composition-service";
 import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermarkt-sale-factor";
+import { isPlayerTransferBuyBlocked } from "@/lib/market/transfer-sold-cooldown";
 import { resolveOpenBuyoutCostForRoster } from "@/lib/market/transfermarkt-sell-proceeds";
 import {
   applySellPricingPolicyToBreakdown,
@@ -1111,7 +1112,9 @@ export type OrganicSellDecision = {
    * Warum der Abgang sich lohnt (nur mit Stempel `verkaufSchwellen`): `kosten_nutzen` = die Abwaegung (`abwaegung`) ergab einen
    * positiven Vorteil; `upgrade_churn` = Upgrade-Tausch. Fuer Protokoll und Messung.
    */
-  abgangsGrund?: "kosten_nutzen" | "upgrade_churn";
+  abgangsGrund?: "kosten_nutzen" | "cash_verkauf" | "ausgleich" | "umbau" | "upgrade_churn";
+  /** Bei `umbau`: der durchgerechnete Plan (Verkauf + Nachkauf gegen Halten + Nachkauf). */
+  umbau?: UmbauPlan;
   /** Die Abwaegung im Moment der Entscheidung (nur mit Stempel `verkaufSchwellen`), alle Posten in C. */
   abwaegung?: VerkaufsAbwaegung;
 };
@@ -1149,6 +1152,11 @@ export type OrganicSellPlanInput = {
    * Angebot ist dort der Abgangswert, Restgehalt gibt es keins); ohne Stempel ohne Wirkung.
    */
   vertragsende?: boolean;
+  /**
+   * Markt fuer die Umbau-Plaene (Team-Blick, Stempel `verkaufSchwellen`): freie Spieler, die der Kaufplaner nachkaufen koennte. Fehlt er,
+   * nimmt der Planer die freien Spieler aus dem Spielstand (nicht im Kader, Marktwert > 0, nicht verkaufsgesperrt).
+   */
+  marktKandidaten?: Player[] | null;
 };
 
 export type OrganicSellPlanResult = {
@@ -1227,6 +1235,137 @@ export function mittlererSpieltagsBedarf(gameState: Pick<GameState, "seasonState
     if (bedarf != null) werte.push(bedarf);
   }
   return werte.length > 0 ? werte.reduce((a, b) => a + b, 0) / werte.length : VERKAUFS_ABWAEGUNG.BEDARF_STANDARD;
+}
+
+/**
+ * TEAM-BLICK (Chris 25.11., Stempel `verkaufSchwellen`, docs/design/verkauf-restgehalt-24-11.md Abschnitt 10): Konstanten der
+ * Portfolio-Stufe in `planOrganicSellsForTeam`.
+ *  - KNAPP_GEHALT_ANTEIL: knapp bei Kasse heisst Kasse unter max(Puffer, dieser Anteil x Jahresgehalt des Kaders); der Abstand ist
+ *    der Liquiditaetsdruck der Abwaegung (Cash-Verkauf ohne Nachbesetzung, wenn die Tiefe es traegt).
+ *  - UMBAU_*: Umbau-Plaene „teuren verkaufen, mit dem Erloes nachkaufen“ gegen „halten“, je Runde die UMBAU_KANDIDATEN teuersten
+ *    Spieler mit Angebot ueber dem Marktwert, hoechstens UMBAU_MAX_RUNDEN Runden; Risiko UMBAU_RISIKO x Abloesen der Nachkaeufe;
+ *    Gehalt ueber UMBAU_GEHALT_HORIZONT Saisons; der Markt wird fuer die Rechnung auf UMBAU_MARKT_MAX Spieler gleichmaessig ueber die
+ *    Preise ausgeduennt.
+ */
+export const KNAPP_GEHALT_ANTEIL = 0.5;
+export const UMBAU_MAX_RUNDEN = 2;
+export const UMBAU_KANDIDATEN = 2;
+export const UMBAU_RISIKO = 0.1;
+export const UMBAU_GEHALT_HORIZONT = 1;
+export const UMBAU_MARKT_MAX = 150;
+/** „Teuer“ fuer einen Umbau: Marktwert mindestens dieses Vielfache des Kader-Medians. */
+export const UMBAU_TEUER_FAKTOR = 1.25;
+/** Ein Kernspieler (beste drei) geht im Umbau nur bei einem Angebot ab diesem Vielfachen des Marktwerts (sonst Kernschutz 1,5/1,4/1,3). */
+export const UMBAU_KERN_ANGEBOT = 1.1;
+
+/** Ergebnis eines durchgerechneten Nachkaufs (Umbau-Plan bzw. Halten), Werte in C bzw. Qualitaetspunkten. */
+export type UmbauPlan = {
+  /** Bewertung: Punktwert x Staerke der besten 6 + Kasse nach den Kaeufen − Gehalt (Horizont). */
+  wert: number;
+  /** Summe der Qualitaet der besten 6 nach dem Nachkauf (Achsen nach Bedarf des Teams). */
+  staerke: number;
+  kasse: number;
+  gehalt: number;
+  kaeufe: number;
+  abloesen: number;
+  kader: number;
+  /** Vergleich: derselbe Nachkauf, wenn das Team haelt. */
+  haltenWert?: number;
+  haltenStaerke?: number;
+  haltenKaeufe?: number;
+};
+
+const umbauMarktCache = new WeakMap<GameState, Player[]>();
+
+/** Freie Spieler fuer die Umbau-Rechnung, gleichmaessig ueber die Preise auf hoechstens UMBAU_MARKT_MAX ausgeduennt. */
+function umbauMarkt(gameState: GameState, gegeben: Player[] | null): Player[] {
+  if (!gegeben) {
+    const cached = umbauMarktCache.get(gameState);
+    if (cached) return cached;
+  }
+  let pool = gegeben;
+  if (!pool) {
+    const imKader = new Set((gameState.rosters ?? []).map((entry) => entry.playerId));
+    pool = (gameState.players ?? []).filter(
+      (player) =>
+        !imKader.has(player.id) &&
+        (player.marketValue ?? 0) > 0 &&
+        !isPlayerTransferBuyBlocked({ gameState, playerId: player.id }),
+    );
+  }
+  const sortiert = [...pool].filter((player) => (player.marketValue ?? 0) > 0).sort((a, b) => (a.marketValue ?? 0) - (b.marketValue ?? 0));
+  const schritt = Math.max(1, Math.ceil(sortiert.length / UMBAU_MARKT_MAX));
+  const markt = sortiert.filter((_, index) => index % schritt === 0);
+  if (!gegeben) umbauMarktCache.set(gameState, markt);
+  return markt;
+}
+
+/** Was der Markt fuer einen Qualitaetspunkt zahlt: Steigung Marktwert ~ Qualitaet ueber den Markt (0,3 bis 10 C, sonst 1). */
+function marktPreisJeQualitaetspunkt(markt: Player[], achsen: Record<CoreAxis, number>, gameState: GameState): number {
+  const punkte = markt.map((player) => {
+    const view = toOrganicPlayerView(player, undefined, undefined, undefined, gameState);
+    return [computePlayerQuality(view, achsen), view.marketValue] as const;
+  });
+  if (punkte.length < 5) return 1;
+  const mq = punkte.reduce((a, [q]) => a + q, 0) / punkte.length;
+  const mp = punkte.reduce((a, [, p]) => a + p, 0) / punkte.length;
+  let kov = 0;
+  let varq = 0;
+  for (const [q, p] of punkte) {
+    kov += (q - mq) * (p - mp);
+    varq += (q - mq) ** 2;
+  }
+  const steigung = varq > 0 ? kov / varq : 1;
+  return Number.isFinite(steigung) ? Math.min(10, Math.max(0.3, steigung)) : 1;
+}
+
+/**
+ * Rechnet den Nachkauf eines Teams mit dem bestehenden Kaufplaner durch (`buildOrganicDraftFrame` + `buildOrganicSquadPlan`):
+ * Kader ohne `weg`, Kasse `kasse`, Kandidaten `markt`. Keine zweite Kauflogik — derselbe Planer wie im Fenster.
+ */
+function simuliereNachkauf(i: {
+  gameState: GameState;
+  team: Team;
+  identity: TeamIdentity | null | undefined;
+  weg: Set<string>;
+  kasse: number;
+  markt: Player[];
+  achsen: Record<CoreAxis, number>;
+  punktwert: number;
+  draftSeed: string | null;
+}): UmbauPlan | null {
+  try {
+    const team = { ...i.team, cash: i.kasse } as Team;
+    const gameState: GameState = {
+      ...i.gameState,
+      teams: i.gameState.teams.map((entry) => (entry.teamId === team.teamId ? { ...entry, cash: i.kasse } : entry)),
+      rosters: (i.gameState.rosters ?? []).filter((entry) => !(entry.teamId === team.teamId && i.weg.has(entry.playerId))),
+    };
+    const spielerNachId = new Map(gameState.players.map((player) => [player.id, player] as const));
+    const startingSquad = gameState.rosters
+      .filter((entry) => entry.teamId === team.teamId)
+      .map((entry) => spielerNachId.get(entry.playerId))
+      .filter((player): player is Player => Boolean(player));
+    const frame = buildOrganicDraftFrame({ gameState, team, identity: i.identity, startingSquad, candidates: i.markt, draftSeed: i.draftSeed });
+    const ergebnis = buildOrganicSquadPlan(frame.planInput);
+    const besten = ergebnis.finalSquad
+      .map((view) => computePlayerQuality(view, i.achsen))
+      .sort((a, b) => b - a)
+      .slice(0, 6);
+    const staerke = besten.reduce((a, b) => a + b, 0);
+    const kasse = ergebnis.finalCash;
+    return {
+      wert: i.punktwert * staerke + kasse - UMBAU_GEHALT_HORIZONT * ergebnis.finalSalaryTotal,
+      staerke,
+      kasse,
+      gehalt: ergebnis.finalSalaryTotal,
+      kaeufe: ergebnis.decisions.length,
+      abloesen: Math.max(0, frame.planInput.economy.cash - kasse),
+      kader: ergebnis.finalSquad.length,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -1365,6 +1504,13 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       return wert;
     };
     let referenzMedian: number | null = null;
+    // TEAM-BLICK (Chris 25.11.): die Runde fuehrt ihre Buchbilanz (Σ Erloes − MW) und den Liquiditaetsdruck mit.
+    let buchBilanz = 0;
+    const liquiditaetsDruck = (kasse: number, gehalt: number): number => {
+      const ziel = Math.max(ctx.cashBuffer, KNAPP_GEHALT_ANTEIL * gehalt);
+      return ziel > 0 ? Math.min(1, Math.max(0, (ziel - kasse) / ziel)) : 0;
+    };
+    let staerkeAchsen: Record<"pow" | "spe" | "men" | "soc", number> | null = null;
     while (held.length > 0) {
       const state = buildState();
       if (kernRang == null) kernRang = bestimmeKern(state);
@@ -1375,8 +1521,10 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       if (referenzMedian == null) {
         const sortiert = [...staerke.values()].sort((a, b) => a - b);
         referenzMedian = sortiert.length > 0 ? Math.max(1e-6, sortiert[Math.floor((sortiert.length - 1) / 2)]!) : 1;
+        staerkeAchsen = state.needAxisWeights;
       }
       const finanznot = teamDistressed || state.cash < ctx.cashBuffer;
+      const druck = finanznot ? 1 : liquiditaetsDruck(state.cash, state.salaryTotal);
       let best: OrganicPlayerView | null = null;
       let bestAbwaegung: VerkaufsAbwaegung | null = null;
       for (const view of held) {
@@ -1398,6 +1546,8 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
           kaderVorher: held.length,
           spieltagsBedarf: bedarf,
           finanznot,
+          liquiditaetsDruck: druck,
+          buchBilanz,
           wWin: ctx.weights.wWin,
           wProfit: ctx.weights.wProfit,
           zufall: input.draftSeed ? draftUnit(`${input.draftSeed}:${view.playerId}:abwaegung`) : 0.5,
@@ -1415,7 +1565,82 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       held.splice(held.indexOf(best), 1);
       cash += Math.max(0, bestAbwaegung.erloes);
       salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
-      decisions.push({ playerId: best.playerId, step: decisions.length, utility: bestAbwaegung.vorteil, abgangsGrund: "kosten_nutzen", abwaegung: bestAbwaegung });
+      buchBilanz += bestAbwaegung.erloes - best.marketValue;
+      // Grund fuer Protokoll und Messung: entscheidet die Liquiditaet (knapp bei Kasse) oder der Bilanz-Ausgleich, steht das da.
+      const a = bestAbwaegung;
+      const abgangsGrund: OrganicSellDecision["abgangsGrund"] =
+        a.liquiditaet > 0 && a.vorteil - a.liquiditaet <= 0
+          ? "cash_verkauf"
+          : a.ausgleich > 0 && a.vorteil - a.ausgleich <= 0
+            ? "ausgleich"
+            : "kosten_nutzen";
+      decisions.push({ playerId: best.playerId, step: decisions.length, utility: a.vorteil, abgangsGrund, abwaegung: a });
+    }
+
+    /**
+     * UMBAU-PLAENE (Team-Blick, Chris 25.11.: „vllt sollte ich dann doch meinen starken teuren player verkaufen wenn der n gutes
+     * Angebot hat … um 2 mittlere zu holen“). Nach den Einzelabgaengen rechnet das Team fuer seine teuersten Spieler mit einem
+     * Angebot ueber dem Marktwert den ganzen Plan durch: VERKAUF + NACHKAUF mit dem bestehenden Kaufplaner (`buildOrganicDraftFrame`
+     * + `buildOrganicSquadPlan`, echte Marktangebote) gegen HALTEN + NACHKAUF. Bewertet wird der Kader danach: Staerke der besten 6
+     * (in C ueber den Marktpreis eines Qualitaetspunkts), Kasse nach den Kaeufen, ein Jahr Gehalt, Risiko auf die Abloesen. Der beste
+     * Plan mit Gewinn wird genommen, danach neu bewertet; hoechstens `UMBAU_MAX_RUNDEN` Runden, je Runde `UMBAU_KANDIDATEN`
+     * Kandidaten (rechnerisch beherrschbar). Ohne Markt (Tests, leerer Pool) entfaellt die Stufe.
+     */
+    const markt = umbauMarkt(input.gameState, input.marktKandidaten ?? null);
+    if (markt.length > 0 && staerkeAchsen && held.length > 1) {
+      const achsen = staerkeAchsen;
+      const punktwert = marktPreisJeQualitaetspunkt(markt, achsen, input.gameState);
+      const verkauftBisher = () => new Set(decisions.map((d) => d.playerId));
+      const simuliere = (ohne: string | null, kasse: number) =>
+        simuliereNachkauf({
+          gameState: input.gameState,
+          team: input.team,
+          identity: input.identity,
+          weg: new Set([...verkauftBisher(), ...(ohne ? [ohne] : [])]),
+          kasse,
+          markt,
+          achsen,
+          punktwert,
+          draftSeed: input.draftSeed ?? null,
+        });
+      for (let runde = 0; runde < UMBAU_MAX_RUNDEN && held.length > 1; runde++) {
+        const state = buildState();
+        const finanznot = teamDistressed || state.cash < ctx.cashBuffer;
+        const mwSortiert = held.map((v) => v.marketValue).sort((x, y) => x - y);
+        const mwMedian = mwSortiert[Math.floor((mwSortiert.length - 1) / 2)] ?? 0;
+        const kandidaten = held
+          .filter((view) => !frischVerlaengert.has(view.playerId) && view.marketValue > 0 && view.marketValue >= UMBAU_TEUER_FAKTOR * mwMedian)
+          .map((view) => {
+            const { preis } = angebot(view, Math.max(0, held.length - 1));
+            return { view, preis, restgehalt: buyoutByPlayerId.get(view.playerId) ?? 0 };
+          })
+          .filter((k) => k.preis != null && k.preis >= k.view.marketValue) // nur ein gutes Angebot (ueber dem Marktwert)
+          // Kernspieler: der Umbau-Plan rechnet den Ersatz mit echten Marktangeboten durch — das ist die begruendete Ausnahme vom Kernschutz
+          // (Chris 25.11.: „meinen starken teuren player verkaufen wenn der n gutes angebot hat“), verlangt aber ein klar gutes Angebot.
+          .filter((k) => finanznot || !kernRang?.has(k.view.playerId) || (k.preis as number) >= UMBAU_KERN_ANGEBOT * k.view.marketValue)
+          .filter((k) => restgehaltVerkaufLohnt({ marketValue: k.view.marketValue, realizedPrice: k.preis as number, openBuyout: k.restgehalt }))
+          .sort((x, y) => y.view.marketValue - x.view.marketValue)
+          .slice(0, UMBAU_KANDIDATEN);
+        if (kandidaten.length === 0) break;
+        const halten = simuliere(null, state.cash);
+        if (!halten) break;
+        let bester: { view: OrganicPlayerView; erloes: number; gewinn: number; plan: UmbauPlan } | null = null;
+        for (const k of kandidaten) {
+          const erloes = (k.preis as number) - k.restgehalt;
+          const plan = simuliere(k.view.playerId, state.cash + erloes);
+          if (!plan) continue;
+          const ausgleich = buchBilanz < 0 ? VERKAUFS_ABWAEGUNG.AUSGLEICH * Math.min(-buchBilanz, Math.max(0, erloes - k.view.marketValue)) : 0;
+          const risiko = UMBAU_RISIKO * plan.abloesen + VERKAUFS_ABWAEGUNG.WECHSEL_GEHALT * k.view.salary;
+          const gewinn = plan.wert - halten.wert - risiko + ausgleich;
+          if (gewinn > 0 && (!bester || gewinn > bester.gewinn)) bester = { view: k.view, erloes, gewinn, plan: { ...plan, haltenWert: halten.wert, haltenStaerke: halten.staerke, haltenKaeufe: halten.kaeufe } };
+        }
+        if (!bester) break;
+        held.splice(held.indexOf(bester.view), 1);
+        cash += Math.max(0, bester.erloes);
+        salaryTotal = Math.max(0, salaryTotal - Math.max(0, bester.view.salary));
+        buchBilanz += bester.erloes - bester.view.marketValue;
+        decisions.push({ playerId: bester.view.playerId, step: decisions.length, utility: bester.gewinn, abgangsGrund: "umbau", umbau: bester.plan });
+      }
     }
   }
   while (!schwellen && held.length > rosterMin) {
