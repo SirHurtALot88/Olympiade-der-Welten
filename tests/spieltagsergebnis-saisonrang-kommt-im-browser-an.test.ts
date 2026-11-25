@@ -40,9 +40,9 @@ function baueDreiSpieltage() {
   const [playerA, playerB, playerC] = gameState.players;
   gameState.teams = [teamA!, teamB!, teamC!];
   gameState.rosters = [
-    { id: "r-a", teamId: teamA!.teamId, playerId: playerA!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
-    { id: "r-b", teamId: teamB!.teamId, playerId: playerB!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
-    { id: "r-c", teamId: teamC!.teamId, playerId: playerC!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
+    { id: "r-a", teamId: teamA!.teamId, playerId: playerA!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
+    { id: "r-b", teamId: teamB!.teamId, playerId: playerB!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
+    { id: "r-c", teamId: teamC!.teamId, playerId: playerC!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
   ];
   gameState.season.matchdayIds = [...MATCHDAY_IDS];
   // Aktiv ist der DRITTE Spieltag — nur dessen Disziplin-Ergebnisse ueberleben die Anfangsladung.

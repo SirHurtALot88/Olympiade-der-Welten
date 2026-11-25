@@ -18,6 +18,7 @@ import { useEscSchliesst } from "@/app/foundation/shared/klickregel";
 import type { KlauselZeile } from "@/lib/marketing/marketing-klausel";
 import type { Werbeklausel } from "@/lib/marketing/marketing-modell";
 import WerbeklauselBlock from "./WerbeklauselBlock";
+import type { VertragswertAnzeige } from "@/lib/contracts/vertragswert-spielstand";
 
 /**
  * VERHANDLUNGSTISCH (Mockup 18.11.): EIN Dialog für Kauf und Verlängerung. Drei Spalten — der Spieler und warum er so
@@ -87,6 +88,8 @@ type Stand = {
   klausel: { gewaehlt: Werbeklausel; zeilen: KlauselZeile[]; ablehnung: string | null; loyal: boolean } | null;
   /** Gehalt, das unterschrieben wird (verhandeltes Gehalt mit Klausel-Faktor). */
   gehaltK: number | null;
+  /** Vertragswert (Stempel `vertragsPlan`): Erwartung im Nebel gestuft, Formkarten-Beitrag — vom Server vergroebert. */
+  anzeige: VertragswertAnzeige | null;
 };
 
 type Antwort = {
@@ -137,6 +140,7 @@ function normalisiere(modus: TischModus, antwort: any): Stand | null {
       confirmToken: null,
       klausel: s.klausel ?? null,
       gehaltK: s.gehaltMitKlausel ?? null,
+      anzeige: s.vertragswertAnzeige ?? null,
     };
   }
   const neg = summary.negotiationPreview ?? null;
@@ -155,7 +159,20 @@ function normalisiere(modus: TischModus, antwort: any): Stand | null {
     confirmToken: summary.confirmToken ?? null,
     klausel: summary.klausel ?? null,
     gehaltK: summary.klausel?.gehalt ?? null,
+    anzeige: summary.vertragswertAnzeige ?? null,
   };
+}
+
+const ERWARTUNG_TEXT: Record<"besser" | "gleich" | "schlechter", { zeichen: string; wort: string; farbe: string }> = {
+  besser: { zeichen: "▲", wort: "eher besser", farbe: "var(--gut)" },
+  gleich: { zeichen: "–", wort: "eher gleich", farbe: "var(--leise)" },
+  schlechter: { zeichen: "▼", wort: "eher schlechter", farbe: "var(--warn)" },
+};
+const FARB_WORT: Record<string, string> = { red: "rot", green: "grün", blue: "blau", yellow: "gelb" };
+
+/** „Ausstieg kostet“ vor jedem Vertragsjahr: Summe der noch offenen Raten laut Jahresplan (dieselbe Summe wie das Restgehalt beim Verkauf). */
+function ausstiegJeJahr(plan: ReadonlyArray<{ salary?: number | null }>): number[] {
+  return plan.map((_, i) => plan.slice(i).reduce((summe, j) => summe + (j.salary ?? 0), 0));
 }
 
 export default function VerhandlungsTisch(props: TischProps) {
@@ -387,11 +404,14 @@ export default function VerhandlungsTisch(props: TischProps) {
     }
   }
 
-  const maxLaenge = 4;
+  // 5-Jahres-Vertraege fuer jeden Spieler (Chris 25.11.), keine Sperre nach Rolle oder Rang.
+  const maxLaenge = 5;
   const chancen = [neg.acceptChance ?? 0, neg.counterChance ?? 0, neg.rejectChance ?? 0];
   const summe = Math.max(1, chancen[0] + chancen[1] + chancen[2]);
   const plan = neg.yearlySalarySchedule ?? [];
   const planMax = Math.max(1, ...plan.map((j) => j.salary ?? 0));
+  const ausstieg = ausstiegJeJahr(plan);
+  const anzeige = stand?.anzeige ?? null;
   const freigabeKostenBetrag =
     modus === "kauf"
       ? freigabeKosten(stand?.purchasePrice, stand?.gehaltK ?? angebot)
@@ -443,6 +463,31 @@ export default function VerhandlungsTisch(props: TischProps) {
                   </b>
                 )}
               </div>
+              {anzeige ? (
+                <>
+                  <div className="gz" data-testid="tisch-erwartung" title="Erwartung über die Vertragsjahre aus Potenzial, Trainingsgüte, Trainingsvorlieben, Leistung gegen Spieler ähnlichen Marktwerts und Form. Dieselbe Rechnung wie die KI; ohne Scouting verdeckt.">
+                    <span>Erwartung</span>
+                    {anzeige.erwartung ? (
+                      <b className="t" style={{ color: ERWARTUNG_TEXT[anzeige.erwartung].farbe }}>
+                        {ERWARTUNG_TEXT[anzeige.erwartung].zeichen} {ERWARTUNG_TEXT[anzeige.erwartung].wort}
+                        {anzeige.anteile ? (
+                          <small>
+                            {Math.round(anzeige.anteile.besser * 100)} / {Math.round(anzeige.anteile.gleich * 100)} / {Math.round(anzeige.anteile.schlechter * 100)} %
+                          </small>
+                        ) : (
+                          <small>beobachtet</small>
+                        )}
+                      </b>
+                    ) : (
+                      <b className="t">?<small>nicht gescoutet</small></b>
+                    )}
+                  </div>
+                  <div className="gz" data-testid="tisch-formkarte" title="Formkarten seiner Klassenfarbe, gemessen am Bedarf der Disziplinen und an den Spielern derselben Farbe im Kader.">
+                    <span>Formkarte {anzeige.formkarteFarbe ? FARB_WORT[anzeige.formkarteFarbe] ?? "" : ""}</span>
+                    <b className="t">+{de(anzeige.formkarte, 1)}<small>C je Saison</small></b>
+                  </div>
+                </>
+              ) : null}
             </div>
             <div className="dsp">
               <h4>Forderung</h4>
@@ -527,6 +572,16 @@ export default function VerhandlungsTisch(props: TischProps) {
                       </div>
                     ))}
                   </div>
+                  {plan.length > 1 && (
+                    <>
+                      <h4 className="ausstieg-kopf">Ausstieg kostet (Restgehalt vor dem Jahr)</h4>
+                      <div className="ausstieg" data-testid="tisch-ausstieg" title="Verkauf vor diesem Vertragsjahr: das Restgehalt laut Jahresplan zahlt der Verkäufer (außer der Spieler bietet die Vertragsauflösung an).">
+                        {ausstieg.map((betrag, i) => (
+                          <b key={i} className="t">{de(betrag, 1)}</b>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </>
               )}
               <div className="chance" aria-label="Chancen">

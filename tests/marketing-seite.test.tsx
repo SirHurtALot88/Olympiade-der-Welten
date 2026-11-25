@@ -29,7 +29,7 @@ function stand(): GameState {
   for (const team of gs.teams.slice(0, 4)) {
     for (let i = 0; i < 8; i += 1) {
       const p = frei[(z++ * 41) % frei.length]!;
-      rosters.push({ id: `ms-${team.teamId}-${i}`, teamId: team.teamId, playerId: p.id, contractLength: 2, salary: 8, upkeep: 8, purchasePrice: 10, currentValue: 10, roleTag: "bench", joinedSeasonId: gs.season.id });
+      rosters.push({ id: `ms-${team.teamId}-${i}`, teamId: team.teamId, playerId: p.id, contractLength: 2, salary: 8, upkeep: 8, purchasePrice: 10, currentValue: 10, joinedSeasonId: gs.season.id });
     }
   }
   return stempleMarketingBeimAnlegen(stempleFinanzenJeSpieltagBeimAnlegen({ ...gs, rosters }));

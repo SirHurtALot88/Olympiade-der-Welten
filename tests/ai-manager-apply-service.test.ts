@@ -145,7 +145,6 @@ function gameState(input?: {
       contractLength: index < 2 ? 2 : 1,
       salary: index < 2 ? 6 : 4,
       upkeep: index < 2 ? 6 : 4,
-      roleTag: index < 2 ? "starter" : "prospect",
       joinedSeasonId: "season-1",
     })),
     contracts: [],
@@ -377,7 +376,6 @@ describe("ai manager apply service", () => {
       contractLength: 2,
       salary: 5,
       upkeep: 5,
-      roleTag: "starter",
       joinedSeasonId: "season-1",
     }));
 
@@ -424,7 +422,6 @@ describe("ai manager apply service", () => {
       salary: 2,
       contractLength: 2,
       upkeep: 2,
-      roleTag: "starter",
       joinedSeasonId: "season-2",
     }));
 
@@ -490,7 +487,6 @@ describe("ai manager apply service", () => {
       contractLength: 2,
       salary: 5,
       upkeep: 5,
-      roleTag: "starter",
       joinedSeasonId: "season-1",
     }));
 
@@ -537,7 +533,6 @@ describe("ai manager apply service", () => {
         salary: 5,
         contractLength: 2,
         upkeep: 5,
-        roleTag: "starter",
         joinedSeasonId: "season-2",
       })),
       players: Array.from({ length: 8 }, (_, index) => player(`p-${index + 1}`)),

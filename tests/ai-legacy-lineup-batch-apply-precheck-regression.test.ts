@@ -144,7 +144,6 @@ function topUpRostersForLineupMinimum(gameState: GameState, saveId: string) {
         upkeep: Math.round(player.salaryDemand),
         purchasePrice: Math.round(player.marketValue),
         currentValue: Math.round(player.marketValue),
-        roleTag: "bench",
         joinedSeasonId: gameState.season.id,
       });
       rosterCounter += 1;

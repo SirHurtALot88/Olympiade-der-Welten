@@ -57,7 +57,6 @@ import { buildOrderedFoundationDisciplines, getTeamAxisRankTooltip } from "@/lib
 import type { TeamsViewRow } from "@/lib/foundation/tabs/teams-view-derivations";
 import type {
   TeamRosterFocusMode,
-  TeamRosterRoleFilter,
 } from "@/lib/foundation/tabs/use-teams-roster-table-derivations";
 import { normalizeLineupDisciplineFieldName } from "@/lib/lineups/team-discipline-ranks";
 import { SEASON_DISCIPLINE_LABELS, isSeasonDisciplineKey } from "@/lib/season/season-discipline-area-groups";
@@ -103,7 +102,6 @@ type NlTeamsRosterMode = "portraits" | "tabelle";
 export type NlTeamsRosterRow = {
   entry: {
     id: string;
-    roleTag?: string | null;
     contractLength: number;
     contractShape?: "balanced" | "front_loaded" | "back_loaded" | null;
     salary?: number | null;
@@ -182,9 +180,6 @@ export type FoundationTeamsNewLookProps = {
   fieldRaceRecentForm?: FieldRaceLedgerEntry[];
   fieldRacePlayedMatchdayCount?: number;
   filteredSelectedRosterTableRows: NlTeamsRosterRow[];
-  teamRosterRoleFilter: TeamRosterRoleFilter;
-  setTeamRosterRoleFilter: (value: TeamRosterRoleFilter) => void;
-  teamRosterRoleFilterOptions: Array<NlTeamsFilterOption<TeamRosterRoleFilter>>;
   teamRosterFocusMode: TeamRosterFocusMode;
   setTeamRosterFocusMode: (value: TeamRosterFocusMode) => void;
   teamRosterFocusOptions: Array<NlTeamsFilterOption<TeamRosterFocusMode>>;
@@ -1020,7 +1015,6 @@ export default function FoundationTeamsNewLook({
           playerId: row.player.id,
           entryId: row.entry.id,
           playerName: row.player.name,
-          roleTag: row.entry.roleTag,
           salary: heroIsOwnTeam && isFiniteNumber(salaryRaw) ? salaryRaw : null,
           contractLength: length,
           shapeShort: formatContractShapeShortLabel(row.entry.contractShape),
@@ -1268,7 +1262,6 @@ export default function FoundationTeamsNewLook({
               axisPps={buildAxisPpsFromRating(playerRatingsById?.get(player.id))}
               leagueHeatPools={leaguePlayerHeatPools}
               variant="team"
-              roleTag={entry.roleTag}
               playerClassName={player.className}
               className={getClassColorClassName(player.className, "player-card-class-frame")}
               subMeta={subMeta || null}
@@ -1428,7 +1421,6 @@ export default function FoundationTeamsNewLook({
           <thead>
             <tr>
               <th className="nl-teams-th-player">Spieler</th>
-              <th className="nl-teams-th-role">Rolle</th>
               <th>OVR</th>
               <th>MVS</th>
               <th>PPs</th>
@@ -1496,7 +1488,6 @@ export default function FoundationTeamsNewLook({
                       <span className="nl-teams-playermeta">{formatPlayerIdentitySubMeta(player) || "—"}</span>
                     </button>
                   </td>
-                  <td className="nl-teams-td-role">{entry.roleTag === "starter" ? "Starter" : entry.roleTag === "bench" ? "Bank" : entry.roleTag === "rotation" ? "Rotation" : "Kader"}</td>
                   <td>{formatNlNumber(row.playerOvr, 0)}</td>
                   <td>{formatNlNumber(row.playerMvs, 1)}</td>
                   <td>{formatNlNumber(row.playerPps, 1)}</td>
@@ -1607,7 +1598,7 @@ export default function FoundationTeamsNewLook({
             })}
             {filteredSelectedRosterTableRows.length === 0 ? (
               <tr>
-                <td colSpan={showActions ? 9 : 8} className="nl-teams-empty">
+                <td colSpan={showActions ? 8 : 7} className="nl-teams-empty">
                   Keine Spieler für den aktuellen Filter.
                 </td>
               </tr>

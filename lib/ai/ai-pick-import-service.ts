@@ -350,7 +350,6 @@ function buildReplayPreview(input: {
           negotiatedAnnualSalary: salaryReplay!,
           purchasePrice: purchasePriceReplay!,
           currentValue: purchasePriceReplay!,
-          roleTag: "prospect",
           joinedSeasonId: simulatedState.season.id,
         },
       ],

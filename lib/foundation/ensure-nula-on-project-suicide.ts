@@ -146,7 +146,6 @@ export function ensureNulaOnProjectSuicide(gameState: GameState): GameState {
     upkeep: existing?.upkeep ?? 0,
     purchasePrice: price,
     currentValue: price,
-    roleTag: existing?.roleTag ?? "bench",
     joinedSeasonId: existing?.joinedSeasonId ?? gameState.season.id,
   };
 

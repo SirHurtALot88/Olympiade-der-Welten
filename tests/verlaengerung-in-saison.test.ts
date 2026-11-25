@@ -83,7 +83,6 @@ function createRosterEntry(playerId: string, partial?: Partial<RosterEntry>): Ro
     upkeep: partial?.upkeep ?? partial?.salary ?? 7,
     purchasePrice: partial?.purchasePrice ?? 45,
     currentValue: partial?.currentValue ?? 45,
-    roleTag: partial?.roleTag ?? "starter",
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
 }
@@ -251,7 +250,7 @@ function unterschreibe(save: PersistedSaveGame, opts: { laenge: number; gehalt: 
 
 describe("Verlaengerung waehrend der Saison", () => {
   const spieler = () => [createPlayer("p1")];
-  const letzteSaison = () => [createRosterEntry("p1", { contractLength: 1, salary: 6, joinedSeasonId: "season-1", roleTag: "bench" })];
+  const letzteSaison = () => [createRosterEntry("p1", { contractLength: 1, salary: 6, joinedSeasonId: "season-1" })];
 
   it("Phasen-Riegel: zwischen den Spieltagen offen, mit Schalter aus wie vorher zu", () => {
     const save = inSaison({ gespielt: 4, players: spieler(), rosters: letzteSaison() });
@@ -296,7 +295,7 @@ describe("Verlaengerung waehrend der Saison", () => {
   });
 
   it("niedrigeres Gehalt gilt ebenfalls ab sofort, ohne Rueckbuchung", () => {
-    const save = inSaison({ gespielt: 5, players: spieler(), rosters: [createRosterEntry("p1", { contractLength: 1, salary: 14, roleTag: "bench" })] });
+    const save = inSaison({ gespielt: 5, players: spieler(), rosters: [createRosterEntry("p1", { contractLength: 1, salary: 14 })] });
     const { gespeichert } = unterschreibe(save, { laenge: 2, gehalt: 10 });
     expect(getTeamActualSalaryTotal(gespeichert!, "A-A")).toBeCloseTo(12, 1);
   });
@@ -392,7 +391,7 @@ describe("Verlaengerung waehrend der Saison", () => {
 
   it("KI: prueft je Spieler an einem festen Spieltag, nur Laufzeit 1, nie zweimal je Saison", () => {
     const players = [createPlayer("p1"), createPlayer("p2")];
-    const rosters = [createRosterEntry("p1", { contractLength: 1, salary: 6, roleTag: "bench" }), createRosterEntry("p2", { contractLength: 3, salary: 6 })];
+    const rosters = [createRosterEntry("p1", { contractLength: 1, salary: 6 }), createRosterEntry("p2", { contractLength: 3, salary: 6 })];
     const tag = kiPruefSpieltag("season-3", "A-A", "p1", GESAMT);
     expect(tag).toBeGreaterThanOrEqual(2);
     expect(tag).toBeLessThanOrEqual(GESAMT - 3);
@@ -416,7 +415,7 @@ describe("Verlaengerung waehrend der Saison", () => {
 
   it("KI: verlaengert nur (gibt nie frei) und hoechstens einmal je Spieler und Saison", () => {
     const players = [createPlayer("p1")];
-    const rosters = [createRosterEntry("p1", { contractLength: 1, salary: 6, roleTag: "bench" })];
+    const rosters = [createRosterEntry("p1", { contractLength: 1, salary: 6 })];
     const tag = kiPruefSpieltag("season-3", "A-A", "p1", GESAMT);
     const save = inSaison({ gespielt: tag, players, rosters });
     let gespeichert: PersistedSaveGame = save;

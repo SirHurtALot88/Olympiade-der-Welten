@@ -22,6 +22,10 @@
  *              Untergrenze, keine Hoechstzahl, Gewinnmitnahme ab 1,1 x MW auch unter Opt/Minimum) noch im Vertrags-Tick (keine Halte-
  *              Signale nach Opt/Minimum, keine Freigabe-Hoechstzahl) noch bei Vertragsaufloesungen; wer unter das Minimum geht, kauft
  *              im Fenster nach. "alt" = wie mit `restgehalt` allein. Fehlt im Altstempel = "alt".
+ *   vertragsPlan "neu" (25.11., docs/design/vertragswert-bau-25-11.md) = der VERTRAGSWERT W entscheidet Kaufen (Laufzeit 1-5 und Form je
+ *              Angebot), Verlaengern, Halten und Verkaufen: W nach echtem Jahresplan plus Fortsetzung, gewichtet nach der Erwartung; er ersetzt
+ *              die feste Sperre „Restgehalt netto >= 0,9 x MW“ in Verkaufsabwaegung, Umbau, Tausch und Vertragsaufloesung. Bestehende
+ *              Vertraege bleiben unveraendert. Setzt `verkaufSchwellen: neu` voraus. Fehlt im Altstempel = "alt".
  *   (Die Verkaufs-Sperre fuer alle Teams ist KEIN Stempel: bestehende Spielregel, gilt sofort — lib/market/transfer-sold-cooldown.ts.)
  *
  * `vorjahr` (Anker): je Team die Platzierung der abgelaufenen Saison als Anteil 0..1 (0 = Erster, 1 = Letzter) IN DER LIGA, in der
@@ -29,7 +33,7 @@
  * als 0 (Erster der neuen Liga: wer absteigt, soll oben erwartet werden und nicht belohnt werden). Liga-Rang 1 aus Liga 2 ist
  * KEIN Rang 1 in Liga 1.
  *
- * SCHALTER (Server, im Browser `NEXT_PUBLIC_…`): `OLY_QUOTE_UEBER_PFLICHTKADER`, `OLY_BOARD_ERWARTUNG_ANKER`, `OLY_KI_KERNSCHUTZ`, `OLY_KI_RESTGEHALT`, `OLY_KI_VERKAUF_SCHWELLEN`. Leer = neu. "0" / "aus" / "alt" = neue Saisons bekommen "alt"; gestempelte Saisons rechnen wie gestempelt.
+ * SCHALTER (Server, im Browser `NEXT_PUBLIC_…`): `OLY_QUOTE_UEBER_PFLICHTKADER`, `OLY_BOARD_ERWARTUNG_ANKER`, `OLY_KI_KERNSCHUTZ`, `OLY_KI_RESTGEHALT`, `OLY_KI_VERKAUF_SCHWELLEN`, `OLY_KI_VERTRAGSPLAN`. Leer = neu. "0" / "aus" / "alt" = neue Saisons bekommen "alt"; gestempelte Saisons rechnen wie gestempelt.
  */
 import type { GameState, SeasonState } from "@/lib/data/olyDataTypes";
 import { findLeagueMovementLog } from "@/lib/season/league-movement-service";
@@ -48,15 +52,17 @@ export type WirtschaftsRegelnStempel = {
   restgehalt?: WirtschaftsRegel;
   /** 24.11.: Abgang am Vertragsende nur nach den Schwellen der Verkaufslogik, Restgehalt-Verkauf praktisch gesperrt. Fehlt = "alt". */
   verkaufSchwellen?: WirtschaftsRegel;
+  /** 25.11.: Vertragswert entscheidet Laufzeit, Verlaengerung, Halten und Verkauf (statt 0,9-Sperre). Fehlt = "alt". */
+  vertragsPlan?: WirtschaftsRegel;
   vorjahr?: Record<string, number>;
 };
 
-export type WirtschaftsRegelName = "quote" | "anker" | "kernschutz" | "toepfeS1" | "restgehalt" | "verkaufSchwellen";
+export type WirtschaftsRegelName = "quote" | "anker" | "kernschutz" | "toepfeS1" | "restgehalt" | "verkaufSchwellen" | "vertragsPlan";
 
 function leseSchalter(wert: string | undefined): WirtschaftsRegel | null {
   const w = (wert ?? "").trim().toLowerCase();
   if (w === "") return null;
-  return w === "0" || w === "aus" || w === "alt" || w === "false" || w === "nein" || w === "off" ? "alt" : "neu";
+  return w === "0" || w === "aus" || w.startsWith("aus-") || w === "alt" || w === "false" || w === "nein" || w === "off" ? "alt" : "neu";
 }
 
 /** Schalter fuer NEUE Saisons. Die Zugriffe stehen woertlich da, damit Next.js die Browser-Variante ersetzt. */
@@ -74,6 +80,8 @@ function schalter(name: WirtschaftsRegelName): WirtschaftsRegel {
       return leseSchalter(process.env.NEXT_PUBLIC_OLY_KI_RESTGEHALT) ?? leseSchalter(process.env.OLY_KI_RESTGEHALT) ?? "neu";
     case "verkaufSchwellen":
       return leseSchalter(process.env.NEXT_PUBLIC_OLY_KI_VERKAUF_SCHWELLEN) ?? leseSchalter(process.env.OLY_KI_VERKAUF_SCHWELLEN) ?? "neu";
+    case "vertragsPlan":
+      return leseSchalter(process.env.NEXT_PUBLIC_OLY_KI_VERTRAGSPLAN) ?? leseSchalter(process.env.OLY_KI_VERTRAGSPLAN) ?? "neu";
   }
 }
 
@@ -86,6 +94,8 @@ export function wirtschaftsRegelnFuerNeueSaison(seasonId: string, vorjahr?: Reco
     toepfeS1: schalter("toepfeS1"),
     restgehalt: schalter("restgehalt"),
     verkaufSchwellen: schalter("verkaufSchwellen"),
+    // Der Vertragsplan setzt die Kosten-Nutzen-Abwaegung voraus (`verkaufSchwellen: neu`).
+    vertragsPlan: schalter("verkaufSchwellen") === "neu" ? schalter("vertragsPlan") : "alt",
     ...(vorjahr && Object.keys(vorjahr).length > 0 ? { vorjahr } : {}),
   };
 }
@@ -102,9 +112,18 @@ export function gueltigeWirtschaftsRegeln(gameState: Quelle): WirtschaftsRegelnS
   return stempel;
 }
 
-/** Gilt die Regel in der laufenden Saison dieses Spielstands? Ohne gueltigen Stempel: "alt". */
+/**
+ * Gilt die Regel in der laufenden Saison dieses Spielstands? Ohne gueltigen Stempel: "alt".
+ * Notbremse `vertragsPlan`: `OLY_KI_VERTRAGSPLAN=aus-sofort` (nur Server) schaltet ihn auch fuer gestempelte Saisons ab.
+ */
 export function wirtschaftsRegel(gameState: Quelle, name: WirtschaftsRegelName): WirtschaftsRegel {
+  if (name === "vertragsPlan" && istVertragsPlanNotbremse()) return "alt";
   return gueltigeWirtschaftsRegeln(gameState)?.[name] ?? "alt";
+}
+
+function istVertragsPlanNotbremse(): boolean {
+  const roh = (typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_OLY_KI_VERTRAGSPLAN ?? process.env.OLY_KI_VERTRAGSPLAN) : undefined) ?? "";
+  return roh.trim().toLowerCase() === "aus-sofort";
 }
 
 /** Gelten die zwei Toepfe samt Vorstands-Quote schon in Saison 1 (Budget-Gespraech 23.11.)? Ab Saison 2 immer; ohne Stempel in Saison 1 nein. */

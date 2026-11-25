@@ -120,7 +120,6 @@ function welt(input: { kader: Player[]; markt: Player[]; cash: number }) {
     upkeep: p.salaryDemand,
     purchasePrice: p.marketValue,
     currentValue: p.marketValue,
-    roleTag: "starter",
     joinedSeasonId: "season-1",
   })) as unknown as RosterEntry[];
   const team = { teamId: "team-test", name: "T", shortCode: "T", cash: input.cash, rosterLimit: 20, budget: 100, identityId: "team-test", humanControlled: false } as unknown as Team;
@@ -141,7 +140,7 @@ function welt(input: { kader: Player[]; markt: Player[]; cash: number }) {
       seasonId: "season-1",
       seasonSnapshots: [],
       sponsorPayoutLogs: [{ seasonId: "season-1", teamId: "team-test", componentId: "salary_deduct" }],
-      wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-1"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: "neu" },
+      wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-1"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: "neu", vertragsPlan: "alt" },
     },
   } as unknown as GameState;
   return { gameState, team };
@@ -226,7 +225,7 @@ function kreditLage(input: { cash: number; kader: number; opt: number; riskToler
           },
         },
       },
-      ...(input.stempel === false ? {} : { wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), verkaufSchwellen: "neu" } }),
+      ...(input.stempel === false ? {} : { wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), verkaufSchwellen: "neu", vertragsPlan: "alt" } }),
     },
     matchdayState: { matchdayId: "matchday-1", status: "planning", pendingTeamIds: [], resolvedFixtureIds: [] },
     teams: [{ teamId, shortCode: "T-1", name: "Team", budget: input.cash, cash: input.cash, rosterLimit: 14 }],
@@ -289,7 +288,7 @@ describe("5. Qualitaetstausch mit Risiko-Kredit ueber den Umbau-Weg", () => {
         sponsorPayoutLogs: [{ seasonId: "season-2", teamId: "team-test", componentId: "salary_deduct" }],
         loans: [],
         teamStrategyProfiles: { "team-test": { teamId: "team-test", strategySummary: "t", preferredArchetypes: [], secondaryArchetypes: [], bias } },
-        wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: "neu" },
+        wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: "neu", vertragsPlan: "alt" },
       },
     } as unknown as GameState;
     return { gameState: gs, team, kader, markt };

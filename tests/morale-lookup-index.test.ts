@@ -27,7 +27,6 @@ describe("morale lookup index equivalence", () => {
           contractLength: 3,
           salary: 1000,
           upkeep: 0,
-          roleTag: "starter",
           joinedSeasonId: gameState.season.id,
         });
       }

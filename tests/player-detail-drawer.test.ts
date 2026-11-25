@@ -190,7 +190,6 @@ function createGameState(input: { player: Player; withRoster?: boolean; snapshot
             teamId,
             salary: 12.75,
             contractLength: 3,
-            roleTag: "starter",
             joinedSeasonId: "season-1",
             purchasePrice: 70,
             currentValue: 73,

@@ -22,7 +22,7 @@ describe("long-run phase audit fatigue gates", () => {
       teams: [{ teamId: "t1", shortCode: "A-A", name: "A", budget: 200, cash: 50, rosterLimit: 32, humanControlled: false }],
       teamIdentities: [{ teamId: "t1", playerMin: 8, playerOpt: 12 }],
       players: [{ id: "p1", name: "P", gender: "male", race: "human", rating: 50, potential: 60, trainingMode: "mittel", fatigue: 40 }],
-      rosters: [{ id: "r1", teamId: "t1", playerId: "p1", contractLength: 2, salary: 10, upkeep: 0, roleTag: "starter", joinedSeasonId: "season-1" }],
+      rosters: [{ id: "r1", teamId: "t1", playerId: "p1", contractLength: 2, salary: 10, upkeep: 0, joinedSeasonId: "season-1" }],
       transferHistory: [],
       contracts: [],
       transferListings: [],

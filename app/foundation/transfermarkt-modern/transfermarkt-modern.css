@@ -262,6 +262,8 @@
 .tmk .treppe div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:calc(.15 * var(--u));font-size:calc(.78 * var(--u));color:var(--leise)}
 .tmk .treppe div i{display:block;width:100%;background:linear-gradient(180deg,var(--heim),rgba(242,160,61,.35));clip-path:polygon(calc(.3 * var(--u)) 0,100% 0,calc(100% - calc(.3 * var(--u))) 100%,0 100%)}
 .tmk .treppe div b{color:var(--tinte);font-size:calc(.9 * var(--u))}
+.tmk .ausstieg{display:flex;gap:calc(.5 * var(--u));flex:none}
+.tmk .ausstieg b{flex:1;text-align:center;color:var(--warn);font-size:calc(.84 * var(--u));font-weight:600}
 .tmk .chance{display:flex;height:calc(1.5 * var(--u));transform:skewX(-14deg);border-radius:2px;overflow:hidden;flex:none}
 .tmk .chance i{display:grid;place-items:center;font-style:normal;font-weight:700;font-size:calc(.85 * var(--u));color:#0b0d12;min-width:0;overflow:hidden;transition:flex-basis .2s}
 .tmk .chance i span{transform:skewX(14deg);white-space:nowrap}

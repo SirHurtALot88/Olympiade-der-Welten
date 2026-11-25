@@ -267,7 +267,6 @@ function createGameState(): GameState {
         upkeep: 10,
         purchasePrice: 95,
         currentValue: 110,
-        roleTag: "starter",
         promisedRole: "starter",
         joinedSeasonId: "season-1",
       },

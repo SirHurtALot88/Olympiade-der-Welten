@@ -232,8 +232,8 @@ describe("ai-manager-doctrine-service", () => {
   it("switches to recovery/light tactical behavior in injury crisis and rejects hard training after crisis", () => {
     const base = gameState({
       rosters: [
-        { id: "r1", teamId: "M-M", playerId: "cheap-prospect", contractLength: 2, salary: 3, upkeep: 3, roleTag: "starter", joinedSeasonId: "season-1" },
-        { id: "r2", teamId: "M-M", playerId: "mage-core", contractLength: 2, salary: 8, upkeep: 8, roleTag: "starter", joinedSeasonId: "season-1" },
+        { id: "r1", teamId: "M-M", playerId: "cheap-prospect", contractLength: 2, salary: 3, upkeep: 3, joinedSeasonId: "season-1" },
+        { id: "r2", teamId: "M-M", playerId: "mage-core", contractLength: 2, salary: 8, upkeep: 8, joinedSeasonId: "season-1" },
       ],
       seasonState: {
         ...gameState().seasonState,
@@ -266,7 +266,6 @@ describe("ai-manager-doctrine-service", () => {
         contractLength: 2,
         salary: 8,
         upkeep: 8,
-        roleTag: index < 5 ? "starter" : "bench",
         joinedSeasonId: "season-1",
       })),
     });

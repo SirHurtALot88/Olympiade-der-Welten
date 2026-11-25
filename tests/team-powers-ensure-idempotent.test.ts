@@ -96,7 +96,6 @@ function createRosterEntry(id: string, teamId: string, playerId: string): Roster
     upkeep: 5,
     purchasePrice: 20,
     currentValue: 20,
-    roleTag: "starter",
     promisedRole: null,
     joinedSeasonId: SEASON_ID,
   };

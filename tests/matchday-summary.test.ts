@@ -19,10 +19,10 @@ describe("matchday summary presenter", () => {
     // draft machinery other tests use (topUpRostersForLineupMinimum()).
     const freePlayers = gameState.players.slice(0, 4);
     gameState.rosters = [
-      { id: "summary-roster-a0", teamId: teamA!.teamId, playerId: freePlayers[0]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
-      { id: "summary-roster-a1", teamId: teamA!.teamId, playerId: freePlayers[1]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
-      { id: "summary-roster-b0", teamId: teamB!.teamId, playerId: freePlayers[2]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
-      { id: "summary-roster-b1", teamId: teamB!.teamId, playerId: freePlayers[3]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
+      { id: "summary-roster-a0", teamId: teamA!.teamId, playerId: freePlayers[0]!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
+      { id: "summary-roster-a1", teamId: teamA!.teamId, playerId: freePlayers[1]!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
+      { id: "summary-roster-b0", teamId: teamB!.teamId, playerId: freePlayers[2]!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
+      { id: "summary-roster-b1", teamId: teamB!.teamId, playerId: freePlayers[3]!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
     ];
     const rosterA = gameState.rosters.filter((entry) => entry.teamId === teamA?.teamId).slice(0, 2);
     const rosterB = gameState.rosters.filter((entry) => entry.teamId === teamB?.teamId).slice(0, 2);

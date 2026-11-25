@@ -1,3 +1,4 @@
+import { vertragswertKaufKontext } from "@/lib/contracts/vertragswert-spielstand";
 import { evaluateAiNeeds } from "@/lib/ai/aiNeedsEngine";
 import { MARKET_BRACKET_DEFINITIONS } from "@/lib/ai/market-pick-engine/market-brackets";
 import { resolveMarketSpendableCashForPlanner } from "@/lib/ai/ai-manager-apply-service";
@@ -1200,6 +1201,7 @@ function buildCandidatePreview(
       teamRosterMin: item.playerMin,
       teamRosterOpt: item.playerOpt,
       isFirstSeason: context.seasonId === "season-1",
+      vertragswert: vertragswertKaufKontext(context.gameState, team.teamId, player),
     });
     const blockingReasons: string[] = [];
 

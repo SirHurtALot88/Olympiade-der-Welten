@@ -108,7 +108,6 @@ function topUpRosterCoverage(saveId: string, requiredUniquePlayers = 12) {
         upkeep: Math.round(player.salaryDemand),
         purchasePrice: Math.round(player.marketValue),
         currentValue: Math.round(player.marketValue),
-        roleTag: "bench",
         joinedSeasonId: save.gameState.season.id,
       });
       rosterCounter += 1;

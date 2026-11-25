@@ -95,7 +95,6 @@ function gameState(partial?: Partial<GameState>): GameState {
         upkeep: 2,
         purchasePrice: 10,
         currentValue: 10,
-        roleTag: "starter",
         joinedSeasonId: "season-2",
       },
     ],

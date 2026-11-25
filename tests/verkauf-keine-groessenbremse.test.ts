@@ -102,7 +102,6 @@ function chrisKader(schwellen: "alt" | "neu") {
       upkeep: 4,
       purchasePrice: 30,
       currentValue: 30,
-      roleTag: "starter",
       joinedSeasonId: "season-1",
     } as RosterEntry);
   }
@@ -120,7 +119,7 @@ function chrisKader(schwellen: "alt" | "neu") {
       seasonId: "season-1",
       seasonSnapshots: [],
       sponsorPayoutLogs: [{ seasonId: "season-1", teamId: "team-test", componentId: "salary_deduct" }],
-      wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-1"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: schwellen },
+      wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-1"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: schwellen, vertragsPlan: "alt" },
     },
   } as unknown as GameState;
   return { gameState, team: t, players };
@@ -232,7 +231,7 @@ function tickState(schwellen: "alt" | "neu" | null, anzahl: number, gehalt = 0.5
       alignment: "N", gender: "f", subclasses: [], traitsPositive: [], traitsNegative: [], coreStats: { pow: 40, spe: 40, men: 40, soc: 40 },
       preferredDisciplineIds: [], disciplineRatings: { climb: 45 }, fatigue: 0, form: 0, potential: 0,
     } as unknown as Player);
-    rosters.push({ id: `roster:A-A:s${i}`, teamId: "A-A", playerId: `s${i}`, contractLength: 1, salary: gehalt, upkeep: gehalt, purchasePrice: 10, currentValue: 10, roleTag: "bench", joinedSeasonId: "season-1" } as RosterEntry);
+    rosters.push({ id: `roster:A-A:s${i}`, teamId: "A-A", playerId: `s${i}`, contractLength: 1, salary: gehalt, upkeep: gehalt, purchasePrice: 10, currentValue: 10, joinedSeasonId: "season-1" } as RosterEntry);
   }
   const gameState = {
     gamePhase: "season_end_management",
@@ -242,7 +241,7 @@ function tickState(schwellen: "alt" | "neu" | null, anzahl: number, gehalt = 0.5
       schedule: [],
       standings: { "A-A": { points: 0 } },
       teamControlSettings: { "A-A": { teamId: "A-A", controlMode: "ai", ownerId: "ai", ownerSlot: "ai", displayLabel: "A-A" } },
-      ...(schwellen ? { wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), verkaufSchwellen: schwellen } } : {}),
+      ...(schwellen ? { wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), verkaufSchwellen: schwellen, vertragsPlan: "alt" } } : {}),
     },
     matchdayState: { matchdayId: "matchday-1", status: "resolved", pendingTeamIds: [], resolvedFixtureIds: [] },
     teams,

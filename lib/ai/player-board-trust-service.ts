@@ -10,7 +10,6 @@ export type PlayerBoardTrustInput = {
   contractLength: number | null;
   weakTeamFit: boolean;
   hardNoGoHit?: boolean;
-  roleTag?: string | null;
   salary?: number | null;
   marketValue?: number | null;
   purchasePrice?: number | null;
@@ -67,19 +66,11 @@ function isFiniteNumber(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function getRoleExpectationWeight(roleTag: string | null | undefined) {
-  const normalized = (roleTag ?? "").toLowerCase();
-  if (normalized.includes("star") || normalized.includes("starter") || normalized.includes("core")) {
-    return 1.25;
-  }
-  if (normalized.includes("bench") || normalized.includes("depth")) {
-    return 0.8;
-  }
-  if (normalized.includes("prospect") || normalized.includes("youth")) {
-    return 0.55;
-  }
-  return 1;
-}
+/**
+ * Gewicht verfehlter Erwartungen. Bis 25.11. hing es am Rollen-Etikett (Stammspieler 1,25 / Bank 0,8 / Nachwuchs 0,55); jeder Kaufweg
+ * schrieb „Nachwuchs“, es galt also praktisch immer 0,55. Das Etikett ist entfernt (Chris 25.11.), der Wert bleibt.
+ */
+const ERWARTUNGS_GEWICHT = 0.55;
 
 function getActualCompositeRank(input: PlayerBoardTrustInput) {
   const weightedRanks: Array<{ rank: number; weight: number }> = [];
@@ -163,7 +154,7 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
     ((hasScoreSample && performanceRatio < 0.9 && !rankMeetsExpectation) ||
       (!hasScoreSample && input.appearances > 0 && !hasBroadRankContext) ||
       input.appearances > 0);
-  const roleExpectationWeight = getRoleExpectationWeight(input.roleTag);
+  const roleExpectationWeight = ERWARTUNGS_GEWICHT;
   const meaningfulRankGap = hasRankSample && rankGap != null;
   const eliteCurrentProduction = [input.actualPpsRank, input.actualMvsRank, input.actualAxisPpsRank].some(
     (rank) => isFiniteNumber(rank) && rank <= 3,
@@ -220,8 +211,6 @@ export function assessPlayerBoardTrust(input: PlayerBoardTrustInput): PlayerBoar
     reasons.push("market_value_loss_after_purchase");
   }
   if (input.appearances > 0 && input.appearances < 3) {
-    const usagePenalty = input.roleTag?.toLowerCase().includes("starter") ? 4 : 0;
-    trustScore -= usagePenalty;
     reasons.push("limited_usage_needs_review");
   }
   if (input.weakTeamFit) {

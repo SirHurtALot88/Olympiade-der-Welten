@@ -39,7 +39,6 @@ function buildRoster(teamId: string, playerId: string): RosterEntry {
     teamId,
     playerId,
     upkeep: 0,
-    roleTag: "squad",
     joinedSeasonId: SEASON_ID,
   } as unknown as RosterEntry;
 }

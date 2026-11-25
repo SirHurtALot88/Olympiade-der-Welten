@@ -170,7 +170,6 @@ export type FoundationScreenPrimaryAction = {
 
 
 export type SeasonTableMode = "compact" | "expert";
-export type TeamRosterRoleFilter = "all" | "starter" | "rotation" | "prospect" | "bench" | "other";
 export type TeamRosterFocusMode = "default" | "salary" | "value" | "contracts" | "training";
 export type FoundationReadSource = "sqlite" | "prisma";
 export type FoundationReadMeta = {
@@ -630,7 +629,6 @@ export type SeasonReviewPromisedRoleSignalResponse = {
   playerName: string;
   teamId: string;
   teamName: string;
-  roleTag: string;
   promisedRole: string;
   appearances: number;
   expectedAppearances: number;
@@ -937,7 +935,6 @@ export type TransfermarktSellSummary = {
     id: string;
     playerId: string;
     status: string;
-    roleTag: string;
     contractLength: number;
     salary: number;
     purchasePrice: number | null;

@@ -403,7 +403,7 @@ describe("player progression forecast", () => {
     const player = createPlayer();
     const gameState = createGameState(player);
     gameState.teams = [{ teamId: "team-1", name: "Team One", shortCode: "T-1", cash: 100, rosterLimit: 14 } as never];
-    gameState.rosters = [{ teamId: "team-1", playerId: player.id, roleTag: "starter", joinedSeasonId: "season-1" } as never];
+    gameState.rosters = [{ teamId: "team-1", playerId: player.id, role: "starter", joinedSeasonId: "season-1" } as never];
     gameState.seasonState.teamFacilities = {
       "team-1": {
         facilities: {
@@ -447,7 +447,7 @@ describe("player progression forecast", () => {
   it("pushes underperforming starter-level players into regression", () => {
     const player = createPlayer({ potential: 63, rating: 60 });
     const gameState = createGameState(player);
-    gameState.rosters = [{ teamId: "team-1", playerId: player.id, roleTag: "starter", joinedSeasonId: "season-1" } as never];
+    gameState.rosters = [{ teamId: "team-1", playerId: player.id, role: "starter", joinedSeasonId: "season-1" } as never];
     const forecast = buildPlayerProgressionForecast({
       gameState,
       player,
@@ -478,7 +478,7 @@ describe("player progression forecast", () => {
   it("warns expensive stars with bad performance through regression pressure", () => {
     const player = createPlayer({ marketValue: 90000, salaryDemand: 20000, potential: 80, rating: 78 });
     const gameState = createGameState(player);
-    gameState.rosters = [{ teamId: "team-1", playerId: player.id, roleTag: "star", joinedSeasonId: "season-1" } as never];
+    gameState.rosters = [{ teamId: "team-1", playerId: player.id, role: "star", joinedSeasonId: "season-1" } as never];
     const forecast = buildPlayerProgressionForecast({
       gameState,
       player,

@@ -37,7 +37,6 @@ function spielstand(overrides?: { nulaTeamId?: string | null; salary?: number; c
               upkeep: 0,
               purchasePrice: PREIS,
               currentValue: PREIS,
-              roleTag: "bench",
               joinedSeasonId: "season-1",
             },
           ];

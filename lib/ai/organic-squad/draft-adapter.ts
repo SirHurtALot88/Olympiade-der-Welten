@@ -80,6 +80,7 @@ import { buildTransfermarktSaleFactorBreakdown } from "@/lib/market/transfermark
 import { isPlayerTransferBuyBlocked } from "@/lib/market/transfer-sold-cooldown";
 import { risikoKreditRahmen } from "@/lib/ai/ai-loan-decision-service";
 import { resolveOpenBuyoutCostForRoster } from "@/lib/market/transfermarkt-sell-proceeds";
+import { laufenderVertragswert, vertragsPlanAktiv } from "@/lib/contracts/vertragswert-spielstand";
 import {
   applySellPricingPolicyToBreakdown,
   isBigHaircut,
@@ -1064,6 +1065,9 @@ export function kernAngebotGenuegt(rang: number, faktor: number | null): boolean
  * Kassensturz (Ruecklage, Kredit, Notkredit, Notverkauf).
  */
 export const RESTGEHALT_NETTO_MINDESTANTEIL = 0.9;
+// Mit Stempel `vertragsPlan` (Chris 25.11.) ersetzt der VERTRAGSWERT diese Sperre in Abwaegung, Umbau und Tausch: ein Spieler mit
+// Vertrag geht, wenn Netto (Preis − Restgehalt) mehr bringt als W (Nutzen der Restjahre − deren Gehalt + Fortsetzung). Uebrig bleibt nur:
+// kein Verkauf, der die Kasse netto belastet (Netto <= 0 bei offenem Restgehalt) — dafuer gibt es die Vertragsaufloesung.
 
 /** Lohnt sich ein Verkauf mit offenem Restgehalt? Rein, fuer Planer und Waechter. */
 export function restgehaltVerkaufLohnt(input: { marketValue: number; realizedPrice: number; openBuyout: number }): boolean {
@@ -1438,6 +1442,10 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
   // Kadergroessen-Untergrenze (Chris 24.11., „fuer immer“): die Kadertiefe ist ein Kostenposten der Abwaegung (Belastung), keine Grenze.
   const rosterMin = schwellen || input.allowBelowMin ? 0 : ROSTER_MIN;
   const frischVerlaengert = schwellen ? frischVerlaengerteSpieler(input.gameState, input.team.teamId) : new Set<string>();
+  // VERTRAGSWERT (Stempel `vertragsPlan`, Chris 25.11., lib/contracts/vertragswert.ts): ersetzt die 0,9-Sperre (s. oben).
+  const vertragsPlan = schwellen && vertragsPlanAktiv(input.gameState);
+  const restgehaltVerkaufErlaubt = (marketValue: number, preis: number, restgehalt: number): boolean =>
+    vertragsPlan ? !(restgehalt > 0) || preis - restgehalt > 0 : restgehaltVerkaufLohnt({ marketValue, realizedPrice: preis, openBuyout: restgehalt });
 
   let cash = ctx.cash;
   let salaryTotal = held.reduce((sum, view) => sum + Math.max(0, view.salary), 0);
@@ -1525,6 +1533,32 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       return ziel > 0 ? Math.min(1, Math.max(0, (ziel - kasse) / ziel)) : 0;
     };
     let staerkeAchsen: Record<"pow" | "spe" | "men" | "soc", number> | null = null;
+    // W je Spieler (Stempel `vertragsPlan`): mit dem festen Staerke-Bezug des Plans einmal gerechnet.
+    const vertragswertCache = new Map<string, number | null>();
+    const vertragswertFuer = (view: OrganicPlayerView, leistungsFaktor: number, staerkeVerhaeltnis: number): number | null => {
+      if (!vertragsPlan) return null;
+      if (!vertragswertCache.has(view.playerId)) {
+        const player = playerById.get(view.playerId) ?? null;
+        const rosterEntry = rosterEntryByPlayerId.get(view.playerId) ?? null;
+        let wert: number | null = null;
+        if (player && rosterEntry) {
+          try {
+            wert = laufenderVertragswert({
+              gameState: input.gameState,
+              teamId: input.team.teamId,
+              player,
+              rosterEntry,
+              leistungsFaktor,
+              staerkeVerhaeltnis,
+            }).wert;
+          } catch {
+            wert = null;
+          }
+        }
+        vertragswertCache.set(view.playerId, wert);
+      }
+      return vertragswertCache.get(view.playerId) ?? null;
+    };
     while (held.length > 0) {
       const state = buildState();
       if (kernRang == null) kernRang = bestimmeKern(state);
@@ -1549,14 +1583,15 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
         const rang = kernRang.get(view.playerId);
         if (rang != null && !finanznot && !kernAngebotGenuegt(rang, preis / view.marketValue)) continue; // Kernschutz
         const restgehalt = buyoutByPlayerId.get(view.playerId) ?? 0;
-        if (!restgehaltVerkaufLohnt({ marketValue: view.marketValue, realizedPrice: preis, openBuyout: restgehalt })) continue;
+        if (!restgehaltVerkaufErlaubt(view.marketValue, preis, restgehalt)) continue;
+        const staerkeVerhaeltnis = (staerke.get(view.playerId) ?? 0) / referenzMedian;
         const a = verkaufsAbwaegung({
           marktwert: view.marketValue,
           preis,
           restgehalt,
           gehalt: view.salary,
           leistungsFaktor,
-          staerkeVerhaeltnis: (staerke.get(view.playerId) ?? 0) / referenzMedian,
+          staerkeVerhaeltnis,
           kaderVorher: held.length,
           spieltagsBedarf: bedarf,
           finanznot,
@@ -1565,6 +1600,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
           wWin: ctx.weights.wWin,
           wProfit: ctx.weights.wProfit,
           zufall: input.draftSeed ? draftUnit(`${input.draftSeed}:${view.playerId}:abwaegung`) : 0.5,
+          vertragswert: vertragswertFuer(view, leistungsFaktor, staerkeVerhaeltnis),
         });
         if (!bestAbwaegung || a.vorteil > bestAbwaegung.vorteil) {
           best = view;
@@ -1579,7 +1615,8 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       held.splice(held.indexOf(best), 1);
       cash += Math.max(0, bestAbwaegung.erloes);
       salaryTotal = Math.max(0, salaryTotal - Math.max(0, best.salary));
-      buchBilanz += bestAbwaegung.erloes - best.marketValue;
+      // Buchbilanz: mit Vertragswert der Preis gegen den Marktwert (das Restgehalt faellt beim Halten genauso an), sonst das Netto.
+      buchBilanz += (bestAbwaegung.vertragswert != null ? bestAbwaegung.erloes + (buyoutByPlayerId.get(best.playerId) ?? 0) : bestAbwaegung.erloes) - best.marketValue;
       // Grund fuer Protokoll und Messung: entscheidet die Liquiditaet (knapp bei Kasse) oder der Bilanz-Ausgleich, steht das da.
       const a = bestAbwaegung;
       const abgangsGrund: OrganicSellDecision["abgangsGrund"] =
@@ -1600,6 +1637,13 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
      * Plan mit Gewinn wird genommen, danach neu bewertet; hoechstens `UMBAU_MAX_RUNDEN` Runden, je Runde `UMBAU_KANDIDATEN`
      * Kandidaten (rechnerisch beherrschbar). Ohne Markt (Tests, leerer Pool) entfaellt die Stufe.
      */
+    /** Restgehalt ohne die erste offene Rate: was das haltende Team nach dem Ein-Jahres-Horizont der Plaene noch zahlt. */
+    const restJenseitsEinesJahres = (playerId: string, restgehalt: number): number => {
+      const entry = rosterEntryByPlayerId.get(playerId);
+      if (!entry || !(restgehalt > 0)) return 0;
+      const ersteRate = Math.max(0, entry.salary ?? 0);
+      return Math.max(0, restgehalt - ersteRate);
+    };
     const markt = umbauMarkt(input.gameState, input.marktKandidaten ?? null);
     if (markt.length > 0 && staerkeAchsen && held.length > 1) {
       const achsen = staerkeAchsen;
@@ -1632,7 +1676,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
           // Kernspieler: der Umbau-Plan rechnet den Ersatz mit echten Marktangeboten durch — das ist die begruendete Ausnahme vom Kernschutz
           // (Chris 25.11.: „meinen starken teuren player verkaufen wenn der n gutes angebot hat“), verlangt aber ein klar gutes Angebot.
           .filter((k) => finanznot || !kernRang?.has(k.view.playerId) || (k.preis as number) >= UMBAU_KERN_ANGEBOT * k.view.marketValue)
-          .filter((k) => restgehaltVerkaufLohnt({ marketValue: k.view.marketValue, realizedPrice: k.preis as number, openBuyout: k.restgehalt }))
+          .filter((k) => restgehaltVerkaufErlaubt(k.view.marketValue, k.preis as number, k.restgehalt))
           .sort((x, y) => y.view.marketValue - x.view.marketValue)
           .slice(0, UMBAU_KANDIDATEN);
         if (kandidaten.length === 0) break;
@@ -1645,7 +1689,9 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
           if (!plan) continue;
           const ausgleich = buchBilanz < 0 ? VERKAUFS_ABWAEGUNG.AUSGLEICH * Math.min(-buchBilanz, Math.max(0, erloes - k.view.marketValue)) : 0;
           const risiko = UMBAU_RISIKO * plan.abloesen + VERKAUFS_ABWAEGUNG.WECHSEL_GEHALT * k.view.salary;
-          const gewinn = plan.wert - halten.wert - risiko + ausgleich;
+          // Keine Doppelzaehlung (Stempel `vertragsPlan`): die Plaene rechnen ein Jahr Gehalt; das Restgehalt jenseits davon zahlt das
+          // haltende Team spaeter genauso — es steht beim Verkauf im Netto und wird hier zurueckgerechnet.
+          const gewinn = plan.wert - halten.wert - risiko + ausgleich + (vertragsPlan ? restJenseitsEinesJahres(k.view.playerId, k.restgehalt) : 0);
           if (gewinn > 0 && (!bester || gewinn > bester.gewinn)) bester = { view: k.view, erloes, gewinn, plan: { ...plan, haltenWert: halten.wert, haltenStaerke: halten.staerke, haltenKaeufe: halten.kaeufe } };
         }
         if (!bester) break;
@@ -1672,7 +1718,7 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
       if (tauschKandidat && rahmen) {
         const { preis } = angebot(tauschKandidat.view, Math.max(0, held.length - 1));
         const restgehalt = buyoutByPlayerId.get(tauschKandidat.view.playerId) ?? 0;
-        if (preis != null && restgehaltVerkaufLohnt({ marketValue: tauschKandidat.view.marketValue, realizedPrice: preis, openBuyout: restgehalt })) {
+        if (preis != null && restgehaltVerkaufErlaubt(tauschKandidat.view.marketValue, preis, restgehalt)) {
           const state = buildState();
           const erloes = preis - restgehalt;
           const halten = simuliere(null, state.cash);
@@ -1680,9 +1726,10 @@ export function planOrganicSellsForTeam(input: OrganicSellPlanInput): OrganicSel
           const mit = simuliere(tauschKandidat.view.playerId, state.cash + erloes + rahmen.betrag);
           if (halten && ohne && mit) {
             const risiko = UMBAU_RISIKO * mit.abloesen + VERKAUFS_ABWAEGUNG.WECHSEL_GEHALT * tauschKandidat.view.salary;
-            const wertMit = mit.wert - rahmen.betrag - rahmen.kosten - risiko;
+            const restKorrektur = vertragsPlan ? restJenseitsEinesJahres(tauschKandidat.view.playerId, restgehalt) : 0;
+            const wertMit = mit.wert - rahmen.betrag - rahmen.kosten - risiko + restKorrektur;
             const staerkeGewinn = punktwert * (mit.staerke - halten.staerke);
-            if (wertMit > halten.wert && wertMit > ohne.wert && staerkeGewinn > rahmen.kosten) {
+            if (wertMit > halten.wert && wertMit > ohne.wert + restKorrektur && staerkeGewinn > rahmen.kosten) {
               held.splice(held.indexOf(tauschKandidat.view), 1);
               cash += Math.max(0, erloes);
               salaryTotal = Math.max(0, salaryTotal - Math.max(0, tauschKandidat.view.salary));

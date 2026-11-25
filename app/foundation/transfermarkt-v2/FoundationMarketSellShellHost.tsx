@@ -18,7 +18,6 @@ import {
   formatGmPressureLabel,
   formatMatchdayShortLabel,
   formatReadinessAfterSellLabel,
-  formatRosterRoleTagLabel,
   resolveSellDisabledReason,
   translateSellBlockingReason,
   translateSellWarning,
@@ -389,11 +388,6 @@ export default function FoundationMarketSellShellHost({
             <ClassColorChip className={className} />
             <span className="transfer-sell-hero-chip">{race}</span>
             <span className="transfer-sell-hero-chip">{teamLabel}</span>
-            {preview?.activePlayer ? (
-              <span className="transfer-sell-hero-chip">
-                Rolle {formatRosterRoleTagLabel(preview.activePlayer.roleTag)}
-              </span>
-            ) : null}
             {preview?.activePlayer ? (
               <span className="transfer-sell-hero-chip">
                 Vertrag{" "}
@@ -889,7 +883,6 @@ export default function FoundationMarketSellShellHost({
                 <article className="metric-card">
                   <span>Laufzeit</span>
                   <strong>{preview.activePlayer?.contractLength ?? "—"}</strong>
-                  <small>Rolle {formatRosterRoleTagLabel(preview.activePlayer?.roleTag)}</small>
                 </article>
               </div>
 

@@ -224,7 +224,7 @@ function applyTrainingModes(gameState: GameState): { gameState: GameState; rows:
       const decision =
         control.controlMode === "manual"
           ? { mode: player.trainingMode ?? "mittel", reason: "manual_team_preview_only_not_overwritten" }
-          : decideTrainingMode({ player, rosterRole: entry.roleTag, usageRank: index + 1, teamRosterSize: roster.length });
+          : decideTrainingMode({ player, rosterRole: entry.promisedRole ?? null, usageRank: index + 1, teamRosterSize: roster.length });
       if (control.controlMode !== "manual") {
         modeByPlayerId.set(player.id, decision.mode);
       }

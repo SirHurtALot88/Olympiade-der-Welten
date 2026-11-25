@@ -1,4 +1,5 @@
-import { ActivePlayerRoleTag, ActivePlayerStatus, TransferType, type PrismaClient } from "@prisma/client";
+import type { VertragswertAnzeige } from "@/lib/contracts/vertragswert-spielstand";
+import { ActivePlayerStatus, TransferType, type PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 
 import { buildActivePlayerId } from "@/lib/db/seed/mappers";
@@ -107,6 +108,11 @@ export type TransfermarktBuyPreview = {
   offeredSalary?: number | null;
   /** Werbeklausel (23.11.): Gehalt, das unterschrieben wird (verhandeltes Gehalt mit Klausel-Faktor); fehlt ohne Regel `klausel-v2`. */
   gehaltMitKlausel?: number | null;
+  /**
+   * Vertragswert-Anzeige (Stempel `vertragsPlan`, Chris 25.11.): Erwartung besser/gleich/schlechter im Scouting-Nebel gestuft und
+   * Formkarten-Beitrag, aus derselben Rechenstelle wie die KI. Nur fuer Kaeufe, die ein Mensch anstoesst.
+   */
+  vertragswertAnzeige?: VertragswertAnzeige | null;
   /** Werbeklausel (23.11.): gewaehlte Stufe und die drei Zeilen der Verhandlung (Gehalt, Team-Anteil, Werbegeld, Saldo); `null` ohne Regel. */
   klausel?: { gewaehlt: Werbeklausel; zeilen: KlauselZeile[]; ablehnung: string | null; loyal: boolean } | null;
   offerRatio?: number | null;
@@ -420,7 +426,6 @@ export async function executeTransfermarktBuy(
         teamId: params.teamId,
         playerId: params.playerId,
         status: ActivePlayerStatus.active,
-        roleTag: ActivePlayerRoleTag.prospect,
         contractLength: context.preview.contractLength,
         salary: playerAttributes.salaryDemand,
         upkeep: playerAttributes.salaryDemand,

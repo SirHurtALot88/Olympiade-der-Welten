@@ -1116,7 +1116,6 @@ export function useFoundationCrossTabTeamsRoster(input: {
             name: player.name,
             portraitUrl: portrait.src,
             portraitInitials: portrait.initials,
-            roleTag: entry.roleTag ?? null,
             promisedRole: entry.promisedRole ?? null,
             className: player.className ?? null,
             race: player.race ?? null,

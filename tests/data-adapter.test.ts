@@ -53,7 +53,6 @@ describe("data adapter", () => {
         upkeep: syntheticPlayers[0].salaryDemand,
         purchasePrice: syntheticPlayers[0].marketValue,
         currentValue: syntheticPlayers[0].marketValue,
-        roleTag: "starter" as const,
         joinedSeasonId: "season-1",
       },
     ];

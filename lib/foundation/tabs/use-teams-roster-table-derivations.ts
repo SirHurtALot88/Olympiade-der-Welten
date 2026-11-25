@@ -8,12 +8,10 @@ import {
 } from "@/lib/foundation/foundation-table-sort";
 import { getTeamRosterPlayerOvrSortKey } from "@/lib/foundation/team-roster-player-sort";
 
-export type TeamRosterRoleFilter = "all" | "starter" | "rotation" | "prospect" | "bench" | "other";
 export type TeamRosterFocusMode = "default" | "salary" | "value" | "contracts" | "training";
 
 export type SelectedRosterTableRow = {
   entry: {
-    roleTag?: string | null;
     contractLength: number;
     salary?: number | null;
   };
@@ -41,30 +39,12 @@ export type SelectedRosterTableRow = {
   poScoreRange?: { min: number; max: number } | null;
 };
 
-function getTeamRosterRoleBucket(roleTag: string | null | undefined): Exclude<TeamRosterRoleFilter, "all"> {
-  const normalized = (roleTag ?? "").toLowerCase();
-  if (normalized.includes("starter") || normalized.includes("star") || normalized.includes("core")) {
-    return "starter";
-  }
-  if (normalized.includes("rotation")) {
-    return "rotation";
-  }
-  if (normalized.includes("prospect")) {
-    return "prospect";
-  }
-  if (normalized.includes("bench") || normalized.includes("bank")) {
-    return "bench";
-  }
-  return "other";
-}
-
 export type UseTeamsRosterTableDerivationsInput = {
   selectedRosterTableRows: SelectedRosterTableRow[];
   selectedRosterSort: FoundationTableSortState | undefined;
   disciplines: Discipline[];
   gameState: GameState;
   teamRosterFocusMode: TeamRosterFocusMode;
-  teamRosterRoleFilter: TeamRosterRoleFilter;
   getRosterEntryDisplayMarketValue: (
     entry: SelectedRosterTableRow["entry"],
     player: SelectedRosterTableRow["player"],
@@ -203,42 +183,13 @@ export function useTeamsRosterTableDerivations(input: UseTeamsRosterTableDerivat
     sortedSelectedRosterTableRows,
   ]);
 
-  const teamRosterRoleFilterOptions = useMemo(() => {
-    const counts: Record<TeamRosterRoleFilter, number> = {
-      all: input.selectedRosterTableRows.length,
-      starter: 0,
-      rotation: 0,
-      prospect: 0,
-      bench: 0,
-      other: 0,
-    };
-    for (const row of input.selectedRosterTableRows) {
-      counts[getTeamRosterRoleBucket(row.entry.roleTag)] += 1;
-    }
-    return [
-      { id: "all" as const, label: "Alle", count: counts.all },
-      { id: "starter" as const, label: "Starter", count: counts.starter },
-      { id: "rotation" as const, label: "Rotation", count: counts.rotation },
-      { id: "bench" as const, label: "Bank", count: counts.bench },
-      { id: "other" as const, label: "Sonstige", count: counts.other },
-    ].filter((entry) => entry.id === "all" || entry.count > 0);
-  }, [input.selectedRosterTableRows]);
-
-  const filteredSelectedRosterTableRows = useMemo(
-    () =>
-      input.teamRosterRoleFilter === "all"
-        ? focusedSelectedRosterTableRows
-        : focusedSelectedRosterTableRows.filter(
-            (row) => getTeamRosterRoleBucket(row.entry.roleTag) === input.teamRosterRoleFilter,
-          ),
-    [focusedSelectedRosterTableRows, input.teamRosterRoleFilter],
-  );
+  // Kaderrollen-Filter entfernt (Rollen-Etikett raus, Chris 25.11.): die gefilterte Liste ist die fokussierte.
+  const filteredSelectedRosterTableRows = focusedSelectedRosterTableRows;
 
   return {
     sortedSelectedRosterTableRows,
     focusedSelectedRosterTableRows,
     filteredSelectedRosterTableRows,
     teamRosterFocusOptions,
-    teamRosterRoleFilterOptions,
   };
 }

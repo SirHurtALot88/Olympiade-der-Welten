@@ -128,8 +128,6 @@ export type AiFullRepickAuditPickRow = {
   salary: number | null;
   marketValue: number | null;
   plannerTraceStatus: PlannerTraceStatus;
-  legacyRoleTag: string | null;
-  exportedRoleBug: boolean;
   pickLane: string | null;
   rosterRole: string | null;
   pickPhase: string;
@@ -177,7 +175,6 @@ export type AiFullRepickAuditTeamRow = {
   expectedPrizeSourceStatus: string | null;
   plannerTraceStatus: PlannerTraceStatus;
   offThemePickCount: number;
-  classSpamPickCount: number;
   teamIdentityStatus: {
     coreIdentityFulfilled: boolean;
     primaryAxisCoverage: number;
@@ -218,8 +215,8 @@ export type AiFullRepickAuditResult = {
     roleDistribution: Array<{ label: AuditRoleLabel; count: number }>;
     laneExportDiagnosis:
       | "planner_lane_available"
-      | "planner_lane_missing_export_used_legacy_role_tag"
-      | "planner_lane_artifact_stale_export_used_legacy_role_tag";
+      | "planner_lane_missing_export"
+      | "planner_lane_artifact_stale_export";
     decision: AuditDecision;
   };
   globalBudgetAudit: {
@@ -649,11 +646,6 @@ function buildMinimumFailureReason(input: {
   return "planner_bug_missing_reason" as const;
 }
 
-function getPlayerRoleTag(player: Player, gameState: GameState, teamId: string) {
-  const rosterEntry = getTeamRosterEntries(gameState, teamId).find((entry) => entry.playerId === player.id) ?? null;
-  return rosterEntry?.roleTag ?? null;
-}
-
 function buildPlannerTraceStatus(input: { artifactStatus: ArtifactStatus; hasArtifactPick: boolean }) {
   if (input.artifactStatus === "usable" && input.hasArtifactPick) {
     return "run_artifact" as const;
@@ -783,7 +775,7 @@ export async function buildAiFullRepickAudit(params: AiFullRepickAuditParams): P
         totalWarlord: 0,
         berserkerWarlordSharePct: null,
         roleDistribution: [],
-        laneExportDiagnosis: "planner_lane_missing_export_used_legacy_role_tag",
+        laneExportDiagnosis: "planner_lane_missing_export",
         decision: "plannerproblem",
       },
       globalBudgetAudit: {
@@ -881,7 +873,6 @@ export async function buildAiFullRepickAudit(params: AiFullRepickAuditParams): P
           artifactStatus: artifactMap.artifactStatus,
           hasArtifactPick: Boolean(artifactPick),
         });
-        const roleTag = getPlayerRoleTag(player, gameState, team.teamId);
         const artifactRole = roleFromPlannerLane(artifactPick?.lane ?? artifactPick?.pickLane);
         const auditRole =
           artifactRole ??
@@ -914,7 +905,6 @@ export async function buildAiFullRepickAudit(params: AiFullRepickAuditParams): P
         const warnings = [
           ...((fit.teamFit ?? 0) < 5 ? ["off_theme_low_team_fit"] : []),
           ...(artifactPick?.reasons.some((reason) => normalizeToken(reason).includes("passt")) ? [] : []),
-          ...(roleTag === "prospect" && auditRole !== "Backup" && auditRole !== "Fill" ? ["legacy_role_tag_prospect_export_bug"] : []),
         ];
         const flags = roleFlags(auditRole);
         return {
@@ -927,8 +917,6 @@ export async function buildAiFullRepickAudit(params: AiFullRepickAuditParams): P
           salary: roundValue(transfer.salary ?? player.displaySalary ?? player.salaryDemand ?? 0, 2),
           marketValue: roundValue(player.displayMarketValue ?? player.marketValue ?? transfer.marketValue ?? 0, 2),
           plannerTraceStatus,
-          legacyRoleTag: roleTag,
-          exportedRoleBug: roleTag === "prospect" && auditRole !== "Backup" && auditRole !== "Fill",
           pickLane: artifactPick?.pickLane ?? null,
           rosterRole: artifactPick?.lane ?? null,
           pickPhase: "manual_transfer_window",
@@ -1007,7 +995,6 @@ export async function buildAiFullRepickAudit(params: AiFullRepickAuditParams): P
       expectedPrizeSourceStatus: artifactPrizeSourceStatus,
       plannerTraceStatus,
       offThemePickCount: pickedRows.filter((row) => row.warnings.some((warning) => warning.startsWith("off_theme"))).length,
-      classSpamPickCount: pickedRows.filter((row) => row.warnings.includes("legacy_role_tag_prospect_export_bug")).length,
       teamIdentityStatus,
       laneDistribution: sortCountEntries(new Map(teamRoleCounts)) as Array<{ label: AuditRoleLabel; count: number }>,
       picks: pickedRows,
@@ -1076,8 +1063,8 @@ export async function buildAiFullRepickAudit(params: AiFullRepickAuditParams): P
         artifactMap.artifactStatus === "usable"
           ? "planner_lane_available"
           : artifactMap.artifactStatus === "stale"
-            ? "planner_lane_artifact_stale_export_used_legacy_role_tag"
-            : "planner_lane_missing_export_used_legacy_role_tag",
+            ? "planner_lane_artifact_stale_export"
+            : "planner_lane_missing_export",
       decision,
     },
     globalBudgetAudit: {
@@ -1103,7 +1090,7 @@ export async function buildAiFullRepickAudit(params: AiFullRepickAuditParams): P
       ...(teamsBelowMinimum > 0 ? ["minimum_not_reached_for_some_teams"] : []),
       ...(suspectBudgetTeams.length > 0 ? ["full_repick_budget_source_suspect"] : []),
       ...(totalOffTheme > 0 ? ["off_theme_picks_present"] : []),
-      ...(totalClassSpam > 0 ? ["legacy_role_tag_export_bug_present"] : []),
+      ...(totalClassSpam > 0 ? ["class_spam_present"] : []),
     ]),
   };
 }

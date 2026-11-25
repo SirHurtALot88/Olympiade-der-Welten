@@ -69,7 +69,6 @@ function createRosterEntry(id: string, playerId: string, partial?: Partial<Roste
     // sonst würde der 60er-Default den "kein Kaufpreis"-Test unterlaufen.
     ...(partial && "purchasePrice" in partial ? { purchasePrice: partial.purchasePrice } : { purchasePrice: 60 }),
     currentValue: partial?.currentValue ?? 60,
-    roleTag: partial?.roleTag ?? "starter",
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
     ...(partial?.yearlySalarySchedule ? { yearlySalarySchedule: partial.yearlySalarySchedule } : {}),
     ...(partial?.contractShape ? { contractShape: partial.contractShape } : {}),

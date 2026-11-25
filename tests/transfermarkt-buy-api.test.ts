@@ -220,7 +220,7 @@ describe("transfermarkt buy api", () => {
     const heavyGameStateAfter = {
       ...phaseSave().gameState,
       teams: [{ teamId: "M-M", shortCode: "M-M", name: "Mayhem Mavericks", budget: 500, cash: 200, identityId: "M-M", humanControlled: true, rosterLimit: 12 }],
-      rosters: [{ id: "roster-1", teamId: "M-M", playerId: "player-1", contractLength: 1, salary: 10000, upkeep: 10000, purchasePrice: 100000, currentValue: 100000, roleTag: "prospect", joinedSeasonId: "season-1" }],
+      rosters: [{ id: "roster-1", teamId: "M-M", playerId: "player-1", contractLength: 1, salary: 10000, upkeep: 10000, purchasePrice: 100000, currentValue: 100000, joinedSeasonId: "season-1" }],
       logs: ["some heavy debug log entry"],
       saveVersion: 7,
       seasonState: {

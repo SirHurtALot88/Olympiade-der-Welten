@@ -3555,7 +3555,7 @@ function getPlayerSportsQuality(player: Player, candidateAxis: "pow" | "spe" | "
   };
 }
 
-function getPlayerRoleTag(player: Player, candidateAxis: "pow" | "spe" | "men" | "soc" | null): "superstar" | "star" | "core" | "depth" | "specialist" | "backup" {
+function getPlayerPickRole(player: Player, candidateAxis: "pow" | "spe" | "men" | "soc" | null): "superstar" | "star" | "core" | "depth" | "specialist" | "backup" {
   const sportsQuality = getPlayerSportsQuality(player, candidateAxis);
   if (sportsQuality.topDiscipline >= 90 && sportsQuality.topCore >= 76) return "superstar";
   if (sportsQuality.topDiscipline >= 82 || sportsQuality.topCore >= 76) return "star";
@@ -3590,8 +3590,8 @@ function buildRosterComposition(gameState: GameState, teamId: string) {
     if (normalizedRace) {
       raceCounts.set(normalizedRace, (raceCounts.get(normalizedRace) ?? 0) + 1);
     }
-    const roleTag = getPlayerRoleTag(player, axis);
-    roleCounts.set(roleTag, (roleCounts.get(roleTag) ?? 0) + 1);
+    const pickRole = getPlayerPickRole(player, axis);
+    roleCounts.set(pickRole, (roleCounts.get(pickRole) ?? 0) + 1);
     for (const [disciplineId, rawScore] of Object.entries(player.disciplineRatings ?? {})) {
       const score = Number(rawScore ?? 0);
       const current = disciplinePeak.get(disciplineId) ?? 0;
@@ -4192,7 +4192,7 @@ export function buildCandidateStaticScoreCache(input: {
     if (!player) continue;
 
     const candidateAxis = getPlayerAxis(player);
-    const playerRole = getPlayerRoleTag(player, candidateAxis);
+    const playerRole = getPlayerPickRole(player, candidateAxis);
     const normalizedClass = normalizeToken(player.className);
     const sportsQuality = getPlayerSportsQuality(player, candidateAxis);
     const playerQualityScore = roundValue(
@@ -6430,7 +6430,6 @@ function buildSimulatedThemeGameState(input: {
           upkeep: 0,
           currentValue: 0,
           contractLength: 1,
-          roleTag: "bench" as const,
           joinedSeasonId: input.gameState.season.id,
         }
       );
@@ -6901,7 +6900,7 @@ function scoreCandidate(input: {
   const cached = player != null ? input.staticScoreCache?.get(player.id) : undefined;
 
   const normalizedClass = cached?.normalizedClass ?? normalizeToken(player?.className ?? input.recommendation.className);
-  const playerRole = cached?.playerRole ?? (player ? getPlayerRoleTag(player, candidateAxis) : "depth");
+  const playerRole = cached?.playerRole ?? (player ? getPlayerPickRole(player, candidateAxis) : "depth");
   const rawTier = cached?.rawTier ?? classifyCandidateTier({
     price: input.recommendation.price ?? input.recommendation.marketValue ?? null,
     anchors: input.anchors,
@@ -9412,7 +9411,7 @@ function buildTeamEntry(input: {
         simulatedFormColorCounts[pickedFormColor] += 1;
       }
     }
-    const pickedRole = pickedPlayer ? getPlayerRoleTag(pickedPlayer, top.candidateAxis) : "depth";
+    const pickedRole = pickedPlayer ? getPlayerPickRole(pickedPlayer, top.candidateAxis) : "depth";
     simulatedRoleCounts.set(pickedRole, (simulatedRoleCounts.get(pickedRole) ?? 0) + 1);
     if (pickedPlayer) {
       simulatedRosterPlayers.push(pickedPlayer);

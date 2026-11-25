@@ -73,7 +73,7 @@ function createGameState(players: Player[]): GameState {
       { id: "d3", name: "Diszi 3", category: "mental", weight: 1 },
     ],
     rosters: [
-      { id: "r-1", teamId: "A-A", playerId: players[0]!.id, contractLength: 2, salary: 11, upkeep: 11, purchasePrice: 48, currentValue: 48, roleTag: "starter", joinedSeasonId: "season-1" },
+      { id: "r-1", teamId: "A-A", playerId: players[0]!.id, contractLength: 2, salary: 11, upkeep: 11, purchasePrice: 48, currentValue: 48, joinedSeasonId: "season-1" },
     ],
     contracts: [],
     transferListings: [],

@@ -37,7 +37,6 @@ export function reconstructDraftRostersFromHistory(gameState: GameState): Roster
         upkeep: buy.salary ?? 0,
         currentValue: buy.marketValue ?? buy.fee ?? 0,
         contractLength: buy.remainingContractLength ?? 1,
-        roleTag: "prospect" as const,
         joinedSeasonId: buy.seasonId,
       }),
     });

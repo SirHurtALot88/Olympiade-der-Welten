@@ -1,3 +1,4 @@
+import { vertragswertKaufKontext } from "@/lib/contracts/vertragswert-spielstand";
 import { randomUUID } from "node:crypto";
 
 import { kiMerklisteSpielerIds } from "@/lib/ai/ki-merkliste-lesen";
@@ -2124,6 +2125,8 @@ export async function applyAiMarketPlanLocally(input: AiMarketPlanApplyParams): 
         // Apron-Lage und Vertragsmix — dieselbe Quelle wie im Fuell-Lauf, damit beide Kaufwege
         // dieselbe Form empfehlen.
         ...getContractShapeTeamContext(preflightGameState, team.teamId),
+        // Vertragswert (Stempel `vertragsPlan`): Laufzeit 1-5 und Form nach W.
+        vertragswert: vertragswertKaufKontext(preflightGameState, team.teamId, candidatePlayer),
       });
       const buyPreview = previewLocalTransfermarktBuy({
         saveId: preview.scope.saveId,

@@ -1,3 +1,4 @@
+import { vertragsPlanAktiv, vertragswertAnzeige, vertragswertKaufKontext } from "@/lib/contracts/vertragswert-spielstand";
 import { baueMarktMarketability } from "@/lib/marketing/marketing-markt";
 import { marketingAktiv } from "@/lib/marketing/marketing-regel";
 import { pruefeKaufGegenVorstandFreigabe } from "@/lib/finance/vorstand-budgetfreigabe";
@@ -1273,6 +1274,10 @@ function buildLocalTransfermarktBuyPreviewFromContext(
     demandMultiplier: negotiationPreview.demandMultiplier,
     offeredSalary: festkonditionen ? (salary as number) : negotiationPreview.offeredSalary,
     gehaltMitKlausel: klauselAktiv ? contractSalary : null,
+    vertragswertAnzeige:
+      player && team && isHumanInitiatedTransferSource(params.transferSource) && vertragsPlanAktiv(gameState)
+        ? vertragswertAnzeige(gameState, params.teamId, player, null)
+        : null,
     klausel: klauselVorschau,
     offerRatio: negotiationPreview.offerRatio,
     yearlySalarySchedule: festSchedule ?? klauselSchedule ?? negotiationPreview.yearlySalarySchedule,
@@ -1464,6 +1469,7 @@ function resolveLocalTransfermarktBuyContext(params: TransfermarktBuyParams): Lo
     // Marktplan gibt die Form ausdruecklich mit, der Fuell-Lauf (`ai_roster_fill`) uebergibt
     // keine und faellt genau auf diese Empfehlung zurueck.
     ...getContractShapeTeamContext(gameState, params.teamId),
+    vertragswert: vertragswertKaufKontext(gameState, params.teamId, player),
   });
   const contractLength =
     typeof params.contractLength === "number" && Number.isFinite(params.contractLength)
@@ -2767,6 +2773,7 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
           // ist ab Saison 2 verboten und picken darf nur noch organisch. Ohne diese Zeilen bliebe
           // der gesamte Erst-Draft apron- und mixblind.
           ...getContractShapeTeamContext(gameState, params.teamId),
+          vertragswert: vertragswertKaufKontext(gameState, params.teamId, player),
         })
       : null;
   const contractLength = hasExplicitContractLength
@@ -2981,7 +2988,6 @@ function executeFastLocalTransfermarktBatchBuy(params: TransfermarktBuyParams, r
         ...(klauselFast != null ? { marketingKlausel: klauselFast } : {}),
         purchasePrice,
         currentValue: marketValueReference,
-        roleTag: "prospect",
         promisedRole,
         joinedSeasonId: gameState.season.id,
       },
@@ -3101,7 +3107,6 @@ export function executeLocalTransfermarktBuy(params: TransfermarktBuyParams): Tr
         negotiatedAnnualSalary: preview.gehaltMitKlausel ?? preview.offeredSalary ?? preview.salary,
         purchasePrice: preview.purchasePrice,
         currentValue: marketValueReference,
-        roleTag: "prospect",
         promisedRole: preview.promisedRole ?? null,
         joinedSeasonId: save.gameState.season.id,
       },
@@ -3586,7 +3591,6 @@ export function previewLocalTransfermarktSell(params: TransfermarktSellParams): 
           id: activePlayer.id,
           playerId: activePlayer.playerId,
           status: "active",
-          roleTag: activePlayer.roleTag,
           contractLength: activePlayer.contractLength,
           salary: activePlayer.salary,
           purchasePrice: normalizedPurchasePrice,

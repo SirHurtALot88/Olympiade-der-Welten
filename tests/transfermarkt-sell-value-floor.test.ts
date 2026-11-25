@@ -231,7 +231,6 @@ function gateRoster(id: string, playerId: string): RosterEntry {
     upkeep: 8,
     purchasePrice: 60,
     currentValue: 40,
-    roleTag: "starter",
     joinedSeasonId: "season-2",
   } as RosterEntry;
 }

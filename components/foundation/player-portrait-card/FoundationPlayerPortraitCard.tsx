@@ -125,7 +125,6 @@ export type FoundationPlayerPortraitCardProps = {
   poScoreRange?: { min: number; max: number } | null;
   className?: string;
   variant?: "home" | "team";
-  roleTag?: string | null;
   playerClassName?: string | null;
   subMeta?: string | null;
   ovrRank?: number | null;
@@ -210,7 +209,6 @@ export default function FoundationPlayerPortraitCard({
   poScoreRange = null,
   className = "",
   variant = "home",
-  roleTag,
   playerClassName,
   subMeta,
   ovrRank,
@@ -262,7 +260,7 @@ export default function FoundationPlayerPortraitCard({
       poRangeMax != null);
   const resolvedSubMeta =
     subMeta ??
-    (variant === "team" && context === "roster" ? [roleTag, playerClassName].filter(Boolean).join(" · ") || null : null);
+    (variant === "team" && context === "roster" ? playerClassName || null : null);
 
   const overlayStats = buildContextOverlayStats({
     context,

@@ -134,7 +134,6 @@ function buildGameState(input?: {
       contractLength: 2,
       salary: 5,
       upkeep: 5,
-      roleTag: index === 0 ? "starter" : "bench",
       joinedSeasonId: "season-1",
     })),
     contracts: [],

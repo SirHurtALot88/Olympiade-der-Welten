@@ -14,7 +14,7 @@ import type { TrainingModeDemandView } from "@/lib/training/training-mode-demand
 import { getAttributeHeadroom, getHeadroomLabel } from "@/lib/scouting/player-attribute-ceiling-service";
 
 type TrainingForecastRowInput = {
-  entry: { id: string; roleTag?: string | null };
+  entry: { id: string };
   player: TrainingPlayerRowView["player"] & {
     id: string;
     trainingMode?: string;
@@ -142,7 +142,6 @@ export function buildTrainingPlayerRowView(
 
   return {
     entryId: row.entry.id,
-    roleTag: row.entry.roleTag ?? null,
     player: row.player,
     mode: row.mode,
     trainingClass: row.trainingClass,

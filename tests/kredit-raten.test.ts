@@ -53,7 +53,6 @@ function bestuecke(gameState: GameState, jeTeam = 8): GameState {
         upkeep: 2,
         purchasePrice: 10,
         currentValue: 10,
-        roleTag: "bench",
         joinedSeasonId: gameState.season.id,
       });
     }

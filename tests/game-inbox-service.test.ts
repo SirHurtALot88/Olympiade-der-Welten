@@ -113,7 +113,6 @@ function makeGameState(partial?: Partial<GameState>): GameState {
           upkeep: 2,
           purchasePrice: 10,
           currentValue: 10,
-          roleTag: "starter",
           joinedSeasonId: "season-3",
         },
       ],
@@ -208,7 +207,6 @@ describe("game inbox service", () => {
           upkeep: 2,
           purchasePrice: 20,
           currentValue: 32,
-          roleTag: "starter",
           joinedSeasonId: "season-3",
         },
       ],
@@ -437,7 +435,6 @@ describe("game inbox service", () => {
         contractLength: 2,
         salary: 2,
         upkeep: 2,
-        roleTag: "starter" as const,
         joinedSeasonId: "season-3",
       })),
     });
@@ -479,8 +476,8 @@ describe("game inbox service", () => {
       teams: [makeTeam({ teamId: "M-M", shortCode: "M-M" }), makeTeam({ teamId: "P-C", shortCode: "P-C", humanControlled: true })],
       players: [makePlayer("p-1"), makePlayer("p-2")],
       rosters: [
-        { id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 2, salary: 2, upkeep: 2, roleTag: "starter", joinedSeasonId: "season-3" },
-        { id: "r-2", teamId: "P-C", playerId: "p-2", contractLength: 2, salary: 2, upkeep: 2, roleTag: "starter", joinedSeasonId: "season-3" },
+        { id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 2, salary: 2, upkeep: 2, joinedSeasonId: "season-3" },
+        { id: "r-2", teamId: "P-C", playerId: "p-2", contractLength: 2, salary: 2, upkeep: 2, joinedSeasonId: "season-3" },
       ],
       scenarioMeta: {
         scenarioType: "manager_multiplayer_test",
@@ -507,8 +504,8 @@ describe("game inbox service", () => {
 	      teams: [makeTeam({ teamId: "M-M", shortCode: "M-M" }), makeTeam({ teamId: "P-C", shortCode: "P-C", humanControlled: true })],
 	      players: [makePlayer("p-1"), makePlayer("p-2")],
 	      rosters: [
-	        { id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 2, salary: 2, upkeep: 2, roleTag: "starter", joinedSeasonId: "season-3" },
-	        { id: "r-2", teamId: "P-C", playerId: "p-2", contractLength: 2, salary: 2, upkeep: 2, roleTag: "starter", joinedSeasonId: "season-3" },
+	        { id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 2, salary: 2, upkeep: 2, joinedSeasonId: "season-3" },
+	        { id: "r-2", teamId: "P-C", playerId: "p-2", contractLength: 2, salary: 2, upkeep: 2, joinedSeasonId: "season-3" },
 	      ],
 	    });
 
@@ -788,8 +785,8 @@ describe("game inbox service", () => {
         makePlayer("p-2", { fatigue: 20 }),
       ],
       rosters: [
-        { id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 2, salary: 2, upkeep: 2, roleTag: "starter", joinedSeasonId: "season-3" },
-        { id: "r-2", teamId: "M-M", playerId: "p-2", contractLength: 2, salary: 2, upkeep: 2, roleTag: "bench", joinedSeasonId: "season-3" },
+        { id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 2, salary: 2, upkeep: 2, joinedSeasonId: "season-3" },
+        { id: "r-2", teamId: "M-M", playerId: "p-2", contractLength: 2, salary: 2, upkeep: 2, joinedSeasonId: "season-3" },
       ],
       seasonState: {
         seasonId: "season-3",
@@ -871,7 +868,6 @@ describe("game inbox service", () => {
         contractLength: 2,
         salary: 2,
         upkeep: 2,
-        roleTag: "starter" as const,
         joinedSeasonId: "season-3",
       })),
     });

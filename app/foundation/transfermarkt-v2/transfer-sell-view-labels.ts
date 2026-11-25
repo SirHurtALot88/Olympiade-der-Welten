@@ -125,21 +125,6 @@ export function formatReadinessAfterSellLabel(status: string | null | undefined)
   return READINESS_LABELS[status] ?? humanizeToken(status);
 }
 
-/** Kader-Rolle (roleTag) → Spieltext, gleiche Konvention wie im Spieler-Drawer. */
-const ROLE_TAG_LABELS: Record<string, string> = {
-  starter: "Starter",
-  bench: "Bank",
-  rotation: "Rotation",
-  prospect: "Talent",
-};
-
-export function formatRosterRoleTagLabel(roleTag: string | null | undefined): string {
-  if (!roleTag) {
-    return "—";
-  }
-  return ROLE_TAG_LABELS[roleTag] ?? humanizeToken(roleTag);
-}
-
 /** Blocking-Reason-Codes der Sell-Preview → Spieltext. */
 export function translateSellBlockingReason(reason: string): string {
   if (looksLikeSentence(reason)) {

@@ -84,7 +84,6 @@ function createGameState(players: Player[]): GameState {
       marketValue: player.marketValue ?? 10,
       currentValue: player.marketValue ?? 10,
       contractLength: 1,
-      roleTag: "core" as const,
     })),
     contracts: [],
     transferListings: [],

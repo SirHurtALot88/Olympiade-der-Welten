@@ -44,7 +44,6 @@ export type DoctrineSeasonPlayerReviewRow = {
   teamId: string;
   playerId: string;
   playerName: string;
-  role: string;
   performanceVsExpectation: "above" | "met" | "below" | "unknown";
   pps: number | null;
   mvs: number | null;
@@ -636,7 +635,6 @@ export function buildDoctrineSeasonReview(gameState: GameState) {
         teamId: roster.teamId,
         playerId: player.id,
         playerName: player.name,
-        role: roster.roleTag,
         performanceVsExpectation: pps == null ? "unknown" : pps >= rating * 0.8 ? "above" : pps >= rating * 0.5 ? "met" : "below",
         pps,
         mvs: player.marketValue ?? null,

@@ -73,7 +73,7 @@ function gameState(partial?: Partial<GameState>): GameState {
     teamIdentities: [],
     players,
     disciplines: [],
-    rosters: partial?.rosters ?? [{ id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 1, salary: 2, upkeep: 2, purchasePrice: 10, currentValue: 10, roleTag: "starter", joinedSeasonId: "season-2" }],
+    rosters: partial?.rosters ?? [{ id: "r-1", teamId: "M-M", playerId: "p-1", contractLength: 1, salary: 2, upkeep: 2, purchasePrice: 10, currentValue: 10, joinedSeasonId: "season-2" }],
     contracts: [],
     transferListings: [],
     transferHistory: [],

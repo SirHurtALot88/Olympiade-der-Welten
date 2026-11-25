@@ -318,7 +318,6 @@ describe("transfer-finance-audit", () => {
         upkeep: 5,
         purchasePrice: 20,
         currentValue: 20,
-        roleTag: "starter",
         joinedSeasonId: "season-1",
       }) as RosterEntry;
 

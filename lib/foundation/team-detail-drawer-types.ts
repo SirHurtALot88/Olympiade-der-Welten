@@ -6,7 +6,6 @@ export type TeamDetailDrawerPlayerCard = {
   name: string;
   portraitUrl: string | null;
   portraitInitials: string;
-  roleTag: string | null;
   promisedRole: string | null;
   className: string | null;
   race: string | null;

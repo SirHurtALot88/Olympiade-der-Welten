@@ -77,7 +77,6 @@ function vertrag(teamId: string, playerId: string, partial: Partial<RosterEntry>
     upkeep: 7,
     purchasePrice: 30,
     currentValue: 40,
-    roleTag: "starter",
     joinedSeasonId: "season-1",
     ...partial,
   };

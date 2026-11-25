@@ -52,12 +52,6 @@ enum ActivePlayerStatus {
   free_agent
 }
 
-enum ActivePlayerRoleTag {
-  starter
-  bench
-  prospect
-}
-
 enum TransferType {
   buy
   sell
@@ -282,7 +276,6 @@ model ActivePlayer {
   teamId           String
   playerId         String
   status           ActivePlayerStatus  @default(active)
-  roleTag          ActivePlayerRoleTag
   contractLength   Int
   salary           Int
   upkeep           Int

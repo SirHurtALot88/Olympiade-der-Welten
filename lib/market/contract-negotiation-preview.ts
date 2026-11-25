@@ -1,4 +1,12 @@
+import { buildShapeWeights } from "@/lib/market/contract-shape-weights";
 import { wendeLiquiditaetUndMixAn } from "@/lib/market/contract-shape-context";
+import {
+  staffleVertragsende,
+  waehleLaufzeit,
+  type ErwartungsVerlauf,
+  type LaufzeitAngebot,
+  type VertragswertSpieler,
+} from "@/lib/contracts/vertragswert";
 import type {
   ContractNegotiationDraft,
   ContractShape,
@@ -359,7 +367,6 @@ export type TeamContractSeasonRow = {
   playerId: string;
   playerName: string;
   status: "active" | "preview";
-  roleTag: string | null;
   contractShape: ContractShape;
   contractLength: number;
   /**
@@ -424,26 +431,6 @@ function buildSeasonLabel(base: string, offset: number, seasonIdBase?: string | 
     },
     offset,
   );
-}
-
-function buildShapeWeights(contractLength: number, shape: ContractShape) {
-  if (contractLength <= 1) {
-    return [1];
-  }
-
-  if (shape === "balanced") {
-    return Array.from({ length: contractLength }, () => 1);
-  }
-
-  const step = Math.min(0.2, 0.8 / Math.max(1, contractLength - 1));
-  const midpoint = (contractLength - 1) / 2;
-
-  return Array.from({ length: contractLength }, (_, index) => {
-    const signedDistance = midpoint - index;
-    const delta = signedDistance * step;
-    const weight = shape === "front_loaded" ? 1 + delta : 1 - delta;
-    return Math.max(0.2, Number(weight.toFixed(4)));
-  });
 }
 
 export function buildContractSalarySchedule(input: ContractPreviewInput): ContractSchedulePreview {
@@ -777,7 +764,19 @@ export function recommendContractOfferForPlayer(input: {
   /** Anteil back-loaded an den laufenden Mehrjahresvertraegen (0..1) — gegen den Gehaltsberg. */
   /** Gebundener Mehrbetrag spaeterer Vertragsjahre, an der heutigen Gehaltssumme gemessen. */
   gehaltsbergQuote?: number | null;
-}): { contractLength: number; contractShape: ContractShape; preference: PlayerContractPreference | null; reasons: string[] } {
+  /**
+   * VERTRAGSWERT (Stempel `vertragsPlan`, Chris 25.11.): ab Saison 2 waehlt W Laufzeit 1-5 und Form je Angebot (keine Sperre nach Rolle
+   * oder Rang). Kommt aus `vertragswertKaufKontext` (lib/contracts/vertragswert-spielstand.ts); ohne ihn die bisherige Empfehlung.
+   */
+  vertragswert?: VertragswertKaufKontext | null;
+}): {
+  contractLength: number;
+  contractShape: ContractShape;
+  preference: PlayerContractPreference | null;
+  reasons: string[];
+  /** Nur mit Vertragswert: die Wahl und die Absicht (Kern / Handel / Test / Tiefe). */
+  vertragswertWahl?: { beste: LaufzeitAngebot; angebote: LaufzeitAngebot[]; erwartung: ErwartungsVerlauf; vertragsAbsicht: VertragsAbsicht };
+} {
   const basePreference = buildPlayerContractPreference(input.player, input.teamStrategyProfile);
   const reasons = [...(basePreference?.reasons ?? [])];
   if (!basePreference) {
@@ -842,6 +841,63 @@ export function recommendContractOfferForPlayer(input: {
   const highCostRisk =
     (marketValue ?? 0) >= 55 &&
     (cashTight || cashPriority >= 8 || wageSensitivity >= 8 || commitmentScore < 5.6 || (input.teamStrategyProfile?.bias.riskTolerance ?? 5) <= 4);
+
+  // VERTRAGSWERT (Stempel `vertragsPlan`, ab Saison 2): W waehlt Laufzeit und Form; es bleiben die Gelaender Kasse eng (hoechstens 2,
+  // Premium 3, back-loaded), Vertragsenden staffeln und Liquiditaet/Gehaltsberg. Keine Sperre nach Rolle oder Rang (Chris 25.11.).
+  if (input.vertragswert && input.isFirstSeason !== true && input.player) {
+    const vw = input.vertragswert;
+    const player = input.player;
+    const isPremium = /\b(superstar|star|impact|leader|premium)\b/.test((input.dealRole ?? "").toLowerCase());
+    const maxLaufzeit = cashTight ? (isPremium ? 3 : 2) : 5;
+    const erlaubt = (l: number) => l >= 1 && l <= maxLaufzeit;
+    const basis = salaryReference ?? 0;
+    const gehaltFuer = (laufzeit: number, form: ContractShape) =>
+      basis *
+      resolveContractLengthSalaryFactor({
+        player,
+        contractLength: laufzeit,
+        teamFit,
+        // Wunschpreis fuer Laufzeit und Form, wie die Verhandlung ihn bucht (Rabatt-/Wunschlogik unveraendert, Chris 25.11.).
+        salaryPreferenceAdjustmentPct:
+          buildPlayerContractPreference(player, input.teamStrategyProfile ?? null, { contractLength: laufzeit, contractShape: form })
+            ?.salaryAdjustmentPct ?? 0,
+      });
+    const wahl = waehleLaufzeit({
+      spieler: vw.spieler,
+      gehaltFuer,
+      laufzeiten: [1, 2, 3, 4, 5].filter(erlaubt),
+      handel: vw.handel,
+      wunschFenster: {
+        min: basePreference.preferredMinLength,
+        max: basePreference.preferredMaxLength,
+        ideal: basePreference.idealLength,
+        form: basePreference.shapePreference,
+      },
+    });
+    let laufzeit = wahl.beste.laufzeit;
+    if (vw.staffel) {
+      laufzeit = staffleVertragsende({ laufzeit, ...vw.staffel, erlaubt });
+    }
+    const beste = wahl.angebote.find((a) => a.laufzeit === laufzeit) ?? wahl.beste;
+    let form = beste.form;
+    if (cashTight && laufzeit >= 2) form = "back_loaded";
+    const lageUndMixW = wendeLiquiditaetUndMixAn({ form, laufzeit, kassenstand: input.kassenstand, gehaltsbergQuote: input.gehaltsbergQuote });
+    form = lageUndMixW.form;
+    const vertragsAbsicht = bestimmeVertragsAbsicht({ laufzeit, bedeutung: vw.spieler.bedeutung, handel: vw.handel, erwartung: vw.erwartung });
+    const wReasons = [
+      ...reasons,
+      `Vertragswert: ${laufzeit} ${laufzeit === 1 ? "Saison" : "Saisons"} ${CONTRACT_SHAPE_LABELS[form]} (W ${beste.wert.toFixed(1)} C, Erwartung ${vw.erwartung.stufe}).`,
+      ...(cashTight ? ["Kasse eng: Laufzeit gedeckelt, back-loaded."] : []),
+      ...(lageUndMixW.grund ? [lageUndMixW.grund] : []),
+    ];
+    return {
+      contractLength: laufzeit,
+      contractShape: form,
+      preference: buildPlayerContractPreference(player, input.teamStrategyProfile, { contractLength: laufzeit, contractShape: form }),
+      reasons: Array.from(new Set(wReasons)),
+      vertragswertWahl: { beste, angebote: wahl.angebote, erwartung: vw.erwartung, vertragsAbsicht },
+    };
+  }
 
   if (cashTight && contractLength >= 4) {
     contractShape = "back_loaded";
@@ -1070,6 +1126,31 @@ export function recommendContractOfferForPlayer(input: {
     }),
     reasons: Array.from(new Set(reasons)),
   };
+}
+
+/** Eingaben des Vertragswerts fuer ein Kaufangebot (lib/contracts/vertragswert-spielstand.ts `vertragswertKaufKontext`). */
+export type VertragswertKaufKontext = {
+  spieler: VertragswertSpieler;
+  handel: number;
+  erwartung: ErwartungsVerlauf;
+  staffel?: {
+    endeFuer: (laufzeit: number) => number | null;
+    endenJeSaison: ReadonlyMap<number, number>;
+    vertraege: number;
+  } | null;
+};
+
+export type VertragsAbsicht = "kern" | "handel" | "test" | "tiefe";
+
+/**
+ * Vertragsabsicht beim Kauf (Konzept Abschnitt 4.3/6.2): Kern = wichtiger Spieler lang gebunden; Handel = kurz, Team handelt gern und
+ * erwartet „besser“; Test = kurz und noch unsicher; Tiefe = Kaderbreite (geringe Bedeutung). Nur Kennzeichnung fuer Messung und Anzeige.
+ */
+export function bestimmeVertragsAbsicht(input: { laufzeit: number; bedeutung: number; handel: number; erwartung: ErwartungsVerlauf }): VertragsAbsicht {
+  if (input.laufzeit <= 2 && input.handel >= 0.5 && input.erwartung.stufe === "besser") return "handel";
+  if (input.bedeutung < 0.7) return "tiefe";
+  if (input.laufzeit >= 3) return "kern";
+  return "test";
 }
 
 function hashToUnitInterval(input: string) {
@@ -2653,7 +2734,6 @@ export function buildTeamContractSeasonTable(input: {
         playerId: entry.playerId,
         playerName: player?.name ?? entry.playerId,
         status: "active",
-        roleTag: entry.roleTag,
         contractShape: entry.contractShape ?? "balanced",
         contractLength: entry.contractLength,
         restlaufzeitSaisons: restSaisons,
@@ -2701,7 +2781,6 @@ export function buildTeamContractSeasonTable(input: {
       playerId: draft.playerId,
       playerName: draft.playerName,
       status: "preview",
-      roleTag: "preview",
       contractShape: draft.contractShape,
       contractLength: draft.contractLength,
       // Ein Entwurf ist noch kein Vertrag — seine Laufzeit ist die geplante, kein Countdown.

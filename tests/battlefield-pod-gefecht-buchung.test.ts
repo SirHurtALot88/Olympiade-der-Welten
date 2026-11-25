@@ -155,7 +155,7 @@ function buildGameState(k: number, gesetztJeTeam: [number, number, number, numbe
     for (let i = 0; i < 6; i += 1) {
       const playerId = `${teamId}-p${i}`;
       players.push({ id: playerId, name: playerId, teamId, attributeSheetStats: {} } as unknown as Player);
-      rosters.push({ id: `r-${playerId}`, teamId, playerId, upkeep: 0, roleTag: "squad", joinedSeasonId: SEASON_ID } as unknown as RosterEntry);
+      rosters.push({ id: `r-${playerId}`, teamId, playerId, upkeep: 0, joinedSeasonId: SEASON_ID } as unknown as RosterEntry);
       if (i < gesetztJeTeam[t]!) {
         entries.push({ playerId, slotIndex: i, disciplineId: "battlefield", disciplineSide: "d1", activePlayerId: null } as unknown as LineupDraft["entries"][number]);
       }

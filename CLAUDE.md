@@ -277,6 +277,13 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
   (Bilanz der Runde, Umbau „teuer verkaufen, mit dem Kaufplaner nachkaufen“ gegen Halten, Cash-Verkauf wenn knapp bei Kasse); **Kredit
   nach Risikobereitschaft** — wer das Geld hat, leiht nicht; fehlt es und verbessert der Kauf das Team, leihen mutige Teams eher,
   auch fuer einen Qualitaetstausch auf dem Ziel (Staerke-Gewinn in C groesser als die Zinsen, Doku Abschnitt 10.5).
+- **Vertragswert und Laufzeit (Chris, 25.11.):** Kaufen, Verlängern, Halten, Verkaufen und Vertragsauflösung fragen eine Zahl, den
+  Vertragswert W (`lib/contracts/vertragswert.ts`, Spielstand `vertragswert-spielstand.ts`): Nutzen minus Gehalt **nach echtem Jahresplan**
+  (nicht linear) plus Fortsetzung, gewichtet nach der Erwartung besser/gleich/schlechter; er ersetzt die 0,9-Sperre. **Laufzeit 1–5 für
+  jeden Spieler**, keine Sperre nach Rolle oder Rang; die **Formkarte zählt** (fehlende Klassenfarbe im Kader = Nutzen). **Restgehalt
+  zahlt der Verkäufer**, außer der Spieler bietet die Vertragsauflösung an. **Kein vorzeitiges Verlängern.** **Keine Rollen-Etiketten**
+  („Stammspieler/Nachwuchs“ ist raus, kein Ersatz). Rabatt nach Wunschlaufzeit unverändert. Stempel `wirtschaftsRegeln.vertragsPlan`,
+  Rückweg `OLY_KI_VERTRAGSPLAN=aus` / `aus-sofort`. Doku `docs/design/vertragswert-bau-25-11.md`.
 - **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte

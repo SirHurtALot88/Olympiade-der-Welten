@@ -33,7 +33,6 @@ function makeSummary(overrides: Partial<TransfermarktSellSummary> = {}): Transfe
       id: "roster-1",
       playerId: "player-1",
       status: "active",
-      roleTag: "starter",
       contractLength: 2,
       salary: 4.2,
       purchasePrice: 18,

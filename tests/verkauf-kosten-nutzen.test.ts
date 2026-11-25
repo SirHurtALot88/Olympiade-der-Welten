@@ -169,7 +169,7 @@ function kader() {
       traitsPositive: [],
       traitsNegative: [],
     } as unknown as Player);
-    rosters.push({ id: `r${i}`, teamId: "team-test", playerId: pid, contractLength: 1, salary: 4, upkeep: 4, purchasePrice: 30, currentValue: 30, roleTag: "starter", joinedSeasonId: "season-1" } as RosterEntry);
+    rosters.push({ id: `r${i}`, teamId: "team-test", playerId: pid, contractLength: 1, salary: 4, upkeep: 4, purchasePrice: 30, currentValue: 30, joinedSeasonId: "season-1" } as RosterEntry);
   }
   const team = { teamId: "team-test", name: "T", shortCode: "T", cash: 80, rosterLimit: 20, budget: 100, identityId: "team-test", humanControlled: false } as unknown as Team;
   const gameState = {
@@ -185,7 +185,7 @@ function kader() {
       seasonId: "season-1",
       seasonSnapshots: [],
       sponsorPayoutLogs: [{ seasonId: "season-1", teamId: "team-test", componentId: "salary_deduct" }],
-      wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-1"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: "neu" },
+      wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-1"), kernschutz: "neu", restgehalt: "neu", verkaufSchwellen: "neu", vertragsPlan: "alt" },
     },
   } as unknown as GameState;
   return { gameState, team, players };

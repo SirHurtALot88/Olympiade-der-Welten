@@ -29,7 +29,6 @@ async function selectSmokeSellCandidate(saveId: string, seasonId: string) {
         id: true,
         playerId: true,
         teamId: true,
-        roleTag: true,
         currentValue: true,
         purchasePrice: true,
         createdAt: true,
@@ -93,7 +92,6 @@ async function selectSmokeSellCandidate(saveId: string, seasonId: string) {
         playerName: row.player.name,
         teamId: row.teamId,
         teamName: row.team.name,
-        roleTag: row.roleTag,
         salePrice: row.currentValue ?? row.purchasePrice ?? null,
         rosterCount,
         playerMin: teamState.playerMin,
@@ -105,11 +103,8 @@ async function selectSmokeSellCandidate(saveId: string, seasonId: string) {
     .sort((left, right) => {
       const leftSafety = left.isSafeRoster ? 0 : 1;
       const rightSafety = right.isSafeRoster ? 0 : 1;
-      const leftBench = left.roleTag === "bench" || left.roleTag === "prospect" ? 0 : 1;
-      const rightBench = right.roleTag === "bench" || right.roleTag === "prospect" ? 0 : 1;
       return (
         leftSafety - rightSafety ||
-        leftBench - rightBench ||
         (left.salePrice ?? Number.MAX_SAFE_INTEGER) - (right.salePrice ?? Number.MAX_SAFE_INTEGER) ||
         left.playerName.localeCompare(right.playerName, "de")
       );

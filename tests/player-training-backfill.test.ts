@@ -44,7 +44,7 @@ describe("player-training-backfill", () => {
   it("applies defaults only to rostered players", () => {
     const gameState = {
       players: [player({ id: "p-1" }), player({ id: "p-2" })],
-      rosters: [{ id: "r-1", teamId: "t-1", playerId: "p-1", contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: "season-1" }],
+      rosters: [{ id: "r-1", teamId: "t-1", playerId: "p-1", contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: "season-1" }],
     } as GameState;
     const next = applyDefaultTrainingFieldsToRosteredPlayers(gameState);
     expect(next.players.find((entry) => entry.id === "p-1")?.trainingMode).toBe("mittel");

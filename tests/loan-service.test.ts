@@ -208,7 +208,6 @@ function makeRosters(teamId: string, count: number): GameState["rosters"] {
     contractLength: 3,
     salary: 1,
     upkeep: 0,
-    roleTag: "bench" as const,
     joinedSeasonId: "season-1",
   }));
 }

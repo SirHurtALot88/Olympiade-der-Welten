@@ -129,8 +129,8 @@ function createSave(): PersistedSaveGame {
     players,
     disciplines: [{ id: "tdm", name: "TDM", category: "power", weight: 1 }],
     rosters: [
-      { id: "r-human", teamId: "team-human", playerId: humanPlayer.id, salary: 1, marketValue: 10, contractLength: 1, roleTag: "core" },
-      { id: "r-ai", teamId: "team-ai", playerId: aiPlayer.id, salary: 1, marketValue: 10, contractLength: 1, roleTag: "depth" },
+      { id: "r-human", teamId: "team-human", playerId: humanPlayer.id, salary: 1, marketValue: 10, contractLength: 1 },
+      { id: "r-ai", teamId: "team-ai", playerId: aiPlayer.id, salary: 1, marketValue: 10, contractLength: 1 },
     ],
     contracts: [],
     transferListings: [],

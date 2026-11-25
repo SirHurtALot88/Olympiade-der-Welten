@@ -83,7 +83,6 @@ function createRosterEntry(playerId: string, partial?: Partial<RosterEntry>): Ro
     upkeep: partial?.upkeep ?? partial?.salary ?? 7,
     purchasePrice: partial?.purchasePrice ?? 45,
     currentValue: partial?.currentValue ?? 45,
-    roleTag: partial?.roleTag ?? "starter",
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
 }
@@ -224,9 +223,8 @@ function createAngryRenewalGameState() {
           contractLength: 0,
           contractStatus: "renewal_pending",
           salary: 3,
-          roleTag: "starter",
         }),
-        createRosterEntry("bad-fit", { teamId: "C-C", roleTag: "bench" }),
+        createRosterEntry("bad-fit", { teamId: "C-C" }),
       ],
     }),
     teamIdentities: [
@@ -666,7 +664,7 @@ describe("contract renewal service", () => {
     const save = createSave(
       createGameState({
         players: [player],
-        rosters: [createRosterEntry(player.id, { contractLength: 0, contractStatus: "renewal_pending", salary: 9.63, roleTag: "starter" })],
+        rosters: [createRosterEntry(player.id, { contractLength: 0, contractStatus: "renewal_pending", salary: 9.63 })],
       }),
     );
 
@@ -696,7 +694,7 @@ describe("contract renewal service", () => {
 
   // Root-cause regression (2026-07-04, contract-length synchronized-expiry-wave -- see
   // outputs/real-engine-s1s5-final/progress-log.md): getRecommendedLength used to return one
-  // single fixed number per (roleTag, highValue, conservativeTeam) bucket, so every "bench"
+  // single fixed number per (role, highValue, conservativeTeam) bucket, so every "bench"
   // player renewed at exactly the same length every season -- turning renewals into another
   // synchronized wave. It now reuses the same organic, trait/seed-based idealLength that new
   // signings already get (buildPlayerContractPreference) as a baseline and only uses role/value/
@@ -709,7 +707,7 @@ describe("contract renewal service", () => {
     const playerIds = ["bench-1", "bench-2", "bench-9", "bench-16"];
     const players = playerIds.map((id) => createPlayer(id, { rating: 55, marketValue: 20, displayMarketValue: 20 }));
     const rosters = playerIds.map((id) =>
-      createRosterEntry(id, { teamId: "D-D", roleTag: "bench", contractLength: 3, salary: 5 }),
+      createRosterEntry(id, { teamId: "D-D", contractLength: 3, salary: 5 }),
     );
     const save = {
       ...createSave(createGameState({ teams: [team], players, rosters })),
@@ -737,16 +735,16 @@ describe("contract renewal service", () => {
         createGameState({
           teams: [cashTightTeam],
           players: [benchOnTightBudget],
-          rosters: [createRosterEntry(benchOnTightBudget.id, { teamId: "E-E", roleTag: "bench", contractLength: 3, salary: 4 })],
+          rosters: [createRosterEntry(benchOnTightBudget.id, { teamId: "E-E", contractLength: 3, salary: 4 })],
         }),
       ),
       saveId: "contract-length-bounds-cash-tight",
     };
     const tightRow = previewSeasonEndContracts(tightSave).rows.find((row) => row.playerId === benchOnTightBudget.id);
-    // Cash-tight teams must still not commit long-term to a bench player, no matter what the
-    // player's own organic baseline would otherwise prefer. 1-year deals stay legitimate (clean expiry
-    // = cash generation without a buyout), so the floor is not raised.
-    expect(tightRow?.recommendedLength).toBeLessThanOrEqual(2);
+    // Ohne Stempel `vertragsPlan` gelten die Grenzen, die bis 25.11. praktisch fuer ALLE Eintraege griffen (jeder Kaufweg schrieb das
+    // Rollen-Etikett „Nachwuchs“): 1 bis 3 Jahre, mit Top-40-Rang 2 bis 4. Das Etikett ist entfernt (Chris 25.11.); die Kassen-Grenze
+    // haengt mit Stempel am Vertragswert (tests/vertragswert.test.ts).
+    expect(tightRow?.recommendedLength).toBeLessThanOrEqual(3);
 
     const wealthyTeam = createTeam({ teamId: "F-F", shortCode: "F-F", cash: 200 });
     const starPlayer = createPlayer("elite-starter", { rating: 99, marketValue: 90, displayMarketValue: 90 });
@@ -757,8 +755,8 @@ describe("contract renewal service", () => {
           teams: [wealthyTeam],
           players: [starPlayer, ...fillerPlayers],
           rosters: [
-            createRosterEntry(starPlayer.id, { teamId: "F-F", roleTag: "starter", contractLength: 3, salary: 20 }),
-            ...fillerPlayers.map((player) => createRosterEntry(player.id, { teamId: "F-F", roleTag: "bench", contractLength: 3, salary: 2 })),
+            createRosterEntry(starPlayer.id, { teamId: "F-F", contractLength: 3, salary: 20 }),
+            ...fillerPlayers.map((player) => createRosterEntry(player.id, { teamId: "F-F", contractLength: 3, salary: 2 })),
           ],
         }),
       ),
@@ -980,7 +978,7 @@ describe("contract renewal service", () => {
     const save = createSave(
       createGameState({
         players: [player],
-        rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "renewal_pending", salary: 3, roleTag: "starter" })],
+        rosters: [createRosterEntry("p1", { contractLength: 0, contractStatus: "renewal_pending", salary: 3 })],
       }),
     );
 
@@ -1114,7 +1112,6 @@ describe("contract renewal service", () => {
             contractLength: 0,
             contractStatus: "renewal_pending",
             salary: 4,
-            roleTag: "rotation",
           }),
         ],
         seasonState: {
@@ -1156,7 +1153,6 @@ describe("contract renewal service", () => {
       createRosterEntry(player.id, {
         teamId: "A-A",
         contractLength: 1,
-        roleTag: "starter",
         salary: 3,
       }),
     );
@@ -1179,7 +1175,6 @@ describe("contract renewal service", () => {
       createRosterEntry(player.id, {
         teamId: "A-A",
         contractLength: 1,
-        roleTag: "rotation",
         salary: 3,
       }),
     );
@@ -1246,7 +1241,6 @@ describe("contract renewal service", () => {
             salary: 6,
             purchasePrice: 20,
             currentValue: 16,
-            roleTag: "bench",
           }),
         ],
         teams: [createTeam({ cash: 40 })],
@@ -1281,7 +1275,7 @@ describe("contract renewal service", () => {
       createPlayer(`p-${index}`, { rating: 62, marketValue: 22, salaryDemand: 3 }),
     );
     const rosters = players.map((player) =>
-      createRosterEntry(player.id, { teamId: "A-A", contractLength: 1, salary: 3, roleTag: "rotation" }),
+      createRosterEntry(player.id, { teamId: "A-A", contractLength: 1, salary: 3 }),
     );
     const gameState = createGameState({ teams: [team], players, rosters });
     gameState.teamIdentities = [{ teamId: "A-A", identityId: "A-A", playerMin: 8, playerMax: 14, playerOpt: 10 }];

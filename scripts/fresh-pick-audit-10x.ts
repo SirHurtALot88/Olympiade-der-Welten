@@ -247,10 +247,6 @@ function roleFromPickLane(lane: string | null | undefined) {
   return "Prospect";
 }
 
-function roleTagFromPromised(promisedRole: RosterPromisedRole): RosterEntry["roleTag"] {
-  return promisedRole === "starter" || promisedRole === "rotation" ? "starter" : promisedRole === "bench" ? "bench" : "prospect";
-}
-
 function normalize(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
@@ -370,7 +366,6 @@ function applyPreviewToSave(save: NonNullable<ReturnType<ReturnType<typeof creat
         upkeep: pick.salary ?? 0,
         purchasePrice: price,
         currentValue: price,
-        roleTag: roleTagFromPromised(promisedRole),
         promisedRole,
         joinedSeasonId: save.gameState.season.id,
       });

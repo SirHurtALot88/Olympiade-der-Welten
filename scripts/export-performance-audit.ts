@@ -254,7 +254,6 @@ function topUpRostersForLineups(persistence: PersistenceService, saveId: string,
         upkeep: Math.round(player.salaryDemand),
         purchasePrice: Math.round(player.marketValue),
         currentValue: Math.round(player.marketValue),
-        roleTag: "bench",
         joinedSeasonId: nextState.season.id,
       });
       rosterCounter += 1;

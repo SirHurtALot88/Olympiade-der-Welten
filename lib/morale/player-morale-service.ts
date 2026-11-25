@@ -186,8 +186,8 @@ function getContractIntent(morale: number, player: Player): PlayerMoraleContract
   return "willing_to_extend";
 }
 
-function getRoleExpectedAppearances(roleTag: string | null | undefined) {
-  const role = (roleTag ?? "").toLowerCase();
+function getRoleExpectedAppearances(promisedRole: string | null | undefined) {
+  const role = (promisedRole ?? "").toLowerCase();
   if (role.includes("starter") || role.includes("star") || role.includes("core")) return 7;
   if (role.includes("rotation")) return 4;
   if (role.includes("bench") || role.includes("depth")) return 3;
@@ -620,7 +620,7 @@ function buildRelativePlayerContext(input: {
   const rosterCount = rosterRows.length;
   const rosterRank = Math.max(1, rosterRows.findIndex((row) => row.player.id === input.player.id) + 1 || rosterCount);
   const relativeStrength = rosterCount <= 1 ? 1 : 1 - (rosterRank - 1) / Math.max(1, rosterCount - 1);
-  const expectationRole = input.rosterEntry.promisedRole ?? input.rosterEntry.roleTag ?? "";
+  const expectationRole = input.rosterEntry.promisedRole ?? "";
   const role = expectationRole.toLowerCase();
   const isPromisedCore = role.includes("starter") || role.includes("star") || role.includes("core");
   const isExplicitDepth = role.includes("rotation") || role.includes("bench") || role.includes("depth") || role.includes("prospect");
@@ -905,7 +905,7 @@ function computePlayerMorale(input: {
   };
   const hasSeasonPerformance =
     seasonPerformance.appearances > 0 || seasonPerformance.averageContribution != null;
-  const expectationRole = rosterEntry.promisedRole ?? rosterEntry.roleTag;
+  const expectationRole = rosterEntry.promisedRole ?? null;
   const expectedAppearances = getRoleExpectedAppearances(expectationRole);
   const appearanceGap = seasonPerformance.appearances - expectedAppearances;
   // Kein eigener Einsatzzeit-Delta mehr HIER: dieselbe Kennzahl (`seasonPerformance.appearances`)

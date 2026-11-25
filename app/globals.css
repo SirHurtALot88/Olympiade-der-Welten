@@ -45728,8 +45728,6 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-teams-th-player,
 .is-new-look .nl-teams-td-player,
-.is-new-look .nl-teams-th-role,
-.is-new-look .nl-teams-td-role,
 .is-new-look .nl-teams-th-actions,
 .is-new-look .nl-teams-td-actions {
   text-align: left;
@@ -45846,10 +45844,6 @@ button.foundation-team-portrait-card {
 
 .is-new-look .nl-teams-playermeta {
   font-size: 11px;
-  color: var(--nl-mut);
-}
-
-.is-new-look .nl-teams-td-role {
   color: var(--nl-mut);
 }
 
@@ -63635,7 +63629,6 @@ span.nl-facility-ampel-chip {
 }
 
 .is-new-look .nl-teamprofile-table th.nl-teamprofile-th-player,
-.is-new-look .nl-teamprofile-table th.nl-teamprofile-th-role,
 .is-new-look .nl-teamprofile-table th.nl-teamprofile-th-disciplines {
   text-align: left;
 }
@@ -63648,7 +63641,6 @@ span.nl-facility-ampel-chip {
 }
 
 .is-new-look .nl-teamprofile-table td.nl-teamprofile-td-player,
-.is-new-look .nl-teamprofile-table td.nl-teamprofile-td-role,
 .is-new-look .nl-teamprofile-table td.nl-teamprofile-td-disciplines {
   text-align: left;
 }

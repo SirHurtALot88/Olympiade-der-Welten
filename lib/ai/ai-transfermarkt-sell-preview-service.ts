@@ -652,7 +652,8 @@ function buildCandidate(
     playerOpt != null && rosterSize > playerOpt ? clamp((rosterSize - playerOpt) / Math.max(playerOpt, 1), 0, 1) : 0;
   const playerAxis = getPlayerAxisLabel(player);
   const coversNeedAxis = playerAxis ? needs.uncoveredNeedAxes.includes(playerAxis) : false;
-  const nonStarterBonus = roster.roleTag !== "starter" ? 0.15 : 0;
+  // Bis 25.11. nur ohne Etikett „Stammspieler“ — das trug kein Eintrag, der Bonus galt immer (Etikett entfernt, Chris 25.11.).
+  const nonStarterBonus = 0.15;
   const shortContractScore = roster.contractLength <= 1 ? 0.16 : roster.contractLength === 2 ? 0.08 : 0;
   const sellAggression = (profile?.bias.sellForProfitAggression ?? 5) / 10;
   const wageSensitivity = (profile?.bias.wageSensitivity ?? 5) / 10;
@@ -689,7 +690,6 @@ function buildCandidate(
     averageFinalScore: performance.averageFinalScore,
     expectedPerformanceValue: playerRating?.ovrNormalized ?? player.rating ?? null,
     contractLength: roster.contractLength,
-    roleTag: roster.roleTag ?? null,
     salary,
     marketValue,
     purchasePrice,

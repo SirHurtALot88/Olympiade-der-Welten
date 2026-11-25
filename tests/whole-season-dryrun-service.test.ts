@@ -140,7 +140,6 @@ function topUpRostersForSeasonMaximum(
         upkeep: Math.round(player.salaryDemand),
         purchasePrice: Math.round(player.marketValue),
         currentValue: Math.round(player.marketValue),
-        roleTag: "bench",
         joinedSeasonId: nextGameState.season.id,
       });
       rosterCounter += 1;

@@ -79,8 +79,8 @@ function minimalGameState(overrides?: Partial<GameState>): GameState {
       { id: "p2", name: "B", gender: "female", race: "human", rating: 38, potential: 48, trainingMode: "mittel" },
     ],
     rosters: [
-      { id: "r1", teamId: "t1", playerId: "p1", contractLength: 2, salary: 10, upkeep: 0, roleTag: "starter", joinedSeasonId: "season-2" },
-      { id: "r2", teamId: "t1", playerId: "p2", contractLength: 2, salary: 12, upkeep: 0, roleTag: "starter", joinedSeasonId: "season-2" },
+      { id: "r1", teamId: "t1", playerId: "p1", contractLength: 2, salary: 10, upkeep: 0, joinedSeasonId: "season-2" },
+      { id: "r2", teamId: "t1", playerId: "p2", contractLength: 2, salary: 12, upkeep: 0, joinedSeasonId: "season-2" },
     ],
     transferHistory: [],
     contracts: [],

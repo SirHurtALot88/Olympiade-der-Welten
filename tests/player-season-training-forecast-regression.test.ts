@@ -109,7 +109,6 @@ function makeGameState(sourcePlayer: Player): GameState {
         playerId: sourcePlayer.id,
         salary: 5,
         upkeep: 0,
-        roleTag: "starter",
         joinedSeasonId: "season-1",
         contractLength: 2,
       },

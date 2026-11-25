@@ -187,8 +187,8 @@ function gameState(input?: { seasonId?: string }): GameState {
     ],
     disciplines: [],
     rosters: [
-      { id: "r-1", teamId: "A-I", playerId: "p-ai-good", contractLength: 2, salary: 8, roleTag: "starter", joinedSeasonId: input?.seasonId ?? "season-1" },
-      { id: "r-2", teamId: "A-I", playerId: "p-ai-bad", contractLength: 1, salary: 2, roleTag: "bench", joinedSeasonId: input?.seasonId ?? "season-1" },
+      { id: "r-1", teamId: "A-I", playerId: "p-ai-good", contractLength: 2, salary: 8, joinedSeasonId: input?.seasonId ?? "season-1" },
+      { id: "r-2", teamId: "A-I", playerId: "p-ai-bad", contractLength: 1, salary: 2, joinedSeasonId: input?.seasonId ?? "season-1" },
     ],
     contracts: [],
     transferListings: [],

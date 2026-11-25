@@ -63,7 +63,6 @@ export type TransfermarktSellPreview = {
     id: string;
     playerId: string;
     status: string;
-    roleTag: string;
     contractLength: number;
     salary: number;
     purchasePrice: number | null;
@@ -104,7 +103,6 @@ type ResolvedSellContext = {
     teamId: string;
     playerId: string;
     status: string;
-    roleTag: string;
     contractLength: number;
     salary: number;
     purchasePrice: number | null;
@@ -208,7 +206,6 @@ async function resolveSellContext(
         teamId: true,
         playerId: true,
         status: true,
-        roleTag: true,
         contractLength: true,
         salary: true,
         purchasePrice: true,
@@ -381,7 +378,6 @@ async function resolveSellContext(
           teamId: activePlayer.teamId,
           playerId: activePlayer.playerId,
           status: activePlayer.status,
-          roleTag: activePlayer.roleTag,
           contractLength: activePlayer.contractLength,
           salary: activePlayer.salary,
         purchasePrice: normalizedPurchasePrice,
@@ -424,7 +420,6 @@ async function resolveSellContext(
             id: activePlayer.id,
             playerId: activePlayer.playerId,
             status: activePlayer.status,
-            roleTag: activePlayer.roleTag,
             contractLength: activePlayer.contractLength,
             salary: activePlayer.salary,
             purchasePrice: activePlayer.purchasePrice,

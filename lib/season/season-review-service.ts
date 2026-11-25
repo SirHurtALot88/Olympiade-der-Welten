@@ -63,7 +63,6 @@ export type SeasonReviewPromisedRoleSignal = {
   playerName: string;
   teamId: string;
   teamName: string;
-  roleTag: string;
   promisedRole: RosterPromisedRole;
   appearances: number;
   expectedAppearances: number;
@@ -360,7 +359,6 @@ function buildPromisedRoleSignals(gameState: GameState) {
         playerName: playerLabel(player),
         teamId: roster.teamId,
         teamName: teamLabel(team),
-        roleTag: roster.roleTag,
         promisedRole,
         appearances,
         expectedAppearances,

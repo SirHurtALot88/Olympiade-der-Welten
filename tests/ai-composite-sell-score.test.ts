@@ -65,7 +65,6 @@ function rosterEntry(id: string, playerId: string, partial: Partial<RosterEntry>
     upkeep: partial.upkeep ?? partial.salary ?? 8,
     purchasePrice: partial.purchasePrice ?? 40,
     currentValue: partial.currentValue ?? partial.purchasePrice ?? 40,
-    roleTag: partial.roleTag ?? "starter",
     joinedSeasonId: partial.joinedSeasonId ?? "season-1",
   };
 }

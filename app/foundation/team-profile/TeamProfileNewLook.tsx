@@ -128,15 +128,6 @@ function formatControlModeLabel(value: TeamDetailDrawerData["controlMode"]): str
   return "Beobachtet";
 }
 
-function getRoleLabel(roleTag: string | null | undefined): string {
-  if (roleTag === "starter") return "Starter";
-  if (roleTag === "bench") return "Bank";
-  if (roleTag === "rotation") return "Rotation";
-  // "prospect" ist ein vager Auto-Rollen-Tag und wird nicht mehr als Rolle gezeigt.
-  if (roleTag === "prospect") return "";
-  return roleTag ?? "—";
-}
-
 function formatGmDismissalReason(reason: "low_board_confidence" | "high_board_pressure"): string {
   if (reason === "low_board_confidence") return "Board-Vertrauen zu niedrig";
   return "Board-Druck zu hoch";
@@ -1149,7 +1140,6 @@ export default function TeamProfileNewLook({
             axisPps={player.axisPps ?? null}
             leagueHeatPools={resolvedHeatPools}
             variant="team"
-            roleTag={player.roleTag}
             playerClassName={player.className ?? undefined}
             className={getClassColorClassName(player.className, "player-card-class-frame")}
             subMeta={[player.className, player.race].filter((part): part is string => Boolean(part && part.trim())).join(" · ") || null}
@@ -1272,7 +1262,6 @@ export default function TeamProfileNewLook({
           <thead>
             <tr>
               <th className="nl-teamprofile-th-player">Spieler</th>
-              <th className="nl-teamprofile-th-role">Rolle</th>
               <th>OVR</th>
               <th>MVS</th>
               <th>PPs</th>
@@ -1324,7 +1313,6 @@ export default function TeamProfileNewLook({
                       </span>
                     </button>
                   </td>
-                  <td className="nl-teamprofile-td-role">{getRoleLabel(player.roleTag) || "—"}</td>
                   <td>{formatNlNumber(player.ovr, 0)}</td>
                   <td>{formatNlNumber(player.mvs, 1)}</td>
                   <td>{formatNlNumber(player.pps, 1)}</td>

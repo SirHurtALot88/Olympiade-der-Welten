@@ -56,10 +56,9 @@ function zeile(input: {
   ovr: number | null;
   pps: number | null;
   mvs?: number | null;
-  roleTag?: string | null;
 }): HomeV2RosterTableRow {
   return {
-    entry: { id: `r-${input.id}`, teamId: "S-C", playerId: input.id, roleTag: input.roleTag ?? null } as RosterEntry,
+    entry: { id: `r-${input.id}`, teamId: "S-C", playerId: input.id } as RosterEntry,
     player: spieler(input.id, input.name),
     playerOvr: input.ovr,
     playerPps: input.pps,
@@ -90,8 +89,8 @@ describe("Home · Top-Kader", () => {
 
   it("ignoriert den Rollen-Tag", () => {
     const reihenfolge = baue([
-      zeile({ id: "reserve", name: "Starker Reservist", ovr: 80, pps: 0, roleTag: "reserve" }),
-      zeile({ id: "star", name: "Schwacher Stammspieler", ovr: 50, pps: 0, roleTag: "star" }),
+      zeile({ id: "reserve", name: "Starker Reservist", ovr: 80, pps: 0 }),
+      zeile({ id: "star", name: "Schwacher Stammspieler", ovr: 50, pps: 0 }),
     ]);
 
     expect(reihenfolge).toEqual(["Starker Reservist", "Schwacher Stammspieler"]);

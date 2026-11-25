@@ -139,7 +139,6 @@ function createCompletedTwoLeagueSeasonState(withLeagueSplit: boolean): GameStat
       // `negotiatedAnnualSalary`, dann `yearlySalarySchedule`, erst dann `.salary`.
       negotiatedAnnualSalary: salary,
       upkeep: salary * 0.1,
-      roleTag: "starter",
       joinedSeasonId: seasonId,
     };
   });
