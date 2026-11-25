@@ -11,6 +11,7 @@ import { computeEarlyPayoff, computeLoanTerms, estimateTeamAnnualRevenue, getTea
 import { pruefeKreditAufnahme } from "@/lib/finance/kredit-pruefung";
 import { isSeasonOne } from "@/lib/season/transfer-season-policy";
 import { getTeamSalarySum } from "@/lib/ai/ai-cash-salary-target-service";
+import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 import { calculateFacilityUpkeep, getTeamFacilityState } from "@/lib/facilities/facility-effects";
 
 /**
@@ -307,6 +308,102 @@ function pruefeKiKredit(input: {
 }
 
 /**
+ * RISIKO-KREDIT (Chris 25.11., Stempel `wirtschaftsRegeln.verkaufSchwellen`): „ja das team soll kaufen, aber wenn sie das geld noch
+ * haben benötigen sie den kredit nicht, wenn kein geld da ist aber es die lage vom team verbessert hängt das auch bisschen von der
+ * risikobereitschaft des teams ab ob sie ihre lage verbessern wollen mit dem kredit“.
+ *
+ * Der bedarfsgetriebene Kredit oben leiht nur bis zur Zwischenstufe Min + halber Weg zu Opt. Darueber hinaus — bis zum Opt plus
+ * einem Platz Tiefe — leiht ein Team nur, wenn (1) das Geld fehlt (Bedarf zum Fuellpreis ueber dem ausgebbaren Geld, mindestens
+ * `MIN_MEANINGFUL_SHORTFALL`), (2) seine Risikobereitschaft die Schwelle `RISIKO_KREDIT_SCHWELLE` erreicht, und (3) der Betrag in
+ * Kapazitaet, Tragfaehigkeit und Vorstands-Sperre passt (dieselben Pruefungen wie oben). Der Betrag waechst mit der Bereitschaft.
+ * Ob der Kauf das Team wirklich verbessert, prueft die Fenster-Sitzung danach mit dem Kaufplaner (`deckleKreditAufKaufplan`: kein
+ * Kredit ohne Kaufplan, gedeckelt auf die geplanten Ausgaben). Vorsichtige Teams leihen so kaum, mutige oefter.
+ */
+export const RISIKO_KREDIT_SCHWELLE = 0.55;
+
+/**
+ * Risikobereitschaft eines Teams 0..1 aus vorhandenen Kennzahlen: GM-/Strategie-Bias (riskTolerance hebt, cashPriority senkt,
+ * starPriority hebt leicht) und Finanzwert der Team-Matrix (ein reiches Team traegt ein Risiko leichter). Neutral (alles 5) = 0,5.
+ */
+export function kreditRisikoBereitschaft(gameState: GameState, teamId: string): number {
+  const bias = getTeamStrategyProfile(gameState, teamId)?.bias;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const finanzwert = Number.isFinite(identity?.finances) ? Number(identity?.finances) : 5;
+  const finanz10 = finanzwert > 10 ? finanzwert / 10 : finanzwert;
+  return clamp(
+    0.5 +
+      0.07 * ((bias?.riskTolerance ?? 5) - 5) -
+      0.06 * ((bias?.cashPriority ?? 5) - 5) +
+      0.03 * ((bias?.starPriority ?? 5) - 5) +
+      0.02 * (finanz10 - 5),
+    0,
+    1,
+  );
+}
+
+/**
+ * Kreditrahmen fuer einen QUALITAETSTAUSCH (PM 25.11. nach Chris' Vorgabe): ein Team auf seinem Ziel, das einen klar besseren Spieler nur
+ * mit Kredit bekaeme. Dieselben Bedingungen wie der Risiko-Kredit (Stempel, Risikobereitschaft, kein Hort-Team, kein geplatzter Kredit,
+ * Kapazitaet, Tragfaehigkeit, Vorstands-Sperre). Liefert Betrag (Wunsch x Bereitschaft, gedeckelt), Laufzeit und die Zinskosten ueber die
+ * Laufzeit — der Verkaufsplaner rechnet damit den Tausch gegen Halten (`planOrganicSellsForTeam`, Grund `tausch_kredit`). Aufgenommen wird
+ * der Kredit spaeter in der Fenster-Sitzung ueber den Risiko-Kredit (`risk_driven_borrow`), gedeckelt auf den geplanten Kauf.
+ */
+export function risikoKreditRahmen(
+  gameState: GameState,
+  teamId: string,
+  wunsch: number,
+): { betrag: number; laufzeit: number; kosten: number; risiko: number } | null {
+  if (wirtschaftsRegel(gameState, "verkaufSchwellen") !== "neu") return null;
+  if (isSeasonOne(gameState.season.id)) return null;
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  if (!team || !(wunsch > 0)) return null;
+  if (isStrategicHoardTeam(gameState, teamId) || hasDefaultedLoan(gameState, teamId)) return null;
+  const risiko = kreditRisikoBereitschaft(gameState, teamId);
+  if (risiko < RISIKO_KREDIT_SCHWELLE) return null;
+  const probe = originateLoan(gameState, { borrowerTeamId: teamId, principal: wunsch, termSeasons: DEFAULT_TERM_SEASONS }, { execute: false });
+  if (probe.capacity <= 0) return null;
+  const betrag = round(Math.min(wunsch, probe.capacity) * risiko * resolveWillingness(gameState, teamId, gameState.season.id), 1);
+  if (betrag < MIN_MEANINGFUL_SHORTFALL) return null;
+  const finances = gameState.teamIdentities.find((entry) => entry.teamId === teamId)?.finances ?? 5;
+  const laufzeit = resolveServiceableTermSeasons({ gameState, teamId, principal: betrag, finances });
+  if (laufzeit == null) return null;
+  const erlaubt = pruefeKiKredit({ gameState, teamId, principal: betrag, termSeasons: laufzeit, finances });
+  if ("grund" in erlaubt) return null;
+  const konditionen = computeLoanTerms({ principal: betrag, termSeasons: erlaubt.termSeasons, finances });
+  const kosten = round(Math.max(0, konditionen.installmentPerSeason * erlaubt.termSeasons - betrag), 2);
+  return { betrag, laufzeit: erlaubt.termSeasons, kosten, risiko };
+}
+
+function risikoKreditOder(gameState: GameState, teamId: string, sonst: AiLoanDecision): AiLoanDecision {
+  if (wirtschaftsRegel(gameState, "verkaufSchwellen") !== "neu") return sonst;
+  const team = gameState.teams.find((entry) => entry.teamId === teamId) ?? null;
+  if (!team) return sonst;
+  if (isStrategicHoardTeam(gameState, teamId) || hasDefaultedLoan(gameState, teamId)) return sonst;
+  const risiko = kreditRisikoBereitschaft(gameState, teamId);
+  if (risiko < RISIKO_KREDIT_SCHWELLE) return sonst;
+  const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId) ?? null;
+  const { playerOpt } = deriveRosterTargets(team, identity);
+  const kader = gameState.rosters.filter((entry) => entry.teamId === teamId).length;
+  const luecke = Math.max(0, playerOpt + 1 - kader);
+  if (luecke <= 0) return sonst;
+  const bedarf = luecke * estimateUpgradeBuyFloorMw(gameState, teamId) * LOAN_AMOUNT_FILL_FRACTION;
+  const ausgebbar = resolveTeamSpendableCashForPlanning(gameState, teamId, team.cash ?? 0);
+  const fehlt = round(bedarf - ausgebbar, 1);
+  // Wer das Geld hat, kauft ohne Kredit.
+  if (fehlt < MIN_MEANINGFUL_SHORTFALL) return sonst;
+  const probe = originateLoan(gameState, { borrowerTeamId: teamId, principal: fehlt, termSeasons: DEFAULT_TERM_SEASONS }, { execute: false });
+  if (probe.capacity <= 0) return sonst;
+  const betrag = round(Math.min(fehlt, probe.capacity) * risiko * resolveWillingness(gameState, teamId, gameState.season.id), 1);
+  if (betrag < MIN_MEANINGFUL_SHORTFALL) return sonst;
+  const finances = identity?.finances ?? 5;
+  const laufzeit = resolveServiceableTermSeasons({ gameState, teamId, principal: betrag, finances });
+  if (laufzeit == null) return sonst;
+  const erlaubt = pruefeKiKredit({ gameState, teamId, principal: betrag, termSeasons: laufzeit, finances });
+  if ("grund" in erlaubt) return sonst;
+  return { shouldBorrow: true, loanAmount: betrag, termSeasons: erlaubt.termSeasons, reason: "risk_driven_borrow" };
+}
+
+/**
  * Entscheidet, ob ein KI-Team im Preseason (unmittelbar vor der Kaufphase) einen Bankkredit
  * aufnimmt. Rein bedarfsgetrieben: kein Kaderbedarf → kein Kredit; genug Cash für den Bedarf →
  * kein Kredit; keine Kreditkapazität → kein Kredit. Deterministisch, kein Zufall.
@@ -381,7 +478,7 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const competitiveFloor = resolveCompetitiveFloor(playerMin, playerOpt);
   const rosterGap = Math.max(0, competitiveFloor - rosterCount);
 
-  if (rosterGap <= 0) return noLoan("no_need");
+  if (rosterGap <= 0) return risikoKreditOder(gameState, teamId, noLoan("no_need"));
   // Reine Hort-Teams (Cash-Creator-Identität) borgen aus Charakter nicht.
   if (isStrategicHoardTeam(gameState, teamId)) return noLoan("strategic_hoard");
 
@@ -401,11 +498,11 @@ export function resolveAiLoanDecision(gameState: GameState, teamId: string): AiL
   const needsEur = estimateRosterNeedEur(gameState, teamId);
   const spendableCash = resolveTeamSpendableCashForPlanning(gameState, teamId, team.cash ?? 0);
   const shortfall = round(needsEur - spendableCash, 1);
-  if (shortfall <= 0) return noLoan("cash_sufficient");
+  if (shortfall <= 0) return risikoKreditOder(gameState, teamId, noLoan("cash_sufficient"));
   // Kredit ist kein Routine-Top-up: nur bei spürbarer Finanzierungslücke. AUSNAHME: ein Team unter dem
   // harten Roster-Minimum darf immer leihen, um überhaupt einen spielfähigen Kader stellen zu können
   // (sonst hält der Saison-Preflight "teams_under_7" den ganzen Lauf an) — dafür greift die Schwelle nicht.
-  if (!belowHardMin && shortfall < MIN_MEANINGFUL_SHORTFALL) return noLoan("shortfall_minor");
+  if (!belowHardMin && shortfall < MIN_MEANINGFUL_SHORTFALL) return risikoKreditOder(gameState, teamId, noLoan("shortfall_minor"));
 
   // SIZING (getrennt von der Qualifikation): der Betrag wird zum größeren Fill-Preis bemessen, damit ein
   // qualifiziertes Team genug für einen guten Spieler bekommt statt nur Trash — so sind die Kredite nicht

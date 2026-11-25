@@ -80,6 +80,7 @@ import { gehaltMitKlausel, klauselErlaubt, type Werbeklausel } from "@/lib/marke
 import { werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
 import { moralOhneWerbung } from "@/lib/morale/player-morale-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
+import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 
 // Weiterexport: die Abwaegung „Verlust realisieren oder ueberbruecken" ist in eine eigene Datei
 // gewandert (siehe dort), damit die KI-Aufloesung sie nutzen kann, ohne einen Import-Zyklus mit
@@ -349,6 +350,17 @@ function getTeamRosterCount(gameState: GameState, teamId: string) {
   return gameState.rosters.filter((entry) => entry.teamId === teamId).length;
 }
 
+/**
+ * KEINE KADERGROESSEN-BREMSE AUF ABGAENGE (Stempel `verkaufSchwellen: neu`, Chris 24.11., „fuer immer“): „Es ist immer erlaubt, alle
+ * moeglichen Spieler zu verkaufen. Es gibt keine Groesse, die sagt, du darfst nicht unter die Soll-Kadergroesse gehen.“ Ein Vertragsende
+ * ist ein Verkauf (CLAUDE.md, 22.11.) — also haelt auch die Verlaengerungs-Entscheidung keinen Spieler mehr WEGEN der Kadergroesse
+ * (Kader unter Opt/Minimum, Mindestkader-Risiko im Kostenvergleich, gelockertes Kassen-Tor unter dem Minimum). Die Kadergroesse steuert
+ * nur das Nachkaufen. Ohne Stempel (bestehende Saison, Rueckweg `OLY_KI_VERKAUF_SCHWELLEN=aus`) wie vorher.
+ */
+function ohneKadergroessenBremse(gameState: GameState): boolean {
+  return wirtschaftsRegel(gameState, "verkaufSchwellen") === "neu";
+}
+
 function getTeamPlayerMin(gameState: GameState, teamId: string) {
   const identity = gameState.teamIdentities.find((entry) => entry.teamId === teamId);
   return Math.max(identity?.playerMin ?? 7, 7);
@@ -494,6 +506,8 @@ function shouldAiRenewContract(input: {
   currentSalary?: number | null;
   renewLength?: number;
   gmArchetype?: string | null;
+  /** Stempel `verkaufSchwellen`: Kadergroesse (Opt, Minimum) haelt keinen Spieler (siehe `ohneKadergroessenBremse`). */
+  ohneKadergroesse?: boolean;
 }) {
   const {
     entry,
@@ -511,6 +525,7 @@ function shouldAiRenewContract(input: {
     currentSalary,
     renewLength,
     gmArchetype,
+    ohneKadergroesse,
   } = input;
   if (contractStrategy === "do_not_renew") {
     return false;
@@ -565,12 +580,14 @@ function shouldAiRenewContract(input: {
     rating?.ovrRank != null &&
     rating.ovrRank <= 19;
   const rosterRetentionSignal =
+    !ohneKadergroesse &&
     playerOpt != null &&
     rosterAfterRelease != null &&
     rosterAfterRelease < playerOpt &&
     ratingValue >= 42 &&
     !badValueContract;
   const hardMinRetentionSignal =
+    !ohneKadergroesse &&
     playerMin != null &&
     rosterAfterRelease != null &&
     rosterAfterRelease < playerMin &&
@@ -586,8 +603,9 @@ function shouldAiRenewContract(input: {
     renewLength: renewLength ?? 1,
     ratingValue,
     badValueContract,
-    rosterAfterRelease,
-    playerMin,
+    // Mindestkader-Risiko nur ohne Stempel `verkaufSchwellen` (Kadergroesse ist kein Grund zu verlaengern).
+    rosterAfterRelease: ohneKadergroesse ? undefined : rosterAfterRelease,
+    playerMin: ohneKadergroesse ? undefined : playerMin,
   });
 
   if (contractStrategy === "market_test" || contractStrategy === "salary_cap") {
@@ -648,7 +666,9 @@ function buildAiRenewalCashGate(input: {
   const salaryTotal = getTeamRosterSalaryTotal(input.gameState, input.teamId);
   const rosterCount = getTeamRosterCount(input.gameState, input.teamId);
   const playerMin = getTeamPlayerMin(input.gameState, input.teamId);
-  const rosterUnderMin = rosterCount < playerMin;
+  // KEINE KADERGROESSEN-BREMSE (Stempel `verkaufSchwellen`, Chris 24.11.): die Lockerung des Kassen-Tors unter dem Minimum hielt einen
+  // Spieler, den das Team sich nicht leisten kann, allein wegen der Kadergroesse. Mit Stempel entscheidet die Kasse; das Team kauft nach.
+  const rosterUnderMin = rosterCount < playerMin && !ohneKadergroessenBremse(input.gameState);
   const bias = input.profile?.bias ?? null;
   const longContractPreference = bias?.longContractPreference ?? (input.profile?.longContractsBias === "high" ? 8 : input.profile?.longContractsBias === "low" ? 3 : 5);
   const riskTolerance = bias?.riskTolerance ?? (input.profile?.riskToleranceLevel === "high" ? 8 : input.profile?.riskToleranceLevel === "low" ? 3 : 5);
@@ -1191,6 +1211,8 @@ function buildPreviewRow(input: {
   const rosterAfterRelease = save.gameState.rosters.filter(
     (roster) => roster.teamId === entry.teamId && roster.playerId !== entry.playerId,
   ).length;
+  // Stempel `verkaufSchwellen`: fuer die KI haelt die Kadergroesse keinen Spieler (kein Mindestkader-Risiko, keine Halte-Signale).
+  const ohneKadergroesse = controlMode === "ai" && ohneKadergroessenBremse(save.gameState);
   const renewalTco = resolveContractRenewalTco({
     exitProfitLoss: exit.profitLoss,
     exitPurchasePrice: exit.purchasePrice,
@@ -1200,8 +1222,8 @@ function buildPreviewRow(input: {
     renewLength: recommendedLength,
     ratingValue: ratingValueForBad,
     badValueContract,
-    rosterAfterRelease,
-    playerMin: rosterTargets.playerMin,
+    rosterAfterRelease: ohneKadergroesse ? undefined : rosterAfterRelease,
+    playerMin: ohneKadergroesse ? undefined : rosterTargets.playerMin,
   });
   const bridgeRenewalCost = renewalTco.renewalYearCost;
   const exitEconomicsAllowRenew =
@@ -1245,6 +1267,7 @@ function buildPreviewRow(input: {
     currentSalary: entry.salary ?? null,
     renewLength: recommendedLength,
     gmArchetype,
+    ohneKadergroesse,
   });
 
   const recommendedAction =
@@ -1275,7 +1298,7 @@ function buildPreviewRow(input: {
     tick.nextStatus !== "out_of_contract" || controlMode !== "ai"
       ? null
       : recommendedAction === "renew"
-        ? rosterAfterRelease < (rosterTargets.playerMin ?? Number.MAX_SAFE_INTEGER)
+        ? !ohneKadergroesse && rosterAfterRelease < (rosterTargets.playerMin ?? Number.MAX_SAFE_INTEGER)
           ? "hard_min_retention"
           : renewalTco.preferRenewOverExit
             ? "tco_prefers_renew"
@@ -1626,7 +1649,14 @@ export function computeSeasonEndContractTick(
   const transferHistory: TransferHistoryEntry[] = [];
   const cashDeltaByTeamId = new Map<string, number>();
   const teamReleaseCounts = new Map<string, number>();
-  const MAX_RELEASES_PER_TEAM_PER_TICK = 3;
+  /**
+   * FREIGABE-BREMSE: ohne Stempel geht je Team und Tick hoechstens drei „heuristic“-Freigaben, der Rest wird fuer ein Jahr
+   * brueckenverlaengert. Mit Stempel `verkaufSchwellen` (Chris 24.11., „fuer immer“: „Es ist immer erlaubt, alle moeglichen Spieler
+   * zu verkaufen“) gibt es keine Hoechstzahl an Abgaengen mehr: ob ein auslaufender Vertrag endet, entscheidet allein die Bewertung
+   * (Wert-Schwellen des Planers, Kosten-Rechnung, schlechter Vertrag, Moral, Kasse). Die Kaufrunde des Fensters fuellt bis Opt.
+   * verkauf-restgehalt-24-11.md Abschnitt 8.
+   */
+  const MAX_RELEASES_PER_TEAM_PER_TICK = ohneKadergroessenBremse(sourceState) ? Number.POSITIVE_INFINITY : 3;
 
   /**
    * HIER STAND EIN SCHUTZ FUER „FRISCH UNTERSCHRIEBENE" VERTRAEGE — er ist weg, und das ist die

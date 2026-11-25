@@ -45,6 +45,7 @@ import { isSeasonEndPhase } from "@/lib/season/season-transition-chain";
 import { resolvePlannerRosterTargets } from "@/lib/foundation/roster-limits";
 import type { LocalTransferWindowPhase } from "@/lib/market/transfer-window-policy";
 import { istFensterAufOpt } from "@/lib/market/transferfenster-gemeinsam";
+import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 
 /**
  * `season_end`      Saisonende-Kette (alte Saison): verkaufen (alter Ablauf) bzw. nur verlaengern
@@ -472,7 +473,9 @@ async function runTeamCycle(input: {
      * ausgefuehrt wird aber nur, solange der Kader danach mindestens max(8, playerMin) hat.
      */
     let verkaufsSpielraum = Number.POSITIVE_INFINITY;
-    if (input.sellNotBelowMin) {
+    // KEINE KADERGROESSEN-BREMSE (Chris 24.11., „fuer immer“): mit Stempel `verkaufSchwellen` gilt die Grenze auch im alten Stand
+    // (`OLY_FENSTER_AUF_OPT=0`) nicht mehr — ob ein Spieler geht, entscheidet der Wert; die Kaufrunde des Fensters kauft nach.
+    if (input.sellNotBelowMin && wirtschaftsRegel(gameState, "verkaufSchwellen") !== "neu") {
       const kaderJetzt = rosterCount(gameState, input.teamId);
       const boden = Math.max(8, identity?.playerMin ?? 0);
       verkaufsSpielraum = Math.max(0, kaderJetzt - boden);
@@ -1027,7 +1030,7 @@ export async function runTransferWindowSession(input: TransferWindowSessionInput
           // bleiben gültig; .save so überschreiben, wie es die Buy/Sell-Executoren selbst tun.
           sessionRunContext.save = persisted;
         }
-        warnings.push(`ai_loan_borrow:${teamId}:${geprueft.loanAmount}:${loanDecision.termSeasons}s`);
+        warnings.push(`ai_loan_borrow:${teamId}:${geprueft.loanAmount}:${loanDecision.termSeasons}s:${loanDecision.reason}`);
       }
     }
   };

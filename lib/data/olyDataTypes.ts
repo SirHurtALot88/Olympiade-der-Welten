@@ -4338,6 +4338,8 @@ export type SeasonState = {
     toepfeS1?: "alt" | "neu";
     /** 24.11.: KI verlaengert nicht, was sie verkaufen wuerde; Verkaufspruefung netto nach Rest-Buyout (verkauf-restgehalt-24-11.md). Fehlt = "alt". */
     restgehalt?: "alt" | "neu";
+    /** 24.11.: Abgang am Vertragsende nur nach den Verkaufs-Schwellen, Restgehalt-Verkauf praktisch gesperrt (verkauf-restgehalt-24-11.md Abschnitt 7). Fehlt = "alt". */
+    verkaufSchwellen?: "alt" | "neu";
     vorjahr?: Record<string, number>;
   } | null;
   /**

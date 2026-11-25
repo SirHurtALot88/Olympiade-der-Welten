@@ -40,6 +40,7 @@ import type { GameState, Player, RosterEntry } from "@/lib/data/olyDataTypes";
 import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
+import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
 import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
 import {
   acceptContractDissolution,
@@ -232,6 +233,11 @@ export function decideAiContractDissolution(input: {
   playerOpt: number;
   cashBefore: number;
   renewal: AiDissolutionRenewalSignal | null;
+  /**
+   * Stempel `verkaufSchwellen` (Chris 24.11., „fuer immer“: keine Kadergroessen-Bremse auf Abgaenge): ein Kader unter Opt macht den
+   * Spieler nicht wertvoller (`rosterFactor` hoechstens 1). Ueber Opt bleibt der Abschlag — Ueberschuss darf leichter gehen.
+   */
+  ohneKadergroessenBremse?: boolean;
 }): AiDissolutionDecision {
   const { offer } = input;
   const netCash = round(offer.salePrice - (offer.payableBuyout ?? 0), 2);
@@ -291,7 +297,7 @@ export function decideAiContractDissolution(input: {
     clamp(
       1 + (input.playerOpt - rosterAfter) * AI_DISSOLUTION_ROSTER_STEP,
       AI_DISSOLUTION_ROSTER_MIN,
-      AI_DISSOLUTION_ROSTER_MAX,
+      input.ohneKadergroessenBremse ? 1 : AI_DISSOLUTION_ROSTER_MAX,
     ),
   );
 
@@ -430,6 +436,7 @@ export function applyAiContractDissolutions(input: {
         playerOpt: targets.playerOpt,
         cashBefore: teamRow.cash ?? 0,
         renewal: input.renewalSignals?.get(`${team.teamId}:${offer.playerId}`) ?? null,
+        ohneKadergroessenBremse: wirtschaftsRegel(gameState, "verkaufSchwellen") === "neu",
       });
       decisions.push(decision);
 

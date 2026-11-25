@@ -88,10 +88,15 @@ export function ermittleKiVerkaufsabsichtAmSaisonende(save: PersistedSaveGame): 
       purchasePriceByPlayerId,
       allowBelowMin: true,
       draftSeed: saltOrganicSeed(`${save.saveId}:${team.teamId}`),
+      // Entscheidung am Vertragsende (24.11., Stempel `verkaufSchwellen`): dieselbe Kosten-Nutzen-Abwaegung wie im Fenster (Angebot =
+      // Abgangswert, kein Restgehalt); ohne den Stempel ist das der unveraenderte Plan der Verkaufsrunde.
+      vertragsende: true,
     });
-    // Wie die Verkaufsrunde im gemeinsamen Fenster: ohne „Fenster auf Opt" nur bis max(8, playerMin).
+    // Wie die Verkaufsrunde im gemeinsamen Fenster: ohne „Fenster auf Opt" nur bis max(8, playerMin) — aber nur im alten Stand.
+    // Mit Stempel `verkaufSchwellen` gibt es keine Kadergroessen-Bremse auf Abgaenge (Chris 24.11., „fuer immer“); wer unter das
+    // Minimum geht, kauft im Fenster nach.
     let spielraum = Number.POSITIVE_INFINITY;
-    if (istTransferfensterGemeinsam() && !istFensterAufOpt()) {
+    if (istTransferfensterGemeinsam() && !istFensterAufOpt() && wirtschaftsRegel(gameState, "verkaufSchwellen") !== "neu") {
       spielraum = Math.max(0, roster.length - Math.max(8, identity?.playerMin ?? 0));
     }
     const geplant = plan.decisions.slice(0, Number.isFinite(spielraum) ? spielraum : undefined).map((d) => d.playerId);

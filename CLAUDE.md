@@ -267,6 +267,16 @@ als bloßen Formabzug darstellen. Umsetzung und Messung: `docs/design/verletzung
     Verlängerungen aus dem Gehaltstopf, beides hart und für Mensch und KI gleich (`pruefeGebaeudeGegenVorstandFreigabe`,
     `pruefeVerlaengerungGegenVorstandFreigabe` in `lib/finance/vorstand-budgetfreigabe.ts`). Geschrieben wird nur über
     `POST /api/finance/vorstand` hinter `authorizeServerRoomWrite`.
+- **Verkaufen ist immer erlaubt — keine Kadergrößen-Bremse (Chris, 24.11., „für immer“).** Ob ein Spieler geht (Verkauf,
+  Vertragsende, Auflösung), entscheidet allein der Wert, nie Opt, Soll, Minimum oder Pflichtkader als Grenze; die Kadergröße
+  steuert nur, wie viel danach nachgekauft wird. Wer unter das Minimum verkauft, kauft im selben Fenster nach. Kein Agent baut
+  wieder eine Größenbremse auf Verkäufe ein. **Ob verkauft wird, ist eine Kosten-Nutzen-Abwägung** (Angebot, Leistung, Ersatz,
+  Gehalt, Kadertiefe als Belastung, Finanzierung), **kein fester Preisfaktor; Verkäufe unter Marktwert sind erlaubt** (Chris,
+  24.11.; `verkaufsAbwaegung` in `lib/ai/organic-squad/utility.ts`, Stempel `wirtschaftsRegeln.verkaufSchwellen`, Doku
+  `docs/design/verkauf-restgehalt-24-11.md` Abschnitte 8 bis 10). **Team-Blick (Chris, 25.11.): Verkauf und Nachkauf sind ein Plan**
+  (Bilanz der Runde, Umbau „teuer verkaufen, mit dem Kaufplaner nachkaufen“ gegen Halten, Cash-Verkauf wenn knapp bei Kasse); **Kredit
+  nach Risikobereitschaft** — wer das Geld hat, leiht nicht; fehlt es und verbessert der Kauf das Team, leihen mutige Teams eher,
+  auch fuer einen Qualitaetstausch auf dem Ziel (Staerke-Gewinn in C groesser als die Zinsen, Doku Abschnitt 10.5).
 - **Kaderstärke** wird überall über die **besten 6** gerechnet, nicht über die Einsatzplätze — sonst zu genau, sie würde das
   Ergebnis spoilern (Chris, 18.11.).
 - **Scouting-Nebel:** Ungescoutete Spieler zeigen nur grobe Bereiche; Sortieren und Filtern dürfen keine verdeckten Werte
