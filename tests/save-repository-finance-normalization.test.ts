@@ -53,7 +53,6 @@ function createRosterEntry(id: string, playerId: string): RosterEntry {
     upkeep: 120,
     purchasePrice: 850,
     currentValue: 850,
-    roleTag: "starter",
     joinedSeasonId: "season-12",
   };
 }

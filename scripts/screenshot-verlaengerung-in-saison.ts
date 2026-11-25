@@ -42,7 +42,7 @@ async function vorbereiten() {
   const spieler = gs.players.find((p) => p.id === ziel.playerId)!;
   const ids = gs.season.matchdayIds;
   const rosters = gs.rosters.map((r) =>
-    r.id === ziel.id ? { ...r, contractLength: 1, contractEndSeasonNumber: 1, contractStatus: "expiring" as const, roleTag: "bench" as const } : r,
+    r.id === ziel.id ? { ...r, contractLength: 1, contractEndSeasonNumber: 1, contractStatus: "expiring" as const } : r,
   );
   const next = {
     ...gs,

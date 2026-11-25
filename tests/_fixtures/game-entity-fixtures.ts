@@ -55,7 +55,6 @@ export function makeRosterEntry(
     contractLength: 3,
     salary: 3,
     upkeep: 3,
-    roleTag: "starter",
     joinedSeasonId: "season-1",
     ...overrides,
   };

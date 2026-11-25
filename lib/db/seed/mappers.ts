@@ -217,7 +217,6 @@ export function mapActivePlayerRecord(input: {
     teamId: rosterEntry.teamId,
     playerId: rosterEntry.playerId,
     status: "active" as const,
-    roleTag: rosterEntry.roleTag,
     contractLength: rosterEntry.contractLength,
     salary: toInt(rosterEntry.salary),
     upkeep: toInt(rosterEntry.upkeep),

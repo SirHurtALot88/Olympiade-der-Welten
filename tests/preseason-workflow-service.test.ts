@@ -223,8 +223,8 @@ function gameState(): GameState {
       // prüfen und nicht versehentlich am Vertragsablauf hängen. Die Season-End-Vertragsalterung
       // dekrementiert diese im Übergang auf LZ 2 (siehe Zusatz-Assertions unten). Vertragsablauf
       // (LZ 1 -> ausgelaufen) wird gezielt im dedizierten Aging-Test abgedeckt.
-      { id: "r-human", teamId: "human-1", playerId: "p-human", salary: 1, upkeep: 1, contractLength: 3, roleTag: "starter", joinedSeasonId: "season-1" },
-      { id: "r-ai", teamId: "ai-1", playerId: "p-ai", salary: 4, upkeep: 4, contractLength: 3, roleTag: "bench", joinedSeasonId: "season-1" },
+      { id: "r-human", teamId: "human-1", playerId: "p-human", salary: 1, upkeep: 1, contractLength: 3, joinedSeasonId: "season-1" },
+      { id: "r-ai", teamId: "ai-1", playerId: "p-ai", salary: 4, upkeep: 4, contractLength: 3, joinedSeasonId: "season-1" },
     ],
     contracts: [],
     transferListings: [],
@@ -501,7 +501,6 @@ describe("pre-season workflow service", () => {
         upkeep: 10,
         contractLength: 3,
         contractStatus: "active",
-        roleTag: "starter",
         joinedSeasonId: "season-1",
         yearlySalarySchedule: [
           { yearIndex: 0, seasonOffset: 0, label: "Season 1", salary: 10 },
@@ -517,7 +516,6 @@ describe("pre-season workflow service", () => {
         upkeep: 3,
         contractLength: 1,
         contractStatus: "expiring",
-        roleTag: "bench",
         joinedSeasonId: "season-1",
       },
     ];

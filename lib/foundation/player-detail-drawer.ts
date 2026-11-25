@@ -532,7 +532,6 @@ export type PlayerDetailDrawerData = {
     warnings: string[];
   } | null;
   transferContext: {
-    roleTag: RosterEntry["roleTag"] | null;
     promisedRole: RosterEntry["promisedRole"] | null;
     joinedSeasonId: string | null;
     purchasePrice: number | null;
@@ -1337,7 +1336,6 @@ function buildSnapshotSaleProjection(
     upkeep: 0,
     currentValue: marketValue,
     purchasePrice: marketValue,
-    roleTag: "prospect",
     promisedRole: row.promisedRole ?? null,
     joinedSeasonId: row.seasonId ?? gameState.season.id,
   };
@@ -1939,7 +1937,6 @@ function buildTransferContext(gameState: GameState, playerId: string, rosterEntr
     .sort((left, right) => right.happenedAt.localeCompare(left.happenedAt, "de"))[0] ?? null;
 
   return {
-    roleTag: rosterEntry?.roleTag ?? null,
     promisedRole: rosterEntry?.promisedRole ?? null,
     joinedSeasonId: rosterEntry?.joinedSeasonId ?? null,
     purchasePrice: rosterEntry?.purchasePrice ?? null,
@@ -2093,7 +2090,6 @@ function buildBoardTrust(input: {
     averageFinalScore: input.seasonPerformance?.averageFinalScore ?? null,
     expectedPerformanceValue: input.playerRating?.ovrNormalized ?? input.player.rating ?? null,
     contractLength: input.rosterEntry.contractLength ?? null,
-    roleTag: input.rosterEntry.roleTag ?? null,
     salary: input.economy.salary,
     marketValue: input.economy.marketValue,
     purchasePrice: input.rosterEntry.purchasePrice ?? null,
@@ -3121,7 +3117,6 @@ export function buildPlayerDrawerDataFromLegacyContext(input: {
     progressionEconomyPreview: null,
     seasonPerformance: null,
     transferContext: {
-      roleTag: null,
       promisedRole: null,
       joinedSeasonId: null,
       purchasePrice: economy.purchasePrice,

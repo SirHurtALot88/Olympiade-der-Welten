@@ -7,7 +7,7 @@ describe("buildTrainingPlayerRowView", () => {
   it("maps class focus, attribute forecast and modifiers", () => {
     const row = buildTrainingPlayerRowView(
       {
-        entry: { id: "entry-1", roleTag: "Starter" },
+        entry: { id: "entry-1" },
         player: {
           id: "player-1",
           name: "Test Player",

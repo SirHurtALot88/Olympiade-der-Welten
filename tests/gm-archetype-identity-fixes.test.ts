@@ -200,7 +200,6 @@ function buildFacilityGameState(gmId: string | null): GameState {
       contractLength: 2,
       salary: 5,
       upkeep: 5,
-      roleTag: index < 2 ? "starter" : "prospect",
       joinedSeasonId: "season-1",
     })),
     contracts: [],

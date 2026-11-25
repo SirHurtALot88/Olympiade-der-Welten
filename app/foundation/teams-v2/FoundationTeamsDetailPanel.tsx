@@ -332,8 +332,6 @@ export type FoundationTeamsDetailPanelProps = {
   renderMetricBar: unknown;
   leaguePlayerHeatPools: unknown;
   selectedTeamDetailTab: "roster" | "contracts" | "portraits" | "transfer";
-  teamRosterRoleFilter: unknown;
-  setTeamRosterRoleFilter: unknown;
   teamRosterFocusMode: unknown;
   setTeamRosterFocusMode: unknown;
   sortedSelectedRosterTableRows: unknown;
@@ -390,8 +388,7 @@ export type FoundationTeamsDetailPanelProps = {
   formatContractShapeLabel: unknown;
   formatMoraleContractIntentLabel: unknown;
   getPlayerDisplaySalary: unknown;
-  starters: unknown;
-  bench: unknown;
+  kaderPortraits: unknown;
   selectedIdentity: unknown;
   freeAgents: unknown;
   aiPreview: unknown;
@@ -429,7 +426,6 @@ export type FoundationTeamsDetailPanelProps = {
   selectedBoardConfidence: unknown;
   selectedTeamCommercialRating: unknown;
   showTeamDisciplines: unknown;
-  teamRosterRoleFilterOptions: unknown;
   teamRosterFocusOptions: unknown;
   contractRenewalNegotiation: unknown;
   showSelectedRosterPpsBreakdown: unknown;
@@ -483,8 +479,6 @@ function FoundationTeamsDetailPanel({
   renderMetricBar,
   leaguePlayerHeatPools,
   selectedTeamDetailTab,
-  teamRosterRoleFilter,
-  setTeamRosterRoleFilter,
   teamRosterFocusMode,
   setTeamRosterFocusMode,
   sortedSelectedRosterTableRows,
@@ -528,8 +522,7 @@ function FoundationTeamsDetailPanel({
   formatContractShapeLabel,
   formatMoraleContractIntentLabel,
   getPlayerDisplaySalary,
-  starters,
-  bench,
+  kaderPortraits,
   selectedIdentity,
   freeAgents,
   aiPreview,
@@ -567,7 +560,6 @@ function FoundationTeamsDetailPanel({
   selectedBoardConfidence,
   selectedTeamCommercialRating,
   showTeamDisciplines,
-  teamRosterRoleFilterOptions,
   teamRosterFocusOptions,
   contractRenewalNegotiation,
   showSelectedRosterPpsBreakdown,
@@ -1009,19 +1001,6 @@ function FoundationTeamsDetailPanel({
                 </div>
                 {selectedTeamDetailTab === "roster" ? (
                   <>
-                    <div className="team-roster-role-filterbar" aria-label="Kaderrollen filtern">
-                      {teamRosterRoleFilterOptions.map((option) => (
-                        <button
-                          key={`team-roster-role-filter-${option.id}`}
-                          className={`secondary-button inline-button${teamRosterRoleFilter === option.id ? " is-active" : ""}`}
-                          type="button"
-                          onClick={() => setTeamRosterRoleFilter(option.id)}
-                        >
-                          {option.label} <span>{option.count}</span>
-                        </button>
-                      ))}
-                    </div>
-
                     <div className="team-roster-focusbar" aria-label="Kaderfokus wählen">
                       {teamRosterFocusOptions.map((option) => (
                         <button
@@ -1114,7 +1093,6 @@ function FoundationTeamsDetailPanel({
                                           leagueHeatPools={leaguePlayerHeatPools}
                                           variant="team"
                                           context="teamGrid"
-                                          roleTag={entry.roleTag}
                                           playerClassName={player.className}
                                           previewDensity="full"
                                           newLook
@@ -1684,9 +1662,6 @@ function FoundationTeamsDetailPanel({
                                             onClick={() => void openPlayerDrawerById(row.playerId)}
                                           >
                                             <span className="nl-teams-playername">{row.playerName}</span>
-                                            <span className="nl-teams-playermeta">
-                                              {(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}
-                                            </span>
                                           </button>
                                           {row.laeuftAus ? (
                                             <span
@@ -2268,7 +2243,6 @@ function FoundationTeamsDetailPanel({
                                     }}
                                   >
                                     <span className="nl-teams-playername">{row.playerName}</span>
-                                    <span className="nl-teams-playermeta">{(row.roleTag ?? "").toLowerCase() === "prospect" ? "Kader" : (row.roleTag ?? "Kader")}</span>
                                   </button>
                                   {isSellMarked ? <span className="pill pill-warning">VK vorgemerkt</span> : null}
                                 </div>
@@ -3059,10 +3033,10 @@ function FoundationTeamsDetailPanel({
               <div className="foundation-main-grid">
                 <section className="panel">
                   <div className="panel-header">
-                    <h2>Starter</h2>
+                    <h2>Kader</h2>
                   </div>
                   <div className="roster-grid team-portraits-grid">
-                    {starters.map(({ entry, player }) => {
+                    {kaderPortraits.map(({ entry, player }) => {
                       const portrait = getPlayerPortraitModel(player);
                       const ratings = playerRatingsById.get(player.id);
                       const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
@@ -3115,69 +3089,7 @@ function FoundationTeamsDetailPanel({
                         />
                       );
                     })}
-                    {starters.length === 0 ? <p className="muted">Noch keine Starter im Kader.</p> : null}
-                  </div>
-                </section>
-
-                <section className="panel">
-                  <div className="panel-header">
-                    <h2>Bench</h2>
-                  </div>
-                  <div className="roster-grid team-portraits-grid">
-                    {bench.map(({ entry, player }) => {
-                      const portrait = getPlayerPortraitModel(player);
-                      const ratings = playerRatingsById.get(player.id);
-                      const marketValueDelta = getPlayerDisplayMarketValueDelta(player, entry, gameState);
-                      const salaryDelta = getRosterEntrySalaryDelta(entry, player, gameState);
-                      return (
-                        <FoundationPlayerPortraitCard
-                          key={entry.id}
-                          playerId={player.id}
-                          name={player.name}
-                          portraitUrl={portrait.thumbSrc ?? portrait.src}
-                          portraitInitials={portrait.initials}
-                          playerOvr={ratings?.ovrNormalized ?? null}
-                          playerMvs={ratings?.mvs ?? null}
-                          playerPps={ratings?.ppsSeason ?? null}
-                          ovrRank={ratings?.ovrRank ?? null}
-                          mvsRank={ratings?.mvsRank ?? null}
-                          ppsRank={ratings?.ppsSeasonRank ?? null}
-                          pow={player.coreStats.pow}
-                          spe={player.coreStats.spe}
-                          men={player.coreStats.men}
-                          soc={player.coreStats.soc}
-                          axisPps={buildAxisPpsFromRating(ratings)}
-                          leagueHeatPools={leaguePlayerHeatPools}
-                          variant="team"
-                          className={getClassColorClassName(player.className, "player-card-class-frame")}
-                          subMeta={formatPlayerIdentitySubMeta(player) || null}
-                          onOpen={() => void openPlayerDrawerById(player.id, entry.id)}
-                          title="Spielerprofil öffnen"
-                          economyStats={[
-                            {
-                              label: "MW",
-                              value: formatLocalePoints(getRosterEntryDisplayMarketValue(entry, player), 2),
-                              delta:
-                                marketValueDelta != null && Math.abs(marketValueDelta) >= 0.01
-                                  ? `${marketValueDelta > 0 ? "+" : ""}${formatLocalePoints(marketValueDelta, 2)}`
-                                  : null,
-                              deltaClass: marketValueDelta != null && marketValueDelta > 0 ? "text-positive" : marketValueDelta != null && marketValueDelta < 0 ? "text-negative" : "",
-                            },
-                            {
-                              label: "Gehalt",
-                              value: formatDisplayMoney(getRosterEntryDisplaySalary(entry, player)),
-                              delta:
-                                salaryDelta != null && Math.abs(salaryDelta) >= 0.01
-                                  ? `${salaryDelta > 0 ? "+" : ""}${formatDisplayMoney(salaryDelta)}`
-                                  : null,
-                              deltaClass: salaryDelta != null && salaryDelta < 0 ? "text-positive" : salaryDelta != null && salaryDelta > 0 ? "text-negative" : "",
-                            },
-                            { label: "LZ", value: `${entry.contractLength ?? "—"}${formatContractShapeShortLabel(entry.contractShape) ? ` · ${formatContractShapeShortLabel(entry.contractShape)}` : ""}` },
-                          ]}
-                        />
-                      );
-                    })}
-                    {bench.length === 0 ? <p className="muted">Keine Bench-Spieler im Moment.</p> : null}
+                    {kaderPortraits.length === 0 ? <p className="muted">Noch keine Spieler im Kader.</p> : null}
                   </div>
                 </section>
 

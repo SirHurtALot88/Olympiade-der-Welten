@@ -45,6 +45,7 @@ import { withSponsorSalaryFactorOfCurrentSeason } from "@/lib/sponsor/sponsor-sa
 import { migriereSponsorNamen } from "@/lib/sponsor/sponsor-namen-migration";
 import { withMigratedSponsorLadders, withSponsorLadderInLeagueRankSpace } from "@/lib/sponsor/sponsor-v3-migration";
 import { withNegotiatedSalaryBenchmark } from "@/lib/contracts/negotiated-salary-benchmark";
+import { entferneRollenEtikettNachLaden } from "@/lib/contracts/rollen-etikett-entfernen";
 import { createGameStateFromSeed } from "@/lib/data/dataAdapter";
 import { hydrateGameStateMedia } from "@/lib/data/mediaAssets";
 import { getDatabase } from "@/lib/persistence/sqlite";
@@ -1486,7 +1487,8 @@ function materializePersistedSave(row: SaveRow): PersistedSaveGame | null {
   ))))))))))))))))));
   // SPONSOR-NAMEN (22.11.): gespeicherte Angebots-/Vertrags-/Ereignis-Namen auf die Parodienamen setzen (nur Anzeige, id bleibt).
   mark("legacy normalization done");
-  const baselineResult = ensurePlayerBaselines(gameStateWithoutBaseline, {
+  // ROLLEN-ETIKETT (Chris 25.11., lib/contracts/rollen-etikett-entfernen.ts): alter Kadereintrag-Wert wird beim Laden entfernt.
+  const baselineResult = ensurePlayerBaselines(entferneRollenEtikettNachLaden(gameStateWithoutBaseline), {
     sourcePlayers: loadBaselineSourcePlayers(),
     createdAt: row.created_at,
   });

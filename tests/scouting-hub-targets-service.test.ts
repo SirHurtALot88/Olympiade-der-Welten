@@ -78,7 +78,6 @@ function createGameState(input?: {
       upkeep: 2,
       purchasePrice: 10,
       currentValue: 10,
-      roleTag: "starter",
       joinedSeasonId: "season-1",
     })),
     contracts: [],

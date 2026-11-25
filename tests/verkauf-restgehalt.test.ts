@@ -78,7 +78,6 @@ function kader(playerId: string, teamId = "A-A", partial?: Partial<RosterEntry>)
     upkeep: 6,
     purchasePrice: 45,
     currentValue: 45,
-    roleTag: "starter",
     joinedSeasonId: "season-1",
     ...partial,
   } as RosterEntry;
@@ -157,7 +156,7 @@ describe("Vertrags-Tick: geplanter Verkauf wird nicht verlaengert", () => {
     const teuer = (id: string) => spieler(id, { rating: 50 });
     const ids = ["g1", "g2", "s1", "s2", "s3", "s4", "s5"];
     const players = ids.map((id) => (id.startsWith("g") ? spieler(id) : teuer(id)));
-    const rosters = ids.map((id) => kader(id, "A-A", id.startsWith("g") ? {} : { salary: 0.5, roleTag: "bench" }));
+    const rosters = ids.map((id) => kader(id, "A-A", id.startsWith("g") ? {} : { salary: 0.5 }));
     const ohne = computeSeasonEndContractTick(save(tickState([team("A-A")], players, rosters)));
     const mit = computeSeasonEndContractTick(save(tickState([team("A-A")], players, rosters)), undefined, {
       kiVerkaufsabsicht: new Map([["A-A", new Set(["g1", "g2"])]]),
@@ -301,7 +300,6 @@ function gateState(regel: "alt" | "neu" | null, vertragsJahre = 2, opt: GateOpti
       upkeep: gehalt,
       purchasePrice: 10,
       currentValue: mwVon(i),
-      roleTag: "starter",
       joinedSeasonId: "season-2",
     } as RosterEntry);
     perfs.push({
@@ -340,7 +338,7 @@ function gateState(regel: "alt" | "neu" | null, vertragsJahre = 2, opt: GateOpti
       playerDisciplinePerformances: perfs,
       seasonSnapshots: [],
       ...(regel
-        ? { wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), kernschutz: "alt", restgehalt: regel, verkaufSchwellen: opt.schwellen ?? "alt" } }
+        ? { wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), kernschutz: "alt", restgehalt: regel, verkaufSchwellen: opt.schwellen ?? "alt", vertragsPlan: "alt" } }
         : {}),
     },
   } as unknown as GameState;
@@ -549,11 +547,11 @@ describe("Vertrags-Tick mit Stempel `verkaufSchwellen`: keine Freigabe-Bremse me
     const teuer = (id: string) => spieler(id, { rating: 50 });
     const ids = ["g1", "g2", "s1", "s2", "s3", "s4", "s5"];
     const players = ids.map((id) => (id.startsWith("g") ? spieler(id) : teuer(id)));
-    const rosters = ids.map((id) => kader(id, "A-A", id.startsWith("g") ? {} : { salary: 0.5, roleTag: "bench" }));
+    const rosters = ids.map((id) => kader(id, "A-A", id.startsWith("g") ? {} : { salary: 0.5 }));
     const mitStempel = (gs: GameState) =>
       ({
         ...gs,
-        seasonState: { ...gs.seasonState, wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), verkaufSchwellen: "neu" } },
+        seasonState: { ...gs.seasonState, wirtschaftsRegeln: { ...wirtschaftsRegelnFuerNeueSaison("season-2"), verkaufSchwellen: "neu", vertragsPlan: "alt" } },
       }) as GameState;
     const tick = computeSeasonEndContractTick(save(mitStempel(tickState([team("A-A")], players, rosters))), undefined, {
       kiVerkaufsabsicht: new Map([["A-A", new Set(["g1", "g2"])]]),

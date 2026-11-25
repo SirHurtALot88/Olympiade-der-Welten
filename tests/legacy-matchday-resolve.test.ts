@@ -755,7 +755,6 @@ describe("legacy matchday resolve preview payload", () => {
         contractLength: 2,
         salary: 2,
         upkeep: 2,
-        roleTag: "starter",
         joinedSeasonId: "season-1",
       })),
       teams: [{ teamId: "A-A", shortCode: "A-A", name: "Alpha" }],

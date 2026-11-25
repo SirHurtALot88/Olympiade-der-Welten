@@ -62,7 +62,6 @@ import type {
   FoundationView,
   PersistedFoundationTablePreferenceEntry,
   PersistedFoundationTablePreferences,
-  TeamRosterRoleFilter,
   TrainingModeDraft,
 } from "@/lib/foundation/tabs/foundation-page-types";
 import {
@@ -1349,22 +1348,6 @@ export function clampIdentityValue(value: number, key: keyof TeamIdentity) {
   return Math.max(0, Math.min(20, rounded));
 }
 
-export function getTeamRosterRoleBucket(roleTag: string | null | undefined): Exclude<TeamRosterRoleFilter, "all"> {
-  const normalized = (roleTag ?? "").toLowerCase();
-  if (normalized.includes("starter") || normalized.includes("star") || normalized.includes("core")) {
-    return "starter";
-  }
-  if (normalized.includes("rotation")) {
-    return "rotation";
-  }
-  if (normalized.includes("prospect")) {
-    return "prospect";
-  }
-  if (normalized.includes("bench") || normalized.includes("bank")) {
-    return "bench";
-  }
-  return "other";
-}
 
 export function clampBiasValue(value: number) {
   if (!Number.isFinite(value)) {

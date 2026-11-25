@@ -78,7 +78,7 @@ function createGameState(player: Player, extraLeaguePlayers: Player[] = []): Gam
       { id: "fechten", name: "Fechten", category: "speed", weight: 1 },
       { id: "speed-schach", name: "Schach", category: "mental", weight: 1 },
     ],
-    rosters: [{ id: "active-1", teamId: "team-1", playerId: player.id, salary: 1, marketValue: 10, contractLength: 1, roleTag: "core" }],
+    rosters: [{ id: "active-1", teamId: "team-1", playerId: player.id, salary: 1, marketValue: 10, contractLength: 1 }],
     contracts: [],
     transferListings: [],
     transferHistory: [],

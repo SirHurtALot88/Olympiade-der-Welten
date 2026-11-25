@@ -81,6 +81,26 @@ import { werbeklauselAktiv } from "@/lib/marketing/marketing-regel";
 import { moralOhneWerbung } from "@/lib/morale/player-morale-service";
 import type { PersistedSaveGame, PersistenceService } from "@/lib/persistence/types";
 import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
+import {
+  ersatzKosten,
+  jahresplan,
+  staffleVertragsende,
+  vertragswert,
+  waehleLaufzeit,
+  type LaufzeitWahl,
+} from "@/lib/contracts/vertragswert";
+import {
+  angebotsGehaltFuer,
+  bracketLeistungsFaktor,
+  kasseEngFuerVerlaengerung,
+  staffelKontext,
+  vertragsPlanAktiv,
+  wunschFensterVon,
+  vertragswertAnzeige,
+  vertragswertSpieler,
+  type VertragswertAnzeige,
+  type VertragswertSpielerKontext,
+} from "@/lib/contracts/vertragswert-spielstand";
 
 // Weiterexport: die Abwaegung „Verlust realisieren oder ueberbruecken" ist in eine eigene Datei
 // gewandert (siehe dort), damit die KI-Aufloesung sie nutzen kann, ohne einen Import-Zyklus mit
@@ -171,6 +191,8 @@ export type ContractActionPreview = {
   negotiationPreview: ContractNegotiationPreview | null;
   morale: ContractRenewalPreviewRow["morale"];
   moraleAdjustedExpectedSalary: number | null;
+  /** Vertragswert-Anzeige (Stempel `vertragsPlan`): Erwartung besser/gleich/schlechter und Formkarten-Beitrag (eigener Spieler: gescoutet). */
+  vertragswertAnzeige?: VertragswertAnzeige | null;
   /** Nur bei einer Verlaengerung mitten in der Saison: ab wann, bis wann, alt gegen neu. */
   inSaison?: ContractInSaisonVorschau | null;
   warnings: string[];
@@ -267,7 +289,7 @@ export function advanceRosterContractSchedule(entry: RosterEntry, nextLength: nu
 // Root-cause fix (2026-07-04, contract-length synchronized-expiry-wave — see
 // outputs/real-engine-s1s5-final/progress-log.md, second contributor after the "fill" deal-role
 // mislabeling fixed in transfermarkt-local-service.ts): this used to return one single, fixed
-// number per (roleTag, highValue, conservativeTeam) bucket — every "bench" player on a
+// number per (role, highValue, conservativeTeam) bucket — every "bench" player on a
 // cash-tight team got exactly 1, every other "bench" player got exactly 2, with zero variety
 // within a bucket. Since a large fraction of any roster shares the same bucket in the same
 // season (most players are "bench", most teams are cash-tight right after season-end payouts),
@@ -287,32 +309,18 @@ function getRecommendedLength(
   teamStrategyProfile: TeamStrategyProfile | null,
   gmArchetype?: string | null,
 ) {
-  const role = entry.roleTag;
   const highValue =
     (rating?.ovrRank != null && rating.ovrRank <= 40) ||
     (rating?.ppsSeasonRank != null && rating.ppsSeasonRank <= 40) ||
     (rating?.mvsRank != null && rating.mvsRank <= 40);
-  const conservativeTeam = (team?.cash ?? 0) < 40;
 
-  // 1-Jahres-Verträge sind bewusst ERLAUBT: ein auslaufender Vertrag erzeugt einen sauberen Exit
-  // (Erlös ~MW, OHNE Buyout-Restgehalt) und ist damit ein legitimes Cash-Generierungs-Werkzeug — lange
-  // Verträge würden Teams beim Verkauf in den Buyout zwingen. Länge bleibt deshalb rollen-/wert-/cash-
-  // abhängig gebunden (kein Hardcode-Floor), die tatsächliche Länge kommt aus der organischen Präferenz.
-  let min = 1;
-  let max = 5;
-  if (role === "starter" && highValue && !conservativeTeam) {
-    min = 3;
-    max = 5;
-  } else if (role === "starter") {
-    min = 2;
-    max = 4;
-  } else if (role === "prospect") {
-    min = highValue ? 2 : 1;
-    max = highValue ? 4 : 3;
-  } else {
-    min = 1;
-    max = conservativeTeam ? 2 : 3;
-  }
+  // ROLLEN-ETIKETT ENTFERNT (Chris 25.11., docs/design/vertragswert-bau-25-11.md): bis dahin hingen die Grenzen an „Stammspieler /
+  // Bank / Nachwuchs“. Jeder Kaufweg schrieb „Nachwuchs“, nichts setzte je „Stammspieler“ (Abbild 25.11.: 327 von 328) — es galt also
+  // praktisch immer der Nachwuchs-Zweig: 1 bis 3 Jahre, mit Top-40-Rang 2 bis 4. Genau diese Grenzen bleiben fuer Saisons ohne Stempel
+  // `vertragsPlan` (Rueckweg); mit Stempel waehlt der Vertragswert die Laufzeit (`waehleVerlaengerungsLaufzeit`), ohne Sperre nach Rang.
+  // 1-Jahres-Verträge sind bewusst ERLAUBT: ein auslaufender Vertrag erzeugt einen sauberen Exit (Erlös ~MW, OHNE Buyout-Restgehalt).
+  let min = highValue ? 2 : 1;
+  let max = highValue ? 4 : 3;
 
   // Culture keeper binds good players longer: a direct archetype floor of 3-4 seasons for high-value
   // players, independent of the diluted blended long/loyalty bias which rarely clears its own gates.
@@ -565,15 +573,15 @@ function shouldAiRenewContract(input: {
     (player?.displayMarketValue != null && player.displayMarketValue >= 30) ||
     (player?.marketValue != null && player.marketValue >= 30);
   const moraleSalaryRisk = morale != null && morale.moraleSalaryModifier >= 1.22;
+  // (Bis 25.11. verlangte das Signal zusaetzlich das Rollen-Etikett „Stammspieler“ oder „Nachwuchs“ — jeder Kaufweg schrieb
+  // „Nachwuchs“, die Bedingung war also immer wahr. Das Etikett ist entfernt, Chris 25.11.; das Signal rechnet unveraendert.)
   const usefulRoleSignal =
-    (entry.roleTag === "starter" || entry.roleTag === "prospect") &&
     ratingValue >= 48 &&
     marketValue >= 14 &&
     salaryToMarketRatio <= 0.38;
   const cheapBridgeSignal = marketValue >= 18 && salaryToMarketRatio <= 0.28;
   const hasRotationSignal =
     (rating?.ovrRank != null && rating.ovrRank <= 100) &&
-    (entry.roleTag === "starter" || entry.roleTag === "prospect") &&
     !badValueContract;
   const moraleBridgeRenew =
     morale?.contractIntent === "considering_exit" &&
@@ -1107,7 +1115,7 @@ function buildPreviewRow(input: {
   const statusBeforeTick = normalizeRosterContractStatus(entry);
   const teamStrategyProfile = getTeamStrategyProfile(save.gameState, entry.teamId);
   const gmArchetype = getTeamGeneralManager(save.gameState, entry.teamId)?.profile?.archetype ?? null;
-  const recommendedLength = getRecommendedLength(entry, player, rating, team, teamStrategyProfile, gmArchetype);
+  let recommendedLength = getRecommendedLength(entry, player, rating, team, teamStrategyProfile, gmArchetype);
   if (tick.nextStatus !== "out_of_contract") {
     const marketValue = player ? resolvePlayerEconomyContract({ player, rosterEntry: entry }).marketValue : null;
     return {
@@ -1146,7 +1154,39 @@ function buildPreviewRow(input: {
       blockingReasons: [],
     };
   }
-  const negotiationPreview = buildNegotiationPreviewForRoster({
+  /**
+   * VERTRAGSWERT (Stempel `vertragsPlan`, Chris 25.11., lib/contracts/vertragswert.ts): die Laufzeit der Verlaengerung kommt aus W
+   * (Laufzeit 1-5 je Form, Jahresgehalt aus der bestehenden Rabatt-/Wunschlogik, Erwartung besser/gleich/schlechter, Formkarte), danach
+   * die Moral-Grenze und das Gelaender „Vertragsenden staffeln“. Keine Grenze nach Rang oder Rolle. Kein vorzeitiges Verlaengern: diese
+   * Zeile entsteht nur fuer auslaufende Vertraege.
+   */
+  let vertragswertKontext: VertragswertSpielerKontext | null = null;
+  let vertragswertWahl: LaufzeitWahl | null = null;
+  if (player && vertragsPlanAktiv(save.gameState)) {
+    // Gelaender „Kasse eng“ (Konzept Abschnitt 7): hoechstens 2 Jahre.
+    const maxVerlaengerung = kasseEngFuerVerlaengerung(save.gameState, entry.teamId, team?.cash ?? null) ? 2 : 5;
+    vertragswertKontext = vertragswertSpieler(save.gameState, entry.teamId, player, {
+      leistungsFaktor: bracketLeistungsFaktor(save.gameState, player, entry),
+      bekannt: true,
+    });
+    vertragswertWahl = waehleLaufzeit({
+      spieler: vertragswertKontext.spieler,
+      gehaltFuer: angebotsGehaltFuer({
+        player,
+        basisGehalt: Math.max(0, player.salaryDemand ?? player.displaySalary ?? entry.salary ?? 0),
+        profil: teamStrategyProfile,
+      }),
+      handel: vertragswertKontext.charakter.handel,
+      laufzeiten: [1, 2, 3, 4, 5].filter((l) => l <= maxVerlaengerung),
+      wunschFenster: wunschFensterVon(buildPlayerContractPreference(player, teamStrategyProfile)),
+    });
+    recommendedLength = staffleVertragsende({
+      laufzeit: vertragswertWahl.beste.laufzeit,
+      ...staffelKontext(save.gameState, entry.teamId, entry.playerId),
+      erlaubt: (l) => l <= maxVerlaengerung,
+    });
+  }
+  let negotiationPreview = buildNegotiationPreviewForRoster({
     save,
     team,
     player,
@@ -1154,6 +1194,21 @@ function buildPreviewRow(input: {
     contractLength: recommendedLength,
     offeredSalary: null,
   });
+  const moraleVorab = vertragswertKontext && player
+    ? assessPlayerMorale({ gameState: save.gameState, playerId: player.id, teamId: entry.teamId, renewalSalaryPreview: negotiationPreview.expectedSalary })
+    : null;
+  if (vertragswertKontext && moraleVorab?.moraleContractLengthLimit != null && recommendedLength > moraleVorab.moraleContractLengthLimit) {
+    // Moral begrenzt die Laufzeit (bestehende Regel): Angebot fuer die erlaubte Laufzeit neu bauen.
+    recommendedLength = Math.max(1, moraleVorab.moraleContractLengthLimit);
+    negotiationPreview = buildNegotiationPreviewForRoster({
+      save,
+      team,
+      player,
+      rosterEntry: entry,
+      contractLength: recommendedLength,
+      offeredSalary: null,
+    });
+  }
   const morale = player
     ? assessPlayerMorale({
         gameState: save.gameState,
@@ -1184,7 +1239,13 @@ function buildPreviewRow(input: {
     profile: teamStrategyProfile,
   });
   const recommendedContractShape =
-    controlMode === "ai"
+    vertragswertWahl && controlMode === "ai"
+      ? wendeLiquiditaetUndMixAn({
+          form: (vertragswertWahl.angebote.find((a) => a.laufzeit === recommendedLength) ?? vertragswertWahl.beste).form,
+          laufzeit: recommendedLength,
+          ...getContractShapeTeamContext(save.gameState, entry.teamId),
+        }).form
+      : controlMode === "ai"
       ? chooseAiRenewalContractShape({
           team,
           entry,
@@ -1270,12 +1331,30 @@ function buildPreviewRow(input: {
     ohneKadergroesse,
   });
 
+  /**
+   * VERTRAGSWERT-ENTSCHEIDUNG (Stempel `vertragsPlan`): verlaengern, wenn W des neuen Vertrags (echtes Gehalt nach Moral, Jahresplan der
+   * gewaehlten Form) mehr wert ist als „auslaufen lassen“ = Abgangswert jetzt (`buildContractExitValue`, der abloesefreie Verkauf).
+   * Moral, die eine Verlaengerung verweigert oder einen Abschied erwaegt, und die Strategie „nicht verlaengern“ bleiben harte Gruende.
+   */
+  const vertragswertVerlaengerung =
+    vertragswertKontext && moraleAdjustedRenewalSalary != null
+      ? vertragswert(vertragswertKontext.spieler, jahresplan(moraleAdjustedRenewalSalary, recommendedLength, recommendedContractShape)).erwartet
+      : null;
+  const vertragswertUrteil =
+    vertragswertVerlaengerung != null && vertragswertKontext
+      ? contractStrategy !== "do_not_renew" &&
+        morale?.contractIntent !== "refuses_extension" &&
+        morale?.contractIntent !== "considering_exit" &&
+        // Auslaufen lassen = Abgangswert jetzt, abzueglich der Kosten, einen gleichwertigen Spieler nachzukaufen (`ersatzKosten`).
+        vertragswertVerlaengerung > (exit.exitValue ?? 0) - ersatzKosten(vertragswertKontext.spieler)
+      : null;
+  const wouldRenew = vertragswertUrteil ?? wouldRenewHeuristic;
   const recommendedAction =
     tick.nextStatus !== "out_of_contract"
       ? "no_action"
       : controlMode === "manual"
         ? "manual_decision"
-        : canRenewEffective && wouldRenewHeuristic
+        : canRenewEffective && wouldRenew
           ? "renew"
           : "release";
 
@@ -1297,6 +1376,14 @@ function buildPreviewRow(input: {
   const decisionReason =
     tick.nextStatus !== "out_of_contract" || controlMode !== "ai"
       ? null
+      : vertragswertUrteil != null
+        ? recommendedAction === "renew"
+          ? "vertragswert_renew"
+          : !canRenewEffective
+            ? "cash_gate"
+            : morale?.contractIntent === "refuses_extension" || morale?.contractIntent === "considering_exit"
+              ? "morale_release"
+              : "vertragswert_release"
       : recommendedAction === "renew"
         ? !ohneKadergroesse && rosterAfterRelease < (rosterTargets.playerMin ?? Number.MAX_SAFE_INTEGER)
           ? "hard_min_retention"
@@ -2275,6 +2362,10 @@ export function previewContractRenewalAction(input: {
         }
       : null,
     moraleAdjustedExpectedSalary,
+    vertragswertAnzeige:
+      player && rosterEntry && vertragsPlanAktiv(input.save.gameState)
+        ? vertragswertAnzeige(input.save.gameState, input.teamId, player, rosterEntry)
+        : null,
     inSaison:
       input.action === "renew" && rosterEntry && istInSaisonModus(input.save.gameState)
         ? baueInSaisonVorschau({ gameState: input.save.gameState, entry: rosterEntry, player, newSalary: neuesGehalt, nextLength: contractLength, shape: input.contractShape ?? "balanced" })

@@ -81,7 +81,7 @@ function gameState(input?: {
     teamIdentities: [],
     players: [],
     disciplines: [],
-    rosters: [{ id: "r-1", teamId: "team-1", playerId: "player-1", salary: 1, upkeep: 1, currentValue: 10, contractLength: 1, roleTag: "starter", joinedSeasonId: "season-1" }],
+    rosters: [{ id: "r-1", teamId: "team-1", playerId: "player-1", salary: 1, upkeep: 1, currentValue: 10, contractLength: 1, joinedSeasonId: "season-1" }],
     contracts: [],
     transferListings: [],
     transferHistory: [{ transferId: "t-1", playerId: "player-x", transferType: "buy", toTeamId: "team-1", fromTeamId: null, fee: 10, seasonId: "season-1", createdAt: "2026-06-11T00:00:00.000Z", source: "test" } as never],

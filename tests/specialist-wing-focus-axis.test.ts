@@ -108,7 +108,6 @@ function gameState(input: {
       contractLength: 2,
       salary: 5,
       upkeep: 5,
-      roleTag: "starter",
       joinedSeasonId: "season-1",
     })),
     contracts: [],
@@ -348,7 +347,7 @@ describe("specialist wing — Wirkung in der echten Progression", () => {
     }) as GameState & { players: Player[] };
     state.players = [input.subject];
     state.rosters = [
-      { id: "r-1", teamId: "T-1", playerId: input.subject.id, salary: 5, upkeep: 5, contractLength: 2, roleTag: "starter", joinedSeasonId: "season-1" },
+      { id: "r-1", teamId: "T-1", playerId: input.subject.id, salary: 5, upkeep: 5, contractLength: 2, joinedSeasonId: "season-1" },
     ] as GameState["rosters"];
     state.teams = [{ teamId: "T-1", name: "Team", shortCode: "T1", budget: 100, cash: 100 }] as unknown as GameState["teams"];
     return state;

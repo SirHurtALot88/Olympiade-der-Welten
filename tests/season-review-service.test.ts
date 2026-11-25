@@ -43,8 +43,8 @@ function gameState(input?: { withResults?: boolean; withTransfers?: boolean }): 
     ],
     disciplines: [{ id: "fencing", name: "Fechten", category: "power", weight: 1 }],
     rosters: [
-      { id: "r-1", teamId: "team-1", playerId: "player-1", salary: 2, upkeep: 2, purchasePrice: 10, currentValue: 20, contractLength: 1, roleTag: "starter", joinedSeasonId: "season-1" },
-      { id: "r-2", teamId: "team-2", playerId: "player-2", salary: 1, upkeep: 1, purchasePrice: 8, currentValue: 12, contractLength: 1, roleTag: "prospect", promisedRole: "starter", joinedSeasonId: "season-1" },
+      { id: "r-1", teamId: "team-1", playerId: "player-1", salary: 2, upkeep: 2, purchasePrice: 10, currentValue: 20, contractLength: 1, joinedSeasonId: "season-1" },
+      { id: "r-2", teamId: "team-2", playerId: "player-2", salary: 1, upkeep: 1, purchasePrice: 8, currentValue: 12, contractLength: 1, promisedRole: "starter", joinedSeasonId: "season-1" },
     ],
     contracts: [],
     transferListings: [],

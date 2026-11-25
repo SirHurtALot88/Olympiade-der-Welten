@@ -105,7 +105,6 @@ function createGameState(partial?: {
       upkeep: 2,
       purchasePrice: 10,
       currentValue: 10,
-      roleTag: "starter",
       joinedSeasonId: "season-2",
     })),
     contracts: [],

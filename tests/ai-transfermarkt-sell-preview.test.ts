@@ -126,7 +126,6 @@ function createRosterEntry(id: string, teamId: string, playerId: string, partial
     upkeep: partial?.upkeep ?? partial?.salary ?? 5,
     purchasePrice: partial?.purchasePrice ?? 20,
     currentValue: partial?.currentValue ?? 20,
-    roleTag: partial?.roleTag ?? "starter",
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
 }
@@ -191,8 +190,8 @@ function createGameState(): GameState {
   ];
 
   const rosters = [
-    createRosterEntry("r-ai-core", "A-I", "ai-core", { salary: 9, purchasePrice: 18, currentValue: 28, contractLength: 1, roleTag: "bench" }),
-    createRosterEntry("r-ai-anchor", "A-I", "ai-anchor", { salary: 4, purchasePrice: 22, currentValue: 24, contractLength: 3, roleTag: "starter" }),
+    createRosterEntry("r-ai-core", "A-I", "ai-core", { salary: 9, purchasePrice: 18, currentValue: 28, contractLength: 1 }),
+    createRosterEntry("r-ai-anchor", "A-I", "ai-anchor", { salary: 4, purchasePrice: 22, currentValue: 24, contractLength: 3 }),
     createRosterEntry("r-manual", "M-N", "manual-core", { salary: 5, purchasePrice: 20, currentValue: 20 }),
     createRosterEntry("r-passive", "P-S", "passive-core", { salary: 4, purchasePrice: 18, currentValue: 18 }),
   ];

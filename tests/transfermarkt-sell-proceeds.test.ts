@@ -12,7 +12,6 @@ function makeRoster(overrides: Partial<RosterEntry> = {}): RosterEntry {
     id: "roster-1",
     playerId: "player-1",
     teamId: "team-1",
-    roleTag: "rotation",
     contractLength: 3,
     salary: 10,
     contractShape: "balanced",

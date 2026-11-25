@@ -21,7 +21,6 @@ function createGameState(team: Team, rosterCount: number): GameState {
       contractLength: 2,
       salary: 4,
       upkeep: 4,
-      roleTag: "rotation" as const,
       joinedSeasonId: "season-1",
     })),
     contracts: [],

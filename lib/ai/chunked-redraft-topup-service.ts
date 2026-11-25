@@ -1,3 +1,4 @@
+import { vertragswertKaufKontext } from "@/lib/contracts/vertragswert-spielstand";
 import fs from "node:fs";
 import { NULA_PLAYER_ID } from "@/lib/foundation/ensure-nula-on-project-suicide";
 import path from "node:path";
@@ -4342,6 +4343,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
             teamRosterMin: minTarget,
             teamRosterOpt: desiredRosterTarget,
             isFirstSeason: runContext.save.gameState.season.id === "season-1",
+            vertragswert: vertragswertKaufKontext(runContext.save.gameState, team.teamId, candidate.player),
           });
           previewCalls += 1;
           counters.buyPreviewCalls += 1;
@@ -5094,6 +5096,7 @@ export function runChunkedRedraftTopup(params: ChunkedRedraftTopupParams) {
           teamRosterMin: teamTarget.playerMin,
           teamRosterOpt: targetPlan.desiredRosterTarget,
           isFirstSeason: runContext.save.gameState.season.id === "season-1",
+          vertragswert: vertragswertKaufKontext(runContext.save.gameState, team.teamId, candidate.player),
         });
         const result = executeLocalTransfermarktBuy({
           saveId: runContext.save.saveId,

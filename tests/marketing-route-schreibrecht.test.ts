@@ -44,7 +44,7 @@ describe("POST /api/marketing: Aushaengeschild", () => {
       if (rosters.filter((r) => r.teamId === teamId).length >= 6) continue;
       for (let i = 0; i < 8; i += 1) {
         rosters.push({
-          id: `route-${teamId}-${i}`, teamId, playerId: frei[z++]!.id, contractLength: 3, salary: 6, upkeep: 6, purchasePrice: 10, currentValue: 10, roleTag: "bench", joinedSeasonId: gs.season.id,
+          id: `route-${teamId}-${i}`, teamId, playerId: frei[z++]!.id, contractLength: 3, salary: 6, upkeep: 6, purchasePrice: 10, currentValue: 10, joinedSeasonId: gs.season.id,
         });
       }
     }

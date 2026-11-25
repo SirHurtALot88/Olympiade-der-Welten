@@ -10,7 +10,6 @@ function createDatabase(options?: {
     teamId?: string;
     playerId?: string;
     status?: string;
-    roleTag?: string;
     contractLength?: number;
     salary?: number;
     purchasePrice?: number | null;
@@ -39,7 +38,6 @@ function createDatabase(options?: {
           teamId: options?.activePlayerRow?.teamId ?? "A-A",
           playerId: options?.activePlayerRow?.playerId ?? "player-1",
           status: options?.activePlayerRow?.status ?? "active",
-          roleTag: options?.activePlayerRow?.roleTag ?? "bench",
           contractLength: options?.activePlayerRow?.contractLength ?? 1,
           salary: options?.activePlayerRow?.salary ?? 52,
           purchasePrice:

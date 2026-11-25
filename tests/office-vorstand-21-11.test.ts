@@ -111,7 +111,6 @@ function roster(teamId: string, playerId: string, partial: Partial<RosterEntry> 
     upkeep: 4,
     purchasePrice: 20,
     currentValue: 20,
-    roleTag: "starter",
     joinedSeasonId: "season-1",
   } as RosterEntry;
 }

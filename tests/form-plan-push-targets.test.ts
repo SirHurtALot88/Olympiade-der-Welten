@@ -191,7 +191,6 @@ describe("Formplan-Persistenz: Karten und Push-Ziel stoeren sich nicht", () => {
       upkeep: Math.round(spenderMitPositiverKarte!.salaryDemand),
       purchasePrice: Math.round(spenderMitPositiverKarte!.marketValue),
       currentValue: Math.round(spenderMitPositiverKarte!.marketValue),
-      roleTag: "bench",
       joinedSeasonId: params.seasonId,
     } as never);
     persistence.saveSingleplayerState(save.saveId, save.gameState);

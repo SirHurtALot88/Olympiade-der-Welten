@@ -652,9 +652,10 @@ function homegrownPlayerIds(gameState: GameState, teamId: string): Set<string> {
   const rosterEntries = gameState.rosters.filter((entry) => entry.teamId === teamId);
   const rosterIds = new Set(rosterEntries.map((entry) => entry.playerId));
   const homegrown = new Set<string>();
-  // (a) Roster-Rolle prospect = selbst entwickelter Nachwuchs.
+  // (a) Versprochene Rolle „Talent“ = selbst entwickelter Nachwuchs. (Das Rollen-Etikett des Kadereintrags ist entfernt, Chris
+  // 25.11.: jeder Kaufweg schrieb dort „Nachwuchs“, damit zaehlte jeder gekaufte Spieler als Eigengewaechs.)
   for (const entry of rosterEntries) {
-    if (entry.roleTag === "prospect" || entry.promisedRole === "prospect") homegrown.add(entry.playerId);
+    if (entry.promisedRole === "prospect") homegrown.add(entry.playerId);
   }
   // (b) transferHistory-Quelle draft/nachwuchs/academy (Zugang zum Team via Nachwuchs).
   for (const t of gameState.transferHistory ?? []) {

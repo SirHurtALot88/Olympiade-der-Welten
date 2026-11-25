@@ -197,7 +197,6 @@ function baueSpielstand() {
         contractStatus: "active",
         salary: 1.31,
         upkeep: 0,
-        roleTag: "bench",
         joinedSeasonId: "season-1",
       },
       {
@@ -208,7 +207,6 @@ function baueSpielstand() {
         contractStatus: "active",
         salary: 2,
         upkeep: 0,
-        roleTag: "bench",
         joinedSeasonId: "season-1",
       },
     ],

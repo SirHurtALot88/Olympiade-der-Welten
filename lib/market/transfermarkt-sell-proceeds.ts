@@ -87,6 +87,23 @@ export function resolveOpenBuyoutCostForRoster(input: {
   return calculateOpenBuyoutCost(schedule, seasonsElapsed) ?? 0;
 }
 
+/**
+ * Die OFFENEN Vertragsjahre (Gehalt je Jahr laut Jahresplan), genau die Jahre, die `resolveOpenBuyoutCostForRoster` summiert. Fuer den
+ * Vertragswert (`lib/contracts/vertragswert.ts`): beim Halten zahlt das Team dieselben Jahre, die ein Verkauf als Restgehalt kostet.
+ */
+export function resolveOpenSalaryYearsForRoster(input: {
+  rosterEntry: Pick<RosterEntry, "teamId" | "contractLength" | "yearlySalarySchedule" | "salary" | "contractShape">;
+  gameState?: GameState | null;
+  seasonsElapsed?: number;
+}): number[] {
+  const schedule = resolveRemainingSalaryScheduleForBuyout({ rosterEntry: input.rosterEntry, gameState: input.gameState ?? null });
+  if (schedule.length === 0) return [];
+  const seasonsElapsed =
+    input.seasonsElapsed ??
+    resolveElapsedContractSeasonsForBuyout({ gameState: input.gameState, teamId: input.rosterEntry.teamId });
+  return schedule.slice(Math.max(0, seasonsElapsed)).map((row) => Math.max(0, row.salary ?? 0));
+}
+
 export function resolveTransfermarktSellProceeds(input: {
   rosterEntry: Pick<RosterEntry, "teamId" | "contractLength" | "yearlySalarySchedule" | "salary" | "contractShape">;
   grossSalePrice: number;

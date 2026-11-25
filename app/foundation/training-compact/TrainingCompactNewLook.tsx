@@ -896,7 +896,6 @@ function NlTrainingPlayerRow({
             >
               {row.player.className}
               {trainsOtherClass ? ` · trainiert ${currentTrainingClassLabel}` : " · aktiv"}
-              {row.roleTag ? ` · ${row.roleTag}` : ""}
             </small>
           </span>
         </td>

@@ -222,7 +222,6 @@ export function projectFoundationStateFromPrisma(snapshot: PrismaFoundationReadS
     upkeep: activePlayer.upkeep,
     purchasePrice: activePlayer.purchasePrice,
     currentValue: activePlayer.currentValue,
-    roleTag: activePlayer.roleTag,
     joinedSeasonId: activePlayer.joinedSeasonId,
   }));
 

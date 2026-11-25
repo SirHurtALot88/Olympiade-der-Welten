@@ -41,7 +41,6 @@ function buildState(players: Player[]): GameState {
     rosters: players.map((player, index) => ({
       teamId: "T-1",
       playerId: player.id,
-      roleTag: index === 0 ? "starter" : "depth",
       salary: 5,
       contractLength: 2,
     })),

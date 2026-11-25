@@ -64,7 +64,7 @@ function createGameState(input?: { includeSeason3?: boolean; negativeCash?: bool
     ],
     players: [{ id: "p1", name: "Rocket", race: "Human", className: "Runner", subclasses: [], traits: [], attributes: {}, ovr: 90, mvs: 50 } as never],
     rosters: [
-      { id: "r1", teamId: "A-A", playerId: "p1", contractLength: 1, salary: 40, upkeep: 40, currentValue: 120, roleTag: "starter", joinedSeasonId: "season-1" },
+      { id: "r1", teamId: "A-A", playerId: "p1", contractLength: 1, salary: 40, upkeep: 40, currentValue: 120, joinedSeasonId: "season-1" },
     ],
     transferHistory: [],
     seasonState: {

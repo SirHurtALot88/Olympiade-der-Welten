@@ -248,7 +248,6 @@ import type {
   TeamControlDraftMap,
   TeamIdentityDraftMap,
   TeamRosterFocusMode,
-  TeamRosterRoleFilter,
   TeamStrategyDraftMap,
   TrainingClassDraft,
   TrainingDevelopmentFilter,
@@ -464,7 +463,6 @@ export function useFoundationPageState({
   const [selectedTeamDetailTab, setSelectedTeamDetailTab] = useState<"roster" | "contracts" | "portraits" | "transfer">("roster");
   const [seasonV2HydrationPhase, setSeasonV2HydrationPhase] = useState<"shell" | "full">("shell");
   const [showTeamContractPreviewRows, setShowTeamContractPreviewRows] = useState<boolean>(false);
-  const [teamRosterRoleFilter, setTeamRosterRoleFilter] = useState<TeamRosterRoleFilter>("all");
   const [teamRosterFocusMode, setTeamRosterFocusMode] = useState<TeamRosterFocusMode>("default");
   const [showSelectedRosterPpsBreakdown, setShowSelectedRosterPpsBreakdown] = useState(false);
   const [trainingModeDraft, setTrainingModeDraft] = useState<Record<string, TrainingModeDraft>>({});
@@ -864,8 +862,6 @@ export function useFoundationPageState({
     setSeasonV2HydrationPhase,
     showTeamContractPreviewRows,
     setShowTeamContractPreviewRows,
-    teamRosterRoleFilter,
-    setTeamRosterRoleFilter,
     teamRosterFocusMode,
     setTeamRosterFocusMode,
     showSelectedRosterPpsBreakdown,

@@ -112,7 +112,6 @@ function makeGameState(ranks: Record<string, Array<number | null>>): GameState {
       purchasePrice: 8,
       currentValue: 12,
       contractLength: 1,
-      roleTag: "starter",
       joinedSeasonId: "season-1",
     })),
     contracts: [],

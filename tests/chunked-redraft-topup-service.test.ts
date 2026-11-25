@@ -165,7 +165,6 @@ function createTightCashBelowHardMinSave(): PersistedSaveGame {
       contractLength: 2,
       salary: 5,
       upkeep: 1,
-      roleTag: "bench" as const,
       joinedSeasonId: "season-1",
     })),
     contracts: [],

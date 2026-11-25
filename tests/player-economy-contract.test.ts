@@ -77,7 +77,6 @@ function buildRosterEntry(overrides: Partial<RosterEntry> = {}): RosterEntry {
     upkeep: 12.25,
     purchasePrice: 62.52,
     currentValue: 62.52,
-    roleTag: "starter",
     joinedSeasonId: "season-1",
     ...overrides,
   };
@@ -264,7 +263,6 @@ describe("Gehalt: der Import ist kein Rueckfall mehr", () => {
       upkeep: 12.5,
       purchasePrice: 40,
       currentValue: 40,
-      roleTag: "starter",
       joinedSeasonId: "season-1",
     } as unknown as RosterEntry;
 

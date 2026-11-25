@@ -37,7 +37,7 @@ describe("ensureNulaOnProjectSuicide", () => {
   it("transfers Nula from another team onto P-S (P-S pays, selling team is credited)", () => {
     const g = base();
     g.rosters = [
-      { id: "r1", teamId: "A-A", playerId: "player-2311-nula", contractLength: 2, salary: 2, upkeep: 0, roleTag: "starter", joinedSeasonId: "season-1" },
+      { id: "r1", teamId: "A-A", playerId: "player-2311-nula", contractLength: 2, salary: 2, upkeep: 0, joinedSeasonId: "season-1" },
     ];
     const gs = ensureNulaOnProjectSuicide(g);
     const entries = nulaEntry(gs);
@@ -52,7 +52,7 @@ describe("ensureNulaOnProjectSuicide", () => {
   it("tops up an existing P-S contract to max without charging again, then is a no-op (idempotent)", () => {
     const g = base();
     g.rosters = [
-      { id: "r1", teamId: "P-S", playerId: "player-2311-nula", contractLength: 2, salary: 2, upkeep: 0, roleTag: "bench", joinedSeasonId: "season-1" },
+      { id: "r1", teamId: "P-S", playerId: "player-2311-nula", contractLength: 2, salary: 2, upkeep: 0, joinedSeasonId: "season-1" },
     ];
     const gs1 = ensureNulaOnProjectSuicide(g);
     expect(nulaEntry(gs1)[0].contractLength).toBe(5);

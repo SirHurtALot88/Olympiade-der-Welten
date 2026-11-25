@@ -53,7 +53,6 @@ function createRosterEntry(partial?: Partial<RosterEntry>): RosterEntry {
     upkeep: partial?.upkeep ?? 10,
     purchasePrice: partial?.purchasePrice ?? 8,
     currentValue: partial?.currentValue ?? 61,
-    roleTag: partial?.roleTag ?? "starter",
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
 }

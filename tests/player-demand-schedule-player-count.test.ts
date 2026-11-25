@@ -87,7 +87,7 @@ function baueSpielstand(): GameState {
       { teamId: "T-1", pow: 5, spe: 5, men: 5, soc: 5, ambition: 5, finances: 5, boardConfidence: 50, harmony: 5, manners: 5, popularity: 5, cooperation: 5, playerMin: 4, playerOpt: 8 },
     ],
     players: spieler,
-    rosters: spieler.map((p) => ({ id: `roster:${p.id}`, teamId: "T-1", playerId: p.id, contractLength: 1, salary: 5, upkeep: 5, purchasePrice: 10, currentValue: 10, roleTag: "starter", joinedSeasonId: "season-1" })),
+    rosters: spieler.map((p) => ({ id: `roster:${p.id}`, teamId: "T-1", playerId: p.id, contractLength: 1, salary: 5, upkeep: 5, purchasePrice: 10, currentValue: 10, joinedSeasonId: "season-1" })),
     // Katalog: "breaking" hat 2 Spieler pro Team.
     disciplines: [
       { id: "filler", name: "Filler", category: "power", weight: 1, playerCount: 5 },

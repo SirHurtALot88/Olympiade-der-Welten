@@ -105,7 +105,6 @@ function gameState(input?: {
       contractLength: 1,
       salary: 4,
       upkeep: 4,
-      roleTag: "starter",
       joinedSeasonId: seasonId,
     })),
     contracts: [],

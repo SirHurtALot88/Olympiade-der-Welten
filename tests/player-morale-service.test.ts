@@ -86,7 +86,6 @@ function createRosterEntry(playerId: string, partial?: Partial<RosterEntry>): Ro
     upkeep: partial?.upkeep ?? partial?.salary ?? 7,
     purchasePrice: partial?.purchasePrice ?? 42,
     currentValue: partial?.currentValue ?? 42,
-    roleTag: partial?.roleTag ?? "starter",
     promisedRole: partial?.promisedRole ?? null,
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
@@ -108,7 +107,7 @@ function createGameState(input: {
   const player = input.player ?? createPlayer("p1");
   const roster = input.roster ?? createRosterEntry(player.id, { teamId: team.teamId });
   const teammate = input.teammate ?? createPlayer("mate", { className: player.className, race: player.race, traitsPositive: player.traitsPositive });
-  const teammateRoster = createRosterEntry(teammate.id, { teamId: team.teamId, roleTag: "bench" });
+  const teammateRoster = createRosterEntry(teammate.id, { teamId: team.teamId });
   const performances = Array.from({ length: input.appearances ?? 0 }, (_, index) => ({
     id: `perf-${index}`,
     matchdayResultId: "result-1",
@@ -398,12 +397,12 @@ describe("player morale service", () => {
     const unused = createPlayer("unused");
 
     const usedMorale = assessPlayerMorale({
-      gameState: createGameState({ player: used, roster: createRosterEntry(used.id, { roleTag: "starter" }), appearances: 9, averageContribution: 13 }),
+      gameState: createGameState({ player: used, roster: createRosterEntry(used.id, { promisedRole: "starter" }), appearances: 9, averageContribution: 13 }),
       playerId: used.id,
       teamId: "M-M",
     });
     const unusedMorale = assessPlayerMorale({
-      gameState: createGameState({ player: unused, roster: createRosterEntry(unused.id, { roleTag: "starter" }), appearances: 0 }),
+      gameState: createGameState({ player: unused, roster: createRosterEntry(unused.id, { promisedRole: "starter" }), appearances: 0 }),
       playerId: unused.id,
       teamId: "M-M",
     });
@@ -412,14 +411,14 @@ describe("player morale service", () => {
     expect(unusedMorale?.reasons.map((reason) => reason.reasonId)).toContain("star_not_used");
   });
 
-  it("uses promisedRole as contract expectation separately from roster roleTag", () => {
+  it("uses promisedRole as contract expectation without a roster role tag", () => {
     const promisedStarter = createPlayer("promised-starter");
     const prospectWithoutPromise = createPlayer("prospect-no-promise");
 
     const promisedMorale = assessPlayerMorale({
       gameState: createGameState({
         player: promisedStarter,
-        roster: createRosterEntry(promisedStarter.id, { roleTag: "prospect", promisedRole: "starter" }),
+        roster: createRosterEntry(promisedStarter.id, { promisedRole: "starter" }),
         appearances: 0,
       }),
       playerId: promisedStarter.id,
@@ -428,7 +427,7 @@ describe("player morale service", () => {
     const prospectMorale = assessPlayerMorale({
       gameState: createGameState({
         player: prospectWithoutPromise,
-        roster: createRosterEntry(prospectWithoutPromise.id, { roleTag: "prospect", promisedRole: null }),
+        roster: createRosterEntry(prospectWithoutPromise.id, { promisedRole: null }),
         appearances: 0,
       }),
       playerId: prospectWithoutPromise.id,
@@ -474,7 +473,7 @@ describe("player morale service", () => {
     const depthMorale = assessPlayerMorale({
       gameState: createGameState({
         player: depth,
-        roster: createRosterEntry(depth.id, { roleTag: "depth" }),
+        roster: createRosterEntry(depth.id, { promisedRole: "bench" }),
         rank: 30,
         appearances: 2,
         teammate: eliteTeammate,
@@ -485,7 +484,7 @@ describe("player morale service", () => {
     const starMorale = assessPlayerMorale({
       gameState: createGameState({
         player: star,
-        roster: createRosterEntry(star.id, { roleTag: "starter" }),
+        roster: createRosterEntry(star.id, { promisedRole: "starter" }),
         rank: 30,
         appearances: 2,
         teammate: eliteTeammate,
@@ -512,7 +511,7 @@ describe("player morale service", () => {
       gameState: createGameState({
         team: createTeam({ teamId: "C-C", shortCode: "C-C" }),
         player,
-        roster: createRosterEntry(player.id, { teamId: "C-C", salary: 3, roleTag: "starter" }),
+        roster: createRosterEntry(player.id, { teamId: "C-C", salary: 3 }),
         rank: 32,
         appearances: 0,
         teammate: createPlayer("bad-fit", { className: "Mage", race: "Elf", traitsPositive: ["Saintly"] }),
@@ -532,7 +531,7 @@ describe("player morale service", () => {
     const sameTeamMorale = assessPlayerMorale({
       gameState: createGameState({
         player,
-        roster: createRosterEntry(player.id, { teamId: "M-M", roleTag: "starter" }),
+        roster: createRosterEntry(player.id, { teamId: "M-M" }),
         seasonId: "season-2",
         playerMoraleState: [
           {
@@ -552,7 +551,7 @@ describe("player morale service", () => {
     const freshMorale = assessPlayerMorale({
       gameState: createGameState({
         player,
-        roster: createRosterEntry(player.id, { teamId: "M-M", roleTag: "starter" }),
+        roster: createRosterEntry(player.id, { teamId: "M-M" }),
         seasonId: "season-2",
       }),
       playerId: player.id,
@@ -568,7 +567,7 @@ describe("player morale service", () => {
       gameState: createGameState({
         team: createTeam({ teamId: "N-N", shortCode: "N-N" }),
         player,
-        roster: createRosterEntry(player.id, { teamId: "N-N", roleTag: "starter" }),
+        roster: createRosterEntry(player.id, { teamId: "N-N" }),
         seasonId: "season-2",
         playerMoraleState: [
           {
@@ -588,7 +587,7 @@ describe("player morale service", () => {
     const sameTeamMorale = assessPlayerMorale({
       gameState: createGameState({
         player,
-        roster: createRosterEntry(player.id, { teamId: "M-M", roleTag: "starter" }),
+        roster: createRosterEntry(player.id, { teamId: "M-M" }),
         seasonId: "season-2",
         playerMoraleState: [
           {
@@ -655,7 +654,7 @@ describe("player morale service", () => {
     const player = createPlayer("on-pace");
     const gameState = createGameState({
       player,
-      roster: createRosterEntry(player.id, { roleTag: "starter" }),
+      roster: createRosterEntry(player.id, { promisedRole: "starter" }),
       appearances: 1,
     });
     // A 10-matchday season, only matchday 1 played so far -- rosterRank <= 3 in this
@@ -672,7 +671,7 @@ describe("player morale service", () => {
     const player = createPlayer("way-behind");
     const gameState = createGameState({
       player,
-      roster: createRosterEntry(player.id, { roleTag: "starter" }),
+      roster: createRosterEntry(player.id, { promisedRole: "starter" }),
       appearances: 1,
     });
     // 10-matchday season, 9 matchdays already played (only matchday-1's performance exists,
@@ -711,7 +710,7 @@ describe("player morale service", () => {
     const player = createPlayer("was-behind");
     const laggingState = createGameState({
       player,
-      roster: createRosterEntry(player.id, { roleTag: "starter" }),
+      roster: createRosterEntry(player.id, { promisedRole: "starter" }),
       appearances: 1,
     });
     const staleSnapshot = assessPlayerMorale({ gameState: laggingState, playerId: player.id, teamId: "M-M" });
@@ -720,7 +719,7 @@ describe("player morale service", () => {
 
     const caughtUpState = createGameState({
       player,
-      roster: createRosterEntry(player.id, { roleTag: "starter" }),
+      roster: createRosterEntry(player.id, { promisedRole: "starter" }),
       appearances: 8, // meets the season-end target -> fulfilled, no fresh demand reason at all.
       playerMoraleState: [
         {

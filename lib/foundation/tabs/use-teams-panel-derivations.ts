@@ -54,19 +54,9 @@ export function useTeamsPanelDerivations(input: UseTeamsPanelDerivationsInput) {
     [input.getRosterEntryDisplayMarketValue, input.playerRatingsById, input.rosterPlayers],
   );
 
-  const starters = useMemo(
-    () =>
-      input.showExtendedTeamPanels
-        ? rosterPlayersByOvr.filter((item) => item.entry.roleTag === "starter")
-        : [],
-    [input.showExtendedTeamPanels, rosterPlayersByOvr],
-  );
-
-  const bench = useMemo(
-    () =>
-      input.showExtendedTeamPanels
-        ? rosterPlayersByOvr.filter((item) => item.entry.roleTag !== "starter")
-        : [],
+  // Ein Kader statt „Starter / Bench“: die Trennung hing am Rollen-Etikett, das entfernt ist (Chris 25.11.).
+  const kaderPortraits = useMemo(
+    () => (input.showExtendedTeamPanels ? rosterPlayersByOvr : []),
     [input.showExtendedTeamPanels, rosterPlayersByOvr],
   );
 
@@ -162,8 +152,7 @@ export function useTeamsPanelDerivations(input: UseTeamsPanelDerivationsInput) {
   );
 
   return {
-    starters,
-    bench,
+    kaderPortraits,
     visibleTeamsViewColumns,
     visibleSelectedRosterColumns,
   };

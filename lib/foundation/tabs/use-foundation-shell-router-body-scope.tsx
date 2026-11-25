@@ -581,7 +581,6 @@ import {
   TeamControlDraftMap,
   TeamIdentityDraftMap,
   TeamRosterFocusMode,
-  TeamRosterRoleFilter,
   TeamStrategyDraftMap,
   TrainingClassDraft,
   TrainingDevelopmentFilter,
@@ -628,7 +627,6 @@ import {
   getRanksMetricToneClass,
   getRawFoundationTeamParam,
   getResponsiveTableImageSize,
-  getTeamRosterRoleBucket,
   homeTaskLabelContract,
   initialGameState,
   isAbortError,
@@ -1062,7 +1060,7 @@ export function useFoundationShellRouterBodyScope({
     setPlayerProfileLoading, inboxV2SelectedItemId, setInboxV2SelectedItemId, selectedEncyclopediaEntryId, setSelectedEncyclopediaEntryId, lineupFocusRequestKey, setLineupFocusRequestKey, lineupDraftBoardViewRequest, setLineupDraftBoardViewRequest, lineupDraftBoardView,
     setLineupDraftBoardView, scoutingCenterTab, setScoutingCenterTab, scoutingReportSelectedPlayerId, setScoutingReportSelectedPlayerId, showCommandPalette, setShowCommandPalette, commandSearch, setCommandSearch, showExtendedTeamPanels, setShowExtendedTeamPanels, showGameFlowPanel,
     setShowGameFlowPanel, inboxCategoryFilter, setInboxCategoryFilter, inboxIncludeDone, setInboxIncludeDone, inboxIncludeDismissed, setInboxIncludeDismissed, selectedMatchdaySummaryId, setSelectedMatchdaySummaryId, teamSettingsSearch,
-    setTeamSettingsSearch, showTeamDisciplines, setShowTeamDisciplines, selectedTeamDetailTab, setSelectedTeamDetailTab, showTeamContractPreviewRows, setShowTeamContractPreviewRows, teamRosterRoleFilter, setTeamRosterRoleFilter, teamRosterFocusMode,
+    setTeamSettingsSearch, showTeamDisciplines, setShowTeamDisciplines, selectedTeamDetailTab, setSelectedTeamDetailTab, showTeamContractPreviewRows, setShowTeamContractPreviewRows, teamRosterFocusMode,
     setTeamRosterFocusMode, showSelectedRosterPpsBreakdown, setShowSelectedRosterPpsBreakdown, trainingModeDraft, setTrainingModeDraft, trainingClassDraft, setTrainingClassDraft, trainingDevelopmentFilter, setTrainingDevelopmentFilter, trainingFacilityPreviewId,
     setTrainingFacilityPreviewId, seasonTableMode, setSeasonTableMode, showSeasonTopPlayerAreas, setShowSeasonTopPlayerAreas, tableSorts, setTableSorts, playerScope,
     setPlayerScope, playerTeamFilter, setPlayerTeamFilter, playerClassFilter, setPlayerClassFilter, playerBracketFilter, setPlayerBracketFilter, marketClassFilter, setMarketClassFilter, marketRaceFilter, setMarketRaceFilter, marketSubclassFilter,
@@ -10977,12 +10975,6 @@ export function useFoundationShellRouterBodyScope({
           };
         })
         .sort((left, right) => {
-          const leftRoleScore = /star|core|starter/i.test(left.entry.roleTag ?? "") ? 1 : 0;
-          const rightRoleScore = /star|core|starter/i.test(right.entry.roleTag ?? "") ? 1 : 0;
-          if (rightRoleScore !== leftRoleScore) {
-            return rightRoleScore - leftRoleScore;
-          }
-
           const ppsDelta = (right.playerPps ?? Number.NEGATIVE_INFINITY) - (left.playerPps ?? Number.NEGATIVE_INFINITY);
           if (ppsDelta !== 0) {
             return ppsDelta;
@@ -12775,7 +12767,6 @@ export function useFoundationShellRouterBodyScope({
     disciplineRankRows,
     teamsViewSort: tableSorts.teamsView,
     teamRosterFocusMode,
-    teamRosterRoleFilter,
     rosterPlayers,
     tableColumnPreferences,
     isTableColumnVisible,
@@ -12822,7 +12813,6 @@ export function useFoundationShellRouterBodyScope({
     chooseTeamSponsor,
     renderMetricBar,
     leaguePlayerHeatPools,
-    setTeamRosterRoleFilter,
     setTeamRosterFocusMode,
     selectedStandingRow,
     selectedRoster,
@@ -13821,7 +13811,6 @@ export function useFoundationShellRouterBodyScope({
     setTeamIdentityDraft,
     setTeamIdentityMessage,
     setTeamRosterFocusMode,
-    setTeamRosterRoleFilter,
     setTeamSettingsSearch,
     setTeamStrategyDraft,
     setTeamStrategyMessage,
@@ -13872,7 +13861,6 @@ export function useFoundationShellRouterBodyScope({
     teamOwners,
     teamProfileData,
     teamRosterFocusMode,
-    teamRosterRoleFilter,
     teamSettingsSearch,
     teamStrategyMessage,
     toggleGameModeOwnershipTeam,

@@ -35,7 +35,6 @@ import {
   useTeamsRosterTableDerivations,
   type SelectedRosterTableRow,
   type TeamRosterFocusMode,
-  type TeamRosterRoleFilter,
   type UseTeamsRosterTableDerivationsInput,
 } from "@/lib/foundation/tabs/use-teams-roster-table-derivations";
 
@@ -48,13 +47,11 @@ type FoundationTeamsViewHostProps = Omit<
   | "sortedSelectedRosterTableRows"
   | "filteredSelectedRosterTableRows"
   | "teamRosterFocusOptions"
-  | "teamRosterRoleFilterOptions"
   | "selectedTeamsHistoryData"
   | "teamEconomyTiles"
   | "gameState"
   | "tableSorts"
-  | "starters"
-  | "bench"
+  | "kaderPortraits"
   | "visibleTeamsViewColumns"
   | "visibleSelectedRosterColumns"
   | "selectedTeamContractTable"
@@ -86,7 +83,6 @@ type FoundationTeamsViewHostProps = Omit<
   disciplineRankRows: DisciplineRankRowInput[];
   teamsViewSort: FoundationTableSortState | undefined;
   teamRosterFocusMode: TeamRosterFocusMode;
-  teamRosterRoleFilter: TeamRosterRoleFilter;
   rosterPlayers: TeamsRosterPlayerPair[];
   tableColumnPreferences: UseTeamsPanelDerivationsInput["tableColumnPreferences"];
   isTableColumnVisible: UseTeamsPanelDerivationsInput["isTableColumnVisible"];
@@ -136,7 +132,6 @@ export default function FoundationTeamsViewHost({
   teamsViewSort,
   selectedRosterTableRows,
   teamRosterFocusMode,
-  teamRosterRoleFilter,
   buildTeamDetailDrawerData,
   formatMoney,
   shouldBuildTeamContracts,
@@ -207,7 +202,6 @@ export default function FoundationTeamsViewHost({
     disciplines: gameState.disciplines,
     gameState,
     teamRosterFocusMode,
-    teamRosterRoleFilter,
     getRosterEntryDisplayMarketValue:
       getRosterEntryDisplayMarketValue as UseTeamsRosterTableDerivationsInput["getRosterEntryDisplayMarketValue"],
     getRosterEntryDisplaySalary:
@@ -282,7 +276,7 @@ export default function FoundationTeamsViewHost({
     playerRatingsById,
   });
 
-  const { starters, bench, visibleTeamsViewColumns, visibleSelectedRosterColumns } = useTeamsPanelDerivations({
+  const { kaderPortraits, visibleTeamsViewColumns, visibleSelectedRosterColumns } = useTeamsPanelDerivations({
     showExtendedTeamPanels: Boolean(showExtendedTeamPanels),
     rosterPlayers,
     playerRatingsById,
@@ -365,11 +359,6 @@ export default function FoundationTeamsViewHost({
         filteredSelectedRosterTableRows={
           rosterDerivations.filteredSelectedRosterTableRows as unknown as FoundationTeamsNewLookProps["filteredSelectedRosterTableRows"]
         }
-        teamRosterRoleFilter={teamRosterRoleFilter}
-        setTeamRosterRoleFilter={panelProps.setTeamRosterRoleFilter as FoundationTeamsNewLookProps["setTeamRosterRoleFilter"]}
-        teamRosterRoleFilterOptions={
-          rosterDerivations.teamRosterRoleFilterOptions as FoundationTeamsNewLookProps["teamRosterRoleFilterOptions"]
-        }
         teamRosterFocusMode={teamRosterFocusMode}
         setTeamRosterFocusMode={panelProps.setTeamRosterFocusMode as FoundationTeamsNewLookProps["setTeamRosterFocusMode"]}
         teamRosterFocusOptions={
@@ -436,7 +425,6 @@ export default function FoundationTeamsViewHost({
       tableSorts={tableSorts}
       selectedRosterTableRows={selectedRosterTableRows}
       teamRosterFocusMode={teamRosterFocusMode}
-      teamRosterRoleFilter={teamRosterRoleFilter}
       getRosterEntryDisplayMarketValue={getRosterEntryDisplayMarketValue}
       getRosterEntryDisplaySalary={getRosterEntryDisplaySalary}
       getRosterEntryCurrentSeasonSalary={getRosterEntryCurrentSeasonSalary}
@@ -448,11 +436,9 @@ export default function FoundationTeamsViewHost({
       sortedSelectedRosterTableRows={rosterDerivations.sortedSelectedRosterTableRows}
       filteredSelectedRosterTableRows={rosterDerivations.filteredSelectedRosterTableRows}
       teamRosterFocusOptions={rosterDerivations.teamRosterFocusOptions}
-      teamRosterRoleFilterOptions={rosterDerivations.teamRosterRoleFilterOptions}
       selectedTeamsHistoryData={selectedTeamsHistoryData}
       teamEconomyTiles={teamEconomyTiles}
-      starters={starters}
-      bench={bench}
+      kaderPortraits={kaderPortraits}
       visibleTeamsViewColumns={visibleTeamsViewColumns}
       visibleSelectedRosterColumns={visibleSelectedRosterColumns}
       getTeamsViewColumnTitle={getTeamsViewColumnTitle}

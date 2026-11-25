@@ -100,7 +100,6 @@ function createRosterEntry(id: string, playerId: string, partial?: Partial<Roste
     upkeep: partial?.upkeep ?? partial?.salary ?? 4,
     purchasePrice: partial?.purchasePrice ?? 20,
     currentValue: partial?.currentValue ?? 20,
-    roleTag: partial?.roleTag ?? "starter",
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
 }

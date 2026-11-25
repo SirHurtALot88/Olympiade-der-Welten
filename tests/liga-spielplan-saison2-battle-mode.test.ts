@@ -220,8 +220,8 @@ function buildSeasonOneEndSave(options: {
     ),
     disciplines: options.doubledBattleSeason ? foundationSeedDisciplines : DISCIPLINES,
     rosters: [
-      { id: "r-human", teamId: "L1-01", playerId: "p-human", salary: 1, upkeep: 1, contractLength: 3, roleTag: "starter", joinedSeasonId: "season-1" },
-      { id: "r-ai", teamId: "L2-01", playerId: "p-ai", salary: 4, upkeep: 4, contractLength: 3, roleTag: "bench", joinedSeasonId: "season-1" },
+      { id: "r-human", teamId: "L1-01", playerId: "p-human", salary: 1, upkeep: 1, contractLength: 3, joinedSeasonId: "season-1" },
+      { id: "r-ai", teamId: "L2-01", playerId: "p-ai", salary: 4, upkeep: 4, contractLength: 3, joinedSeasonId: "season-1" },
     ],
     contracts: [],
     transferListings: [],

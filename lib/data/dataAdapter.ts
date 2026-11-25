@@ -366,7 +366,6 @@ export function buildRosterSeedData(): OlySeedData {
     }
 
     mappedPlayerIds.add(player.id);
-    const roleTag = index % 4 === 3 ? "bench" : "starter";
     rosters.push({
       id: `roster-${index + 1}`,
       teamId: row.teamId,
@@ -378,7 +377,6 @@ export function buildRosterSeedData(): OlySeedData {
       negotiatedAnnualSalary: player.salaryDemand,
       purchasePrice: player.marketValue,
       currentValue: player.marketValue,
-      roleTag,
       joinedSeasonId: foundationSeedSeason.id,
     });
     contracts.push({

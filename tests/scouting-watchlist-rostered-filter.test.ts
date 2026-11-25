@@ -15,7 +15,6 @@ function roster(playerId: string, teamId: string): RosterEntry {
     contractLength: 2,
     salary: 3,
     upkeep: 3,
-    roleTag: "starter",
     joinedSeasonId: "season-1",
   };
 }

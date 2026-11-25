@@ -211,7 +211,6 @@ export function buildSeasonEndReconstructedGameState(
       upkeep: template?.upkeep ?? 0,
       purchasePrice: template?.purchasePrice ?? null,
       currentValue: template?.currentValue ?? null,
-      roleTag: template?.roleTag ?? "bench",
       joinedSeasonId: template?.joinedSeasonId ?? "rekonstruiert",
     });
   }

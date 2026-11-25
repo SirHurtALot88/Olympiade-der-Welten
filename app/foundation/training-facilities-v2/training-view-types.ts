@@ -42,7 +42,6 @@ export type TrainingAttributeForecastEntry = {
 
 export type TrainingPlayerRowView = {
   entryId: string;
-  roleTag: string | null;
   player: {
     id: string;
     name: string;

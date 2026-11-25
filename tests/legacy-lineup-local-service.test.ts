@@ -110,7 +110,6 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
           upkeep: Math.round(player.salaryDemand),
           purchasePrice: Math.round(player.marketValue),
           currentValue: Math.round(player.marketValue),
-          roleTag: "bench",
           joinedSeasonId: save.gameState.season.id,
         });
         rosterCounter += 1;
@@ -713,7 +712,6 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
       upkeep: Math.round(lateJoiner!.salaryDemand),
       purchasePrice: Math.round(lateJoiner!.marketValue),
       currentValue: Math.round(lateJoiner!.marketValue),
-      roleTag: "bench",
       joinedSeasonId: afterGeneration.gameState.season.id,
     });
     persistence.saveSingleplayerState(save.saveId, afterGeneration.gameState);
@@ -814,7 +812,6 @@ describe("legacy lineup local service", { timeout: 120_000 }, () => {
       upkeep: Math.round(mitNull!.salaryDemand),
       purchasePrice: Math.round(mitNull!.marketValue),
       currentValue: Math.round(mitNull!.marketValue),
-      roleTag: "bench",
       joinedSeasonId: nachher.gameState.season.id,
     } as never);
     persistence.saveSingleplayerState(save.saveId, nachher.gameState);

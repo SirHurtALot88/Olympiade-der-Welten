@@ -219,7 +219,6 @@ describe("prize money preview", () => {
           contractLength: 2,
           purchasePrice: 10,
           currentValue: 10,
-          roleTag: "starter",
           joinedSeasonId: "season-1",
         },
       ] as GameState["rosters"];

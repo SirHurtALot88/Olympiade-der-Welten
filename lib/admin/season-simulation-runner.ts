@@ -848,7 +848,6 @@ function applyFastLocalBuy(input: {
           negotiatedAnnualSalary: salary,
           purchasePrice,
           currentValue: marketValue,
-          roleTag: "prospect",
           promisedRole: "prospect",
           joinedSeasonId: gameState.season.id,
         },

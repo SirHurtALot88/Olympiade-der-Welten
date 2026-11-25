@@ -215,7 +215,6 @@ describe("buildSeasonEndReconstructedGameState", () => {
           upkeep: 3,
           purchasePrice: 20,
           currentValue: 20,
-          roleTag: "bench",
           promisedRole: null,
           joinedSeasonId: "season-2",
         },

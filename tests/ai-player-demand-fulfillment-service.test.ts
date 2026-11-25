@@ -40,7 +40,6 @@ function rosterEntry(playerId: string, teamId = "T-1"): RosterEntry {
     upkeep: 5,
     contractLength: 2,
     contractStatus: "active",
-    roleTag: "starter",
     currentValue: 20,
     purchasePrice: 15,
   };

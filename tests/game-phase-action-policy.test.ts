@@ -77,7 +77,7 @@ function gameState(phase: GamePhase, options?: { newGameFlowOpen?: boolean; comp
     teamIdentities: [],
     players: [player()],
     disciplines: [],
-    rosters: [{ id: "roster-1", teamId: "M-M", playerId: "p-1", contractLength: 1, salary: 2, upkeep: 2, purchasePrice: 10, currentValue: 10, roleTag: "starter", joinedSeasonId: "season-1" }],
+    rosters: [{ id: "roster-1", teamId: "M-M", playerId: "p-1", contractLength: 1, salary: 2, upkeep: 2, purchasePrice: 10, currentValue: 10, joinedSeasonId: "season-1" }],
     contracts: [],
     transferListings: [],
     transferHistory: [],

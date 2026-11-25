@@ -117,7 +117,6 @@ function createRosterEntry(id: string, playerId: string, partial?: Partial<Roste
     upkeep: partial?.upkeep ?? partial?.salary ?? 1000,
     purchasePrice: partial?.purchasePrice ?? 5000,
     currentValue: partial?.currentValue ?? 5500,
-    roleTag: partial?.roleTag ?? "starter",
     promisedRole: partial?.promisedRole ?? null,
     joinedSeasonId: partial?.joinedSeasonId ?? "season-1",
   };
@@ -485,7 +484,8 @@ describe("transfermarkt local service", () => {
     expect(afterRow?.cash).toBe((beforeRow?.cash ?? 0) - 25);
     expect(afterRow?.salaryTotal).toBe((beforeRow?.salaryTotal ?? 0) + (result.offeredSalary ?? result.salary ?? 0));
     expect(afterRow?.marketValueTotal).toBe((beforeRow?.marketValueTotal ?? 0) + 25);
-    expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.roleTag).toBe("prospect");
+    // Rollen-Etikett entfernt (Chris 25.11.): ein Kauf schreibt kein „Nachwuchs“-Etikett mehr.
+    expect(Object.keys(afterState.rosters.find((entry) => entry.playerId === "fa-1") ?? {})).not.toContain("roleTag");
     expect(afterState.rosters.find((entry) => entry.playerId === "fa-1")?.promisedRole).toBe("rotation");
 
     // UNTERSCHRIFTSPFAD (docs/APRON_UND_VERTRAGSFORMEN.md, Schritt 3): jeder Kauf schreibt das

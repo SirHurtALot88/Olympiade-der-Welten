@@ -41,6 +41,7 @@ import { deriveRosterTargets } from "@/lib/foundation/roster-limits";
 import { resolvePlayerEconomyContract } from "@/lib/foundation/player-economy-contract";
 import { getTeamControlSettings } from "@/lib/foundation/team-control-settings";
 import { wirtschaftsRegel } from "@/lib/resolve/wirtschafts-regeln";
+import { laufenderVertragswert, vertragsPlanAktiv } from "@/lib/contracts/vertragswert-spielstand";
 import { resolveContractExitRenewBias } from "@/lib/contracts/contract-exit-renew-bias";
 import {
   acceptContractDissolution,
@@ -112,7 +113,14 @@ export type AiDissolutionReason =
    * Annehmen: die KI wuerde ihn im naechsten Fenster ohnehin verkaufen. Der Verkauf kostete den vollen Rest-Buyout, die
    * Aufloesung nur den nicht erlassenen Teil — bei gleichem Verkaufspreis (dieselbe `buildTransfermarktSaleFactorBreakdown`).
    */
-  | "verkauf_geplant";
+  | "verkauf_geplant"
+  /**
+   * Stempel `vertragsPlan` (Chris 25.11.): die Aufloesung durch den Spieler hat guenstigere Konditionen (Teilverzicht auf das Restgehalt).
+   * Annehmen, wenn ihr Netto (Erloes − zahlbarer Rest) mehr bringt als der VERTRAGSWERT W beim Halten (lib/contracts/vertragswert.ts).
+   */
+  | "vertragswert_niedriger"
+  /** Ablehnen mit Vertragswert: W beim Halten ist hoeher als das Netto der Aufloesung. */
+  | "vertragswert_hoeher";
 
 /**
  * WIE VIEL EIN UNZUFRIEDENER SPIELER NOCH WERT IST.
@@ -238,6 +246,8 @@ export function decideAiContractDissolution(input: {
    * Spieler nicht wertvoller (`rosterFactor` hoechstens 1). Ueber Opt bleibt der Abschlag — Ueberschuss darf leichter gehen.
    */
   ohneKadergroessenBremse?: boolean;
+  /** Vertragswert W beim Halten (Stempel `vertragsPlan`); gesetzt, entscheidet er statt Restwert x Faktoren. */
+  vertragswert?: number | null;
 }): AiDissolutionDecision {
   const { offer } = input;
   const netCash = round(offer.salePrice - (offer.payableBuyout ?? 0), 2);
@@ -283,6 +293,21 @@ export function decideAiContractDissolution(input: {
       moraleFactor: 0,
       rosterFactor: 0,
       qualityFactor: 0,
+    };
+  }
+
+  // VERTRAGSWERT (Stempel `vertragsPlan`): W enthaelt Nutzen, Restgehalt nach Jahresplan und Fortsetzung — dieselbe Zahl wie beim
+  // Verkauf. Die Aufloesung lohnt, wenn ihr Netto mehr bringt als das Halten.
+  if (typeof input.vertragswert === "number" && Number.isFinite(input.vertragswert)) {
+    const annehmen = netCash > input.vertragswert;
+    return {
+      ...basis,
+      decision: annehmen ? "accepted" : "declined",
+      reason: annehmen ? "vertragswert_niedriger" : "vertragswert_hoeher",
+      keepWorth: round(input.vertragswert, 2),
+      moraleFactor: 1,
+      rosterFactor: 1,
+      qualityFactor: 1,
     };
   }
 
@@ -437,6 +462,7 @@ export function applyAiContractDissolutions(input: {
         cashBefore: teamRow.cash ?? 0,
         renewal: input.renewalSignals?.get(`${team.teamId}:${offer.playerId}`) ?? null,
         ohneKadergroessenBremse: wirtschaftsRegel(gameState, "verkaufSchwellen") === "neu",
+        vertragswert: vertragswertBeimHalten(gameState, team.teamId, playersById.get(offer.playerId) ?? null, rosterEntry),
       });
       decisions.push(decision);
 
@@ -460,6 +486,16 @@ export function applyAiContractDissolutions(input: {
     acceptedCount: decisions.filter((entry) => entry.decision === "accepted").length,
     declinedCount: decisions.filter((entry) => entry.decision === "declined").length,
   };
+}
+
+/** W beim Halten (Stempel `vertragsPlan`), sonst null (dann die bisherige Abwaegung). */
+function vertragswertBeimHalten(gameState: GameState, teamId: string, player: Player | null, rosterEntry: RosterEntry): number | null {
+  if (!player || !vertragsPlanAktiv(gameState)) return null;
+  try {
+    return laufenderVertragswert({ gameState, teamId, player, rosterEntry }).wert;
+  } catch {
+    return null;
+  }
 }
 
 /**

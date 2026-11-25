@@ -229,7 +229,6 @@ function topUpRostersForLineups(save: PersistedSaveGame, seasonId: string) {
         upkeep: Math.round(salary),
         purchasePrice: Math.round(marketValue),
         currentValue: Math.round(marketValue),
-        roleTag: "bench",
         joinedSeasonId: seasonId,
       });
       rosterCounter += 1;

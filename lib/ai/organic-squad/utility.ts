@@ -709,6 +709,13 @@ export type VerkaufsAbwaegungEingabe = {
   wProfit: number;
   /** Reproduzierbarer Zufall 0..1 (0,5 = neutral). */
   zufall: number;
+  /**
+   * VERTRAGSWERT W (Stempel `vertragsPlan`, Chris 25.11., lib/contracts/vertragswert.ts): was der Vertrag beim Halten noch bringt —
+   * Nutzen der offenen Jahre minus deren Gehalt laut Jahresplan plus Fortsetzung. Ist er gesetzt, ersetzt er Haltewert und
+   * Gehaltsbilanz (die nur EIN Jahr Gehalt sahen, waehrend das Restgehalt alle Jahre abzog — die Doppelzaehlung). Verlustscheu und
+   * Bilanz-Ausgleich messen dann den Preis gegen den Marktwert (das Restgehalt faellt beim Halten genauso an).
+   */
+  vertragswert?: number | null;
 };
 
 export type VerkaufsAbwaegung = {
@@ -726,6 +733,8 @@ export type VerkaufsAbwaegung = {
   bauchgefuehl: number;
   teamBedeutung: number;
   leistungsAnteil: number;
+  /** W, wenn mit Vertragswert gerechnet wurde (sonst null). */
+  vertragswert: number | null;
 };
 
 /** Team-Bedeutung aus dem Staerke-Verhaeltnis zum Kader-Median (siehe VERKAUFS_ABWAEGUNG). */
@@ -765,6 +774,32 @@ export function verkaufsAbwaegung(e: VerkaufsAbwaegungEingabe): VerkaufsAbwaegun
   const bilanz = Number.isFinite(e.buchBilanz) ? (e.buchBilanz as number) : 0;
   const ausgleich = bilanz < 0 ? k.AUSGLEICH * Math.min(-bilanz, Math.max(0, erloes - mw)) : 0;
   const bauchgefuehl = k.BAUCHGEFUEHL * halteWert * 2 * ((Number.isFinite(e.zufall) ? e.zufall : 0.5) - 0.5);
+  const w = typeof e.vertragswert === "number" && Number.isFinite(e.vertragswert) ? e.vertragswert : null;
+  if (w != null) {
+    // Vertragswert: Netto (Preis − Restgehalt) gegen W. Das Gehalt steht in beiden — es hebt sich bis auf den Zeitwert auf.
+    const verlustW = Math.max(0, mw - e.preis);
+    const verlustScheuW = ((1 - druck) * k.VERLUST * verlustW * verlustW) / (verlustW + k.VERLUST_KNIE);
+    const ausgleichW = bilanz < 0 ? k.AUSGLEICH * Math.min(-bilanz, Math.max(0, e.preis - mw)) : 0;
+    const vorteilW =
+      erloes - w - ersatzRisiko - wechselKosten - tiefenKosten + liquiditaet - marge - verlustScheuW + ausgleichW + bauchgefuehl;
+    return {
+      vorteil: vorteilW,
+      erloes,
+      halteWert,
+      ersatzRisiko,
+      wechselKosten,
+      gehaltsBilanz: 0,
+      tiefenKosten,
+      liquiditaet,
+      marge,
+      verlustScheu: verlustScheuW,
+      ausgleich: ausgleichW,
+      bauchgefuehl,
+      teamBedeutung: bedeutung,
+      leistungsAnteil,
+      vertragswert: w,
+    };
+  }
   const vorteil =
     erloes - halteWert - ersatzRisiko - wechselKosten + gehaltsBilanz - tiefenKosten + liquiditaet - marge - verlustScheu + ausgleich + bauchgefuehl;
   return {
@@ -782,5 +817,6 @@ export function verkaufsAbwaegung(e: VerkaufsAbwaegungEingabe): VerkaufsAbwaegun
     bauchgefuehl,
     teamBedeutung: bedeutung,
     leistungsAnteil,
+    vertragswert: null,
   };
 }

@@ -36,8 +36,8 @@ function baueHalbenSpieltag() {
   const [teamA, teamB] = gameState.teams;
   const freePlayers = gameState.players.slice(0, 2);
   gameState.rosters = [
-    { id: "r-a", teamId: teamA!.teamId, playerId: freePlayers[0]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
-    { id: "r-b", teamId: teamB!.teamId, playerId: freePlayers[1]!.id, contractLength: 2, salary: 5, upkeep: 5, roleTag: "starter", joinedSeasonId: gameState.season.id },
+    { id: "r-a", teamId: teamA!.teamId, playerId: freePlayers[0]!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
+    { id: "r-b", teamId: teamB!.teamId, playerId: freePlayers[1]!.id, contractLength: 2, salary: 5, upkeep: 5, joinedSeasonId: gameState.season.id },
   ];
   gameState.season.matchdayIds = ["matchday-1", "matchday-2"];
   gameState.matchdayState.matchdayId = "matchday-2";

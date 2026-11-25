@@ -48,7 +48,6 @@ function bestuecke(gameState: GameState, jeTeam = 8): GameState {
         upkeep: 5 + (i % 4),
         purchasePrice: 10,
         currentValue: 10,
-        roleTag: "bench",
         joinedSeasonId: gameState.season.id,
       });
     }
@@ -282,7 +281,7 @@ describe("Sonderfaelle", () => {
       ...vorher,
       rosters: [
         ...vorher.rosters,
-        { id: "fjs-neu", teamId: TEAM, playerId: player.id, contractLength: 2, salary: 10, upkeep: 10, purchasePrice: 5, currentValue: 5, roleTag: "bench", joinedSeasonId: vorher.season.id },
+        { id: "fjs-neu", teamId: TEAM, playerId: player.id, contractLength: 2, salary: 10, upkeep: 10, purchasePrice: 5, currentValue: 5, joinedSeasonId: vorher.season.id },
       ],
     };
     const bisher = -summeSpieltagBuchungen(vorher, TEAM).gehalt;

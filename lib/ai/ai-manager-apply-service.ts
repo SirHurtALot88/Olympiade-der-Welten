@@ -490,8 +490,7 @@ function buildTrainingActions(save: PersistedSaveGame, preview: AiLeagueManageme
   });
 }
 
-function chooseContractStrategy(input: { role: string; salary: number; contractLength: number | null | undefined; youth: boolean }): AiManagerContractStrategy {
-  if (input.role.includes("starter") || input.role.includes("core") || input.role.includes("star")) return "extend_core";
+function chooseContractStrategy(input: { salary: number; contractLength: number | null | undefined; youth: boolean }): AiManagerContractStrategy {
   if (input.youth) return "prospect_hold";
   if ((input.contractLength ?? 0) <= 1) return "wait_and_see";
   if (input.salary >= 14) return "market_test";
@@ -505,9 +504,7 @@ function buildContractActions(save: PersistedSaveGame, preview: AiLeagueManageme
     const teamPlan = teamPlanById.get(roster.teamId);
     const player = playerById.get(roster.playerId);
     if (!teamPlan || !player) return [];
-    const role = String(roster.roleTag ?? "").toLowerCase();
     const strategy = chooseContractStrategy({
-      role,
       salary: roster.salary ?? player.displaySalary ?? player.salaryDemand ?? 0,
       contractLength: roster.contractLength,
       // Eine Quelle: Record-Score statt Import-Altfeld player.potential (wich am
@@ -527,7 +524,7 @@ function buildContractActions(save: PersistedSaveGame, preview: AiLeagueManageme
         cashBefore: cash,
         cashAfter: cash,
         expectedEffect: strategy,
-        reason: `${player.name}: Rolle ${roster.roleTag ?? "unbekannt"}, Vertrag ${roster.contractLength ?? "?"}`,
+        reason: `${player.name}: Vertrag ${roster.contractLength ?? "?"}`,
         risk: "low" as const,
         sourcePlanId,
         canApply: true,

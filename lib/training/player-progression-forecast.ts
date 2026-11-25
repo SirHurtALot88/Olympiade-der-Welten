@@ -379,10 +379,16 @@ function buildTrainingFormScore(player: Player, mode: PlayerTrainingMode) {
   return clamp(55 + positive + negative + modeSignal + sharpnessSignal, 5, 99);
 }
 
+/**
+ * Rolle fuer die Prognose. Bis 25.11. las sie das Rollen-Etikett des Kadereintrags; jeder Kaufweg schrieb „Nachwuchs“, also rechnete die
+ * Entwicklung fuer praktisch alle Kaderspieler im Nachwuchs-Zweig. Das Etikett ist entfernt (Chris 25.11.); damit die Entwicklungsbalance
+ * („neu2“) unveraendert bleibt, rechnet die Prognose fuer Kaderspieler ohne eigene Rollenangabe weiter genau so. Rollenversprechen
+ * (`promisedRole`) gingen hier nie ein.
+ */
 function getRosterRole(gameState: GameState, playerId: string) {
   const rosterEntry = gameState.rosters.find((entry) => entry.playerId === playerId);
-  const role = rosterEntry ? (rosterEntry as { role?: string | null; roleTag?: string | null }).role ?? rosterEntry.roleTag : null;
-  return String(role ?? "").toLowerCase();
+  if (!rosterEntry) return "";
+  return String((rosterEntry as { role?: string | null }).role ?? "prospect").toLowerCase();
 }
 
 function isStarOrCore(role: string) {

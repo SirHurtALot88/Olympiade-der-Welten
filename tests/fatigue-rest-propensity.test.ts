@@ -230,7 +230,6 @@ function buildGameState(players: Player[]): GameState {
       contractLength: 2,
       salary: 5,
       upkeep: 5,
-      roleTag: "starter",
       joinedSeasonId: "season-1",
     })),
     contracts: [],

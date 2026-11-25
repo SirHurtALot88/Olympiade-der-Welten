@@ -228,8 +228,8 @@ function buildGameState(): GameState {
     ],
     disciplines: [],
     rosters: [
-      { id: "r-cc-1", teamId: "C-C", playerId: "p-cc-1", contractLength: 2, salary: 4, upkeep: 4, purchasePrice: 20, currentValue: 20, roleTag: "starter", joinedSeasonId: "season-1" },
-      { id: "r-ww-1", teamId: "W-W", playerId: "p-ww-1", contractLength: 2, salary: 4, upkeep: 4, purchasePrice: 21, currentValue: 21, roleTag: "starter", joinedSeasonId: "season-1" },
+      { id: "r-cc-1", teamId: "C-C", playerId: "p-cc-1", contractLength: 2, salary: 4, upkeep: 4, purchasePrice: 20, currentValue: 20, joinedSeasonId: "season-1" },
+      { id: "r-ww-1", teamId: "W-W", playerId: "p-ww-1", contractLength: 2, salary: 4, upkeep: 4, purchasePrice: 21, currentValue: 21, joinedSeasonId: "season-1" },
     ],
     contracts: [],
     transferListings: [],
@@ -712,7 +712,6 @@ describe("ai picks run service", () => {
             upkeep: salary,
             purchasePrice,
             currentValue: purchasePrice,
-            roleTag: "prospect" as const,
             joinedSeasonId: "season-1",
           },
         ],
