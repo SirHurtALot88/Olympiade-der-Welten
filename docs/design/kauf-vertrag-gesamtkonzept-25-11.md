@@ -389,3 +389,15 @@ Dazu Wächter-Tests mit den Tabellen aus 3.3 und 4.2 (jede Zeile ein Fall) und e
    *Empfehlung: später*, nicht in diesem Bau; heute nur für auslaufende Verträge.
 6. **Erwartung in der Verhandlung zeigen** (Pfeil besser / gleich / schlechter, im Nebel gestuft)? *Empfehlung: ja* — sonst sieht
    der Mensch weniger als die KI rechnet.
+
+## 12. Entscheidungen Chris (25.11.) — verbindlich für den Bau
+
+| # | Frage | Entscheidung |
+|---|---|---|
+| — | Rolle „Stammspieler“/„Nachwuchs“ (`roleTag`) | **Komplett raus.** Chris: „das mit Stammspieler und Nachwuchs und so, das solltest du ja rausnehmen. Lösch das mal und guck mal, dass da auch keine Code-Rückstände sind.“ Jede Stelle, die über `roleTag` Laufzeit, Rabatt oder Verhalten steuert, wird entfernt bzw. durch den Vertragswert ersetzt; keine toten Felder, keine Ersatz-Etiketten. |
+| 1 | Vertragswert statt 0,9-Sperre | **Ja**, einbauen. |
+| 2 | Rabatt nach Wunschlaufzeit in drei Kurven | **Nein, nichts ändern** — „haben wir ja schon drin“. Die bestehende Rabatt-/Wunschlogik bleibt unverändert. |
+| 3 | 5-Jahres-Verträge nur für Stammspieler | **Nein.** Auch günstige Spieler können sich für 5 Jahre lohnen, z. B. wegen ihrer **Formkarte**: „es kann sich lohnen, einen günstigen Spieler, der vielleicht auch nur sehr wenig Gehalt kostet, mitzunehmen, weil der dann dir eine passende Formkarte aus der Farbe mitbringt.“ Der Vertragswert muss deshalb den **Beitrag zur Formkarten-Aufstellung des Teams** (Klassenfarbe des Spielers ↔ Farbbedarf der Disziplinen/Kartenplan, `lib/lineups/formkarten-farbregel.ts`, Plus/Minus-Regel) als Nutzen enthalten, nicht nur Eignung/Leistung. Keine Laufzeit-Sperre nach Rolle oder Rang. |
+| 4 | Wer zahlt das Restgehalt | **Der Verkäufer**, wie bisher — **außer der Spieler bietet die Vertragsauflösung an**: dann gelten günstigere Konditionen, es wird aber trotzdem etwas bezahlt (bestehender Weg der Vertragsauflösung; die KI soll ihn im Vertragswert nutzen). |
+| 5 | Vorzeitig verlängern | **Nein**, machen wir nicht. |
+| 6 | Erwartung (besser/gleich/schlechter) in der Verhandlung zeigen, im Scouting-Nebel gestuft | **Ja.** |
