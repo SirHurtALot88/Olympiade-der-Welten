@@ -100,6 +100,9 @@ async function main() {
   const ids = vorhanden ? (JSON.parse(vorhanden) as Awaited<ReturnType<typeof baueSave>>) : await baueSave();
   await fs.writeFile(idsPfad, JSON.stringify(ids));
   console.log("[shot-vw]", JSON.stringify(ids));
+  process.env.OLY_APP_SQLITE_PATH = SQLITE_PATH;
+  const stand = createPersistenceService().getSaveById(ids.saveId)!.gameState;
+  const namen = new Map(stand.players.map((p) => [p.id, p.name] as const));
   const server = starteDevServer();
   let browser: Browser | null = null;
   try {
@@ -123,13 +126,14 @@ async function main() {
         throw e;
       });
       for (const [art, playerId] of [["gescoutet", ids.gescoutet], ["beobachtet", ids.beobachtet], ["unbekannt", ids.unbekannt]] as const) {
-        // Zeile über die Spieler-Id finden (blättern, falls nötig).
-        let zeile = page.locator(`[data-testid="tm-zeile"][data-player-id="${playerId}"]`);
-        for (let i = 0; i < 300 && !(await zeile.count()); i += 1) {
-          const weiter = page.getByLabel("Nächstes Blatt");
-          if (await weiter.isDisabled().catch(() => true)) break;
-          await weiter.click();
-          zeile = page.locator(`[data-testid="tm-zeile"][data-player-id="${playerId}"]`);
+        // Zeile über den Namen suchen (auch Spieler mit negativem Fit einblenden).
+        const name = namen.get(playerId) ?? playerId;
+        await page.getByTestId("tm-suche").fill(name);
+        await page.waitForTimeout(800);
+        const zeile = page.locator(`[data-testid="tm-zeile"][data-player-id="${playerId}"]`);
+        if (!(await zeile.count())) {
+          await page.getByTestId("tm-fit-negativ").click();
+          await page.waitForTimeout(800);
         }
         await zeile.first().click();
         if ((await page.locator('[role="dialog"][aria-modal="true"]').count()) > 0) await page.keyboard.press("Escape");

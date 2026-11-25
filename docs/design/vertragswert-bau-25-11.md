@@ -109,6 +109,13 @@ Verträge bleiben, wie sie sind. Ausnahme: das Rollen-Etikett ist sofort weg (Ab
 - **Jahresplan** (vorhanden) und darunter **„Ausstieg kostet“** je Vertragsjahr (Restgehalt laut Plan, dieselbe Summe wie der Buyout).
 - **Laufzeit 1–5** wählbar (vorher 1–4).
 
+Aufnahmen aus der echten App (Dev-Server, Wegwerf-SQLite, `scripts/screenshot-vertragswert.ts`) unter `docs/design/vertragswert-25-11/`,
+je 1920×1080 und 2560×1440: `tisch-gescoutet-*` (Erwartung „– eher gleich 32 / 40 / 28 %“, Formkarte rot +0,5 C, 4 Jahre, Ausstieg
+42,9 / 32,2 / 21,5 / 10,7 C), `tisch-beobachtet-*` (nur Stufe, „beobachtet“; front-loaded 9,1 / 7,6 / 6,1 → Ausstieg 22,8 / 13,7 / 6,1),
+`tisch-unbekannt-*` („? nicht gescoutet“). Selbst angesehen: kein Seitenscroll (scrollHeight = Fensterhöhe in allen sechs), keine
+Überlappung, „Ausstieg kostet“ steht unter den Säulen des Jahresplans, Laufzeit-Knöpfe 1–5. Kein Mockup für diesen Zusatz (bestehender
+Tisch, Stil übernommen).
+
 Mehrspieler: Daten kommen über die bestehenden Routen (`/api/transfermarkt/buy`, `/api/contracts/renewal`) für das anfragende Team
 (`teamId` = aktives Team), Schreibwege unverändert hinter `authorizeServerRoomWrite`.
 
