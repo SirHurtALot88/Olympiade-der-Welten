@@ -97,6 +97,18 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
     // (sichtbar als Bestandsabgang ohne Verkauf). Darum bis einschliesslich morgen.
     maxOrderDate: new Date(now.getTime() + 86_400_000).toISOString().slice(0, 10),
   }, 250, 400, (p, t) => progress(20 + (50 * p) / Math.max(1, t), `Bestellungen laden (Seite ${p} von ${t})`));
+  // Der Bestellabruf dauert (gesamte Historie, Pause zwischen den Seiten). Billbee bucht den Bestand beim Eingang einer Bestellung ab;
+  // ist sie erst NACH dem Laden des Artikelstamms eingegangen, steht sie in den Verkaeufen, der Bestand aber noch auf dem alten Wert.
+  // Darum wird der Stamm direkt vor dem Speichern noch einmal gelesen (still, wenige Seiten) und liefert Bestand und Grenzen.
+  progress(71, "Bestand aktualisieren …");
+  let stockMasters = masters;
+  try {
+    const rawFresh = await client.getAll<Record<string, unknown>>("/products", {}, 250, 400);
+    const fresh = rawFresh.map(mapProduct).filter((m): m is MasterProduct => m !== null);
+    if (fresh.length > 0) stockMasters = fresh;
+  } catch {
+    // Zweiter Abruf gescheitert: es bleibt beim ersten Stand (der Lauf selbst soll deshalb nicht scheitern).
+  }
   progress(72, "Bestellungen auswerten …");
   const { orders, duplicates } = dedupeOrders(fetched);
   const canonical = makeCanonicalizer(masters, rarityFromTitle);
@@ -111,7 +123,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   progress(86, "Artikel und Bestand speichern …");
   const artikelPersist = await persistBillbeeArtikel(
     prisma,
-    masters.map((m) => m.row)
+    stockMasters.map((m) => m.row)
   );
 
   // eBay-Artikelnummern aus Billbee. Eine vom Shop-Abruf bestaetigte Nummer (ebayPrice gesetzt) bleibt: der Shop zeigt, was gerade gelistet ist.
@@ -119,7 +131,7 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   let minStockCount = 0;
   const seenMasters = new Set<string>();
   let duplicateMasters = 0;
-  for (const m of masters) {
+  for (const m of stockMasters) {
     if (seenMasters.has(m.row.nameNormalized)) {
       duplicateMasters++;
       continue;
@@ -171,9 +183,9 @@ export async function syncBillbee(prisma: PrismaClient, opts: BillbeeSyncOptions
   progress(98, "Abschließen …");
   // Alles, was der Stamm nicht (mehr) aktiv fuehrt, ist ausgelaufen.
   let deactivated = 0;
-  if (masters.length > 0) {
+  if (stockMasters.length > 0) {
     const res = await prisma.article.updateMany({
-      where: { active: true, nameNormalized: { notIn: masters.map((m) => m.row.nameNormalized) } },
+      where: { active: true, nameNormalized: { notIn: stockMasters.map((m) => m.row.nameNormalized) } },
       data: { active: false },
     });
     deactivated = res.count;

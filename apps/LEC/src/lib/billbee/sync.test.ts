@@ -117,4 +117,23 @@ describe("syncBillbee", () => {
     expect(await db.prisma.sale.count({ where: { articleId: a.id } })).toBe(1);
     expect((await db.prisma.article.findUnique({ where: { id: a.id } }))!.stock).toBe(3);
   });
+  it("liest den Bestand nach den Bestellungen noch einmal: eine waehrend des Abrufs verkaufte Karte steht nicht mehr auf dem alten Bestand", async () => {
+    let productCalls = 0;
+    const fetchFn = (async (url: URL) => {
+      const p = new URL(String(url)).pathname;
+      if (p.endsWith("/products")) {
+        productCalls++;
+        // erster Abruf vor der Bestellung (Bestand 1), zweiter danach (Billbee hat 0 gebucht)
+        return json({ Paging: { TotalPages: 1 }, Data: [{ Id: 1, SKU: "A", Title: A, Price: 6.99, CostPrice: 2.5, StockCurrent: productCalls === 1 ? 1 : 0 }] });
+      }
+      if (p.endsWith("/orders"))
+        return json({ Paging: { TotalPages: 1 }, Data: [{ CreatedAt: "2026-10-12T10:00:00Z", State: 4, OrderItems: [{ Quantity: 1, TotalPrice: 4.49, Product: { Title: A, SKU: "A" } }] }] });
+      return new Response("{}", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    await syncBillbee(db.prisma, { config: CONFIG, now: NOW, minGapMs: 0, sleep: async () => {}, fetchFn });
+
+    expect(productCalls).toBe(2);
+    expect((await db.prisma.article.findFirst({ where: { nameRaw: A } }))!.stock).toBe(0);
+  });
 });
