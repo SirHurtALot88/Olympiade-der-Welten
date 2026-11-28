@@ -1,0 +1,41 @@
+{
+  "note": "es müsste irgendwie noch mehr eigene team highlights geben wenn man in die neue season kommt, dass man irgendwo sehen kann wie sich das trainnig entwickelt hat, dass man sieht ob spieler ihre klasse gewechselt haben, welche spieler sich in stats und in MW verbessert haben usw  - da müsste man mal so ein spotlight designen",
+  "view": "trainingCompact",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=trainingCompact&team=V-W&saveId=new-game-1787123325719-swnjlk",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2327,
+    "height": 1186
+  },
+  "clientTime": "2026-08-22T10:15:56.576Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-22T10-15-50-136Z-5hcq2p",
+  "createdAt": "2026-08-22T10:15:50.136Z",
+  "page": {
+    "path": "/foundation",
+    "view": "trainingCompact",
+    "tab": null,
+    "label": "Team · Training"
+  },
+  "game": {
+    "saveId": "new-game-1787123325719-swnjlk",
+    "saveName": "Oly New Game Custom 19.8.2026, 09:08:45",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 1,
+    "matchdayId": "season-2-matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "V-W"
+    ]
+  }
+}

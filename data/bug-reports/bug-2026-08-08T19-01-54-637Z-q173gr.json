@@ -1,0 +1,41 @@
+{
+  "note": "1 Season ist rum aber kein team hat seine medallien bekommen bitte fixen",
+  "view": "allTimeTable",
+  "path": "/foundation",
+  "tab": null,
+  "pageTitle": "Olympiade der Welten",
+  "url": "https://olympiade.duckdns.org/foundation?view=allTimeTable&team=S-C&saveId=new-game-1785823388048-1hf25q",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "viewport": {
+    "width": 2048,
+    "height": 1017
+  },
+  "clientTime": "2026-08-08T19:01:58.027Z",
+  "reporter": {
+    "username": "chris",
+    "displayName": "Chris",
+    "ownerId": "user_local",
+    "source": "session"
+  },
+  "reportId": "bug-2026-08-08T19-01-54-637Z-q173gr",
+  "createdAt": "2026-08-08T19:01:54.637Z",
+  "page": {
+    "path": "/foundation",
+    "view": "allTimeTable",
+    "tab": null,
+    "label": "Team · Ewige Tabelle"
+  },
+  "game": {
+    "saveId": "new-game-1785823388048-1hf25q",
+    "saveName": "Oly New Game Custom 4.8.2026, 08:03:08",
+    "saveSource": "url",
+    "seasonId": "season-2",
+    "seasonYear": 2,
+    "currentMatchday": 1,
+    "matchdayId": "season-2-matchday-1",
+    "matchdayStatus": "planning",
+    "activeTeamIds": [
+      "S-C"
+    ]
+  }
+}
